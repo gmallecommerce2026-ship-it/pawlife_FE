@@ -1,0 +1,85 @@
+import * as ImagePicker from 'expo-image-picker';
+import { useState } from 'react';
+// SỬA QUAN TRỌNG: Import axiosClient thay vì axios mặc định
+import axiosClient from '@/api/axiosClient'; // Đảm bảo đường dẫn này trỏ đúng tới file cấu hình axios của bạn
+
+interface UploadOptions {
+  folder: string;         // 'avatars', 'pets', 'posts'...
+  aspect?: [number, number]; // [1, 1] cho avatar vuông, [4, 3] cho ảnh thường
+  quality?: number;       // 0 -> 1 (0.8 là tối ưu)
+}
+
+export const useImageUpload = () => {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const pickAndUploadImage = async (options: UploadOptions): Promise<string | null> => {
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      // 1. Mở thư viện ảnh
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: options.aspect || [4, 3],
+        quality: options.quality || 0.8,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        // (Không cần gọi setIsUploading(false) ở đây nữa vì đã có khối finally lo)
+        return null; // User huỷ chọn ảnh
+      }
+
+      const fileUri = result.assets[0].uri;
+      
+      const fileName = fileUri.split('/').pop() || `image-${Date.now()}.jpg`;
+      const match = /\.(\w+)$/.exec(fileName);
+      const ext = match ? match[1].toLowerCase() : 'jpg';
+      const fileType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+      // 2. Lấy Presigned URL từ Backend
+      const presignedRes = await axiosClient.post('/storage/presigned-url', {
+        fileName,
+        fileType,
+        folder: options.folder,
+      });
+      
+      const { uploadUrl, fileUrl } = presignedRes.data;
+
+      // 3. Đọc file thành Blob
+      const response = await fetch(fileUri);
+      const blob = await response.blob();
+
+      // 4. Upload trực tiếp lên Cloudflare R2
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: blob,
+        headers: {
+          'Content-Type': fileType,
+        },
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Upload to Cloudflare R2 failed: ${uploadRes.status}`);
+      }
+
+      // 5. Trả về link ảnh công khai
+      return fileUrl; 
+      
+    } catch (error: any) {
+      if (error.response) {
+        console.error('Lỗi Axios chi tiết:', error.response.status, error.response.data);
+      } else {
+        console.error('Lỗi upload ảnh:', error.message || error);
+      }
+      setUploadError('Không thể tải ảnh lên. Vui lòng kiểm tra lại máy chủ!');
+      return null;
+    } finally {
+      // BỔ SUNG KHỐI FINALLY: Đảm bảo luôn tắt loading dù thành công hay thất bại
+      setIsUploading(false);
+    }
+  };
+
+  return { pickAndUploadImage, isUploading, uploadError };
+};

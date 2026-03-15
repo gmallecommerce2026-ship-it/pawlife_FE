@@ -1,59 +1,242 @@
+// app/(tabs)/_layout.tsx
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Tabs, useRouter } from 'expo-router';
 import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+const { width } = Dimensions.get('window');
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
+// --- CẤU HÌNH UI/UX ---
+const TAB_BAR_HEIGHT = 55;   
+const CURVE_HEIGHT = 30;     
+const BUTTON_RADIUS = 40;    
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+const CustomTabBar = ({ state, descriptors, navigation }: any) => {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  
+  // 1. LẤY ROUTE ĐANG HOẠT ĐỘNG
+  const activeRoute = state.routes[state.index];
+  const activeRouteName = activeRoute.name;
+
+  // Lấy tuỳ chọn tabBarStyle được truyền từ màn hình hiện tại
+  const options = descriptors[activeRoute.key].options;
+  const isHiddenByOptions = options.tabBarStyle?.display === 'none';
+
+  // 2. ẨN CỨNG Ở CÁC MÀN HÌNH NÀY
+  const hiddenRoutes = ['scan', 'scanned-pet']; 
+  
+  if (hiddenRoutes.includes(activeRouteName) || isHiddenByOptions) {
+    return null; 
+  }
+  
+  const center = width / 2;
+  const radius = 75; 
+  
+  const d = `
+    M 0 ${CURVE_HEIGHT}
+    L ${center - radius} ${CURVE_HEIGHT}
+    C ${center - radius * 0.5} ${CURVE_HEIGHT}, ${center - radius * 0.5} 0, ${center} 0
+    C ${center + radius * 0.5} 0, ${center + radius * 0.5} ${CURVE_HEIGHT}, ${center + radius} ${CURVE_HEIGHT}
+    L ${width} ${CURVE_HEIGHT}
+    L ${width} ${TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom}
+    L 0 ${TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom}
+    Z
+  `;
+
+  const getRouteIndex = (name: string) => {
+    return state.routes.findIndex((route: any) => route.name === name);
+  };
+
+  // --- LOGIC XỬ LÝ KHI NHẤN TAB ---
+  const handleTabPress = (routeName: string) => {
+    const isCurrentlyActive = state.index === getRouteIndex(routeName);
+    if (isCurrentlyActive) {
+      // Nếu tab đang active mà user nhấn lại -> Quay về Home (index)
+      navigation.navigate('index');
+    } else {
+      // Nếu chưa active -> Chuyển sang tab đó
+      navigation.navigate(routeName);
+    }
+  };
 
   return (
+    <View style={styles.container} pointerEvents="box-none">
+      <View style={[styles.svgContainer, { height: TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom }]}>
+        <Svg width={width} height={TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom}>
+          <Path 
+            d={d} 
+            fill="white"
+            stroke="#E5E7EB" 
+            strokeWidth={0.5}
+          />
+        </Svg>
+        <View style={styles.shadowOverlay} pointerEvents="none" />
+      </View>
+
+      <View style={[
+        styles.centerButtonContainer, 
+        { bottom: TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom - (BUTTON_RADIUS * 2) - 10 }
+      ]}>
+        <TouchableOpacity 
+          activeOpacity={0.9}
+          onPress={() => router.push('/scan')} 
+          style={styles.scanButton}
+        >
+          <View style={styles.scanButtonInner}>
+            <MaterialCommunityIcons name="line-scan" size={28} color="#ffa053" />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <View style={[
+        styles.contentContainer, 
+        { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }
+      ]}>
+        {/* Tab Trái: Pawdoption */}
+        <View style={styles.tabGroup}>
+          <TabItem 
+            label="Pawdoption" 
+            icon="heart-outline" 
+            activeIcon="heart"
+            isActive={state.index === getRouteIndex('matching')}
+            onPress={() => handleTabPress('matching')} // Gọi hàm xử lý mới
+          />
+        </View>
+
+        <View style={{ width: radius * 2 }} />
+
+        {/* Tab Phải: Pets */}
+        <View style={styles.tabGroup}>
+          <TabItem 
+            label="Pets" 
+            icon="paw-outline" 
+            activeIcon="paw"
+            isActive={state.index === getRouteIndex('my-pets')}
+            onPress={() => handleTabPress('my-pets')} // Gọi hàm xử lý mới
+          />
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const TabItem = ({ label, icon, activeIcon, isActive, onPress }: any) => {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.tabItem}>
+      <View style={[styles.iconContainer, isActive && styles.activeIconContainer]}>
+        <Ionicons 
+          name={isActive ? activeIcon : icon} 
+          size={26} 
+          color={isActive ? "#F97316" : "#9CA3AF"} 
+        />
+      </View>
+      <Text style={[styles.tabLabel, { color: isActive ? "#F97316" : "#9CA3AF", fontWeight: isActive ? '700' : '500' }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+export default function TabLayout() {
+  return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="two"
-        options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-        }}
-      />
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      {/* Đưa matching lên làm tab chính */}
+      <Tabs.Screen name="matching" />
+      <Tabs.Screen name="my-pets" />
+      
+      {/* Ẩn các tab không nằm trên Navbar (Bao gồm cả index) */}
+      <Tabs.Screen name="index" options={{ href: null }} />
+      <Tabs.Screen name="profile" options={{ href: null }} />
+      <Tabs.Screen name="scan" options={{ href: null }} />
+      <Tabs.Screen name="scanned-pet" options={{ href: null }} />
+      <Tabs.Screen name="applications" options={{ href: null }} />
+      <Tabs.Screen name="our-pets" options={{ href: null }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    zIndex: 10,
+  },
+  svgContainer: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 15,
+    elevation: 15,
+    backgroundColor: 'transparent'
+  },
+  shadowOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  contentContainer: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tabGroup: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerButtonContainer: {
+    position: 'absolute',
+    left: width / 2 - BUTTON_RADIUS,
+    zIndex: 20,
+  },
+  scanButton: {
+    width: BUTTON_RADIUS * 2,
+    height: BUTTON_RADIUS * 2,
+    borderRadius: BUTTON_RADIUS,
+    backgroundColor: '#ffd5b3', 
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: "#ffd5b3",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+    borderWidth: 4,
+    borderColor: '#ffd5b3',
+  },
+  scanButtonInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: BUTTON_RADIUS,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    width: '100%',
+    paddingTop: 8,
+  },
+  iconContainer: {
+    marginBottom: 4,
+  },
+  activeIconContainer: {
+    transform: [{ scale: 1.15 }], 
+  },
+  tabLabel: {
+    fontSize: 11,
+  }
+});
