@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "pet-id-app",
+    "name": "PawLife",
     "slug": "pet-id-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -21,7 +21,9 @@
           { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
           { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" }
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Ứng dụng cần quyền truy cập Camera để quét mã QR và tìm kiếm thú cưng bị thất lạc.",
+        "NSPhotoLibraryUsageDescription": "Ứng dụng cần quyền truy cập thư viện ảnh để cập nhật ảnh đại diện và hồ sơ thú cưng."
       }
     },
     "android": {
