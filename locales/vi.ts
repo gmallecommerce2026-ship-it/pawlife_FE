@@ -406,5 +406,15 @@ export const viDict: Record<string, string> = {
   "Resend": "Gửi lại",
   "Verifying...": "Đang xác thực",
   "Select Gender": "Chọn giới tính",
-  "PawLife Policy": "Chính sách của PawLife"
+  "PawLife Policy": "Chính sách của PawLife",
+  "Contact Owner": "Gọi cho chủ",
+  'common.cancel': 'Hủy',
+  'error.title': 'Lỗi',
+  'error.toggleModeFailed': 'Không thể thay đổi trạng thái lúc này.',
+  'lostMode.titleOn': 'Bật chế độ báo lạc?',
+  'lostMode.descOn': 'Khi bật, bất kỳ ai quét mã QR của bé sẽ ngay lập tức thấy thông tin liên hệ của bạn để giúp bé về nhà an toàn.',
+  'lostMode.titleOff': 'Tắt chế độ báo lạc?',
+  'lostMode.descOff': 'Bạn có chắc chắn bé thú cưng đã an toàn? Hành động này sẽ dừng các cảnh báo khi có người quét mã QR.',
+  'lostMode.confirmOn': 'Bật chế độ',
+  'lostMode.confirmOff': 'Vâng, bé đã an toàn',
 };

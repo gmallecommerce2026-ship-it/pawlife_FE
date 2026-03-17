@@ -6,7 +6,8 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Camera, CheckCircle, ChevronLeft } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Easing, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BOX_SIZE = 288; 
 
@@ -75,36 +76,46 @@ export default function ScanScreen() {
   };
 
   const processValidScan = (data: string) => {
-    setScanned(true);
-    setScanSuccess(true);
+      setScanned(true);
+      setScanSuccess(true);
 
-    Animated.parallel([
-      Animated.spring(successScaleAnim, {
-        toValue: 1,
-        friction: 4,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(successOpacityAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      })
-    ]).start(() => {
-      setTimeout(() => {
-        router.push({
-          pathname: '/scanned-pet',
-          params: { tagId: data } 
-        });
+      // 🛠 THÊM ĐOẠN NÀY: Bóc tách tiền tố để lấy ra tagId chuẩn xác
+      let finalTagId = data;
+      if (data.includes('pawlife://tag/')) {
+        finalTagId = data.replace('pawlife://tag/', '');
+      } else if (data.includes('/tag/')) {
+        // Đề phòng trường hợp quét mã QR dạng Web Link (VD: https://pawlife.vn/tag/123)
+        finalTagId = data.split('/tag/')[1];
+      }
 
+      Animated.parallel([
+        Animated.spring(successScaleAnim, {
+          toValue: 1,
+          friction: 4,
+          tension: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(successOpacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start(() => {
         setTimeout(() => {
-          setScanned(false);
-          setScanSuccess(false);
-          successScaleAnim.setValue(0);
-          successOpacityAnim.setValue(0);
-        }, 500);
-      }, 800);
-    });
+          router.push({
+            pathname: '/scanned-pet',
+            // 🛠 SỬA ĐỔI data THÀNH finalTagId Ở ĐÂY
+            params: { tagId: finalTagId } 
+          });
+
+          setTimeout(() => {
+            setScanned(false);
+            setScanSuccess(false);
+            successScaleAnim.setValue(0);
+            successOpacityAnim.setValue(0);
+          }, 500);
+        }, 800);
+      });
   };
 
   if (!permission) {

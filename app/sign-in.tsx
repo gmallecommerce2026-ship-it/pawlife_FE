@@ -11,9 +11,10 @@ import * as SecureStore from 'expo-secure-store';
 import { ChevronLeft, Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
 import React, { useContext, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, SafeAreaView,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform,
   ScrollView, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // --- COMMON INPUT COMPONENT ---
 const InputField = ({
   placeholder, icon, value, onChangeText,

@@ -4,5 +4,14 @@ export const enDict: Record<string, string> = {
   "Vietnamese": "Vietnamese",
   "Search": "Search",
   "Home": "Home",
-  "Profile": "Profile"
+  "Profile": "Profile",
+  'common.cancel': 'Cancel',
+  'error.title': 'Error',
+  'error.toggleModeFailed': 'Unable to change status at this time.',
+  'lostMode.titleOn': 'Enable Lost Pet Mode?',
+  'lostMode.descOn': 'When enabled, anyone scanning the QR code will immediately see your contact information to help your pet return home.',
+  'lostMode.titleOff': 'Disable Lost Mode?',
+  'lostMode.descOff': 'Are you sure your pet is safe? This action will disable alerts when the QR code is scanned.',
+  'lostMode.confirmOn': 'Enable Mode',
+  'lostMode.confirmOff': 'Yes, pet is safe',
 };

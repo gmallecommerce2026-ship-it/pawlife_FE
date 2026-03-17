@@ -7,8 +7,9 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Href, useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
-import { Alert, Dimensions, Linking, Platform, SafeAreaView, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Linking, Platform, TouchableOpacity, View } from 'react-native';
 import { AccessToken, LoginManager } from 'react-native-fbsdk-next';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,

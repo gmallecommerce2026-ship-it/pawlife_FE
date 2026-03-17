@@ -19,8 +19,8 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useImageUpload } from '../hooks/useImageUpload';
 import { petService } from '../services/petService';
-import { useImageUpload } from './hooks/useImageUpload';
 
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 
@@ -209,7 +209,9 @@ export default function EditPetScreen() {
                 <Feather name="chevron-left" size={28} color="#1F2937" />
               </TouchableOpacity>
               <Text className="text-lg font-bold text-gray-900">Edit Profile</Text>
-              <View className="w-10" /> {/* Spacer to center the title */}
+              
+              <View className="w-10" /> 
+              {/* Spacer to center the title */}
             </View>
 
             <ScrollView 
@@ -387,7 +389,7 @@ export default function EditPetScreen() {
               <View className="bg-white p-5 rounded-3xl mb-8 shadow-sm">
                 <View className="flex-row items-center mb-2">
                   <Ionicons name="person-circle" size={24} color="#ffa053" />
-                  <Text className="text-lg font-bold text-gray-900 ml-2">Contact Info</Text>
+                  <Text className="text-lg font-bold text-gray-900 ml-2">Owner Information</Text>
                 </View>
                 <Text className="text-sm text-gray-500 mb-5 leading-5">
                   Crucial details for others to reach you if your pet gets lost or is in an emergency.

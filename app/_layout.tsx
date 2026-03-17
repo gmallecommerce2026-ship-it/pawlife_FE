@@ -171,12 +171,15 @@ function RootLayoutNav() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="sign-in" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="fill-profile" options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }} />
-      <Stack.Screen name="my-application" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      
+      {/* SỬA LỖI 1: Thêm chữ 's' vào my-applications để khớp với tên file */}
+      <Stack.Screen name="my-applications" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      
       <Stack.Screen name="adoption-status" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_right' }} />
-      <Stack.Screen name="scanned-pet" options={{ headerShown: false, animation: 'slide_from_right' }} />
-      <Stack.Screen name="matching" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      
+      {/* SỬA LỖI 2: ĐÃ XÓA `scan`, `scanned-pet`, và `matching` VÌ CHÚNG THUỘC VỀ (tabs) */}
+
       <Stack.Screen name="shelter-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pet-detail-modal" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pet-profile-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />

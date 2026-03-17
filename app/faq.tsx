@@ -5,7 +5,6 @@ import React, { useMemo, useState } from 'react';
 import {
   LayoutAnimation,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -13,6 +12,7 @@ import {
   UIManager,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

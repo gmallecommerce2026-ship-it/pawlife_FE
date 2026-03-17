@@ -19,8 +19,8 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useImageUpload } from '../hooks/useImageUpload';
 import { petService } from '../services/petService';
-import { useImageUpload } from './hooks/useImageUpload';
 
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';

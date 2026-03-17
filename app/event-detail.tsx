@@ -5,6 +5,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { AlertCircle } from 'lucide-react-native';
 import React, { useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, ImageBackground, ScrollView, Share, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +25,7 @@ export default function EventDetailScreen() {
     const [eventData, setEventData] = useState<any>(null);
     const [similarEvents, setSimilarEvents] = useState<any[]>([]); // Thêm state cho Similar Events
     const [loading, setLoading] = useState(true);
+    const [isNotFound, setIsNotFound] = useState(false); // Thêm state xử lý lỗi
     const [isInterested, setIsInterested] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
 
@@ -42,17 +44,24 @@ export default function EventDetailScreen() {
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!eventId) return;
+            if (!eventId) {
+                setIsNotFound(true);
+                setLoading(false);
+                return;
+            }
             try {
                 setLoading(true);
                 
                 // 1. Lấy chi tiết sự kiện
                 const res = await eventService.getEventDetail(eventId, user?.id);
-                if (res.data) {
+                if (res && res.data) {
                     setEventData(res.data);
                     if (res.data.isInterested !== undefined) {
                         setIsInterested(res.data.isInterested);
                     }
+                } else {
+                    // Nếu gọi API thành công nhưng data rỗng/null
+                    setIsNotFound(true);
                 }
 
                 // 2. Lấy danh sách sự kiện tương tự (Dùng API upcoming events)
@@ -64,9 +73,14 @@ export default function EventDetailScreen() {
                     setSimilarEvents(filteredEvents);
                 }
 
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Lỗi lấy chi tiết sự kiện:", error);
-                Alert.alert("Lỗi", "Không thể tải dữ liệu sự kiện. Vui lòng thử lại sau.");
+                // Bắt lỗi 404 từ server hoặc các lỗi khác
+                if (error.response?.status === 404 || error.response?.status === 403) {
+                    setIsNotFound(true);
+                } else {
+                    setIsNotFound(true); 
+                }
             } finally {
                 setLoading(false);
             }
@@ -93,10 +107,36 @@ export default function EventDetailScreen() {
         }
     };
 
-    if (loading || !eventData) {
+    // 1. GIAO DIỆN LOADING
+    if (loading) {
         return (
             <View className="flex-1 bg-white justify-center items-center">
                 <ActivityIndicator size="large" color="#ffa053" />
+            </View>
+        );
+    }
+
+    // 2. GIAO DIỆN LỖI (NOT FOUND) KHI DỮ LIỆU KHÔNG TỒN TẠI
+    if (isNotFound || !eventData) {
+        return (
+            <View className="flex-1 bg-white px-6 items-center justify-center">
+                <View className="w-24 h-24 bg-red-50 rounded-full items-center justify-center mb-6">
+                    <AlertCircle size={48} color="#EF4444" />
+                </View>
+                <Text className="text-2xl font-bold text-gray-900 mb-3 text-center">
+                    Sự kiện không tồn tại
+                </Text>
+                <Text className="text-gray-500 text-center mb-8 px-4 leading-6">
+                    Sự kiện này có thể đã bị xóa, hết hạn hoặc bạn không có quyền truy cập. Vui lòng quay lại màn hình trước.
+                </Text>
+                <TouchableOpacity 
+                    className="bg-[#ffa053] px-8 py-4 rounded-full flex-row items-center shadow-sm shadow-orange-200"
+                    onPress={() => router.back()}
+                    activeOpacity={0.8}
+                >
+                    <Feather name="chevron-left" size={20} color="white" />
+                    <Text className="text-white font-bold text-base ml-2">Quay lại</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -109,7 +149,7 @@ export default function EventDetailScreen() {
     const year = startDate.getFullYear();
     const timeString = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-    // Ưu tiên bannerUrl, nếu không có thì lấy ảnh đầu tiên trong mảng images, cuối cùng là ảnh dự phòng local (nên thay bằng file local asset như require('../assets/default-banner.png'))
+    // Ưu tiên bannerUrl, nếu không có thì lấy ảnh đầu tiên trong mảng images, cuối cùng là ảnh dự phòng local
     const bannerImage = eventData.bannerUrl || eventData.images?.[0]?.url || 'https://via.placeholder.com/800x400.png?text=No+Image';
 
     return (
@@ -209,7 +249,7 @@ export default function EventDetailScreen() {
                         </View>
                     )}
 
-                    {/* LOCATION MAP - NOTE: Nên dùng react-native-maps thay vì ảnh nền tĩnh */}
+                    {/* LOCATION MAP */}
                     <View className="mb-8">
                         <Text className="text-lg font-bold text-gray-900 mb-2">Location</Text>
                         <View className="flex-row items-center mb-4">

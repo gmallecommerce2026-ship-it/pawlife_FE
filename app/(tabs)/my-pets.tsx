@@ -14,10 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { petService } from '../../services/petService';
 
-// Import thêm thư viện sinh trắc học và bộ nhớ
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as LocalAuthentication from 'expo-local-authentication';
-
 // Cập nhật Interface: Bỏ 'age', thêm 'dob'
 interface Pet {
   id: string;
@@ -61,9 +57,6 @@ export default function MyPetsScreen() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // State quản lý việc khoá Tab bằng Face ID
-  const [isTabLocked, setIsTabLocked] = useState(true);
 
   // --- HÀM FETCH DATA ---
   const fetchMyPets = async () => {
@@ -89,53 +82,14 @@ export default function MyPetsScreen() {
     }
   };
 
-  // Hàm gọi Face ID thủ công (dùng cho nút Retry)
-  const promptFaceId = async () => {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Xác thực để xem danh sách thú cưng',
-      disableDeviceFallback: false,
-    });
-
-    if (result.success) {
-      setIsTabLocked(false);
-      fetchMyPets();
-    }
-  };
-
   // --- LẮNG NGHE SỰ KIỆN FOCUS VÀO TAB ---
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      const checkAuthAndLoad = async () => {
-        try {
-          // Kiểm tra xem user có bật bảo mật Face ID ở Settings không
-          const useFaceIdSetting = await AsyncStorage.getItem('useFaceId');
-
-          if (useFaceIdSetting === 'true') {
-            setIsTabLocked(true); // Đảm bảo luôn khoá màn hình trước
-            const result = await LocalAuthentication.authenticateAsync({
-              promptMessage: 'Xác thực để xem danh sách thú cưng',
-              disableDeviceFallback: false,
-            });
-
-            if (result.success && isActive) {
-              setIsTabLocked(false);
-              fetchMyPets(); // Chỉ fetch data khi đã xác thực thành công
-            }
-          } else {
-            // Nếu không bật tính năng khoá, hiển thị bình thường
-            if (isActive) {
-              setIsTabLocked(false);
-              fetchMyPets();
-            }
-          }
-        } catch (error) {
-          console.error("Lỗi kiểm tra Face ID:", error);
-        }
-      };
-
-      checkAuthAndLoad();
+      if (isActive) {
+        fetchMyPets();
+      }
 
       return () => {
         isActive = false; // Cleanup function khi rời khỏi tab
@@ -211,26 +165,6 @@ export default function MyPetsScreen() {
 
     </TouchableOpacity>
   );
-
-  // --- RENDER KHI TAB BỊ KHOÁ (Chưa xác thực Face ID) ---
-  if (isTabLocked) {
-    return (
-      <SafeAreaView className="flex-1 bg-[#F8F9FB] justify-center items-center">
-        <MaterialCommunityIcons name="lock-outline" size={72} color="#ffa053" style={{ marginBottom: 20 }} />
-        <Text className="text-xl font-bold text-gray-900 mb-2">Đã khoá bảo mật</Text>
-        <Text className="text-gray-500 mb-8 text-center px-10 text-base">
-          Danh sách thú cưng đã bị khoá. Vui lòng xác thực bằng Face ID / Vân tay để xem thông tin.
-        </Text>
-        <TouchableOpacity 
-          onPress={promptFaceId}
-          className="bg-[#ffa053] px-8 py-3.5 rounded-full flex-row items-center shadow-sm"
-        >
-          <MaterialCommunityIcons name="face-recognition" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text className="text-white font-bold text-base">Mở Khoá Bằng Face ID</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
 
   // --- RENDER BÌNH THƯỜNG ---
   return (

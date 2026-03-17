@@ -1,7 +1,7 @@
 // app/fill-profile.tsx
-import { useImageUpload } from '@/app/hooks/useImageUpload'; // Đảm bảo đúng đường dẫn hook của bạn
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
+import { useImageUpload } from '@/hooks/useImageUpload'; // Đảm bảo đúng đường dẫn hook của bạn
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Href, useRouter } from 'expo-router';
 import { Calendar, Camera, CheckCircle, ChevronDown, ChevronLeft, Lock, Mail, User } from 'lucide-react-native';
@@ -14,13 +14,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // ==========================================
 // 1. COMPONENT INPUT & DATA
 // ==========================================

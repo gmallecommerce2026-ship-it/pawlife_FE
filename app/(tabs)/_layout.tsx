@@ -6,6 +6,9 @@ import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
+// --- IMPORT THƯ VIỆN RUNG ---
+import * as Haptics from 'expo-haptics';
+
 const { width } = Dimensions.get('window');
 
 // --- CẤU HÌNH UI/UX ---
@@ -34,15 +37,19 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   
   const center = width / 2;
   const radius = 75; 
+  const CORNER_RADIUS = 26; // Bạn có thể tăng/giảm số này để chỉnh độ bo tròn
   
   const d = `
-    M 0 ${CURVE_HEIGHT}
+    M ${CORNER_RADIUS} ${CURVE_HEIGHT}
     L ${center - radius} ${CURVE_HEIGHT}
     C ${center - radius * 0.5} ${CURVE_HEIGHT}, ${center - radius * 0.5} 0, ${center} 0
     C ${center + radius * 0.5} 0, ${center + radius * 0.5} ${CURVE_HEIGHT}, ${center + radius} ${CURVE_HEIGHT}
-    L ${width} ${CURVE_HEIGHT}
+    L ${width - CORNER_RADIUS} ${CURVE_HEIGHT}
+    Q ${width} ${CURVE_HEIGHT}, ${width} ${CURVE_HEIGHT + CORNER_RADIUS}
     L ${width} ${TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom}
     L 0 ${TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom}
+    L 0 ${CURVE_HEIGHT + CORNER_RADIUS}
+    Q 0 ${CURVE_HEIGHT}, ${CORNER_RADIUS} ${CURVE_HEIGHT}
     Z
   `;
 
@@ -60,6 +67,11 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       // Nếu chưa active -> Chuyển sang tab đó
       navigation.navigate(routeName);
     }
+  };
+
+  // --- HÀM XỬ LÝ HIỆU ỨNG RUNG KHI CHẠM NÚT SCAN ---
+  const handleScanPressIn = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   return (
@@ -82,6 +94,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       ]}>
         <TouchableOpacity 
           activeOpacity={0.9}
+          onPressIn={handleScanPressIn} // Thêm sự kiện rung khi bắt đầu chạm
           onPress={() => router.push('/scan')} 
           style={styles.scanButton}
         >
@@ -102,7 +115,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
             icon="heart-outline" 
             activeIcon="heart"
             isActive={state.index === getRouteIndex('matching')}
-            onPress={() => handleTabPress('matching')} // Gọi hàm xử lý mới
+            onPress={() => handleTabPress('matching')} 
           />
         </View>
 
@@ -115,7 +128,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
             icon="paw-outline" 
             activeIcon="paw"
             isActive={state.index === getRouteIndex('my-pets')}
-            onPress={() => handleTabPress('my-pets')} // Gọi hàm xử lý mới
+            onPress={() => handleTabPress('my-pets')} 
           />
         </View>
       </View>
@@ -152,11 +165,11 @@ export default function TabLayout() {
       
       {/* Ẩn các tab không nằm trên Navbar (Bao gồm cả index) */}
       <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen name="profile" options={{ href: null }} />
+      {/* <Tabs.Screen name="profile" options={{ href: null }} /> */}
       <Tabs.Screen name="scan" options={{ href: null }} />
       <Tabs.Screen name="scanned-pet" options={{ href: null }} />
-      <Tabs.Screen name="applications" options={{ href: null }} />
-      <Tabs.Screen name="our-pets" options={{ href: null }} />
+      {/* <Tabs.Screen name="applications" options={{ href: null }} /> */}
+      {/* <Tabs.Screen name="our-pets" options={{ href: null }} /> */}
     </Tabs>
   );
 }
@@ -205,16 +218,16 @@ const styles = StyleSheet.create({
     width: BUTTON_RADIUS * 2,
     height: BUTTON_RADIUS * 2,
     borderRadius: BUTTON_RADIUS,
-    backgroundColor: '#ffd5b3', 
+    backgroundColor: '#ffebce', 
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: "#ffd5b3",
+    shadowColor: "#00000061",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 10,
-    borderWidth: 4,
-    borderColor: '#ffd5b3',
+    borderWidth: 1,
+    borderColor: '#fff9f3',
   },
   scanButtonInner: {
     width: '100%',

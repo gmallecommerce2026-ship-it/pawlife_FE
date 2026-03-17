@@ -1,8 +1,9 @@
 // app/adoption-form.tsx
+import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +19,6 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-// import api from '@/services/api'; // <--- Bỏ comment dòng này để dùng API client của bạn
 
 // --- DATA CONSTANTS ---
 const LOCATIONS = [
@@ -59,6 +59,7 @@ const ADOPTION_REASONS = [
   "Because I want to give them a forever home", 
   "Other"
 ];
+
 interface AdoptionFormParams {
   id?: string;
   petId?: string;
@@ -67,6 +68,7 @@ interface AdoptionFormParams {
   breed?: string;
   image?: string;
 }
+
 // --- COMPONENTS ---
 const SectionTitle = ({ title }: { title: string }) => (
   <Text className="text-gray-900 font-bold text-base mb-4 mt-6">{title}</Text>
@@ -226,8 +228,9 @@ export default function AdoptionFormScreen() {
   };
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingLimit, setIsCheckingLimit] = useState(true);
+  const [showLimitModal, setShowLimitModal] = useState(false); // <--- State mới cho popup custom
   
-  // ID thú cưng lấy từ màn chi tiết truyền sang
   const petId = params.id || params.petId;
 
   const pet = {
@@ -243,22 +246,14 @@ export default function AdoptionFormScreen() {
   const [phone, setPhone] = useState('+84 1234567890');
   const [zalo, setZalo] = useState('+84 1234567890');
   const [adoptFor, setAdoptFor] = useState('Myself');
-  
   const [location, setLocation] = useState('Quận Cầu Giấy');
-  
-  // Housing State & Other Input
   const [housing, setHousing] = useState('Apartment (allows pet ownership)');
   const [otherHousing, setOtherHousing] = useState('');
-
   const [exp, setExp] = useState('Yes, I used to have one');
   const [job, setJob] = useState('Currently employed');
-  
-  // Reason State & Other Input
   const [reason, setReason] = useState('Because I want to give them a forever home');
   const [otherReason, setOtherReason] = useState('');
-  
   const [prevPetHistory, setPrevPetHistory] = useState("My previous dog passed away due to old age after 12 wonderful years together.");
-
   const [children, setChildren] = useState('No');
   const [cage, setCage] = useState('No');
   const [vaccine, setVaccine] = useState('Yes');
@@ -268,27 +263,44 @@ export default function AdoptionFormScreen() {
   const [homeVisit, setHomeVisit] = useState('Yes');
   const [provideID, setProvideID] = useState('Yes');
 
+  // --- USE EFFECT CHECK LIMIT ---
+  useEffect(() => {
+    const checkLimit = async () => {
+      try {
+        const response = await axiosClient.get('/applications/my-applications');
+        const applications = response.data?.data || [];
+        
+        const activeApps = applications.filter(
+          (app: any) => app.status !== 'CLOSED' && app.status !== 'ADOPTION_COMPLETED'
+        );
+
+        if (activeApps.length >= 5) {
+          setShowLimitModal(true); // <--- Hiển thị Modal tuỳ chỉnh
+        }
+      } catch (error) {
+        console.error("Failed to check application limit", error);
+      } finally {
+        setIsCheckingLimit(false); 
+      }
+    };
+
+    checkLimit();
+  }, []);
+
   // --- SUBMIT HANDLER ---
   const handleSubmit = async () => {
     if (!petId) {
-      Alert.alert('Error', 'Pet ID is missing. Cannot submit form.');
+      Alert.alert('Lỗi', 'Không tìm thấy thông tin thú cưng.');
       return;
     }
-    // Basic validation
     if (!fullName || !phone || !zalo || !location) {
-      Alert.alert('Missing Info', 'Please fill in all contact information.');
-      return;
-    }
-
-    if (!petId) {
-      Alert.alert('Error', 'Pet ID is missing. Cannot submit form.');
+      Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin liên lạc.');
       return;
     }
 
     try {
       setIsLoading(true);
 
-      // Gộp data lại thành payload
       const finalHousing = housing === 'Other' ? otherHousing : housing;
       const finalReason = reason === 'Other' ? otherReason : reason;
 
@@ -316,23 +328,59 @@ export default function AdoptionFormScreen() {
         }
       };
 
-      // TODO: Thay thế bằng API thật của bạn
-      // await api.post('/applications', payload);
-      
-      // Giả lập delay mạng 1.5s
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
+      await axiosClient.post('/applications', payload);
       router.push('/application-success');
     } catch (error: any) {
-      Alert.alert('Submission Failed', error.response?.data?.message || 'Something went wrong while sending your application.');
+      Alert.alert('Gửi đơn thất bại', error.response?.data?.message || 'Đã có lỗi xảy ra.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (isCheckingLimit) {
+    return (
+      <View className="flex-1 bg-white justify-center items-center">
+        <ActivityIndicator size="large" color="#F99C2E" />
+        <Text className="text-gray-500 mt-4 font-medium">Đang kiểm tra dữ liệu...</Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-[#FAFAFA]">
       <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+        {/* --- CUSTOM LIMIT MODAL --- */}
+        <Modal visible={showLimitModal} transparent animationType="fade">
+          <View className="flex-1 bg-black/50 justify-center items-center px-6">
+            <View className="bg-white w-full rounded-[28px] p-6 items-center shadow-2xl">
+              {/* Icon */}
+              <View className="w-16 h-16 bg-red-50 rounded-full items-center justify-center mb-5">
+                <Ionicons name="warning-outline" size={32} color="#EF4444" />
+              </View>
+              
+              {/* Text content */}
+              <Text className="text-xl font-bold text-gray-900 mb-2 text-center">
+                Đạt giới hạn đăng ký
+              </Text>
+              <Text className="text-gray-500 text-center mb-6 leading-6 text-sm">
+                Bạn đang có 5 đơn đăng ký chờ xử lý. Vui lòng đợi kết quả của các đơn cũ trước khi nộp thêm hồ sơ mới nhé!
+              </Text>
+
+              {/* Action Button */}
+              <TouchableOpacity
+                className="w-full bg-[#F99C2E] py-4 rounded-xl items-center shadow-sm"
+                activeOpacity={0.8}
+                onPress={() => {
+                  setShowLimitModal(false);
+                  router.back();
+                }}
+              >
+                <Text className="text-white font-bold text-base">Quay lại</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* --- HEADER --- */}
         <View className="flex-row items-center px-4 py-3 border-b border-gray-50 bg-white">
           <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
@@ -395,7 +443,6 @@ export default function AdoptionFormScreen() {
                 options={HOUSING_TYPES} 
                 onSelect={setHousing} 
             />
-            {/* Logic hiển thị input khi chọn Other cho Housing */}
             {housing === 'Other' && (
                 <CustomInput 
                     placeholder="Please specify your housing type" 
@@ -446,7 +493,6 @@ export default function AdoptionFormScreen() {
                 options={ADOPTION_REASONS} 
                 onSelect={setReason} 
             />
-            {/* Logic hiển thị input khi chọn Other cho Reason */}
             {reason === 'Other' && (
                 <CustomInput 
                     placeholder="Please specify your reason" 

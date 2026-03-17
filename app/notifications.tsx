@@ -2,13 +2,13 @@ import { Feather } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import { useRouter } from 'expo-router';
 import {
-  AlertTriangle, Calendar, ChevronLeft, Info, Lock, ShieldCheck, Sparkles
+    AlertTriangle, Calendar, ChevronLeft, Info, Lock, ShieldCheck, Sparkles
 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, SectionList, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, RefreshControl, SectionList, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient';
-import { groupNotifications } from './utils/dateUtils';
+import { groupNotifications } from '../utils/dateUtils';
 
 import { Text } from '@/components/AppText';
 const getIconByType = (type: string) => {
@@ -34,7 +34,15 @@ export default function NotificationsScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-
+  const [popupConfig, setPopupConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info', // 'error' | 'feature' | 'system'
+    buttonText: 'Đóng'
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const closePopup = () => setPopupConfig(prev => ({ ...prev, visible: false }));
   const fetchNotifications = async (pageNum = 1, isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
@@ -93,7 +101,7 @@ export default function NotificationsScreen() {
   };
 
   const handlePressItem = async (item: any) => {
-    // 1. Đánh dấu đã đọc (chạy ngầm cập nhật state)
+    // 1. Đánh dấu đã đọc
     if (!item.isRead) {
         axiosClient.patch(`/notifications/${item.id}/read`).catch(console.error);
         setSections(prevSections => prevSections.map(section => ({
@@ -104,17 +112,32 @@ export default function NotificationsScreen() {
         })));
     }
 
-    // 2. Xử lý điều hướng đa dạng theo TYPE
+    const showCustomAlert = (title: string, message: string, type: 'error' | 'feature' | 'system', buttonText: string) => {
+        setPopupConfig({ visible: true, title, message, type, buttonText });
+    };
+
+    // 2. Xử lý điều hướng
     switch (item.type) {
-        case 'TAG':
-            // QUAN TRỌNG: Màn hình này cần ID của thông báo
-            router.push(`/tag-report-detail?id=${item.id}`); 
-            break;
+        case 'TAG_SCANNED': 
+        // 1. Chỉ những thông báo QUÉT THẺ mới chuyển sang màn hình detail
+        if (!item.id) return;
+        router.push(`/tag-report-detail?id=${item.id}`);
+        break;
+
+    case 'TAG': 
+        // 2. Những thông báo TAG bình thường (báo đi lạc, an toàn...) 
+        // KHÔNG CHUYỂN TRANG. Bạn có thể cho hiển thị popup hoặc để trống không làm gì.
+        
+        // Nếu muốn hiện popup đọc tin:
+        showCustomAlert(item.title, item.body, "system", "Đã hiểu");
+        
+        // Hoặc nếu không muốn làm gì cả khi bấm vào, chỉ cần break:
+        // break;
+        break;
 
         case 'EVENT':
-            // QUAN TRỌNG: Màn hình này cần ID của sự kiện (referenceId)
             if (!item.referenceId) {
-                alert("Sự kiện này không tồn tại hoặc đã bị xóa.");
+                showCustomAlert("Sự kiện không tồn tại", "Sự kiện này có thể đã bị hủy hoặc xóa bởi người tổ chức.", "error", "Đóng");
                 return;
             }
             router.push(`/event-detail?id=${item.referenceId}`);
@@ -129,18 +152,18 @@ export default function NotificationsScreen() {
             if (item.referenceId) {
                // router.push(`/blog-detail?id=${item.referenceId}`);
             } else {
-                alert("Tính năng mới: \n" + item.body);
+                showCustomAlert("Tính năng mới ✨", item.body, "feature", "Tuyệt vời");
             }
             break;
 
         case 'SYSTEM':
-            alert("Thông báo hệ thống: \n" + item.body);
+            showCustomAlert("Thông báo hệ thống", item.body, "system", "Đã hiểu");
             break;
 
         default:
             console.log("Pressed generic notification");
     }
-};
+  };
 
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
@@ -227,6 +250,61 @@ export default function NotificationsScreen() {
             />
         )}
       </SafeAreaView>
+      {isProcessing && (
+        <View className="absolute top-0 bottom-0 left-0 right-0 bg-black/10 justify-center items-center z-50">
+           <View className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+               <ActivityIndicator size="large" color="#ffa053" />
+           </View>
+        </View>
+      )}
+      <Modal
+        transparent={true}
+        visible={popupConfig.visible}
+        animationType="fade"
+        onRequestClose={closePopup}
+      >
+        {/* Lớp phủ mờ background */}
+        <TouchableOpacity 
+          className="flex-1 bg-black/40 justify-center items-center px-6"
+          activeOpacity={1}
+          onPress={closePopup}
+        >
+          <TouchableWithoutFeedback>
+            <View className="bg-white w-full rounded-3xl p-6 items-center shadow-xl">
+              
+              {/* Icon thay đổi theo loại thông báo */}
+              <View className={`w-16 h-16 rounded-full items-center justify-center mb-4 
+                ${popupConfig.type === 'error' ? 'bg-red-50' : 
+                  popupConfig.type === 'feature' ? 'bg-orange-50' : 'bg-blue-50'}`}
+              >
+                {popupConfig.type === 'error' && <AlertTriangle size={32} color="#EF4444" />}
+                {popupConfig.type === 'feature' && <Sparkles size={32} color="#ffa053" />}
+                {popupConfig.type === 'system' && <Info size={32} color="#3B82F6" />}
+              </View>
+
+              {/* Tiêu đề & Nội dung */}
+              <Text className="text-xl font-bold text-gray-900 mb-2 text-center">
+                {popupConfig.title}
+              </Text>
+              <Text className="text-gray-500 text-base text-center mb-6 leading-6">
+                {popupConfig.message}
+              </Text>
+
+              {/* Nút bấm (Dùng màu cam chủ đạo của bạn) */}
+              <TouchableOpacity 
+                className="w-full bg-[#ffa053] py-4 rounded-2xl items-center active:bg-[#e88d44]"
+                activeOpacity={0.8}
+                onPress={closePopup}
+              >
+                <Text className="text-white font-bold text-[16px]">
+                  {popupConfig.buttonText}
+                </Text>
+              </TouchableOpacity>
+              
+            </View>
+          </TouchableWithoutFeedback>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

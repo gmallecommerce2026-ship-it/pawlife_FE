@@ -7,7 +7,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { Dimensions, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, TextInput, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
@@ -24,8 +24,8 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocation } from '../../hooks/useLocation';
 import { petService } from '../../services/petService';
-import { useLocation } from '../hooks/useLocation';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.3;
@@ -208,13 +208,17 @@ const SwipeableCard = ({ data, onSwipe, sharedTranslateX, sharedTranslateY, disa
 // ==================================================================
 const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: () => void }) => {
     const insets = useSafeAreaInsets();
-    const [surveyStep, setSurveyStep] = useState(1);
+    const { requestLocation, saveManualCity } = useLocation();
     
-    // States lưu dữ liệu
+    // Thêm state mới này để cờ đánh dấu
+    const [isUsingGps, setIsUsingGps] = useState(false); 
+    
+    const [surveyStep, setSurveyStep] = useState(1);
     const [selectedType, setSelectedType] = useState<string | null>(null);
     const [selectedExp, setSelectedExp] = useState<number | null>(null);
     const [selectedAge, setSelectedAge] = useState<string | null>(null);
     const [locationText, setLocationText] = useState('');
+    const [isRequestingGps, setIsRequestingGps] = useState(false);
 
     const ProgressBar = ({ current }: { current: number }) => (
         <View className="flex-row gap-2 mb-6 mt-2">
@@ -231,11 +235,26 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
         return false;
     };
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (surveyStep < 4) {
             setSurveyStep(prev => prev + 1);
         } else {
+            // SỬA Ở ĐÂY: Chỉ lưu địa chỉ text nếu user KHÔNG dùng GPS
+            if (!isUsingGps && locationText.trim().length > 0) {
+                await saveManualCity(locationText.trim());
+            }
             onComplete();
+        }
+    };
+
+    const handleUseGps = async () => {
+        setIsRequestingGps(true);
+        const loc = await requestLocation();
+        setIsRequestingGps(false);
+        if (loc) {
+            // SỬA Ở ĐÂY: Bật cờ GPS lên để chặn lưu text đè lên GPS
+            setIsUsingGps(true); 
+            setLocationText('Vị trí hiện tại của bạn');
         }
     };
 
@@ -251,12 +270,12 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
     return (
         <SafeAreaView className="flex-1 bg-white" edges={['top']}> 
             <View className="flex-1 px-6 pt-2">
-                <View className="flex-row items-center mb-2 justify-between">
+                {/* <View className="flex-row items-center mb-2 justify-between">
                     <TouchableOpacity onPress={handleBack} className="p-2 -ml-2">
                         <Ionicons name="chevron-back" size={24} color="#374151" />
                     </TouchableOpacity>
                     {surveyStep === 1 && <Text className="text-gray-400 font-medium" onPress={onComplete}>Skip</Text>}
-                </View>
+                </View> */}
                 <ProgressBar current={surveyStep} />
 
                 <View className="flex-1 mt-2">
@@ -332,11 +351,17 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
                                         locationText.trim().length > 0 ? 'text-gray-900 font-semibold' : 'text-gray-900'
                                     }`}
                                     value={locationText}
-                                    onChangeText={setLocationText} 
+                                    onChangeText={(text) => {
+                                        setLocationText(text);
+                                        setIsUsingGps(false); // Nếu user tự gõ phím thì tắt cờ GPS
+                                    }} 
                                 />
                                 {/* Thêm nút Xóa (Clear) nhẹ nhàng nếu user muốn nhập lại (chỉ hiện khi có chữ) */}
                                 {locationText.trim().length > 0 && (
-                                    <TouchableOpacity onPress={() => setLocationText('')} className="p-1">
+                                    <TouchableOpacity onPress={() => {
+                                        setLocationText('');
+                                        setIsUsingGps(false); // Xóa text thì cũng tắt cờ GPS
+                                    }} className="p-1">
                                         <Ionicons name="close-circle" size={18} color="#D1D5DB" />
                                     </TouchableOpacity>
                                 )}
@@ -345,10 +370,15 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
                             {/* Action Button: Lắng nghe sự kiện onPress và set cứng Ho Chi Minh City */}
                             <TouchableOpacity 
                                 activeOpacity={0.7}
-                                onPress={() => setLocationText('Ho Chi Minh City')}
+                                onPress={handleUseGps}
+                                disabled={isRequestingGps}
                                 className="flex-row items-center justify-center py-4 border border-gray-200 rounded-2xl bg-white shadow-sm active:bg-gray-50"
                             >
-                                <Ionicons name="navigate-circle-outline" size={20} color="#F97316" />
+                                {isRequestingGps ? (
+                                    <ActivityIndicator size="small" color="#F97316" />
+                                ) : (
+                                    <Ionicons name="navigate-circle-outline" size={20} color="#F97316" />
+                                )}
                                 <Text className="ml-2 font-bold text-gray-700">Use My Current Location</Text>
                             </TouchableOpacity>
                         </Animated.View>
@@ -596,7 +626,7 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
     const router = useRouter();
     
     const { user } = useContext(AuthContext);
-    const { location } = useLocation();
+    const { location, isLocationLoaded } = useLocation();
 
     // --- STATE THÚ CƯNG TỪ API ---
     const [pets, setPets] = useState<any[]>([]);
@@ -623,16 +653,23 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
             const response = await petService.getFeed(10, location?.lat, location?.lng);
             const petsData = response?.data?.data || response?.data || response || [];
 
-            const mappedPets = petsData.map((pet: any) => ({
-                id: pet.id,
-                name: pet.name,
-                age: pet.age || 'Unknown',
-                // FIX TẠI ĐÂY: Giữ nguyên UPPERCASE từ DB để UI so sánh chính xác
-                gender: pet.gender || 'MALE', 
-                distance: pet.distance || 'Near you',
-                location: pet.shelter?.name || pet.location || 'Location',
-                image: pet.images && pet.images.length > 0 ? pet.images[0].url : 'https://via.placeholder.com/400x600?text=No+Image'
-            }));
+            const mappedPets = petsData.map((pet: any) => {
+                // SỬA Ở ĐÂY: Đồng bộ logic khoảng cách giống trang Home
+                // Nếu có distance (có GPS), thêm chữ km. Nếu không có thì lấy city/location
+                const displayDistance = pet.distance 
+                    ? `${pet.distance}` 
+                    : (pet.city || pet.location || 'Gần bạn');
+
+                return {
+                    id: pet.id,
+                    name: pet.name,
+                    age: pet.age || 'Unknown',
+                    gender: pet.gender || 'MALE',
+                    distance: displayDistance, // Đã thay 'Near you' bằng biến xử lý ở trên
+                    location: pet.shelter?.name || pet.location || 'Location',
+                    image: pet.images && pet.images.length > 0 ? pet.images[0].url : 'https://via.placeholder.com/400x600?text=No+Image'
+                };
+            });
             
             setPets(mappedPets);
             setOriginalPets(mappedPets); // <--- LƯU LẠI MẢNG GỐC ĐỂ DÙNG CHO LOOP
@@ -650,10 +687,11 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
 
     useFocusEffect(
         useCallback(() => {
-            if (location !== null) {
+            // SỬA Ở ĐÂY: Dùng isLocationLoaded thay vì location !== null
+            if (isLocationLoaded) {
                 loadPets();
             }
-        }, [location, user?.id])
+        }, [isLocationLoaded, location, user?.id]) 
     );
 
     useEffect(() => {
@@ -855,16 +893,16 @@ export default function MatchingScreen() {
   
   
   const handleDetail = (pet: any) => {
-      router.push({
+        router.push({
         pathname: '/pet-detail-modal',
         params: { id: pet.id, name: pet.name, age: pet.age, gender: pet.gender, image: pet.image, distance: pet.distance }
-      });
-  };
+        });
+    };
 
   const handleAdopt = (pet: any) => {
       router.push({
           pathname: '/adoption-form', 
-          params: { name: pet.name, age: pet.age, image: pet.image }
+          params: {  id: pet.id, name: pet.name, age: pet.age, image: pet.image }
       });
   };
 

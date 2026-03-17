@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
 
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -27,6 +28,9 @@ export default function PetProfileDetailScreen() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingLostMode, setIsTogglingLostMode] = useState(false);
+  const [showLostModeModal, setShowLostModeModal] = useState(false);
+  const [pendingLostMode, setPendingLostMode] = useState<boolean>(false);
+  const { t } = useLanguage();
   const handleRemovePet = () => {
     Alert.alert(
       "Xóa thú cưng",
@@ -103,28 +107,15 @@ export default function PetProfileDetailScreen() {
   // --- LOGIC HANDLERS ---
   
   // 1. Logic Tắt Lost Mode (Confirm Dialog)
-  const handleLostModeToggle = async (value: boolean) => {
-      if (!value) {
-          // Nếu đang cố tắt (value = false) -> Hiện cảnh báo xác nhận
-          Alert.alert(
-              "Disable Lost Mode?",
-              "Bạn có chắc thú cưng đã an toàn? Hành động này sẽ dừng các cảnh báo khi có người quét mã.",
-              [
-                  { text: "Hủy", style: "cancel" },
-                  { 
-                    text: "Vâng, bé đã an toàn", 
-                    onPress: () => executeToggleMode(false) // Gọi hàm thực thi
-                  }
-              ]
-          );
-      } else {
-          // Nếu đang bật -> Thực thi luôn
-          executeToggleMode(true);
-      }
+  const handleLostModeToggle = (value: boolean) => {
+      setPendingLostMode(value);
+      setShowLostModeModal(true); // Mở popup
   };
 
-  const executeToggleMode = async (isLost: boolean) => {
+  const executeToggleMode = async () => {
+    const isLost = pendingLostMode;
     try {
+      setShowLostModeModal(false); // Đóng modal trước khi xử lý
       setIsTogglingLostMode(true);
       
       // Gọi lên Backend
@@ -133,12 +124,9 @@ export default function PetProfileDetailScreen() {
       // Cập nhật giao diện
       setIsLostMode(isLost);
       
-      if (isLost) {
-        Alert.alert("Lost Mode Active", "Đã bật chế độ báo lạc. Khi ai đó quét mã QR, họ sẽ thấy thông tin liên hệ của bạn.");
-      }
     } catch (error: any) {
-      Alert.alert("Lỗi", error.message || "Không thể thay đổi trạng thái lúc này.");
-      // Revert lại switch nếu lỗi
+      // Sử dụng t() cho thông báo lỗi
+      Alert.alert(t('error.title'), error.message || t('error.toggleModeFailed'));
       setIsLostMode(!isLost); 
     } finally {
       setIsTogglingLostMode(false);
@@ -469,29 +457,31 @@ export default function PetProfileDetailScreen() {
 
             {/* Khung hiển thị QR / Empty State */}
             <View className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-4 w-full min-h-[220px] items-center justify-center">
-               
-               {/* 1. Ưu tiên hiển thị ảnh QR Code mà user đã upload ở phần Edit/Add Pet */}
-               {petData?.qrCodeUrl ? (
-                  <Image 
+    
+                {/* 1. Ưu tiên hiển thị ảnh QR Code từ Database */}
+                {petData?.qrCodeUrl ? (
+                <Image 
                     source={{ uri: petData.qrCodeUrl }} 
-                    className="w-48 h-48 rounded-lg"
+                    // 🛠 THÊM DÒNG NÀY: Bắt buộc khai báo kích thước cứng cho ảnh tải từ URL
+                    style={{ width: 192, height: 192 }} 
+                    className="rounded-lg"
                     resizeMode="contain"
-                  />
-               ) 
-               /* 2. Fallback: Nếu hệ thống dùng Tag ID cũ (sản phẩm vòng cổ vật lý) */
-               : petData?.tags && petData.tags.length > 0 ? (
-                  <QRCode
+                />
+                ) 
+                /* 2. Fallback: Render tự động bằng thư viện qrcode-svg nếu có tag ID */
+                : petData?.tags && petData.tags.length > 0 ? (
+                <View style={{ width: 192, height: 192, alignItems: 'center', justifyContent: 'center' }}>
+                    <QRCode
                     value={petData.tags[0].id}
-                    size={200}
+                    size={180} // Fix size cứng cho QRCode
                     color="black"
                     backgroundColor="white"
-                    logoSize={40}
-                    logoBackgroundColor='transparent'
-                  />
-               ) 
-               /* 3. Nếu chưa có bất kỳ QR nào -> Hiển thị thông báo (Không tạo QR linh tinh) */
-               : (
-                  <View className="items-center py-4">
+                    />
+                </View>
+                ) 
+                /* 3. Nếu chưa có bất kỳ QR nào -> Hiển thị thông báo */
+                : (
+                <View className="items-center py-4">
                     <MaterialCommunityIcons name="qrcode-remove" size={60} color="#D1D5DB" />
                     <Text className="text-gray-500 font-bold text-base text-center mt-4">
                         No QR Code Available
@@ -499,8 +489,8 @@ export default function PetProfileDetailScreen() {
                     <Text className="text-gray-400 text-xs text-center mt-2 px-2 leading-5">
                         Please go to "Edit Profile" to upload a Smart Tag or QR Code for {petData?.name}.
                     </Text>
-                  </View>
-               )}
+                </View>
+                )}
             </View>
 
             {/* Chỉ hiện câu hướng dẫn quét QR nếu thực sự có QR Code để quét */}
@@ -516,6 +506,63 @@ export default function PetProfileDetailScreen() {
             >
               <Text className="text-orange-600 font-bold text-base">Close</Text>
             </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={showLostModeModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLostModeModal(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/60 px-5">
+          <View className="bg-white rounded-[24px] p-6 w-full items-center shadow-xl">
+            
+            {/* Icon Header */}
+            <View className={`w-16 h-16 rounded-full items-center justify-center mb-4 border-[4px] ${
+              pendingLostMode ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'
+            }`}>
+              <Feather 
+                name={pendingLostMode ? "alert-triangle" : "check-circle"} 
+                size={32} 
+                color={pendingLostMode ? "#EF4444" : "#10B981"} 
+              />
+            </View>
+
+            {/* Tiêu đề & Nội dung sử dụng hàm t() */}
+            <Text className="text-xl font-bold text-gray-900 text-center mb-2">
+              {pendingLostMode ? t('lostMode.titleOn') : t('lostMode.titleOff')}
+            </Text>
+            
+            <Text className="text-gray-500 text-center text-sm mb-8 leading-5 px-2">
+              {pendingLostMode ? t('lostMode.descOn') : t('lostMode.descOff')}
+            </Text>
+
+            {/* Các nút hành động */}
+            <View className="flex-row w-full gap-3">
+              {/* Nút Hủy */}
+              <TouchableOpacity 
+                className="flex-1 bg-gray-100 py-3.5 rounded-full items-center"
+                onPress={() => setShowLostModeModal(false)}
+              >
+                <Text className="text-gray-600 font-bold text-base">
+                  {t('common.cancel')}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Nút Xác nhận */}
+              <TouchableOpacity 
+                className={`flex-1 py-3.5 rounded-full items-center shadow-sm ${
+                  pendingLostMode ? 'bg-[#EF4444] shadow-red-200' : 'bg-[#10B981] shadow-green-200'
+                }`}
+                onPress={executeToggleMode}
+              >
+                <Text className="text-white font-bold text-base">
+                  {pendingLostMode ? t('lostMode.confirmOn') : t('lostMode.confirmOff')}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
           </View>
         </View>

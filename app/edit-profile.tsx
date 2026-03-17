@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // IMPORT CONTEXT VÀ HOOK CỦA BẠN
 import { AuthContext } from '../contexts/AuthContext';
-import { useImageUpload } from './hooks/useImageUpload';
+import { useImageUpload } from '../hooks/useImageUpload';
 
 // --- DANH SÁCH QUỐC GIA & GIỚI TÍNH ---
 const COUNTRY_CODES = [

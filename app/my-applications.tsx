@@ -1,12 +1,11 @@
 // app/my-applications.tsx
+import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AntDesign, Feather } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-// Giả định bạn có một instance axios hoặc fetch hook được cấu hình sẵn token
-// import api from '@/services/api'; 
 
 // Định nghĩa interface cho dữ liệu trả về từ API
 interface ApplicationRecord {
@@ -16,26 +15,24 @@ interface ApplicationRecord {
   pet: {
     name: string;
     breed: string;
-    images: string[]; // Thay đổi tùy theo dữ liệu trả về của bạn
+    images: { url: string }[];
   };
 }
 
 const StatusBadge = ({ status }: { status: string }) => {
   const getStyle = () => {
-    // Format status từ enum DB (VD: ADOPTION_COMPLETED) sang text hiển thị
-    const normalizedStatus = status.replace(/_/g, ' ').toLowerCase();
+    // Ép kiểu về chữ hoa để dễ so sánh với dữ liệu DB
+    const normalizedStatus = status.toUpperCase();
     
     switch (normalizedStatus) {
-      case 'adoption completed': 
-        return { bg: 'bg-green-50 border-green-200', text: 'text-green-700', label: 'Adoption Completed' };
-      case 'need more info': 
-        return { bg: 'bg-orange-50 border-orange-200', text: 'text-[#F97316]', label: 'Need more info' };
-      case 'pending': 
+      case 'SUBMITTED': 
+        return { bg: 'bg-purple-50 border-purple-200', text: 'text-purple-600', label: 'Submitted' };
+      case 'PENDING': 
         return { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-600', label: 'Pending' };
-      case 'submitted': 
-        return { bg: 'bg-gray-50 border-gray-200', text: 'text-gray-700', label: 'Submitted' };
-      case 'closed': 
-        return { bg: 'bg-gray-100 border-gray-300', text: 'text-gray-500', label: 'Closed' };
+      case 'ADOPTION_COMPLETED': 
+        return { bg: 'bg-green-50 border-green-200', text: 'text-green-700', label: 'Completed' };
+      case 'CLOSED': 
+        return { bg: 'bg-red-50 border-red-200', text: 'text-red-600', label: 'Closed' };
       default: 
         return { bg: 'bg-gray-50 border-gray-200', text: 'text-gray-600', label: status };
     }
@@ -64,16 +61,18 @@ export default function MyApplicationsScreen() {
   
   const progressPercentage = (currentApplications / maxApplications) * 100;
 
-  useEffect(() => {
-    fetchMyApplications();
-  }, []);
+  // Sử dụng useFocusEffect thay vì useEffect để tự động fetch lại data khi back về màn hình này
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyApplications();
+    }, [])
+  );
 
   const fetchMyApplications = async () => {
     try {
       setIsLoading(true);
-      // Thay thế bằng hàm gọi API thực tế của bạn
-      // const response = await api.get('/applications/my-applications');
-      // setApplications(response.data.data);
+      const response = await axiosClient.get('/applications/my-applications');
+      setApplications(response.data.data);
     } catch (error) {
       console.error('Error fetching applications:', error);
     } finally {
@@ -154,8 +153,8 @@ export default function MyApplicationsScreen() {
               </View>
             }
             renderItem={({ item }) => {
-              // Lấy ảnh đầu tiên của pet, nếu không có thì fallback sang ảnh mặc định
-              const petImage = item.pet.images?.[0] || 'https://via.placeholder.com/150';
+              // Fix dữ liệu ảnh cho khớp với định dạng object array của Prisma
+              const petImage = item.pet.images?.[0]?.url || 'https://via.placeholder.com/150';
 
               return (
                 <TouchableOpacity 
