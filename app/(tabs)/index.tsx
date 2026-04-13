@@ -13,6 +13,9 @@ import { useCallback } from 'react';
 import { FlatList } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
+    Extrapolation,
+    interpolate,
+    useAnimatedScrollHandler,
     useAnimatedStyle,
     useSharedValue,
     withDelay,
@@ -25,7 +28,6 @@ import { useLocation } from '../../hooks/useLocation';
 import { eventService } from '../../services/eventService';
 import { petService } from '../../services/petService';
 import { shelterService } from '../../services/shelterService';
-
 // --- DATA CONSTANTS ---
 const CATEGORIES = [
   { id: 1, label: 'Training', icon: 'graduation-cap' },
@@ -35,10 +37,10 @@ const CATEGORIES = [
 ];
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 const SectionHeader = ({ title, onLinkPress }: { title: string, onLinkPress?: () => void }) => (
-  <View className="flex-row justify-between items-end mb-4 px-6">
-    <Text className="text-xl font-bold text-gray-900">{title}</Text>
+  <View className="flex-row justify-between items-center mb-4 px-6">
+    <Text className="text-[16px] font-semibold text-gray-900 ">{title}</Text>
     <TouchableOpacity onPress={onLinkPress}>
-      <Text className="text-[#ffc99e] font-bold text-sm">View All {' >'}</Text>
+      <Text className="text-[#F59E0B] text-sm font-extralight">View All {' >'}</Text>
     </TouchableOpacity>
   </View>
 );
@@ -59,7 +61,62 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasUnread, setHasUnread] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // --- THÔNG SỐ HEADER ---
+  const HEADER_MAX_HEIGHT = 340; // Chiều cao ảnh bìa ban đầu
+  const CURVE_HEIGHT = 56; // Chiều cao của đoạn bo cong trắng
+  const HEADER_MIN_HEIGHT = insets.top + 116; // Đảm bảo đủ chỗ cho: Status bar + Avatar 40px + Curve 56px
+  const SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
+  const scrollY = useSharedValue(0);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  // 1. Header chỉ co chiều cao, KHÔNG làm phẳng góc bo tròn
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    const height = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT], Extrapolation.CLAMP);
+    return { height };
+  });
+
+  // 2. Avatar co lại từ 68 -> 40
+  const avatarAnimatedStyle = useAnimatedStyle(() => {
+    const size = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [68, 40], Extrapolation.CLAMP);
+    return { width: size, height: size, borderRadius: size / 2 };
+  });
+
+  // 3. User name dịch ngang 56px và kéo lên chính xác -76px để Center với Avatar 40px
+  const textContainerAnimatedStyle = useAnimatedStyle(() => {
+    // Kéo lên trên: Khoảng cách kéo lên phải bù lại độ cao của Avatar to và khoảng cách ban đầu
+    const translateY = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, -72], Extrapolation.CLAMP);
+    
+    // Dịch sang phải: 40px (chiều rộng avatar khi thu nhỏ) + 12px (khoảng cách gap) = 52px
+    const translateX = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, 45], Extrapolation.CLAMP);
+    
+    // Thu nhỏ text một chút xíu (10%) để thanh Header nhìn thanh thoát hơn, không bị chật chội
+    const scale = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [1, 0.9], Extrapolation.CLAMP);
+
+    return { 
+      transform: [
+        { translateY }, 
+        { translateX },
+        { scale }
+      ],
+      // Nếu RN version hỗ trợ, thêm dòng này để scale không làm lệch text sang trái
+      // transformOrigin: 'left center' 
+    };
+  });
+
+  // 4. Subtitle: Mờ đi và xẹp xuống NHANH HƠN (nhân với 0.35 thay vì 0.5) 
+  // để dọn đường cho User Name trượt sang phải gọn gàng, không bị dính chữ.
+  const subtitleAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(scrollY.value, [0, SCROLL_DISTANCE * 0.35], [1, 0], Extrapolation.CLAMP);
+    const height = interpolate(scrollY.value, [0, SCROLL_DISTANCE * 0.35], [20, 0], Extrapolation.CLAMP);
+    const marginTop = interpolate(scrollY.value, [0, SCROLL_DISTANCE * 0.35], [4, 0], Extrapolation.CLAMP);
+    return { opacity, height, marginTop };
+  });
   useFocusEffect(
     useCallback(() => {
       const checkUnreadNotifications = async () => {
@@ -139,19 +196,19 @@ export default function HomeScreen() {
 
   useEffect(() => {
     rotation.value = withRepeat(
-      withDelay(
-        4000, 
-        withSequence(
-          withTiming(-2, { duration: 80, easing: Easing.linear }),
-          withTiming(2, { duration: 80, easing: Easing.linear }),
-          withTiming(-2, { duration: 80, easing: Easing.linear }),
-          withTiming(2, { duration: 80, easing: Easing.linear }),
-          withTiming(0, { duration: 80, easing: Easing.linear })
-        )
-      ),
-      -1, 
-      false
-    );
+        withDelay(
+            4000, 
+            withSequence(
+            withTiming(-1, { duration: 80, easing: Easing.linear }),
+            withTiming(1, { duration: 80, easing: Easing.linear }),
+            withTiming(-1, { duration: 80, easing: Easing.linear }),
+            withTiming(1, { duration: 80, easing: Easing.linear }),
+            withTiming(0, { duration: 80, easing: Easing.linear })
+            )
+        ),
+        -1, 
+        false
+        );
 
     translateY.value = withRepeat(
       withDelay(
@@ -184,81 +241,127 @@ export default function HomeScreen() {
   }
 
   return (
-    <View className="flex-1 bg-[#ffead9]">
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        
-        {/* --- 1. HEADER IMAGE BACKGROUND --- */}
-        <View className="h-[340px] w-full bg-[#FFDDA2]"> 
-            <ImageBackground 
-                source={require('../../assets/images/home_tab.jpg')} 
-                className="flex-1"
-                style={{ paddingTop: insets.top + 10 }}
-                resizeMode="cover"
-            >
-                <View className="px-6">
-                    <View className="flex-row justify-between items-start">
-                        <TouchableOpacity 
-                            activeOpacity={0.8}
-                            onPress={() => router.push('/edit-profile')}
-                            className="w-14 h-14 rounded-full border-[3px] border-white shadow-sm overflow-hidden bg-orange-100"
-                        >
-                            <Image source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }} className="w-full h-full" />
+    <View className="flex-1 bg-[#ffffff]"> {/* Background cam để khi kéo pull-to-refresh không bị lộ viền */}
+      
+      {/* --- 1. HEADER CỐ ĐỊNH (ABSOLUTE) NỔI TRÊN CÙNG --- */}
+      <Animated.View style={[headerAnimatedStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: '#FFDDA2', overflow: 'hidden' }]}>
+        <ImageBackground 
+            source={require('../../assets/images/home_tab.jpg')} 
+            className="w-full h-full"
+            style={{ paddingTop: insets.top + 10 }}
+            resizeMode="cover"
+        >
+            <View className="px-6 relative h-full">
+                {/* Hàng ngang chứa Avatar và 3 Icon */}
+                <View className="flex-row justify-between items-start z-20">
+                    <AnimatedTouchableOpacity 
+                        activeOpacity={0.8}
+                        onPress={() => router.push('/edit-profile')}
+                        style={[avatarAnimatedStyle, { backgroundColor: '#ffedd5', overflow: 'hidden' }]}
+                    >
+                        <Image source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }} className="w-full h-full" />
+                    </AnimatedTouchableOpacity>
+
+                    {/* TRẢ LẠI 3 NÚT TẠI ĐÂY */}
+                    <View className="flex-row gap-5 items-center mt-2">
+                        <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/search')}>
+                            <Feather name="search" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }} />
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity activeOpacity={0.7} className="relative" onPress={() => router.push('/notifications')} >
+                            <Ionicons name="notifications" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }} />
+                            {hasUnread && (
+                                <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-[#F59E0B] rounded-full border border-white" />
+                            )}
                         </TouchableOpacity>
 
-                        <View className="flex-row gap-5 items-center mt-2">
-                             <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/search')}>
-                                <Feather name="search" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }} />
-                             </TouchableOpacity>
-                             
-                             <TouchableOpacity activeOpacity={0.7} className="relative" onPress={() => router.push('/notifications')} >
-                                <Ionicons name="notifications" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }} />
-                                {hasUnread && (
-                                    <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-orange-500 rounded-full border border-white" />
-                                )}
-                            </TouchableOpacity>
-
-                             <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/profile-settings')} >
-                                <Feather name="menu" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    <View className="mt-4">
-                        <Text className="text-white font-bold text-lg shadow-black/10">Hello,</Text>
-                        <Text className="text-white text-2xl font-extrabold shadow-sm tracking-tight">
-                            {user?.name || 'Người dùng'}
-                        </Text>
+                        <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/profile-settings')} >
+                            <Feather name="menu" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }} />
+                        </TouchableOpacity>
                     </View>
                 </View>
-            </ImageBackground>
-        </View>
 
-        {/* --- 2. MAIN CONTENT BODY --- */}
-        {/* FIX TẠI ĐÂY: Dùng View bọc ngoài để lấy lại góc bo tròn và overflow-hidden */}
-        <View className="flex-1 rounded-t-[40px] -mt-14 overflow-hidden bg-white">
+                {/* Khối Text - Sử dụng insets.top để đo vị trí chính xác trên mọi thiết bị */}
+                <Animated.View style={[
+                    textContainerAnimatedStyle, 
+                    { 
+                        position: 'absolute', 
+                        top: insets.top + 21, /* <-- Sửa 94 thành 82 để kéo text gần sát vào gốc Avatar */
+                        left: 24, 
+                        zIndex: 10 
+                    }
+                ]}>
+                    <Text 
+                        className="text-white font-semibold text-[20px] shadow-black/10"
+                        style={{ transformOrigin: 'left center' }} // Giúp khi scale text không bị thụt lùi về tâm
+                    >
+                        Hello, {user?.name || 'Người dùng'}!
+                    </Text>
+                    <Animated.Text 
+                        style={[subtitleAnimatedStyle]} 
+                        className="text-white text-[14px] font-medium shadow-sm tracking-tight overflow-hidden"
+                    >
+                        Let’s dive into your account
+                    </Animated.Text>
+                </Animated.View>
+            </View>
+        </ImageBackground>
+
+        {/* 🏔️ LỚP GIẢ LẬP ĐƯỜNG CONG (FAKE CURVE) 🏔️ */}
+        {/* Lớp này luôn bám dưới đáy Header, giữ nguyên hình dạng cong đè lên ảnh. Nó liền mạch hoàn toàn với ScrollView bên dưới */}
+        <View className="absolute bottom-0 w-full h-[56px] bg-white rounded-t-[40px]" />
+      </Animated.View>
+
+      {/* --- 2. MAIN CONTENT SCROLLVIEW --- */}
+      <Animated.ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingTop: HEADER_MAX_HEIGHT, paddingBottom: 120 }} // Bắt đầu nối tiếp đúng ngay dưới điểm 340px của Header
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+      >
+        <View className="flex-1 bg-white">
             <LinearGradient
-                colors={['#FFFFFF', '#FFF5EC', '#ffead9']} 
+                colors={['#FFFFFF', '#FFFBF5', '#FFF9F0']} 
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 className="flex-1 pt-2 pb-6"
             >
                 <View className="px-6">
+                    {/* KHỐI QUÉT MÃ FOUND A LOST PET */}
                     <AnimatedTouchableOpacity 
                         activeOpacity={0.8} 
                         onPress={() => router.push('/scan')}
-                        style={animatedStyle}
                     >
-                        <View className="bg-[#fffbf4] p-6 rounded-[32px] shadow-sm shadow-orange-100 flex-row items-center border border-orange-100 mt-6">
-                            <View className="w-16 h-16 bg-[#ffebce] rounded-2xl items-center justify-center mr-5 shadow-lg shadow-orange-200">
-                                <MaterialCommunityIcons name="line-scan" size={32} color="#ffa053" />
+                        <View 
+                            className="relative p-6 rounded-[32px] flex-row items-center mt-6 bg-white/50"
+                            style={{
+                                shadowColor: '#F59E0B5d', shadowOffset: { width: 0, height: 0 }, 
+                                shadowOpacity: 0.6, shadowRadius: 5, elevation: 4,
+                            }}
+                        >
+                            <LinearGradient 
+                                colors={['#FFFFFF', '#FCF8ED']} locations={[0.3, 0.8]}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 32 }}
+                            />
+                            <View className="w-16 h-16 rounded-2xl overflow-hidden items-center justify-center mr-5">
+                                <LinearGradient 
+                                    colors={['rgb(255, 244, 230)', 'rgba(255, 232, 204, 0.52)']}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                />
+                                <MaterialCommunityIcons name="line-scan" size={32} color="#F59E0B" />
                             </View>
                             <View className="flex-1">
-                                <Text className="font-bold text-gray-900 text-lg">Found A Lost Pet?</Text>
+                                <Text className="font-semibold text-gray-900 text-lg">Found A Lost Pet?</Text>
                                 <Text className="text-gray-500 text-sm mt-1 leading-5">Scan to help them find a way home</Text>
                             </View>
                         </View>
                     </AnimatedTouchableOpacity>
-                    
-                    <View className="mt-8 mb-4">
-                        <Text className="text-xl font-bold text-gray-900 mb-6">Pawcare</Text>
+
+                    {/* PAWCARE */}
+                    <View className="mt-[38px]">
+                        <Text className="text-[16px] font-semibold text-gray-900 mb-4">Pawcare</Text>
                         <View className="flex-row justify-between">
                             {CATEGORIES.map((cat) => (
                                 <TouchableOpacity 
@@ -267,8 +370,11 @@ export default function HomeScreen() {
                                     activeOpacity={0.7}
                                     onPress={() => router.push({ pathname: '/pawcare/[category]', params: { category: cat.label } })}
                                 >
-                                    <View className="w-18 h-18 aspect-square w-full bg-white rounded-full items-center justify-center shadow-sm shadow-gray-100 mb-3 border border-gray-50">
-                                        <FontAwesome5 name={cat.icon as any} size={24} color="#ff9b49" />
+                                    <View 
+                                        className="w-20 h-20 bg-white rounded-full items-center justify-center mb-3 border border-gray-50"
+                                        style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 2, elevation: 4 }}
+                                    >
+                                        <FontAwesome5 name={cat.icon as any} size={26} color="#F59E0B" />
                                     </View>
                                     <Text className="text-gray-500 text-xs font-medium">{cat.label}</Text>
                                 </TouchableOpacity>
@@ -278,10 +384,10 @@ export default function HomeScreen() {
                 </View>
 
                 {/* --- PETS NEAR YOU TỪ API --- */}
-                <View className="mt-4">
+                <View className="mt-[38px]">
                     <SectionHeader 
                         title="Pets Near You" 
-                        onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pets' }})}
+                        onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pet' }})}
                     />
                     {pets.length === 0 ? (
                         <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có thú cưng nào gần đây</Text>
@@ -289,7 +395,7 @@ export default function HomeScreen() {
                         <FlatList
                             horizontal
                             showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }}
+                            contentContainerStyle={{ paddingHorizontal: 24, gap: 4 }}
                             data={pets}
                             keyExtractor={(item, index) => item.fakeId ? item.fakeId : item.id.toString() + index} 
                             initialNumToRender={4}
@@ -300,14 +406,28 @@ export default function HomeScreen() {
                                 const petImageUrl = (pet.images && pet.images.length > 0) 
                                     ? pet.images[0]?.url : 'https://via.placeholder.com/200x300.png?text=No+Image';
 
-                                const displayLocation = pet.distance 
-                                    ? `${pet.distance}` 
-                                    : (pet.location || pet.city || 'Chưa cập nhật');
+                                // Xử lý lấy Tỉnh/Thành phố
+                                const fullAddress = pet.location || pet.shelter?.address;
+                                let displayCity = 'Chưa cập nhật';
+                                if (fullAddress) {
+                                    const addressParts = fullAddress.split(',');
+                                    displayCity = addressParts[addressParts.length - 1].trim();
+                                }
+                                const displayLocation = displayCity;
+
+                                const isFemale = pet.gender?.toUpperCase() === 'FEMALE';
 
                                 return (
                                     <TouchableOpacity 
-                                        className="w-40 h-52 rounded-[24px] overflow-hidden relative bg-gray-200 shadow-sm" 
-                                        activeOpacity={0.9}
+                                        className="w-[128px] h-56 rounded-[24px] bg-white mt-1 mr-3"
+                                        activeOpacity={0.85}
+                                        style={{
+                                            shadowColor: '#E89B5A',
+                                            shadowOffset: { width: 3, height: 3 }, 
+                                            shadowOpacity: 0.3, 
+                                            shadowRadius: 4, 
+                                            elevation: 6, 
+                                        }}
                                         onPress={() => router.push({
                                             pathname: '/pet-detail-modal',
                                             params: { 
@@ -317,34 +437,62 @@ export default function HomeScreen() {
                                             }
                                         })}
                                     >
-                                        <Image source={{ uri: petImageUrl }} className="w-full h-full" resizeMode="cover" />
-                                        
-                                        <LinearGradient
-                                            colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.95)']}
-                                            locations={[0, 0.4, 1]}
-                                            style={{
-                                                position: 'absolute',
-                                                bottom: 0,
-                                                left: 0,
-                                                right: 0,
-                                                paddingHorizontal: 12,
-                                                paddingBottom: 12,
-                                                paddingTop: 50,
-                                            }}
-                                        >
-                                            <View className="flex-row items-center justify-between">
-                                                <Text className="text-white font-bold text-lg">{pet.name}</Text>
-                                                <View className="bg-white/30 px-1.5 py-0.5 rounded-md overflow-hidden">
-                                                    <Ionicons name={pet.gender === 'FEMALE' ? 'female' : 'male'} size={12} color="white" />
+                                        <View className="w-full h-full rounded-[24px] overflow-hidden relative">
+                                            {/* Ảnh Cover */}
+                                            <Image 
+                                                source={{ uri: petImageUrl }} 
+                                                className="w-full h-full absolute" 
+                                                resizeMode="cover" 
+                                            />
+                                            
+                                            <LinearGradient
+                                                colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.7)']}
+                                                locations={[0.1, 0.2, 1]}
+                                                style={{
+                                                    position: 'absolute',
+                                                    bottom: 0,
+                                                    left: 0,
+                                                    right: 0,
+                                                    height: '50%',
+                                                    justifyContent: 'flex-end',
+                                                    paddingHorizontal: 12,
+                                                    paddingBottom: 14,
+                                                }}
+                                            >
+                                                {/* Dòng 1: Tên + [Icon Giới tính + Tuổi (Hiệu ứng Blur)] */}
+                                                <View className="flex-row items-center mb-1">
+                                                    <Text 
+                                                        className="text-white text-[17px] font-semibold tracking-tight shrink mb-0.5" 
+                                                        numberOfLines={1}
+                                                    >
+                                                        {pet.name}
+                                                    </Text>
+                                                    
+                                                    {/* Thẻ Giới tính + Tuổi CÓ kính mờ */}
+                                                    <View className="flex-row items-center ml-2 px-2 py-0.5 rounded-full shrink-0 border border-white/40 overflow-hidden bg-white/20 backdrop-blur-md">
+                                                        <Ionicons 
+                                                            name={isFemale ? 'female' : 'male'} 
+                                                            size={12} 
+                                                            color="#ffffff" 
+                                                        />
+                                                        <Text className="text-white text-[11px] font-bold ml-1">
+                                                            {pet.age || '1'}
+                                                        </Text>
+                                                    </View>
                                                 </View>
-                                            </View>
-                                            <View className="flex-row items-center mt-1">
-                                                <Ionicons name="location-sharp" size={12} color="#FB923C" />
-                                                <Text className="text-gray-200 text-xs ml-1 flex-1" numberOfLines={1}>
-                                                    {displayLocation}
-                                                </Text>
-                                            </View>
-                                        </LinearGradient>
+
+                                                {/* Dòng 2: Location (Trở về thiết kế không viền, không blur như cũ) */}
+                                                <View className="flex-row items-center">
+                                                    <Ionicons name="location-sharp" size={13} color="#ffffff" />
+                                                    <Text 
+                                                        className="text-white/95 text-xs font-medium ml-1 flex-1" 
+                                                        numberOfLines={1}
+                                                    >
+                                                        {displayLocation}
+                                                    </Text>
+                                                </View>
+                                            </LinearGradient>
+                                        </View>
                                     </TouchableOpacity>
                                 )
                             }}
@@ -353,22 +501,29 @@ export default function HomeScreen() {
                 </View>
 
                 {/* --- ADOPTION SHELTERS TỪ API --- */}
-                <View className="mt-8">
+                <View className="mt-[38px]">
                     <SectionHeader 
                         title="Adoption Shelters" 
-                        onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelters' }})}
+                        onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' }})}
                     />
                     {shelters.length === 0 ? (
                         <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
                     ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 5, gap: 16 }}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }}>
                             {shelters.map((shelter) => {
                                 const shelterImageUrl = shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150';
 
                                 return (
                                     <TouchableOpacity 
                                         key={shelter.id} 
-                                        className="w-72 bg-white p-3 rounded-[20px] flex-row items-center shadow-sm border border-gray-50 active:opacity-70"
+                                        className="w-72 bg-white p-3 rounded-[20px] flex-row items-center active:opacity-70"
+                                        style={{
+                                            shadowColor: '#E89B5A',
+                                            shadowOffset: { width: 3, height: 3 }, 
+                                            shadowOpacity: 0.25, 
+                                            shadowRadius: 4, 
+                                            elevation: 6, 
+                                        }}
                                         onPress={() => router.push({
                                             pathname: '/shelter-profile',
                                             params: { 
@@ -379,11 +534,11 @@ export default function HomeScreen() {
                                     >
                                         <Image source={{ uri: shelterImageUrl }} className="w-14 h-14 rounded-2xl bg-gray-200 mr-3" resizeMode="cover" />
                                         <View className="flex-1">
-                                            <Text className="font-bold text-gray-800 text-sm" numberOfLines={1}>{shelter.name}</Text>
-                                            <View className="flex-row items-center mt-1">
+                                            <Text className="font-semibold text-gray-800 text-sm " numberOfLines={1}>{shelter.name}</Text>
+                                            <View className="flex-row items-center mt-2">
                                                 <Ionicons name="location-outline" size={12} color="#9CA3AF" />
                                                 <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
-                                                    {shelter.distance ? `Cách ${shelter.distance} - ` : ''}{shelter.address || 'Đang cập nhật'}
+                                                    {shelter.address || 'Đang cập nhật'}
                                                 </Text>
                                             </View>
                                         </View>
@@ -395,15 +550,20 @@ export default function HomeScreen() {
                 </View>
 
                 {/* --- UPCOMING EVENTS TỪ API --- */}
-                <View className="mt-8 mb-6"> 
+                {/* --- UPCOMING EVENTS TỪ API --- */}
+                <View className="mt-[38px] mb-6"> 
                     <SectionHeader 
                         title="Upcoming Events" 
-                        onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Events' }})}
+                        onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' }})}
                     />
                     {events.length === 0 ? (
                         <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có sự kiện nào sắp tới</Text>
                     ) : (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 5, gap: 16 }}>
+                    <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false} 
+                        contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 8, gap: 16 }}
+                    >
                         {events.map((event) => {
                             const d = new Date(event.startDate);
                             const dayStr = d.getDate().toString().padStart(2, '0');
@@ -412,47 +572,79 @@ export default function HomeScreen() {
                             return (
                             <TouchableOpacity 
                                 key={event.id} 
-                                className="w-[310px] bg-white p-3 rounded-[24px] flex-row shadow-sm border border-gray-50 active:scale-[0.98]"
-                                activeOpacity={0.9}
+                                // LAYER 1: Thẻ này CHỈ giữ shadow và kích thước, KHÔNG để overflow-hidden
+                                className="w-[340px] h-[79px] bg-white rounded-[20px] active:scale-[0.98]"
+                                style={{
+                                    shadowColor: '#E89B5A',
+                                    shadowOffset: { width: 3, height: 3 }, 
+                                    shadowOpacity: 0.25, 
+                                    shadowRadius: 4, 
+                                    elevation: 6, 
+                                }}
+                                activeOpacity={0.85}
                                 onPress={() => router.push(`/event-detail?id=${event.id}`)}
                             >
-                                <View className="relative">
+                                <View className="flex-1 flex-row rounded-[20px] overflow-hidden">
+
+                                    {/* 1. BÊN TRÁI: Ảnh Thumbnail */}
                                     <Image 
                                         source={{ uri: event.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} 
-                                        className="w-24 h-24 rounded-2xl bg-gray-200" 
+                                        className="w-[98px] h-full bg-gray-100" 
                                         resizeMode="cover"
                                     />
-                                    <View className="absolute top-2 left-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg items-center shadow-sm">
-                                        <Text className="text-xs font-bold text-orange-500 uppercase">{monthStr}</Text>
-                                        <Text className="text-lg font-black text-gray-800 leading-5">{dayStr}</Text>
-                                    </View>
-                                </View>
-                                
-                                <View className="flex-1 ml-4 justify-between py-1">
-                                    <View>
-                                        <Text className="font-bold text-gray-800 text-base leading-tight" numberOfLines={2}>
-                                            {event.title}
-                                        </Text>
-                                        <View className="flex-row items-center mt-1.5">
-                                            <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                                            <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
-                                                {event.locationName || event.address}
-                                            </Text>
-                                        </View>
-                                    </View>
                                     
-                                    <View className="flex-row items-center justify-between mt-2">
-                                        <View className="flex-row items-center">
-                                            <View className="flex-row -space-x-2">
-                                                <Image source={{ uri: 'https://i.pravatar.cc/100?img=1' }} className="w-6 h-6 rounded-full border-2 border-white" />
-                                                <Image source={{ uri: 'https://i.pravatar.cc/100?img=5' }} className="w-6 h-6 rounded-full border-2 border-white" />
-                                                <Image source={{ uri: 'https://i.pravatar.cc/100?img=8' }} className="w-6 h-6 rounded-full border-2 border-white" />
+                                    {/* 2. NỘI DUNG VÀ NGÀY THÁNG */}
+                                    <View className="flex-1 flex-row items-center pl-6 pr-4 py-3">
+                                        
+                                        {/* THÔNG TIN & NGƯỜI THAM GIA */}
+                                        <View className="flex-1 justify-between h-full pr-2">
+                                            <View>
+                                                <Text 
+                                                    className="font-semibold text-gray-800 text-sm leading-tight mb-0.5" 
+                                                    numberOfLines={2}
+                                                >
+                                                    {event.title}
+                                                </Text>
+                                                <View className="flex-row items-center mt-1.5">
+                                                    <Ionicons name="location" size={12} color="#9CA3AF" />
+                                                    <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
+                                                        {event.locationName || event.address}
+                                                    </Text>
+                                                </View>
                                             </View>
-                                            <Text className="text-gray-400 text-[10px] ml-2 font-medium">+{event.interestedCount} joined</Text>
+                                            
+                                            {/* Người tham gia */}
+                                            <View className="flex-row mt-2 items-center">
+                                                <View className="flex-row">
+                                                    {/* Ảnh 1: Đứng đầu, thứ tự layer cao nhất để đè lên ảnh sau */}
+                                                    <Image 
+                                                        source={{ uri: 'https://i.pravatar.cc/100?img=1' }} 
+                                                        className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 z-30" 
+                                                    />
+                                                    
+                                                    {/* Ảnh 2: Thêm -ml-1.5 (âm margin-left) để kéo lùi sang trái, đè một phần xuống dưới ảnh 1 */}
+                                                    <Image 
+                                                        source={{ uri: 'https://i.pravatar.cc/100?img=5' }} 
+                                                        className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-20" 
+                                                    />
+                                                    
+                                                    {/* Ảnh 3: Tương tự ảnh 2 */}
+                                                    <Image 
+                                                        source={{ uri: 'https://i.pravatar.cc/100?img=8' }} 
+                                                        className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-10" 
+                                                    />
+                                                </View>
+                                            </View>
                                         </View>
                                         
-                                        <View className="bg-orange-50 p-1.5 rounded-full">
-                                            <Feather name="arrow-right" size={14} color="#F97316" />
+                                        {/* 3. BÊN PHẢI: Khối Ngày Tháng */}
+                                        <View className="items-center justify-center shrink-0 min-w-[32px]">
+                                            <Text className="text-[18px] font-black text-gray-800 leading-tight">
+                                                {dayStr}
+                                            </Text>
+                                            <Text className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">
+                                                {monthStr}
+                                            </Text>
                                         </View>
                                     </View>
                                 </View>
@@ -464,7 +656,7 @@ export default function HomeScreen() {
             </LinearGradient>
         </View>
 
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }

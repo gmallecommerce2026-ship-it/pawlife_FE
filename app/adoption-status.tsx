@@ -1,7 +1,8 @@
 // app/adoption-status.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
-import { AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, TouchableOpacity, View } from 'react-native';
@@ -23,27 +24,29 @@ interface TimelineStep {
 
 // --- COMPONENTS DÀNH CHO POPUP APPLICATION DETAILS ---
 const SectionCard = ({ title, children }: { title: string, children: React.ReactNode }) => (
-  <View className="mb-6">
-    <Text className="text-[16px] font-bold text-gray-900 mb-2.5 px-5">{title}</Text>
-    <View className="bg-white px-5 py-2 border-y border-gray-100">
+  <View className="mb-7">
+    <Text className="text-[16px] font-bold text-gray-900 mb-3 px-5 tracking-tight">{title}</Text>
+    <View className="bg-white px-5 py-2 border-y border-gray-100 shadow-sm shadow-gray-50/50">
       {children}
     </View>
   </View>
 );
 
 const DetailRow = ({ label, value, isLast = false, isQuote = false }: { label: string, value: string, isLast?: boolean, isQuote?: boolean }) => (
-  <View className={`py-3.5 ${!isLast ? 'border-b border-gray-100' : ''}`}>
-    <Text className="text-[13px] text-gray-500 mb-1.5">{label}</Text>
-    <Text className={`text-[15px] leading-6 ${isQuote ? 'italic text-gray-700' : 'font-medium text-gray-900'}`}>
+  <View className={`py-4 ${!isLast ? 'border-b border-gray-100/80' : ''} flex-row justify-between items-start`}>
+    <Text className="text-[14px] text-gray-500 w-1/3 mt-0.5">{label}</Text>
+    <Text className={`text-[15px] flex-1 text-right leading-6 ${isQuote ? 'italic text-gray-600' : 'font-medium text-gray-900'}`}>
       {value}
     </Text>
   </View>
 );
 
 const CommitmentItem = ({ text }: { text: string }) => (
-  <View className="flex-row items-center py-2.5">
-    <Feather name="check-circle" size={18} color="#10B981" />
-    <Text className="text-[15px] font-medium text-gray-800 ml-3">{text}</Text>
+  <View className="flex-row items-center py-3 border-b border-gray-50">
+    <View className="w-6 h-6 rounded-full bg-green-50 items-center justify-center">
+      <Feather name="check" size={14} color="#10B981" />
+    </View>
+    <Text className="text-[15px] font-medium text-gray-800 ml-3 flex-1">{text}</Text>
   </View>
 );
 
@@ -57,6 +60,7 @@ export default function AdoptionStatusScreen() {
   const [isDetailsVisible, setIsDetailsVisible] = useState(false); 
   const [isWithdrawVisible, setIsWithdrawVisible] = useState(false); 
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   useEffect(() => {
     if (id) {
       fetchApplicationDetails();
@@ -78,17 +82,11 @@ export default function AdoptionStatusScreen() {
   const handleWithdraw = async () => {
     try {
       setIsWithdrawing(true);
-      // Gọi API sang NestJS
       await axiosClient.patch(`/applications/${id}/withdraw`);
-      
-      // Đóng popup
       setIsWithdrawVisible(false);
-      
-      // Load lại dữ liệu để màn hình cập nhật trạng thái thành "Closed"
       fetchApplicationDetails();
     } catch (error) {
       console.error('Lỗi khi thu hồi đơn:', error);
-      // Có thể thêm Alert báo lỗi ở đây nếu muốn
     } finally {
       setIsWithdrawing(false);
     }
@@ -116,20 +114,20 @@ export default function AdoptionStatusScreen() {
 
   const renderNodeIcon = (state: string) => {
     switch (state) {
-      case 'completed': return <View className="w-7 h-7 rounded-full bg-[#10B981] items-center justify-center z-20"><Feather name="check" size={14} color="white" /></View>;
-      case 'success': return <View className="w-7 h-7 rounded-full bg-[#10B981] items-center justify-center z-20 shadow-sm shadow-green-200"><MaterialCommunityIcons name="heart" size={14} color="white" /></View>;
-      case 'alert': return <View className="w-7 h-7 rounded-full bg-[#F59E0B] items-center justify-center z-20 shadow-sm shadow-orange-200"><Text className="text-white font-bold text-sm">!</Text></View>;
-      case 'error': return <View className="w-7 h-7 rounded-full bg-[#EF4444] items-center justify-center z-20 shadow-sm shadow-red-200"><Feather name="x" size={14} color="white" /></View>;
+      case 'completed': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20 shadow-sm shadow-green-200"><Feather name="check" size={14} color="white" /></View>;
+      case 'success': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20 shadow-sm shadow-green-200"><MaterialCommunityIcons name="heart" size={14} color="white" /></View>;
+      case 'alert': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20 shadow-sm shadow-orange-200"><Text className="text-white font-bold text-sm">!</Text></View>;
+      case 'error': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20 shadow-sm shadow-red-200"><Feather name="x" size={14} color="white" /></View>;
       case 'active':
-      default: return <View className="w-7 h-7 rounded-full bg-white border-[2.5px] border-[#3B82F6] items-center justify-center z-20"><View className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]" /></View>;
+      default: return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] border-[3px] border-[#D38544] items-center justify-center z-20 shadow-sm shadow-[#D38544]"><View className="w-2.5 h-2.5 rounded-full bg-[#D38544]" /></View>;
     }
   };
 
   if (isLoading || !applicationData) {
     return (
-      <SafeAreaView className="flex-1 bg-[#F3F4F6] justify-center items-center" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-[#F9FAFB] justify-center items-center" edges={['top']}>
          <Stack.Screen options={{ headerShown: false }} />
-         <ActivityIndicator size="large" color="#3B82F6" />
+         <ActivityIndicator size="large" color="#ffa053" />
       </SafeAreaView>
     );
   }
@@ -139,69 +137,143 @@ export default function AdoptionStatusScreen() {
   const timelineSteps = generateTimelineSteps(applicationData.status, applicationData.createdAt);
   const commitments = applicationData.commitments || {};
   
-  // Format Date for Footer
   const submittedDate = new Date(applicationData.createdAt).toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric'
   });
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F3F4F6]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
       
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-3 bg-white z-20 border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <AntDesign name="left" size={24} color="#111827" />
+      {/* 1. HEADER */}
+      <View className="flex-row items-center px-4 py-3 bg-white z-20">
+        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 rounded-full active:bg-gray-50" activeOpacity={0.7}>
+          <Feather name="chevron-left" size={30} color="#000000" />
         </TouchableOpacity>
-        <Text className="text-[18px] font-bold text-[#111827] flex-1 text-center mr-8">
+        <Text className="text-[24px] font-semibold text-[#111827] flex-1 text-center mr-8">
           Adoption Status
         </Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        
-        {/* Pet Info Card */}
-        <View className="bg-white px-5 py-5 mb-2 flex-row items-center mt-2">
-          <Image source={{ uri: pet?.images?.[0]?.url || 'https://via.placeholder.com/150' }} className="w-16 h-16 rounded-full bg-gray-200" resizeMode="cover" />
-          <View className="ml-4 flex-1">
-            <Text className="text-xl font-bold text-gray-900">{pet?.name}</Text>
-            <Text className="text-[15px] text-gray-600 mt-0.5">{pet?.breed}</Text>
-            <Text className="text-[14px] text-gray-500 mt-1">{pet?.shelter?.name || 'Shelter'}</Text>
-          </View>
-        </View>
+        <View 
+          className="flex-col pt-[14px] px-[14px] mx-5 mt-[21px] rounded-[13px] border border-[#E5E5E5]"
+          style={{
+            shadowColor: '#8E8E93', 
+            shadowOffset: { width: 2, height: 3 }, 
+            shadowOpacity: 0.15, 
+            shadowRadius: 4, 
+            elevation: 3, 
+          }}
+        >
+          <LinearGradient 
+              colors={['#FBF0F6', '#F8E8F1']}
+              locations={[0.3, 0.8]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 13 }}
+          />
+          {/* Phần trên: Ảnh và Thông tin cơ bản */}
+          <TouchableOpacity 
+            className="flex-row mb-3.5"
+            activeOpacity={0.7}
+            onPress={() => {
+              if (pet?.id) {
+                router.push(`/shelter-pet-detail?id=${pet.id}`);
+              }
+            }}
+          >
+            <Image 
+              source={{ uri: pet?.images?.[0]?.url || 'https://via.placeholder.com/150' }} 
+              className="w-[76px] h-[76px] rounded-2xl bg-gray-100" 
+              resizeMode="cover" 
+            />
+            
+            <View className="flex-1 mb-2 ml-[10px] justify-center">
+              <Text className="text-[16px] font-medium text-black leading-tight" numberOfLines={1}>
+                {pet?.name}
+              </Text>
+              
+              <Text className="text-[#8E8E93] text-[12px] font-regular mt-[7px]" numberOfLines={1}>
+                {pet?.breed || 'Unknown'}
+              </Text>
+              
+              {/* Nút bấm riêng cho Tên Shelter */}
+              <TouchableOpacity 
+                activeOpacity={0.6}
+                hitSlop={{ top: 5, right: 10, bottom: 5, left: 0 }} // Tăng vùng bấm cho text
+                onPress={(e) => {
+                  e.stopPropagation(); // Ngăn sự kiện click lan ra ngoài thẻ cha
+                  // Đảm bảo dữ liệu pet có chứa shelterId hoặc shelter.id
+                  const shelterId = pet?.shelter?.id || pet?.shelterId; 
+                  if (shelterId) {
+                    router.push(`/shelter-profile?id=${shelterId}`);
+                  } else {
+                    console.warn("Không tìm thấy ID của shelter");
+                  }
+                }}
+              >
+                <Text className="text-[#000000] text-[12px] font-regular mt-[7px]" numberOfLines={1}>
+                  {pet?.shelter?.name || 'PawLife Shelter'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-        {/* Application Details Box */}
-        <View className="bg-white px-5 py-5 mb-2">
-          <View className="flex-row justify-between items-center mb-3">
-            <Text className="text-[15px] text-gray-500">Application ID</Text>
-            <Text className="text-[15px] font-semibold text-gray-900">
-              #{applicationData.id.substring(applicationData.id.length - 6).toUpperCase()}
-            </Text>
-          </View>
-          <TouchableOpacity className="mt-1" onPress={() => setIsDetailsVisible(true)} activeOpacity={0.7}>
-            <Text className="text-[15px] font-semibold text-[#ffa053]">View Application Details</Text>
+            {/* Nút góc trên cùng bên phải */}
+            <TouchableOpacity 
+              className="p-1 -mr-1 mt-7 items-start"
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              onPress={(e) => {
+                e.stopPropagation(); // Ngăn click lan ra ngoài
+                console.log('Open options menu');
+              }}
+            >
+              <Feather name="chevron-right" size={20} color="#8E8E93" />
+            </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Phần dưới: Màu nền xám, thêm padding dọc (py-3), bo góc dưới */}
+          <View className="flex-row justify-between items-center py-3 border-t border-[#E5E5E5] bg-[#ffffff58] -mx-[14px] px-[14px] rounded-b-[13px]">
+            {/* ID thay cho status ở góc trái */}
+            <View className="">
+               <Text className="text-[#8E8E93] text-[12px] font-medium">
+                 ID: #{applicationData.id.substring(applicationData.id.length - 6).toUpperCase()}
+               </Text>
+            </View>
+            
+            {/* Nút View Application Details thay cho ngày tháng ở góc phải */}
+            <TouchableOpacity 
+              className=""
+              activeOpacity={0.7}
+              onPress={() => setIsDetailsVisible(true)}
+            >
+              <Text className="text-[#8E8E93] text-[12px] font-regular">
+                View Application Details
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Application Progress Timeline */}
-        <View className="bg-white px-5 py-6 mb-2">
-          <Text className="text-[18px] font-bold text-gray-900 mb-6">Application Progress</Text>
-          <View>
+        {/* 5. APPLICATION PROGRESS TIMELINE */}
+        <View className="bg-white px-5 pt-[38px] pb-2 shadow-sm shadow-gray-50/50">
+          <Text className="text-[16px] font-semibold text-gray-900 mb-[21px] tracking-tight">Application Progress</Text>
+          <View className="p-[17px] border rounded-[16px] border-[#E5E5E5]">
             {timelineSteps.map((step, index) => {
               const isLast = index === timelineSteps.length - 1;
               const isCompletedStep = step.state === 'completed';
               return (
                 <View key={step.id} className="flex-row relative">
-                  {!isLast && <View className={`absolute left-3.5 top-7 bottom-0 w-[2px] -ml-[1px] z-10 ${isCompletedStep ? 'bg-[#10B981]' : 'bg-gray-200'}`} />}
-                  <View className="w-7 items-center z-20">{renderNodeIcon(step.state)}</View>
-                  <View className={`flex-1 ml-4 ${!isLast ? 'pb-8' : ''}`}>
-                    <Text className={`text-[16px] font-bold mt-0.5 ${step.state === 'alert' ? 'text-[#F59E0B]' : step.state === 'error' ? 'text-[#EF4444]' : step.state === 'success' ? 'text-[#10B981]' : 'text-gray-900'}`}>{step.title}</Text>
-                    {step.date && <Text className="text-[14px] text-gray-500 mt-1.5">{step.date}</Text>}
-                    {step.description && <Text className="text-[14px] text-gray-600 mt-1.5 leading-5">{step.description}</Text>}
+                  {!isLast && <View className={`absolute left-[12px] top-[26px] bottom-[-4px] w-[2px] z-10 ${isCompletedStep ? 'bg-[#E89B5A]' : 'bg-gray-200'}`} />}
+                  
+                  <View className="w-[26px] items-center z-20 pt-0.5">{renderNodeIcon(step.state)}</View>
+                  
+                  <View className={`flex-1 ml-4 ${!isLast ? 'pb-8' : 'pb-4'}`}>
+                    <Text className={`text-[14px] font-medium mt-1 ${step.state === 'alert' ? 'text-[#F59E0B]' : step.state === 'error' ? 'text-[#EF4444]' : step.state === 'success' ? 'text-[#10B981]' : 'text-gray-900'}`}>{step.title}</Text>
+                    {step.date && <Text className="text-[12px] font-regular text-[#8E8E93] mt-1">{step.date}</Text>}
+                    {step.description && <Text className="text-[12px] font-regular text-[#8E8E93] mt-2 leading-5">{step.description}</Text>}
                     {step.actionRequired && (
-                      <TouchableOpacity className="mt-3 flex-row items-center justify-between bg-white border border-gray-200 rounded-xl p-3 shadow-sm shadow-gray-100">
+                      <TouchableOpacity className="mt-3.5 flex-row items-center justify-between bg-[#F9FAFB] border border-gray-100 rounded-xl p-3.5" activeOpacity={0.7}>
                         <Text className="text-[14px] font-medium text-gray-800">{step.actionRequired}</Text>
-                        <Feather name="chevron-right" size={20} color="#9CA3AF" />
+                        <Feather name="chevron-right" size={18} color="#9CA3AF" />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -210,56 +282,58 @@ export default function AdoptionStatusScreen() {
             })}
           </View>
         </View>
-
-        {/* Footer Actions */}
-        <View className="px-5 pt-4 pb-6">
-          {!isClosed && <Text className="text-center text-[13px] text-gray-500 mb-6">Adoption decisions are handled by the shelter.</Text>}
-          {isClosed ? (
-            <View className="bg-white rounded-2xl p-5 border border-gray-100">
-              <Text className="text-[16px] font-bold text-gray-900 text-center mb-2">Keep Looking</Text>
-              <Text className="text-[14px] text-gray-500 text-center mb-5 leading-5">There are many other wonderful pets waiting for a home. We've found some similar pets you might like.</Text>
-              
-              {/* THÊM SỰ KIỆN onPress VÀO NÚT NÀY */}
-              <TouchableOpacity 
-                className="bg-[#ffa053] rounded-xl py-3.5 items-center"
-                activeOpacity={0.8}
-                onPress={() => {
-                  // Điều hướng về màn hình Matching (Tab)
-                  // Hoặc bạn có thể đổi thành router.push('/search') nếu muốn qua màn tìm kiếm
-                  router.push('/matching'); 
-                }}
-              >
-                <Text className="text-white font-bold text-[15px] ">Browse More Pets</Text>
-              </TouchableOpacity>
-              
-            </View>
-          ) : (
-            <TouchableOpacity 
-              className="items-center py-2"
-              onPress={() => setIsWithdrawVisible(true)}
-            >
-              <Text className="text-[15px] font-bold text-[#EF4444]">Withdraw Application</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {!isClosed && <Text className="text-center text-[13px] text-gray-400 mb-4 mt-[24px] font-medium">Adoption decisions are handled by the shelter.</Text>}
+            <ScrollView 
+        className="flex-1" 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 20 }} 
+      >
       </ScrollView>
+        {/* 6. FOOTER ACTIONS */}
+        <View className="px-5 pb-[31px] bg-white border-t border-[#F3F4F6] w-full">
+        {isClosed ? (
+          <View className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm shadow-gray-100/50">
+            <View className="w-12 h-12 bg-gray-50 rounded-full items-center justify-center self-center mb-3">
+              <Feather name="search" size={20} color="#9CA3AF" />
+            </View>
+            <Text className="text-[17px] font-bold text-gray-900 text-center mb-2 tracking-tight">Keep Looking</Text>
+            <Text className="text-[14px] text-gray-500 text-center mb-6 leading-5 px-2">There are many other wonderful pets waiting for a home. We've found some similar pets you might like.</Text>
+            
+            <TouchableOpacity 
+              className="bg-[#ffa053] rounded-[14px] py-4 items-center shadow-sm shadow-orange-200"
+              activeOpacity={0.8}
+              onPress={() => router.push('/matching')}
+            >
+              <Text className="text-white font-bold text-[15px] tracking-wide">Browse More Pets</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity 
+            className="items-center py-[21px] bg-[#F6F6F6] rounded-full"
+            activeOpacity={0.7}
+            onPress={() => setIsWithdrawVisible(true)}
+          >
+            <Text className="text-[14px] font-bold text-[#B8B8B8]">Withdraw Application</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* ========================================= */}
       {/* POPUP 1: APPLICATION DETAILS (DYNAMIC DATA) */}
       {/* ========================================= */}
       <Modal visible={isDetailsVisible} animationType="slide" transparent={true} onRequestClose={() => setIsDetailsVisible(false)}>
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-[#F9FAFB] rounded-t-[28px] overflow-hidden" style={{ maxHeight: SCREEN_HEIGHT * 0.9 }}>
-            <View className="bg-white px-5 pt-3 pb-4 border-b border-gray-100 rounded-t-[28px]">
+        <View className="flex-1 justify-end bg-black/60">
+          <View className="bg-[#F9FAFB] rounded-t-[32px] overflow-hidden shadow-2xl" style={{ maxHeight: SCREEN_HEIGHT * 0.9 }}>
+            <View className="bg-white px-5 pt-3 pb-4 border-b border-gray-100 rounded-t-[32px] z-10">
               <View className="w-12 h-1.5 bg-gray-200 rounded-full self-center mb-4" />
               <View className="flex-row items-center justify-between">
-                <Text className="text-[18px] font-bold text-gray-900">Application Details</Text>
-                <TouchableOpacity onPress={() => setIsDetailsVisible(false)} className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center">
-                  <Feather name="x" size={18} color="#4B5563" />
+                <Text className="text-[19px] font-bold text-gray-900 tracking-tight">Application Details</Text>
+                <TouchableOpacity onPress={() => setIsDetailsVisible(false)} className="w-8 h-8 bg-gray-50 rounded-full items-center justify-center border border-gray-100" activeOpacity={0.7}>
+                  <Feather name="x" size={16} color="#4B5563" />
                 </TouchableOpacity>
               </View>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, paddingTop: 24 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50, paddingTop: 24 }}>
               
               <SectionCard title="Contact Information">
                 <DetailRow label="Full Name" value={applicationData.fullName || 'N/A'} />
@@ -287,20 +361,21 @@ export default function AdoptionStatusScreen() {
               </SectionCard>
               
               <SectionCard title="Adoption Commitment">
-                <DetailRow label="Reason for Adoption" value={`"${applicationData.adoptionReason || 'N/A'}"`} isQuote />
+                <DetailRow label="Reason for Adoption" value={`"${applicationData.adoptionReason || 'N/A'}"`} isQuote isLast={Object.keys(commitments).length === 0} />
                 
-                <View className="pt-1 pb-2">
-                  {commitments.vaccine === 'Yes' && <CommitmentItem text="Yearly vaccinations" />}
-                  {commitments.medical === 'Yes' && <CommitmentItem text="Hospital treatment when needed" />}
-                  {commitments.expenses === 'Yes' && <CommitmentItem text="Cover pre-adoption expenses" />}
-                  {commitments.updateStatus === 'Yes' && <CommitmentItem text="Provide status updates" />}
-                  {commitments.homeVisit === 'Yes' && <CommitmentItem text="Allow home visits" />}
-                  {commitments.provideID === 'Yes' && <CommitmentItem text="Provide ID and address" />}
-                </View>
-
+                {Object.keys(commitments).length > 0 && (
+                  <View className="pt-2 pb-1">
+                    {commitments.vaccine === 'Yes' && <CommitmentItem text="Yearly vaccinations" />}
+                    {commitments.medical === 'Yes' && <CommitmentItem text="Hospital treatment when needed" />}
+                    {commitments.expenses === 'Yes' && <CommitmentItem text="Cover pre-adoption expenses" />}
+                    {commitments.updateStatus === 'Yes' && <CommitmentItem text="Provide status updates" />}
+                    {commitments.homeVisit === 'Yes' && <CommitmentItem text="Allow home visits" />}
+                    {commitments.provideID === 'Yes' && <CommitmentItem text="Provide ID and address" />}
+                  </View>
+                )}
               </SectionCard>
 
-              <Text className="text-center text-[13px] text-gray-400 mt-2">Submitted on {submittedDate}</Text>
+              <Text className="text-center text-[13px] font-medium text-gray-400 mt-4">Submitted on {submittedDate}</Text>
             </ScrollView>
           </View>
         </View>
@@ -315,41 +390,38 @@ export default function AdoptionStatusScreen() {
         transparent={true}
         onRequestClose={() => setIsWithdrawVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/50 px-5">
-          <View className="bg-white w-full rounded-[24px] p-6 items-center shadow-lg shadow-black/10">
-            <View className="w-14 h-14 rounded-full bg-red-50 items-center justify-center mb-5">
-              <Feather name="alert-circle" size={28} color="#EF4444" />
+        <View className="flex-1 justify-center items-center bg-black/60 px-5">
+          <View className="bg-white w-full rounded-[28px] p-7 items-center shadow-2xl">
+            <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-5 border border-red-100">
+              <Feather name="alert-triangle" size={26} color="#EF4444" />
             </View>
-            <Text className="text-[19px] font-bold text-gray-900 text-center mb-3">
-              Withdraw adoption request?
+            <Text className="text-[20px] font-bold text-gray-900 text-center mb-3 tracking-tight">
+              Withdraw request?
             </Text>
-            <Text className="text-[15px] text-gray-500 text-center mb-8 leading-6">
-              The shelter will be notified that you've withdrawn your adoption request for <Text className="font-bold text-gray-800">{pet?.name}</Text>. After withdrawing, <Text className="font-bold text-gray-800">{pet?.name}</Text> will no longer appear in your app and you won't be able to reapply.
+            <Text className="text-[15px] text-gray-500 text-center mb-8 leading-6 px-1">
+              The shelter will be notified that you've withdrawn your adoption request for <Text className="font-bold text-gray-800">{pet?.name}</Text>. This action cannot be undone.
             </Text>
-            <View className="w-full flex-col gap-3">
+            <View className="w-full flex-col gap-3.5">
               <TouchableOpacity 
-                // Thay đổi màu nền mờ đi một chút nếu đang loading
-                className={`w-full py-3.5 rounded-xl items-center ${isWithdrawing ? 'bg-red-400' : 'bg-[#EF4444]'}`}
+                className={`w-full py-4 rounded-[14px] items-center shadow-sm ${isWithdrawing ? 'bg-red-400 shadow-none' : 'bg-[#EF4444] shadow-red-200'}`}
                 activeOpacity={0.8}
-                // Gắn hàm handleWithdraw vào đây
                 onPress={handleWithdraw}
                 disabled={isWithdrawing}
               >
-                {/* Hiển thị vòng xoay loading nếu đang xử lý */}
                 {isWithdrawing ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text className="text-white font-bold text-[16px]">Withdraw request</Text>
+                  <Text className="text-white font-bold text-[15px] tracking-wide">Withdraw Request</Text>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity 
-                className="w-full bg-gray-100 py-3.5 rounded-xl items-center"
-                activeOpacity={0.8}
+                className="w-full bg-gray-50 py-4 rounded-[14px] items-center border border-gray-100"
+                activeOpacity={0.7}
                 onPress={() => setIsWithdrawVisible(false)}
                 disabled={isWithdrawing}
               >
-                <Text className="text-gray-700 font-bold text-[16px]">Cancel</Text>
+                <Text className="text-gray-600 font-bold text-[15px]">Keep Application</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -1,7 +1,8 @@
 // app/(tabs)/my-pets.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useState } from 'react';
 import {
@@ -101,13 +102,13 @@ export default function MyPetsScreen() {
   const PetCard = ({ pet }: { pet: Pet }) => (
     <TouchableOpacity 
       activeOpacity={0.9}
-      className="bg-white rounded-[24px] p-4 mb-5 flex-row items-center shadow-sm"
+      className="bg-white rounded-[16px] border border-[#FFF9F0] p-[12px] mb-[21px] flex-row items-center shadow-sm"
       style={{
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 3, 
+        shadowColor: '#000000',
+        // shadowOffset: { width: 6, height: 6 }, // TĂNG độ lệch xuống dưới và sang phải
+        shadowOpacity: 0.06, 
+        shadowRadius: 4, // GIẢM độ lan rộng của bóng
+        elevation: 6, 
       }}
       onPress={() => router.push({
           pathname: '/pet-profile-detail', 
@@ -116,15 +117,16 @@ export default function MyPetsScreen() {
     >
       <Image 
         source={{ uri: pet.avatarUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=500&auto=format&fit=crop' }} 
-        className="w-24 h-24 rounded-[20px] bg-gray-100"
+        className="w-[92px] h-[108px] rounded-[13px] bg-gray-100"
         resizeMode="cover"
       />
 
-      <View className="flex-1 ml-4 justify-between h-20">
+      <View className="flex-1 ml-6 mb-6 justify-between h-20">
+        
         <View className="flex-row justify-between items-start">
           <Text 
             numberOfLines={1} 
-            className="text-gray-800 text-xl font-bold flex-1 mr-2"
+            className="font-semibold text-gray-900 text-lg flex-1 mr-2"
           >
             {pet.name}
           </Text>
@@ -145,22 +147,18 @@ export default function MyPetsScreen() {
                 size={14} 
                 color="#9CA3AF" 
             />
-            <Text className="text-gray-500 ml-1.5 text-xs font-medium">
+            <Text className="text-gray-500 text-sm ml-1.5">
               {pet.breed || 'Unknown breed'}
             </Text>
             </View>
 
             <View className="flex-row items-center">
             <MaterialCommunityIcons name="cake-variant-outline" size={14} color="#9CA3AF" />
-            <Text className="text-gray-500 ml-1.5 text-xs font-medium">
+            <Text className="text-gray-500 text-sm ml-1.5">
               {calculateAge(pet.dob)}
             </Text>
             </View>
         </View>
-      </View>
-
-      <View className="justify-center pl-2">
-         <Feather name="chevron-right" size={20} color="#E5E7EB" />
       </View>
 
     </TouchableOpacity>
@@ -168,22 +166,34 @@ export default function MyPetsScreen() {
 
   // --- RENDER BÌNH THƯỜNG ---
   return (
-    <SafeAreaView className="flex-1 bg-[#F8F9FB]">
-      <ScrollView 
-        className="flex-1 px-5" 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100, paddingTop: 12 }}
-      >
-        {/* --- HEADER --- */}
-        <View className="flex-row justify-between items-center mb-8">
-          <View>
-            <Text className="text-3xl font-bold text-gray-900 tracking-tight">My Pets</Text>
-            <Text className="text-gray-400 text-sm font-medium mt-1">Manage your furry friends</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/profile-settings')} className="p-2 bg-white rounded-full shadow-sm">
-            <Feather name="grid" size={20} color="#374151" />
-          </TouchableOpacity>
+    <SafeAreaView className="flex-1 bg-[#F8F9FB]" edges={['top']}>
+       <LinearGradient 
+            colors={['rgba(255, 255, 255, 0.9)', 'rgba(255, 248, 240, 0.69)']}
+            locations={[0.3, 0.8]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 32 }}
+        />
+       {/* --- HEADER --- */}
+      <View className="flex-row justify-between items-center px-6 pt-[28px] pb-[21px] z-10 bg-transparent">
+        <View className="flex-row items-center">
+          <Text className="text-3xl font-normal text-gray-900 tracking-tight">My Pet</Text>
         </View>
+        {/* <TouchableOpacity onPress={() => router.push('/profile-settings')} className="p-2 ">
+          <Feather name="align-justify" size={25} color="#374151" />
+        </TouchableOpacity> */}
+      </View>
+
+      <ScrollView 
+        className="flex-1" // 1. Bỏ px-6 và pt-0 ở đây đi
+        showsVerticalScrollIndicator={false}
+        // style={{ overflow: 'visible' }} // 2. Thêm thuộc tính này để ScrollView không cắt các phần tử tràn viền (rất quan trọng trên Android)
+        contentContainerStyle={{ 
+          paddingBottom: 100, 
+          paddingHorizontal: 24   // 4. Chuyển px-6 (tương đương 24px) từ ngoài vào trong đây
+        }}
+      >
+       
 
         {/* --- STATE HANDLING --- */}
         {isLoading ? (
@@ -218,10 +228,10 @@ export default function MyPetsScreen() {
           activeOpacity={0.7}
           onPress={() => router.push('/add-pet')} 
         >
-          <View className="bg-orange-100 p-1 rounded-full mr-2">
-            <Ionicons name="add" size={20} color="#ffa053" />
+          <View className=" rounded-full mr-2">
+            <Ionicons name="add" size={20} color="#F59E0B" />
           </View>
-          <Text className="text-orange-500 font-bold text-base">Add New Pet</Text>
+          <Text className="text-[#F59E0B] font-thin text-base">Add New Pet</Text>
         </TouchableOpacity>
 
       </ScrollView>

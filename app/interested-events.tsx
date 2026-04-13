@@ -1,4 +1,4 @@
-import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, TouchableOpacity, View } from 'react-native';
@@ -34,54 +34,114 @@ export default function InterestedEventsScreen() {
 
     fetchInterestedEvents();
   }, [user?.id]);
+  const handleRemoveInterest = async (eventId: string | number) => {
+    // 1. Xóa tạm khỏi UI ngay lập tức cho mượt (Optimistic Update)
+    setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
 
+    try {
+      // 2. Gọi API để bỏ follow/interest trên server 
+      // (Giả sử bạn có hàm này trong eventService, bạn nhớ đổi tên cho đúng thực tế API của bạn)
+      //await eventService.removeInterestedEvent(eventId); 
+    } catch (error) {
+      console.error("Lỗi khi hủy quan tâm event:", error);
+      // Nếu API lỗi, có thể bạn sẽ muốn fetch lại data để đồng bộ lại UI
+    }
+  };
   const renderEventItem = ({ item }: { item: any }) => {
-    const startDate = new Date(item.startDate);
-    const day = startDate.getDate();
-    const month = startDate.toLocaleDateString('en-US', { month: 'short' });
+    // Format lại ngày tháng giống định dạng trong ảnh
+    let displayDate = 'Đang cập nhật';
+    if (item.startDate) {
+        const d = new Date(item.startDate);
+        const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+        const formattedTime = timePart.replace('am', 'a.m').replace('pm', 'p.m');
+        displayDate = `${datePart} at ${formattedTime}`;
+    }
+
+    const mockAvatars = [
+        'https://i.pravatar.cc/100?img=12', 
+        'https://i.pravatar.cc/100?img=13'
+    ];
 
     return (
-      <TouchableOpacity 
-        activeOpacity={0.8}
-        onPress={() => router.push({ pathname: '/event-detail', params: { id: item.id }})}
-        className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100 flex-row items-center"
-      >
-        <Image 
-          source={{ uri: item.bannerUrl || 'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?q=80&w=800&auto=format&fit=crop' }} 
-          className="w-20 h-20 rounded-xl bg-gray-100"
-        />
-        <View className="flex-1 ml-4">
-          <Text className="text-base font-bold text-gray-900 mb-1" numberOfLines={2}>
-            {item.title}
-          </Text>
-          <View className="flex-row items-center mb-2">
-            <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-            <Text className="text-gray-500 text-xs ml-1" numberOfLines={1}>
-              {item.locationName}
-            </Text>
-          </View>
-          <View className="flex-row items-center justify-between mt-1">
-             <View className="bg-orange-50 px-2 py-1 rounded-md">
-                <Text className="text-orange-600 text-xs font-bold">{item.category || 'Event'}</Text>
-             </View>
-             <Text className="text-gray-800 text-sm font-bold">{day} {month.toUpperCase()}</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+        <TouchableOpacity 
+            className="bg-white rounded-[20px] flex-row shadow-sm border border-[#F3F4F6] mb-4 overflow-hidden"
+            activeOpacity={0.8}
+            onPress={() => router.push({ 
+                pathname: '/event-detail', 
+                params: { 
+                    id: item.id,
+                    title: item.title, 
+                    location: item.locationName || item.address, 
+                    date: item.startDate,
+                    image: item.bannerUrl 
+                }
+            })}
+        >
+            <Image 
+                source={{ uri: item.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} 
+                className="w-[110px] min-h-[120px] bg-gray-200"
+                resizeMode="cover" 
+            />
+            
+            <View className="flex-1 p-[14px] justify-between">
+                <View className="pr-6 relative"> 
+                    <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1" numberOfLines={2}>
+                        {item.title || 'Weekend Animal Event'}
+                    </Text>
+                    <Text className="text-[#8E8E93] text-[13px] font-regular" numberOfLines={1}>
+                        {item.locationName || item.address || 'District, City'}
+                    </Text>
+                    
+                    <TouchableOpacity 
+                        className="absolute -top-1 right-0" 
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                        onPress={() => handleRemoveInterest(item.id)}
+                    >
+                        {/* Icon màu cam để thể hiện event đã được lưu */}
+                        <Feather name="bookmark" size={20} color="#E89B5A" />
+                    </TouchableOpacity>
+                </View>
+                
+                <View className="flex-row items-center justify-between mt-4">
+                    <View className="flex-row items-center flex-1 pr-2">
+                        <Feather name="calendar" size={13} color="#E89B5A" />
+                        <Text className="text-[#E89B5A] text-[9px] font-medium ml-1.5" numberOfLines={1}>
+                            {displayDate}
+                        </Text>
+                    </View>
+                    
+                    <View className="flex-row items-center">
+                        <View className="flex-row">
+                            {mockAvatars.map((avatar, index) => (
+                                <Image 
+                                    key={index}
+                                    source={{ uri: avatar }} 
+                                    className={`w-[18px] h-[18px] rounded-full border-2 border-white ${index > 0 ? '-ml-2' : ''}`}
+                                />
+                            ))}
+                        </View>
+                        <Text className="text-[#8E8E93] text-[9px] font-regular ml-1">
+                            + {item.interestedCount || 123} interested
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        </TouchableOpacity>
     );
   };
 
   return (
-    <View className="flex-1 bg-[#F9FAFB]">
+    <View className="flex-1 bg-white">
       <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
         
         {/* --- HEADER --- */}
-        <View className="flex-row items-center px-4 py-2 relative bg-white pb-4 shadow-sm z-10 border-b border-gray-100">
+        <View className="flex-row items-center px-4 py-3 relative bg-white z-10">
             <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 z-10">
-                <AntDesign name="left" size={24} color="#1F2937" />
+                <Feather name="chevron-left" size={24} color="#000000" />
             </TouchableOpacity>
             <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-                <Text className="text-xl font-bold text-gray-900">Interested Events ({events.length})</Text>
+                <Text className="text-[24px] font-semibold text-black">Interested Events</Text>
             </View>
         </View>
 
@@ -115,7 +175,8 @@ export default function InterestedEventsScreen() {
                 data={events}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={renderEventItem}
-                contentContainerStyle={{ padding: 16 }}
+                // Đồng bộ padding giống bên search.tsx để danh sách hiển thị đẹp mắt hơn
+                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 13, paddingBottom: 20 }}
                 showsVerticalScrollIndicator={false}
             />
         )}

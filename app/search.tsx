@@ -29,7 +29,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => (
     <TouchableOpacity 
-        className="bg-transparent mb-5"
+        className="bg-transparent mb-[21px]"
         style={{ width: COLUMN_WIDTH }}
         activeOpacity={0.9}
         onPress={() => onPress(item)}
@@ -37,7 +37,10 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
         <View className="relative">
             <Image 
                 source={{ uri: item.images?.[0]?.url || item.image || 'https://via.placeholder.com/600' }} 
-                className="w-full h-40 rounded-[20px] bg-gray-100" 
+                // Xóa h-40, thay bằng aspect-square (hoặc dùng height: COLUMN_WIDTH ở dưới)
+                className="w-full aspect-square rounded-[24px] bg-gray-100" 
+                // Backup nếu NativeWind bản cũ không nhận aspect-square
+                style={{ height: COLUMN_WIDTH }} 
                 resizeMode="cover" 
             />
             {item.sticker && (
@@ -46,11 +49,10 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
                 </View>
             )}
         </View>
-        <View className="pt-3">
-            <Text className="text-gray-900 font-bold text-base mb-1">{item.name}</Text>
+        <View className="pt-[12px]">
+            <Text className="text-gray-900 font-semibold text-[16px] mb-1">{item.name}</Text>
             <View className="flex-row items-center">
-                <Ionicons name="location-sharp" size={12} color="#ffa053" />
-                <Text className="text-gray-400 text-xs ml-1 font-medium">{item.distance || '1.0 km'} · {item.breed || 'Unknown'}</Text>
+                <Text className="text-gray-400 text-[12px] font-regular">{item.age || '2 years'} · {item.breed || 'Unknown'}</Text>
             </View>
         </View>
     </TouchableOpacity>
@@ -58,74 +60,117 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
 
 const ShelterCard = memo(({ item, onPress, onToggleFollow }: { item: any; onPress: (item: any) => void; onToggleFollow: (item: any) => void }) => (
     <TouchableOpacity 
-        className="flex-row items-center mb-6 bg-white"
+        className="flex-row items-center mb-[21px] bg-white"
         activeOpacity={0.7}
         onPress={() => onPress(item)}
     >
         <Image 
             source={{ uri: item.avatarUrl || item.avatar || item.img || 'https://via.placeholder.com/200' }} 
-            className="w-14 h-14 rounded-full bg-gray-200 border border-gray-50" 
+            className="w-[54px] h-[54px] rounded-full bg-gray-200" 
         />
-        <View className="flex-1 ml-4 justify-center">
-            <Text className="text-gray-900 font-bold text-[15px] mb-0.5" numberOfLines={1}>{item.name}</Text>
-            <Text className="text-gray-400 text-xs font-medium">{item.address || item.loc || 'Unknown location'}</Text>
+        <View className="flex-1 ml-[14px] pr-2 justify-center">
+            <Text className="text-black font-semibold text-[16px] mb-[3px]" numberOfLines={1}>
+                {item.name}
+            </Text>
+            {/* Cập nhật dòng dưới đây để nối thêm số lượng pet và dấu chấm cách điệu (·) */}
+            <Text className="text-[#8E8E93] text-[12px] font-regular" numberOfLines={1}>
+                {item.address || item.loc || 'Unknown location'} · {item.petCount || item.totalPets || 20} pets
+            </Text>
         </View>
         
         {/* Nút Follow được gắn sự kiện onPress và đổi style động */}
         <TouchableOpacity 
             onPress={() => onToggleFollow(item)}
-            className={`px-5 py-1.5 rounded-full shadow-sm ${
-                item.isFollowed ? 'bg-gray-200 shadow-gray-100' : 'bg-[#FF9C56] shadow-orange-100'
+            className={`px-5 py-[3.5px] rounded-full shadow-sm ${
+                item.isFollowed ? 'bg-[#F8F8F8] shadow-gray-100' : 'bg-[#E89B5A] shadow-orange-100'
             }`}
         >
-            <Text className={`text-xs font-bold ${
-                item.isFollowed ? 'text-gray-600' : 'text-white'
+            <Text className={`text-[14px] font-semibold ${
+                item.isFollowed ? 'text-[#8E8E93]' : 'text-white'
             }`}>
-                {item.isFollowed ? 'Đang theo dõi' : 'Theo dõi'}
+                {item.isFollowed ? 'Following' : 'Follow'}
             </Text>
         </TouchableOpacity>
     </TouchableOpacity>
 ));
 
 const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
-    // Format lại ngày tháng giống định dạng dễ đọc (VD: 15/12/2023)
+    // Format lại ngày tháng giống định dạng trong ảnh (VD: Jan 1, 2026 at 7:00 a.m)
     let displayDate = 'Đang cập nhật';
     if (item.startDate) {
         const d = new Date(item.startDate);
-        displayDate = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        // Lấy giờ phút, chuyển sang chữ thường (a.m / p.m)
+        const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+        // Thêm dấu chấm chuẩn format như ảnh: "a.m" / "p.m"
+        const formattedTime = timePart.replace('am', 'a.m').replace('pm', 'p.m');
+        displayDate = `${datePart} at ${formattedTime}`;
     }
+
+    // Mock dữ liệu avatar xếp chồng (có thể thay bằng item.interestedUsers từ API nếu có)
+    const mockAvatars = [
+        'https://i.pravatar.cc/100?img=12', // Thay bằng link avatar thú cưng/người dùng thực tế
+        'https://i.pravatar.cc/100?img=13'
+    ];
 
     return (
         <TouchableOpacity 
-            className="bg-white p-3 rounded-[24px] flex-row shadow-sm border border-gray-100 mb-4 items-start"
+            className="bg-white rounded-[20px] flex-row shadow-sm border border-[#F3F4F6] mb-4 overflow-hidden"
             activeOpacity={0.8}
             onPress={() => onPress(item)}
         >
+            {/* Ảnh cover bên trái, bo tròn theo viền component cha */}
             <Image 
-                // Đồng bộ field ảnh với Home tab (dùng bannerUrl)
                 source={{ uri: item.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} 
-                className="w-24 h-24 rounded-2xl bg-gray-200" 
+                className="w-[110px] min-h-[120px] bg-gray-200"
                 resizeMode="cover" 
             />
-            <View className="flex-1 ml-3 h-24 py-1 justify-between">
+            
+            {/* Cột nội dung bên phải */}
+            <View className="flex-1 p-[14px] justify-between">
                 <View className="pr-6 relative"> 
-                    <Text className="text-gray-900 font-bold text-[15px] leading-5 mb-1" numberOfLines={2}>
-                        {item.title}
+                    <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1" numberOfLines={2}>
+                        {item.title || 'Weekend Animal Event'}
                     </Text>
-                    {/* Đồng bộ field địa điểm với Home tab */}
-                    <Text className="text-gray-400 text-xs font-medium" numberOfLines={1}>
-                        {item.locationName || item.address || 'Đang cập nhật địa điểm'}
+                    <Text className="text-[#8E8E93] text-[13px] font-regular" numberOfLines={1}>
+                        {item.locationName || item.address || 'District, City'}
                     </Text>
-                    <View className="absolute -top-1 -right-2">
-                        <Feather name="bookmark" size={18} color="#9CA3AF" />
-                    </View>
+                    
+                    {/* Icon Bookmark - Dùng position absolute để gắn góc phải */}
+                    <TouchableOpacity 
+                        className="absolute -top-1 right-0" 
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    >
+                        {/* Đổi icon thành dạng filled màu cam nếu event đã được lưu */}
+                        <Feather name="bookmark" size={20} color="#9CA3AF" />
+                    </TouchableOpacity>
                 </View>
-                <View className="flex-row items-center">
-                    <Feather name="calendar" size={14} color="#ffa053" />
-                    <Text className="text-gray-400 text-[11px] font-medium ml-1.5">
-                        {/* Đồng bộ field số người tham gia (interestedCount) */}
-                        {displayDate} <Text className="text-gray-300">|</Text> {item.interestedCount || 0} attending
-                    </Text>
+                
+                {/* Dòng dưới cùng chứa thời gian & số lượng quan tâm */}
+                <View className="flex-row items-center justify-between mt-4">
+                    {/* Thời gian */}
+                    <View className="flex-row items-center flex-1 pr-2">
+                        <Feather name="calendar" size={13} color="#E89B5A" />
+                        <Text className="text-[#E89B5A] text-[9px] font-medium ml-1.5" numberOfLines={1}>
+                            {displayDate}
+                        </Text>
+                    </View>
+                    
+                    {/* Avatars & Lượt interested */}
+                    <View className="flex-row items-center">
+                        <View className="flex-row">
+                            {mockAvatars.map((avatar, index) => (
+                                <Image 
+                                    key={index}
+                                    source={{ uri: avatar }} 
+                                    className={`w-[18px] h-[18px] rounded-full border-2 border-white ${index > 0 ? '-ml-2' : ''}`}
+                                />
+                            ))}
+                        </View>
+                        <Text className="text-[#8E8E93] text-[9px] font-regular ml-1">
+                            + {item.interestedCount || 123} interested
+                        </Text>
+                    </View>
                 </View>
             </View>
         </TouchableOpacity>
@@ -168,31 +213,6 @@ const PetsSection = ({ searchQuery, onDetailPress }: { searchQuery: string, onDe
 
     return (
         <View className="flex-1 px-6 pt-4">
-            {/* Giao diện Group Button Filter Chip */}
-            <View className="flex-row gap-3 mb-5">
-                {['All', 'Dog', 'Cat'].map((type) => {
-                    const isActive = activeType === type;
-                    return (
-                        <TouchableOpacity
-                            key={type}
-                            onPress={() => setActiveType(type as any)}
-                            activeOpacity={0.8}
-                            className={`px-5 py-2 rounded-full border ${
-                                isActive 
-                                    ? 'bg-[#F97316] border-[#F97316]' 
-                                    : 'bg-white border-gray-200'
-                            }`}
-                        >
-                            <Text className={`font-semibold text-[13px] ${
-                                isActive ? 'text-white' : 'text-gray-600'
-                            }`}>
-                                {type}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-
             {/* Danh sách Pets */}
             {loading ? (
                 <View className="flex-1 items-center justify-center mt-10">
@@ -292,7 +312,7 @@ const SheltersSection = ({ searchQuery, onProfilePress }: { searchQuery: string,
         <FlatList 
             data={shelters}
             keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-            contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 20 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 }}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={() => (
                 <View className="items-center justify-center mt-10">
@@ -335,7 +355,7 @@ const EventsSection = ({ searchQuery, onEventPress }: { searchQuery: string, onE
         <FlatList 
             data={events}
             keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-            contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 20 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 13, paddingBottom: 20 }}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={() => (
                 <View className="items-center justify-center mt-10">
@@ -354,8 +374,8 @@ const EventsSection = ({ searchQuery, onEventPress }: { searchQuery: string, onE
 export default function SearchScreen() {
   const router = useRouter(); 
   const { type } = useLocalSearchParams();
-  const initialTab = (type as 'Pets' | 'Shelters' | 'Events') || 'Pets';
-  const [activeTab, setActiveTab] = useState<'Pets' | 'Shelters' | 'Events'>(initialTab);
+  const initialTab = (type as 'Pet' | 'Shelter' | 'Event') || 'Pet';
+  const [activeTab, setActiveTab] = useState<'Pet' | 'Shelter' | 'Event'>(initialTab);
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearchQuery = useDebounce(searchInput, 500);
 
@@ -405,51 +425,52 @@ export default function SearchScreen() {
       });
   };
 
-  const TabButton = ({ title }: { title: 'Pets' | 'Shelters' | 'Events' }) => {
+  const TabButton = ({ title }: { title: 'Pet' | 'Shelter' | 'Event' }) => {
       const isActive = activeTab === title;
       return (
           <TouchableOpacity 
             onPress={() => setActiveTab(title)}
-            className={`flex-1 items-center py-3 border-b-2 ${isActive ? 'border-[#F97316]' : 'border-transparent'}`}
+            className={`flex-1 items-center pb-3 border-b-2 ${isActive ? 'border-[#E89B5A]' : 'border-transparent'}`}
             activeOpacity={0.8}
           >
-              <Text className={`text-sm ${isActive ? 'text-[#F97316] font-bold' : 'text-gray-400 font-medium'}`}>{title}</Text>
+              <Text className={`text-[16px] ${isActive ? 'text-[#E89B5A] font-semibold' : 'text-gray-400 font-regular'}`}>{title}</Text>
           </TouchableOpacity>
       )
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ paddingTop: StatusBar.currentHeight }}>
-      <View className="flex-row items-center px-4 py-3 gap-3">
+      <View className="flex-row items-center px-6 pt-3 gap-3">
           <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
               <Feather name="chevron-left" size={26} color="#1F2937" />
           </TouchableOpacity>
           <View className="flex-1 flex-row items-center bg-[#F9FAFB] rounded-full px-4 h-12 border border-gray-100">
-              <Feather name="search" size={18} color="#9CA3AF" />
+              <Feather name="search" size={18} color="#8E8E93" />
               <TextInput 
-                className="flex-1 ml-3 text-[15px] text-gray-800 font-medium"
+                className="flex-1 ml-3 text-[14px] text-gray-800 font-regular"
                 placeholder="Search shelters, pets..."
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#8E8E93"
                 value={searchInput}
+                style={{fontFamily: "Urbanist"}}
                 onChangeText={setSearchInput}
                 autoFocus={false} 
               />
               <TouchableOpacity onPress={() => router.push('/filter-modal')} activeOpacity={0.6} className="p-1">
-                    <Ionicons name="options-outline" size={20} color="#9CA3AF" />
+                    <Ionicons name="options-outline" size={20} color="#8E8E93" />
               </TouchableOpacity>
           </View>
       </View>
 
-      <View className="flex-row px-6 border-b border-gray-50 mb-2">
-          <TabButton title="Pets" />
-          <TabButton title="Shelters" />
-          <TabButton title="Events" />
+      <View className="flex-row px-6 border-b pt-[38px] border-gray-100">
+          <TabButton title="Pet" />
+          <TabButton title="Shelter" />
+          <TabButton title="Event" />
       </View>
 
       <View className="flex-1 bg-white">
-          {activeTab === 'Pets' && <PetsSection searchQuery={debouncedSearchQuery} onDetailPress={handlePetPress} />}
-          {activeTab === 'Shelters' && <SheltersSection searchQuery={debouncedSearchQuery} onProfilePress={handleShelterPress} />}
-          {activeTab === 'Events' && <EventsSection searchQuery={debouncedSearchQuery} onEventPress={handleEventPress} />}
+          {activeTab === 'Pet' && <PetsSection searchQuery={debouncedSearchQuery} onDetailPress={handlePetPress} />}
+          {activeTab === 'Shelter' && <SheltersSection searchQuery={debouncedSearchQuery} onProfilePress={handleShelterPress} />}
+          {activeTab === 'Event' && <EventsSection searchQuery={debouncedSearchQuery} onEventPress={handleEventPress} />}
       </View>
     </SafeAreaView>
   );

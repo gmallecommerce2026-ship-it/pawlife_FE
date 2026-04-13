@@ -19,8 +19,11 @@ module.exports = {
         'primary-dark': '#D6791B',
       },
       fontFamily: {
-        sans: ['"Be Vietnam Pro"', ...fontFamily.sans],
-        'be-vietnam-pro': ['"Be Vietnam Pro"', ...fontFamily.sans],
+        sans: ['Urbanist', 'sans-serif'],
+        urbanist: ['Urbanist', 'sans-serif'],
+        'urbanist-medium': ['UrbanistMedium', 'sans-serif'], // Thêm dòng này
+        'urbanist-semibold': ['UrbanistSemiBold', 'sans-serif'], // Thêm dòng này
+        'urbanist-bold': ['UrbanistBold', 'sans-serif'],
         // ...các font khác giữ nguyên
       },
       spacing: {

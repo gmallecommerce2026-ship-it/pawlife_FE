@@ -25,5 +25,5 @@ export function Text(props: TextProps) {
   }
 
   // Vẫn trả về RNText gốc để tương thích 100% với NativeWind
-  return <RNText {...restProps}>{children}</RNText>;
+  return <RNText {...restProps} style={{fontFamily: "urbanist"}}>{children}</RNText>;
 }

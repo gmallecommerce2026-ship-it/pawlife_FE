@@ -18,7 +18,7 @@ import {
   TouchableWithoutFeedback,
   View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --- DATA CONSTANTS ---
 const LOCATIONS = [
@@ -71,11 +71,11 @@ interface AdoptionFormParams {
 
 // --- COMPONENTS ---
 const SectionTitle = ({ title }: { title: string }) => (
-  <Text className="text-gray-900 font-bold text-base mb-4 mt-6">{title}</Text>
+  <Text className="text-gray-900 font-semibold text-[16px] mt-[50px]">{title}</Text>
 );
 
 const Label = ({ text, required = false }: { text: string; required?: boolean }) => (
-  <Text className="text-gray-600 text-sm font-medium mb-2">
+  <Text className="text-gray-600 text-[14px] font-regular mb-2 mt-[21px]">
     {text} {required && <Text className="text-red-500">*</Text>}
   </Text>
 );
@@ -95,7 +95,7 @@ const CustomInput = ({
   placeholder?: string;
   multiline?: boolean;
 }) => (
-  <View className="mb-4">
+  <View className="">
     <TextInput
       className={`w-full bg-white border border-gray-200 rounded-2xl px-4 text-gray-800 ${
         multiline ? 'h-24 py-3' : 'h-14'
@@ -124,7 +124,7 @@ const CustomDropdown = ({
   const [visible, setVisible] = useState(false);
 
   return (
-    <View className="mb-4">
+    <View className="">
       <TouchableOpacity
         onPress={() => setVisible(true)}
         activeOpacity={0.7}
@@ -179,6 +179,16 @@ const CustomDropdown = ({
   );
 };
 
+const PolicyItem = ({ number, title, content }: { number: string; title: string; content: string }) => (
+  <View className="flex-row items-start mb-5">
+      <Text className="font-medium text-[16px] text-gray-900 w-5 mt-0.5">{number}.</Text>
+      <View className="flex-1">
+          <Text className="text-gray-800 font-medium text-[16px] mb-1">{title}</Text>
+          <Text className="text-gray-500 font-regular text-[14px] leading-4">{content}</Text>
+      </View>
+  </View>
+);
+
 const OptionGroup = ({
   options,
   selected,
@@ -188,7 +198,7 @@ const OptionGroup = ({
   selected: string;
   onSelect: (opt: string) => void;
 }) => (
-  <View className="flex-row gap-3 mb-5">
+  <View className="flex-row gap-3 mt-[12px]">
     {options.map((opt) => {
       const isActive = selected === opt;
       return (
@@ -196,15 +206,15 @@ const OptionGroup = ({
           key={opt}
           onPress={() => onSelect(opt)}
           activeOpacity={0.9}
-          className={`flex-1 py-3.5 rounded-xl items-center border ${
+          className={`flex-1 py-[9px] rounded-[12px] items-center border ${
             isActive
-              ? 'bg-[#F99C2E] border-[#F99C2E]'
-              : 'bg-white border-gray-100'
+              ? 'bg-[#E89B5A] border-[#E5E5E5]/0'
+              : 'bg-white border-gray-100 border-[#E5E5E5]'
           }`}
         >
           <Text
-            className={`font-bold text-sm ${
-              isActive ? 'text-white' : 'text-gray-500'
+            className={`font-semibold text-[14px] ${
+              isActive ? 'text-white' : 'text-[#757575]'
             }`}
           >
             {opt}
@@ -218,6 +228,7 @@ const OptionGroup = ({
 export default function AdoptionFormScreen() {
   const router = useRouter();
   const rawParams = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const params = rawParams as unknown as {
     id?: string;
     petId?: string;
@@ -262,7 +273,8 @@ export default function AdoptionFormScreen() {
   const [updateStatus, setUpdateStatus] = useState('Yes');
   const [homeVisit, setHomeVisit] = useState('Yes');
   const [provideID, setProvideID] = useState('Yes');
-
+  const [isAgreed, setIsAgreed] = useState(false); // Trạng thái checkbox
+  const [showPolicyModal, setShowPolicyModal] = useState(false); // Trạng thái hiện modal policy
   // --- USE EFFECT CHECK LIMIT ---
   useEffect(() => {
     const checkLimit = async () => {
@@ -347,7 +359,7 @@ export default function AdoptionFormScreen() {
   }
 
   return (
-    <View className="flex-1 bg-[#FAFAFA]">
+    <View className="flex-1 bg-white">
       <SafeAreaView className="flex-1 bg-white" edges={['top']}>
         {/* --- CUSTOM LIMIT MODAL --- */}
         <Modal visible={showLimitModal} transparent animationType="fade">
@@ -380,13 +392,40 @@ export default function AdoptionFormScreen() {
             </View>
           </View>
         </Modal>
+        {/* --- POLICY MODAL --- */}
+        <Modal visible={showPolicyModal} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setShowPolicyModal(false)}>
+          <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
+            <View className="flex-row items-center justify-between px-4 pt-3">
+                <View className="w-10" />
+                <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 tracking-wide">
+                    Adoption Pawlicy
+                </Text>
+                <TouchableOpacity 
+                    onPress={() => setShowPolicyModal(false)} 
+                    className="w-10 items-end py-1.5"
+                >
+                    <Feather name="x" size={22} color="#374151" />
+                </TouchableOpacity>
+            </View>
 
+            <ScrollView className="flex-1 px-[35px] pt-[50px]" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                <View className="mb-4">
+                    <PolicyItem number="1" title="Love and care for your pet for life" content="Do not abandon, harm, or use the pet for any illegal or inhumane purposes." />
+                    <PolicyItem number="2" title="Provide a safe and suitable living environment" content="This includes proper food, shelter, attention, and veterinary care when needed." />
+                    <PolicyItem number="3" title="Take care of your pet's health" content="Check-ups, vaccinations, and rabies shots as recommended." />
+                    <PolicyItem number="4" title="Stay in touch" content="During the first 6 months, share updates to ensure pet is doing well." />
+                    <PolicyItem number="5" title="Do not transfer your pet" content="Contact PawLife if you can no longer care for the pet." />
+                    <PolicyItem number="6" title="Provide truthful personal information" content="Basic info helps ensure your pet's safety." />
+                </View>
+            </ScrollView>
+          </View>
+        </Modal>
         {/* --- HEADER --- */}
         <View className="flex-row items-center px-4 py-3 border-b border-gray-50 bg-white">
           <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-            <AntDesign name="left" size={24} color="#374151" />
+            <Feather name="chevron-left" size={24} color="#000000" />
           </TouchableOpacity>
-          <Text className="flex-1 text-center font-bold text-lg text-gray-900 mr-8">
+          <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 mr-8">
             Adoption Application
           </Text>
         </View>
@@ -398,10 +437,10 @@ export default function AdoptionFormScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 40 }}
-            className="px-5 pt-6 bg-[#FAFAFA]"
+            className="px-5 pt-6 bg-white"
           >
             {/* --- PET INFO CARD --- */}
-            <View className="bg-[#EFF8FF] p-4 rounded-2xl flex-row items-center mb-6 border border-blue-50">
+            <View className="bg-[#EFF8FF] p-4 rounded-2xl flex-row items-center border border-blue-50">
               <Image source={{ uri: pet.image }} className="w-16 h-16 rounded-xl bg-gray-200" resizeMode="cover" />
               <View className="ml-4 flex-1">
                 <Text className="text-gray-900 font-bold text-lg">{pet.name}</Text>
@@ -452,7 +491,7 @@ export default function AdoptionFormScreen() {
             )}
 
             <Label text="Are there children in your household?" required />
-            <AdviceText text="Advice needed: Some pets in the rescue center are not suitable for living with children" />
+            <AdviceText text="Some pets in the rescue center are not suitable for living with children" />
             <OptionGroup options={['Yes', 'No']} selected={children} onSelect={setChildren} />
 
             <Label text="Are you planning to keep the pet in a cage?" required />
@@ -462,7 +501,7 @@ export default function AdoptionFormScreen() {
             <SectionTitle title="Section C – Pet Experience" />
 
             <Label text="Have you raised any pet before?" required />
-            <AdviceText text="Advice needed: Some pets in the rescue center are not suitable for living with other pets" />
+            <AdviceText text="Some pets in the rescue center are not suitable for living with other pets" />
             <CustomDropdown 
                 placeholder="Select an option" 
                 value={exp} 
@@ -523,20 +562,51 @@ export default function AdoptionFormScreen() {
             <OptionGroup options={['Yes', 'No']} selected={provideID} onSelect={setProvideID} />
 
             {/* --- SUBMIT BUTTON --- */}
-            <TouchableOpacity
-              className={`w-full py-4 rounded-full shadow-lg mt-6 mb-8 flex-row justify-center items-center ${
-                isLoading ? 'bg-[#fcd3a0] shadow-transparent' : 'bg-[#F99C2E] shadow-orange-200'
-              }`}
-              activeOpacity={0.8}
-              onPress={handleSubmit}
-              disabled={isLoading}
+            <View className="flex-row items-center mt-[50px] mb-[21px]"> {/* Đổi items-start thành items-center */}
+            <TouchableOpacity 
+              onPress={() => setIsAgreed(!isAgreed)} 
+              className="mr-3" // Xóa mt-0.5 ở đây
+              activeOpacity={0.7}
             >
-              {isLoading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text className="text-white font-bold text-center text-lg">Send Application</Text>
-              )}
+              <Ionicons
+                  name={isAgreed ? "checkbox" : "square-outline"}
+                  size={24}
+                  color={isAgreed ? "#E89B5A" : "#9CA3AF"} 
+              />
             </TouchableOpacity>
+            <Text className="flex-1 text-gray-600 text-[14px] leading-5">
+              I agree to {" "}
+              <Text
+                  className="text-[#E89B5A] font-bold"
+                  onPress={() => setShowPolicyModal(true)}
+              >
+                  conditions of PawLife Adoption Policy.
+              </Text>
+            </Text>
+          </View>
+
+            {/* --- SUBMIT BUTTON --- */}
+            <TouchableOpacity
+            // Bỏ các class bg- ra khỏi className
+            className="w-full py-4 rounded-full mt-4 mb-8 flex-row justify-center items-center"
+            style={{
+              // Quản lý màu nền trực tiếp qua style
+              backgroundColor: isLoading 
+                ? '#fcd3a0' 
+                : (!isAgreed ? '#F6F6F6' : '#E89B5A') // #D1D5DB tương đương bg-gray-300
+            }}
+            activeOpacity={0.8}
+            onPress={handleSubmit}
+            disabled={isLoading || !isAgreed} 
+          >
+            {isLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text className={`font-bold text-center text-lg ${!isAgreed ? 'text-[#B8B8B8]' : 'text-white'}`}>
+                Send Application
+              </Text>
+            )}
+          </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

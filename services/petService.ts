@@ -17,9 +17,11 @@ export const petService = {
     return response.data;
   },
 
+  
+
   swipePet: async (petId: string, data: SwipePayload) => {
     try {
-      const response = await axiosClient.post(`pets/${petId}/swipe`, data);
+      const response = await axiosClient.post(`/pets/${petId}/swipe`, data);
       return response.data;
     } catch (error: any) {
       throw error.response?.data || { message: error.message };
@@ -28,7 +30,7 @@ export const petService = {
 
   favoritePet: async (petId: string) => {
     try {
-      const response = await axiosClient.post(`pets/${petId}/favorite`);
+      const response = await axiosClient.post(`/pets/${petId}/favorite`);
       return response.data;
     } catch (error: any) {
       throw error.response?.data || { message: error.message };
@@ -37,7 +39,7 @@ export const petService = {
 
   unfavoritePet: async (petId: string) => {
     try {
-      const response = await axiosClient.delete(`pets/${petId}/favorite`);
+      const response = await axiosClient.delete(`/pets/${petId}/favorite`);
       return response.data;
     } catch (error: any) {
       throw error.response?.data || { message: error.message };
@@ -46,7 +48,7 @@ export const petService = {
 
   getFavorites: async () => {
     try {
-      const response = await axiosClient.get('pets/favorites');
+      const response = await axiosClient.get('/pets/favorites');
       return response.data;
     } catch (error: any) {
       throw error.response?.data || { message: error.message };

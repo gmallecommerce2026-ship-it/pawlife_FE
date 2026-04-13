@@ -167,8 +167,8 @@ export default function ShelterProfileScreen() {
 
   const StatItem = ({ value, label }: { value: string | number, label: string }) => (
     <View className="items-center">
-      <Text className="text-gray-900 font-bold text-lg">{value}</Text>
-      <Text className="text-gray-400 text-xs font-medium">{label}</Text>
+      <Text className="text-gray-900 font-bold text-[16px]">{value}</Text>
+      <Text className="text-gray-400 text-[12px] font-regular">{label}</Text>
     </View>
   );
 
@@ -199,7 +199,7 @@ export default function ShelterProfileScreen() {
       {/* --- HEADER --- */}
       <View className="flex-row items-center justify-between px-6 py-2 border-b border-transparent min-h-[48px]">
         <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <AntDesign name="left" size={24} color="#374151" />
+          <Feather name="chevron-left" size={35} color="#000000" />
         </TouchableOpacity>
         
         {/* --- LOGIC HIỂN THỊ THANH SEARCH HOẶC TÊN TRẠM --- */}
@@ -212,7 +212,7 @@ export default function ShelterProfileScreen() {
             autoFocus
           />
         ) : (
-          <Text className="text-lg font-bold text-gray-900 flex-1 text-center mx-2" numberOfLines={1}>
+          <Text className="text-[16px] font-semibold text-[#000000] flex-1 text-center mx-2" numberOfLines={1}>
             {shelterInfo.name}
           </Text>
         )}
@@ -239,7 +239,7 @@ export default function ShelterProfileScreen() {
         {!isSearching && (
           <View className="px-6 mt-4 mb-6">
             <View className="flex-row items-center justify-between mb-6">
-              <View className="w-20 h-20 rounded-full bg-orange-400 overflow-hidden border-4 border-white shadow-sm">
+              <View className="w-[95px] h-[95px] rounded-full bg-orange-400 overflow-hidden border-4 border-white shadow-sm">
                  {shelterInfo.avatarUrl ? (
                      <Image source={{ uri: shelterInfo.avatarUrl }} className="w-full h-full" resizeMode="cover" />
                  ) : (
@@ -247,7 +247,7 @@ export default function ShelterProfileScreen() {
                  )}
               </View>
               
-              <View className="flex-1 flex-row justify-around ml-4">
+              <View className="flex-1 flex-row justify-around ml-[26px]">
                 {/* Sửa lại hiển thị số lượng pet lấy từ count để đúng thực tế tổng số pet của trạm (ngay cả khi search) */}
                 <StatItem value={shelterInfo._count?.pets || pets.length} label="Pets" />
                 <StatItem value={shelterInfo._count?.followers || 0} label="Followers" />
@@ -255,10 +255,15 @@ export default function ShelterProfileScreen() {
               </View>
             </View>
 
-            <Text className="text-gray-400 text-xs font-medium mb-1">Animal Shelter & Rescue</Text>
+            <Text className="text-gray-400 text-[10px] font-regular mb-1">Animal Shelter & Rescue</Text>
             <View className="flex-row items-center mb-1">
-               <Text className="text-gray-500 text-sm leading-5">
-                  Saving lives and finding forever homes 🐾 {shelterInfo.address}
+               <Text className="text-gray-500 text-[12px] font-regular leading-5">
+                  Saving lives and finding forever homes 🐾
+               </Text>
+            </View>
+             <View className="flex-row items-center mb-1">
+               <Text className="text-gray-500 text-[12px] font-regular leading-5">
+                  {shelterInfo.address}
                </Text>
             </View>
             <Text className="text-orange-500 text-sm font-medium mb-3">{shelterInfo.contactInfo}</Text> 
@@ -266,7 +271,7 @@ export default function ShelterProfileScreen() {
             <View className="flex-row gap-3 mt-2">
                 <TouchableOpacity 
                   onPress={handleToggleFollow}
-                  className={`flex-1 py-2.5 rounded-lg items-center justify-center shadow-sm ${
+                  className={`flex-1 py-2.5 rounded-full items-center justify-center shadow-sm ${
                     isFollowing ? 'bg-gray-200 shadow-gray-100' : 'bg-orange-400 shadow-orange-200'
                   }`}
                 >
@@ -275,16 +280,16 @@ export default function ShelterProfileScreen() {
                     </Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity 
+                {/* <TouchableOpacity 
                   onPress={openPolicy}
                   className="flex-1 bg-white border border-gray-200 py-2.5 rounded-lg items-center justify-center"
                 >
                     <Text className="text-gray-600 font-bold text-sm">Policy</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
                 
                 <TouchableOpacity 
                   onPress={openContact}
-                  className="flex-1 bg-white border border-gray-200 py-2.5 rounded-lg items-center justify-center"
+                  className="flex-1 bg-[#F6F6F6] py-2.5 rounded-full items-center justify-center"
                 >
                     <Text className="text-gray-600 font-bold text-sm">Contact</Text>
                 </TouchableOpacity>
@@ -302,25 +307,61 @@ export default function ShelterProfileScreen() {
              pets.map((pet) => {
                const imageUrl = pet.images && pet.images.length > 0 
                   ? pet.images[0].url 
-                  : 'https://via.placeholder.com/150';
+                  : 'https://via.placeholder.com/400';
+               
+               // Giả lập logic lấy giới tính (nếu API trả về 'female' hoặc 'male')
+               const isFemale = pet.gender?.toLowerCase() === 'female';
 
                return (
                  <TouchableOpacity 
                   key={pet.id} 
                   style={{ width: COLUMN_WIDTH }}
-                  className="bg-white rounded-[20px] mb-4 shadow-sm shadow-gray-200 border border-gray-100 overflow-hidden pb-3"
+                  // Xóa sạch bg-white, shadow, border. Chỉ giữ lại margin bottom
+                  className="mb-[21px]"
+                  activeOpacity={0.8}
                   onPress={() => router.push(`/shelter-pet-detail?id=${pet.id}`)}
                   >
-                     <Image source={{ uri: imageUrl }} className="w-full h-40 bg-gray-100" resizeMode="cover" />
-                     
-                     <View className="px-3 pt-3">
-                         <Text className="text-gray-900 font-bold text-base mb-1" numberOfLines={1}>{pet.name}</Text>
-                         <View className="flex-row items-center justify-between">
-                             <View className="flex-row items-center">
-                                 <Ionicons name="location-sharp" size={10} color="#ffa053" />
-                                 <Text className="text-gray-400 text-[10px] ml-1">{pet.distance || '1.0 km'}</Text>
+                     {/* 1. KHỐI ẢNH: Ép tỉ lệ 1:1, bo góc cực sâu 28px */}
+                     <View className="w-full aspect-square mb-[12px] relative">
+                         <Image 
+                            source={{ uri: imageUrl }} 
+                            className="w-full h-full rounded-[24px] bg-gray-100" 
+                            resizeMode="cover" 
+                         />
+                         
+                         {/* Icon Heart (mô phỏng theo ảnh mẫu có trái tim màu cam phấn) */}
+                         {pet.isFavorite && (
+                             <View className="absolute top-3.5 right-3.5">
+                                 <Ionicons name="heart" size={22} color="#E89B5F" />
                              </View>
-                             <Text className="text-gray-500 text-[10px] font-medium" numberOfLines={1}>• {pet.breed}</Text>
+                         )}
+                     </View>
+                     
+                     {/* 2. KHỐI TEXT: Padding = 0 để thẳng hàng hoàn toàn với lề trái của ảnh */}
+                     <View className="px-1">
+                         {/* Tên Pet: Đen tuyền, chữ to, bold, margin bottom rất nhỏ */}
+                         <Text 
+                            className="text-[#000000] font-bold text-[17px] tracking-tight mb-[7.6px]" 
+                            numberOfLines={1}
+                         >
+                            {pet.name}
+                         </Text>
+                         
+                         {/* Thông tin: Giới tính + Tuổi + Giống */}
+                         <View className="flex-row items-center">
+                             {/* Icon Giới tính với mã màu chuẩn chiết xuất từ ảnh */}
+                             <Ionicons 
+                                name={isFemale ? "female" : "male"} 
+                                size={14} 
+                                color={isFemale ? "#F471B5" : "#5BB0FF"} 
+                             />
+                             
+                             <Text 
+                                className="text-[#8B8B8B] text-[13px] font-normal ml-1.5" 
+                                numberOfLines={1}
+                             >
+                                 {pet.age || '1 year'} · {pet.breed || 'Unknown'}
+                             </Text>
                          </View>
                      </View>
                  </TouchableOpacity>

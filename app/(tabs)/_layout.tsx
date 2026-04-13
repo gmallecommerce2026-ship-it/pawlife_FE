@@ -8,13 +8,14 @@ import Svg, { Path } from 'react-native-svg';
 
 // --- IMPORT THƯ VIỆN RUNG ---
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
 // --- CẤU HÌNH UI/UX ---
-const TAB_BAR_HEIGHT = 55;   
-const CURVE_HEIGHT = 30;     
-const BUTTON_RADIUS = 40;    
+const TAB_BAR_HEIGHT = 40;   
+const CURVE_HEIGHT = 15;     
+const BUTTON_RADIUS = 31;    
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const router = useRouter();
@@ -36,14 +37,16 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   }
   
   const center = width / 2;
-  const radius = 75; 
-  const CORNER_RADIUS = 26; // Bạn có thể tăng/giảm số này để chỉnh độ bo tròn
+  const radius = 68;           // Giữ nguyên bề rộng vòm để ôm vừa nút scan
+  const bottomTension = 0.45;  // Giữ nguyên độ thoải ở chân
+  const topTension = 0.32;     // TĂNG LÊN 0.32: Khử độ nhọn, làm đỉnh vòm tròn và mềm hơn
+  const CORNER_RADIUS = 26; 
   
   const d = `
     M ${CORNER_RADIUS} ${CURVE_HEIGHT}
     L ${center - radius} ${CURVE_HEIGHT}
-    C ${center - radius * 0.5} ${CURVE_HEIGHT}, ${center - radius * 0.5} 0, ${center} 0
-    C ${center + radius * 0.5} 0, ${center + radius * 0.5} ${CURVE_HEIGHT}, ${center + radius} ${CURVE_HEIGHT}
+    C ${center - radius * bottomTension} ${CURVE_HEIGHT}, ${center - radius * topTension} 0, ${center} 0
+    C ${center + radius * topTension} 0, ${center + radius * bottomTension} ${CURVE_HEIGHT}, ${center + radius} ${CURVE_HEIGHT}
     L ${width - CORNER_RADIUS} ${CURVE_HEIGHT}
     Q ${width} ${CURVE_HEIGHT}, ${width} ${CURVE_HEIGHT + CORNER_RADIUS}
     L ${width} ${TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom}
@@ -88,18 +91,29 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         <View style={styles.shadowOverlay} pointerEvents="none" />
       </View>
 
+      {/* Điều chỉnh lại vị trí nút quét để nó khớp với đường lõm mới */}
       <View style={[
         styles.centerButtonContainer, 
-        { bottom: TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom - (BUTTON_RADIUS * 2) - 10 }
+        { bottom: TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom - (BUTTON_RADIUS * 2) - 7 }
       ]}>
         <TouchableOpacity 
           activeOpacity={0.9}
-          onPressIn={handleScanPressIn} // Thêm sự kiện rung khi bắt đầu chạm
+          onPressIn={handleScanPressIn} 
           onPress={() => router.push('/scan')} 
           style={styles.scanButton}
         >
+          <LinearGradient 
+              colors={['rgb(255, 244, 230)', 'rgb(255, 232, 204)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ 
+                position: 'absolute', 
+                top: 0, left: 0, right: 0, bottom: 0, 
+                borderRadius: BUTTON_RADIUS // Thêm dòng này để cắt dải màu thành hình tròn
+              }}
+          />
           <View style={styles.scanButtonInner}>
-            <MaterialCommunityIcons name="line-scan" size={28} color="#ffa053" />
+            <MaterialCommunityIcons name="line-scan" size={28} color="#F59E0B" />
           </View>
         </TouchableOpacity>
       </View>
@@ -143,10 +157,10 @@ const TabItem = ({ label, icon, activeIcon, isActive, onPress }: any) => {
         <Ionicons 
           name={isActive ? activeIcon : icon} 
           size={26} 
-          color={isActive ? "#F97316" : "#9CA3AF"} 
+          color={isActive ? "#F59E0B" : "#9CA3AF"} 
         />
       </View>
-      <Text style={[styles.tabLabel, { color: isActive ? "#F97316" : "#9CA3AF", fontWeight: isActive ? '700' : '500' }]}>
+      <Text style={[styles.tabLabel, { color: isActive ? "#F59E0B" : "#9CA3AF", fontWeight: '500' }]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -203,6 +217,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 40,
   },
   tabGroup: {
     flex: 1,
@@ -218,16 +233,16 @@ const styles = StyleSheet.create({
     width: BUTTON_RADIUS * 2,
     height: BUTTON_RADIUS * 2,
     borderRadius: BUTTON_RADIUS,
-    backgroundColor: '#ffebce', 
+    // backgroundColor: '#ffebce', 
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: "#00000061",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    // shadowColor: "#00000061",
+    // shadowOffset: { width: 0, height: 8 },
+    // shadowOpacity: 0.4,
+    // shadowRadius: 12,
     elevation: 10,
-    borderWidth: 1,
-    borderColor: '#fff9f3',
+    // borderWidth: 1,
+    // borderColor: '#fff9f3',
   },
   scanButtonInner: {
     width: '100%',
@@ -241,7 +256,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: '100%',
     width: '100%',
-    paddingTop: 8,
+    marginTop: 65,
   },
   iconContainer: {
     marginBottom: 4,

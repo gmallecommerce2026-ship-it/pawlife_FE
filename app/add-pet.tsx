@@ -1,6 +1,6 @@
 // app/add-pet.tsx
 import { Text } from '@/components/AppText';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -8,19 +8,16 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useImageUpload } from '../hooks/useImageUpload';
-import { petService } from '../services/petService';
 
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
@@ -30,7 +27,9 @@ interface AddPetFormData {
   species: SpeciesType;
   breed: string;
   color: string;
+  weight: string;
   dob: string;
+  microchip: string;
   description: string;
   gender: GenderType;
   imageUrl: string;
@@ -43,10 +42,11 @@ interface AddPetFormData {
 
 export default function AddPetScreen() {
   const router = useRouter();
-  const { pickAndUploadImage, isUploading: isUploadingImage } = useImageUpload();
-  const { pickAndUploadImage: uploadAvatar, isUploading: isUploadingAvatar } = useImageUpload();
-  const { pickAndUploadImage: uploadVaccine, isUploading: isUploadingVaccine } = useImageUpload();
-  const { pickAndUploadImage: uploadQR, isUploading: isUploadingQR } = useImageUpload();
+  
+  // Tách biệt hook upload cho Avatar và Vaccination Record
+  const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
+  const { pickAndUploadImage: pickVaccine, isUploading: isUploadingVaccine } = useImageUpload();
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   
@@ -55,7 +55,9 @@ export default function AddPetScreen() {
     species: 'Dog',
     breed: '',
     color: '',
+    weight: '',
     dob: '',
+    microchip: '',
     description: '',
     gender: 'UNKNOWN',
     imageUrl: '',
@@ -66,8 +68,11 @@ export default function AddPetScreen() {
     qrCodeUrl: '',
   });
 
-  const handlePickImage = async () => {
-    const uploadedUrl = await pickAndUploadImage({ 
+  const inputFontStyle = { fontFamily: 'Urbanist-Regular' };
+
+  // Xử lý upload Avatar
+  const handlePickAvatar = async () => {
+    const uploadedUrl = await pickAvatar({ 
       folder: 'pets', 
       aspect: [1, 1],
       quality: 0.8,
@@ -78,19 +83,17 @@ export default function AddPetScreen() {
     }
   };
 
-  const handlePickAvatar = async () => {
-    const url = await uploadAvatar({ folder: 'pets/avatars', aspect: [1, 1], quality: 0.8 });
-    if (url) handleChange('imageUrl', url);
-  };
-
+  // Xử lý upload Vaccination Record
   const handlePickVaccine = async () => {
-    const url = await uploadVaccine({ folder: 'pets/paw-history', aspect: [3, 4], quality: 0.8 });
-    if (url) handleChange('vaccinationRecordUrl', url);
-  };
-
-  const handlePickQR = async () => {
-    const url = await uploadQR({ folder: 'pets/qr-codes', aspect: [1, 1], quality: 0.8 });
-    if (url) handleChange('qrCodeUrl', url);
+    const uploadedUrl = await pickVaccine({ 
+      folder: 'vaccines', 
+      aspect: [4, 3], // Tỉ lệ ngang phù hợp cho giấy tờ
+      quality: 0.8,
+    });
+    
+    if (uploadedUrl) {
+      handleChange('vaccinationRecordUrl', uploadedUrl);
+    }
   };
 
   const handleChange = (field: keyof AddPetFormData, value: string) => {
@@ -128,14 +131,14 @@ export default function AddPetScreen() {
         contactAddress: formData.contactAddress || null,
         images: formData.imageUrl ? [formData.imageUrl] : [],
         vaccinationRecordUrl: formData.vaccinationRecordUrl || null,
-        qrCodeUrl: formData.qrCodeUrl || null,
       };
 
       if (formData.dob) {
         payload.dob = formData.dob;
       }
 
-      await petService.addPet(payload);
+      // Giả lập API call
+      // await petService.addPet(payload);
       Alert.alert('Success', 'Pet profile added successfully!', [
         { text: 'OK', onPress: () => router.back() }
       ]);
@@ -146,317 +149,327 @@ export default function AddPetScreen() {
     }
   };
 
-  const renderGenderChip = (label: string, value: GenderType) => {
-    const isSelected = formData.gender === value;
-    return (
-      <TouchableOpacity
-        onPress={() => handleChange('gender', value)}
-        className={`flex-1 items-center justify-center py-3.5 rounded-xl border ${
-          isSelected 
-            ? 'bg-orange-50 border-orange-500' 
-            : 'bg-white border-gray-200'
-        }`}
-      >
-        <Text className={`font-semibold ${isSelected ? 'text-orange-600' : 'text-gray-500'}`}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderSpeciesChip = (label: string, value: SpeciesType) => {
-    const isSelected = formData.species === value;
-    return (
-      <TouchableOpacity
-        onPress={() => handleChange('species', value)}
-        className={`flex-1 items-center justify-center py-3.5 rounded-xl border ${
-          isSelected 
-            ? 'bg-blue-50 border-blue-500' 
-            : 'bg-white border-gray-200'
-        }`}
-      >
-        <Text className={`font-semibold ${isSelected ? 'text-blue-600' : 'text-gray-500'}`}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View className="flex-1">
             {/* Header */}
-            <View className="flex-row items-center justify-between px-5 py-4 bg-white border-b border-gray-100 z-10">
+            <View className="flex-row items-center justify-between px-5 py-4 bg-white z-10">
               <TouchableOpacity 
                 onPress={() => router.back()} 
-                className="w-10 h-10 items-start justify-center"
+                className="w-8 h-8 items-start justify-center"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Feather name="chevron-left" size={28} color="#1F2937" />
+                <Feather name="chevron-left" size={24} color="#000000" />
               </TouchableOpacity>
-              <Text className="text-lg font-bold text-gray-900">Add Pet</Text>
-              <View className="w-10" />
+              <Text className="text-[18px] font-semibold text-[#000000]">Add Pet</Text>
+              <View className="w-8" />
             </View>
 
             <ScrollView 
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 100 }}
-              className="px-4 pt-6"
+              contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 20 }}
+              className="flex-1"
             >
               {/* Avatar Section */}
-              <View className="items-center mb-8">
-                <View className="relative shadow-sm">
-                  {formData.imageUrl ? (
+              <View className="items-center mt-6 mb-8">
+                <TouchableOpacity 
+                    onPress={handlePickAvatar}
+                    disabled={isUploadingAvatar}
+                    className="w-32 h-32 rounded-full bg-[#FAFAFA] border border-gray-200 items-center justify-center overflow-hidden shadow-sm"
+                >
+                  {isUploadingAvatar ? (
+                    <ActivityIndicator size="large" color="#EFA062" />
+                  ) : formData.imageUrl ? (
                     <Image 
                       source={{ uri: formData.imageUrl }} 
-                      className="w-32 h-32 rounded-full bg-gray-100 border-4 border-white"
+                      className="w-full h-full"
                     />
                   ) : (
-                    <View className="w-32 h-32 rounded-full bg-orange-50 items-center justify-center border-4 border-white">
-                      <Ionicons name="paw" size={48} color="#ffa053" />
-                    </View>
+                    <Feather name="camera" size={32} color="#9CA3AF" />
                   )}
-                  
-                  <TouchableOpacity 
-                    onPress={handlePickImage}
-                    disabled={isUploadingImage}
-                    className="absolute bottom-1 right-1 bg-orange-500 w-10 h-10 rounded-full items-center justify-center border-4 border-white shadow-md"
-                  >
-                    {isUploadingImage ? (
-                      <ActivityIndicator size="small" color="white" />
-                    ) : (
-                      <Feather name="camera" size={16} color="white" />
-                    )}
-                  </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               </View>
 
-              {/* Form Section 1: Basic Info */}
-              <View className="bg-white p-5 rounded-3xl mb-4 shadow-sm">
-                <View className="mb-5">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Pet Name <Text className="text-red-500">*</Text></Text>
-                  <TextInput
-                    className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-medium"
-                    value={formData.name}
-                    onChangeText={(text) => handleChange('name', text)}
-                    placeholder="e.g. Max, Bella"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
+              {/* Pet Information Section */}
+              <View className="mb-6">
+                <Text className="text-[15px] font-semibold text-black mb-3">Pet Information</Text>
+                
+                <View className="bg-white p-6 rounded-[20px] border border-gray-200">
+                  {/* Name */}
+                  <View className="flex-row gap-3 mb-4">
+                    {/* Cột 1: Name (Input) */}
+                    <View className="flex-1">
+                      <Text className="text-[13px] text-black font-medium mb-1.5">Name</Text>
+                      <TextInput
+                        style={inputFontStyle}
+                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                        value={formData.name}
+                        onChangeText={(text) => handleChange('name', text)}
+                        placeholder="Enter name"
+                        placeholderTextColor="#A1A1AA"
+                      />
+                    </View>
 
-                <View className="mb-5">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Species</Text>
+                    {/* Cột 2: Type (Dropdown select) */}
+                    <View className="flex-1">
+                      <Text className="text-[13px] text-black font-medium mb-1.5">Type</Text>
+                      {/* Thường thì Type (Species) nên dùng dropdown để giới hạn lựa chọn (Chó/Mèo) */}
+                      <TouchableOpacity 
+                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white"
+                        onPress={() => {
+                          // TODO: Implement ActionSheet hoặc Modal để chọn Dog/Cat
+                          Alert.alert("Select Type", "Tính năng chọn Chó/Mèo đang được phát triển.");
+                        }}
+                      >
+                        {/* Hiển thị giá trị từ formData.species (mặc định là Dog) */}
+                        <Text className="text-black text-[14px]">
+                          {formData.species === 'Dog' ? 'Dog' : 'Cat'}
+                        </Text>
+                        <Feather name="chevron-down" size={16} color="#A1A1AA" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Gender & Breed Row */}
+                  <View className="flex-row gap-3 mb-4">
+                    <View className="flex-1">
+                      <Text className="text-[13px] text-black font-medium mb-1.5">Gender</Text>
+                      <TouchableOpacity className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white">
+                        <Text className="text-[#A1A1AA] text-[14px]">Select</Text>
+                        <Feather name="chevron-down" size={16} color="#A1A1AA" />
+                      </TouchableOpacity>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[13px] text-black font-medium mb-1.5">Breed</Text>
+                      <TouchableOpacity className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white">
+                        <Text className="text-[#A1A1AA] text-[14px]">Select</Text>
+                        <Feather name="chevron-down" size={16} color="#A1A1AA" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Color & Weight Row */}
+                  <View className="flex-row gap-3 mb-4">
+                    <View className="flex-1">
+                      <Text className="text-[13px] text-black font-medium mb-1.5">Color</Text>
+                      <TextInput
+                        style={inputFontStyle}
+                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                        value={formData.color}
+                        onChangeText={(text) => handleChange('color', text)}
+                        placeholder="e.g. Brown"
+                        placeholderTextColor="#A1A1AA"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[13px] text-black font-medium mb-1.5">Weight (kg)</Text>
+                      <TextInput
+                        style={inputFontStyle}
+                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                        value={formData.weight}
+                        onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
+                        keyboardType="decimal-pad"
+                        placeholder="0.0"
+                        placeholderTextColor="#A1A1AA"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Birthday & Microchip Row */}
                   <View className="flex-row gap-3">
-                    {renderSpeciesChip('Dog', 'Dog')}
-                    {renderSpeciesChip('Cat', 'Cat')}
+                    <View className="flex-1">
+                      <Text className="text-[13px] text-black font-medium mb-1.5">Birthday</Text>
+                      <TouchableOpacity
+                        onPress={() => setShowDatePicker(true)}
+                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 justify-center bg-white"
+                      >
+                        <Text className={`text-[14px] ${formData.dob ? 'text-black' : 'text-[#A1A1AA]'}`}>
+                          {formData.dob ? new Date(formData.dob).toLocaleDateString('en-GB') : 'DD/MM/YYYY'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[13px] text-black font-medium mb-1.5">Microchip</Text>
+                      <TextInput
+                        style={inputFontStyle}
+                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                        value={formData.microchip}
+                        onChangeText={(text) => handleChange('microchip', text)}
+                        placeholder="ID Number"
+                        placeholderTextColor="#A1A1AA"
+                      />
+                    </View>
                   </View>
-                </View>
 
-                <View>
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Gender</Text>
-                  <View className="flex-row gap-3">
-                    {renderGenderChip('Đực', 'MALE')}
-                    {renderGenderChip('Cái', 'FEMALE')}
-                    {renderGenderChip('Không rõ', 'UNKNOWN')}
-                  </View>
-                </View>
-              </View>
+                  {/* Divider */}
+                  <View className="h-[1px] bg-gray-100 my-5" />
 
-              {/* Form Section 2: Details */}
-              <View className="bg-white p-5 rounded-3xl mb-4 shadow-sm">
-                <View className="flex-row gap-4 mb-5">
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">Breed</Text>
-                    <TextInput
-                      className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-medium"
-                      value={formData.breed}
-                      onChangeText={(text) => handleChange('breed', text)}
-                      placeholder="e.g. Corgi"
-                      placeholderTextColor="#9CA3AF"
-                    />
-                  </View>
-                  
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">Date of Birth</Text>
-                    <TouchableOpacity
-                      onPress={() => setShowDatePicker(true)}
-                      className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 flex-row items-center justify-between"
-                    >
-                      <Text className={`text-base font-medium ${formData.dob ? 'text-gray-900' : 'text-[#9CA3AF]'}`}>
-                        {formData.dob ? new Date(formData.dob).toLocaleDateString('en-GB') : 'Select Date'}
-                      </Text>
-                      <Feather name="calendar" size={18} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View className="mb-5">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Color</Text>
-                  <TextInput
-                    className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-medium"
-                    value={formData.color}
-                    onChangeText={(text) => handleChange('color', text)}
-                    placeholder="e.g. Golden, Black & White"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-
-                <View>
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Description & Notes</Text>
-                  <TextInput
-                    className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-medium min-h-[100px]"
-                    value={formData.description}
-                    onChangeText={(text) => handleChange('description', text)}
-                    placeholder="Any unique traits, medical notes, or fun facts..."
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                  />
-                </View>
-              </View>
-
-              {/* --- FORM SECTION: PAW HISTORY (MEDICAL) --- */}
-              <View className="bg-white p-5 rounded-3xl mb-4 shadow-sm">
-                <View className="flex-row items-center mb-2">
-                  <MaterialCommunityIcons name="medical-bag" size={24} color="#10B981" />
-                  <Text className="text-lg font-bold text-gray-900 ml-2">Paw History (Medical)</Text>
-                </View>
-                <Text className="text-sm text-gray-500 mb-5 leading-5">
-                  Upload vaccination record images. This information needs to be verified by our Veterinary (Vet) team.
-                </Text>
-
-                <View className="w-full">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Vaccination Book</Text>
-                  <TouchableOpacity 
-                    onPress={handlePickVaccine}
-                    disabled={isUploadingVaccine}
-                    className="bg-gray-50 border border-gray-200 border-dashed rounded-2xl h-40 items-center justify-center overflow-hidden"
-                  >
-                    {isUploadingVaccine ? (
-                      <ActivityIndicator size="small" color="#10B981" />
-                    ) : formData.vaccinationRecordUrl ? (
-                      <Image source={{ uri: formData.vaccinationRecordUrl }} className="w-full h-full" resizeMode="cover" />
-                    ) : (
-                      <View className="items-center">
-                        <Feather name="upload-cloud" size={28} color="#9CA3AF" />
-                        <Text className="text-sm text-gray-500 mt-2">Upload Vaccination Record</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* --- FORM SECTION: SMART TAG / QR CODE --- */}
-              <View className="bg-white p-5 rounded-3xl mb-4 shadow-sm">
-                <View className="flex-row items-center mb-2">
-                  <MaterialCommunityIcons name="qrcode-scan" size={24} color="#3B82F6" />
-                  <Text className="text-lg font-bold text-gray-900 ml-2">Smart Tag / QR Code</Text>
-                </View>
-                <Text className="text-sm text-gray-500 mb-5 leading-5">
-                  Upload the pet's collar QR code. This data will be verified by the system or the Management team to activate the search feature.
-                </Text>
-
-                <View className="w-full">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Pet QR Code</Text>
-                  <TouchableOpacity 
-                    onPress={handlePickQR}
-                    disabled={isUploadingQR}
-                    className="bg-gray-50 border border-gray-200 border-dashed rounded-2xl h-40 items-center justify-center overflow-hidden"
-                  >
-                    {isUploadingQR ? (
-                      <ActivityIndicator size="small" color="#3B82F6" />
-                    ) : formData.qrCodeUrl ? (
-                      <Image source={{ uri: formData.qrCodeUrl }} className="w-full h-full" resizeMode="contain" />
-                    ) : (
-                      <View className="items-center">
-                        <MaterialCommunityIcons name="qrcode-plus" size={28} color="#9CA3AF" />
-                        <Text className="text-sm text-gray-500 mt-2">Upload QR Code</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Form Section 3: Owner Information */}
-              <View className="bg-white p-5 rounded-3xl mb-8 shadow-sm">
-                <View className="flex-row items-center mb-2">
-                  <Ionicons name="person-circle" size={24} color="#ffa053" />
-                  <Text className="text-lg font-bold text-gray-900 ml-2">Contact Info</Text>
-                </View>
-                <Text className="text-sm text-gray-500 mb-5 leading-5">
-                  Crucial details for others to reach you if your pet gets lost or is in an emergency.
-                </Text>
-
-                <View className="space-y-5">
+                  {/* Notes */}
                   <View>
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">Owner Name</Text>
+                    <Text className="text-[13px] text-black font-medium mb-1.5">Notes</Text>
                     <TextInput
-                      className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-medium"
-                      value={formData.contactName}
-                      onChangeText={(text) => handleChange('contactName', text)}
-                      placeholder="e.g. John Doe"
-                      placeholderTextColor="#9CA3AF"
-                    />
-                  </View>
-
-                  <View>
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">Phone Number</Text>
-                    <TextInput
-                      className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-medium"
-                      value={formData.contactPhone}
-                      onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
-                      keyboardType="phone-pad"
-                      placeholder="e.g. 0912345678"
-                      placeholderTextColor="#9CA3AF"
-                      maxLength={15}
-                    />
-                  </View>
-
-                  <View>
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">Address</Text>
-                    <TextInput
-                      className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-medium min-h-[80px]"
-                      value={formData.contactAddress}
-                      onChangeText={(text) => handleChange('contactAddress', text)}
-                      placeholder="e.g. 123 Main St, Apartment 4B..."
-                      placeholderTextColor="#9CA3AF"
+                      style={[inputFontStyle, { paddingTop: 12 }]}
+                      className="border border-gray-200 rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
+                      value={formData.description}
+                      onChangeText={(text) => handleChange('description', text)}
+                      placeholder="Loves belly rubs and playing fetch. Very friendly with children."
+                      placeholderTextColor="#A1A1AA"
                       multiline
-                      numberOfLines={3}
                       textAlignVertical="top"
                     />
                   </View>
                 </View>
               </View>
 
-            </ScrollView>
+              {/* Owner Information Section */}
+              <View className="mb-6">
+                <Text className="text-[15px] font-semibold text-black mb-3">Owner Information</Text>
+                
+                <View className="bg-white rounded-[20px] border border-gray-200 px-4 py-2">
+                  {/* Name */}
+                  <View className="flex-row items-center py-3 border-b border-gray-100">
+                    <Text className="text-[14px] font-medium text-black w-[80px]">Name</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="flex-1 text-right text-[14px] text-black p-0"
+                      value={formData.contactName}
+                      onChangeText={(text) => handleChange('contactName', text)}
+                      placeholder="Full Name"
+                      placeholderTextColor="#A1A1AA"
+                    />
+                  </View>
 
-            {/* Sticky Bottom Action Button */}
-            <View className="absolute bottom-0 w-full px-5 py-4 bg-white border-t border-gray-100 pb-8">
-              <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={isSubmitting || isUploadingImage || !formData.name}
-                className={`w-full py-4 rounded-2xl items-center justify-center flex-row shadow-sm ${
-                  (isSubmitting || isUploadingImage || !formData.name) ? 'bg-orange-400' : 'bg-orange-500'
-                }`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <ActivityIndicator size="small" color="white" />
-                    <Text className="text-white font-bold text-lg ml-2">Saving...</Text>
-                  </>
-                ) : (
-                  <Text className="text-white font-bold text-lg">Save Profile</Text>
+                  {/* Phone */}
+                  <View className="flex-row items-center py-3 border-b border-gray-100">
+                    <Text className="text-[14px] font-medium text-black w-[80px]">Phone</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="flex-1 text-right text-[14px] text-black p-0"
+                      value={formData.contactPhone}
+                      onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
+                      keyboardType="phone-pad"
+                      placeholder="Phone Number"
+                      placeholderTextColor="#A1A1AA"
+                      maxLength={15}
+                    />
+                  </View>
+
+                  {/* Address */}
+                  <View className="flex-row items-center py-3">
+                    <Text className="text-[14px] font-medium text-black w-[80px]">Address</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="flex-1 text-right text-[14px] text-black p-0"
+                      value={formData.contactAddress}
+                      onChangeText={(text) => handleChange('contactAddress', text)}
+                      placeholder="Street, District, City"
+                      placeholderTextColor="#A1A1AA"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Vaccination Record Section */}
+              {/* Vaccination Record Section */}
+              <View className="mb-8">
+                <Text className="text-[15px] font-semibold text-[#111827] mb-3">Vaccination Record</Text>
+                
+                {/* 1. Upload Khu vực kéo thả / Click (Dropzone) */}
+                <TouchableOpacity
+                  onPress={handlePickVaccine}
+                  activeOpacity={0.7}
+                  className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center mb-4"
+                >
+                  <View className="w-10 h-10 bg-[#F3F4F6] rounded-full items-center justify-center mb-2">
+                    <Feather name="upload-cloud" size={20} color="#6B7280" />
+                  </View>
+                  <Text className="text-[14px] text-[#374151] font-medium mb-1">
+                    <Text className="text-[#EFA062]">Click to upload</Text> or drag and drop
+                  </Text>
+                  <Text className="text-[12px] text-[#9CA3AF]">SVG, PNG, JPG or GIF (max. 800x400px)</Text>
+                </TouchableOpacity>
+
+                {/* 2. Trạng thái Đang tải lên (Uploading File Item) */}
+                {isUploadingVaccine && (
+                  <View className="border border-[#E5E7EB] rounded-[12px] p-3 flex-row items-center mb-3 bg-white shadow-sm shadow-gray-100">
+                    <View className="w-10 h-10 rounded-lg bg-[#F3F4F6] items-center justify-center">
+                      <Feather name="file" size={20} color="#9CA3AF" />
+                    </View>
+                    <View className="flex-1 mx-3">
+                      <View className="flex-row justify-between items-center mb-1.5">
+                        <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>Uploading_document...</Text>
+                        <Text className="text-[12px] text-[#6B7280]">45%</Text>
+                      </View>
+                      <View className="h-1.5 w-full bg-[#F3F4F6] rounded-full overflow-hidden">
+                        <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '45%' }} />
+                      </View>
+                    </View>
+                    <TouchableOpacity className="p-1">
+                      <Feather name="x" size={16} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  </View>
                 )}
-              </TouchableOpacity>
-            </View>
 
+                {/* 3. Trạng thái Đã tải lên xong (Uploaded File Item) */}
+                {formData.vaccinationRecordUrl ? (
+                  <View className="border border-[#EFA062] rounded-[12px] p-3 flex-row items-center bg-[#FEF3EB]/30 shadow-sm shadow-orange-100/50">
+                    <Image 
+                      source={{ uri: formData.vaccinationRecordUrl }} 
+                      className="w-10 h-10 rounded-lg bg-[#F3F4F6]" 
+                      resizeMode="cover"
+                    />
+                    <View className="flex-1 mx-3">
+                      <View className="flex-row justify-between items-center mb-0.5">
+                        <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>vaccination_record.jpg</Text>
+                      </View>
+                      <View className="flex-row items-center">
+                        <Text className="text-[12px] text-[#6B7280] mr-2">1.2 MB</Text>
+                        <View className="flex-row items-center">
+                           <Feather name="check-circle" size={12} color="#EFA062" />
+                           <Text className="text-[12px] text-[#EFA062] ml-1 font-medium">Completed</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <TouchableOpacity 
+                      onPress={() => handleChange('vaccinationRecordUrl', '')}
+                      className="p-1"
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Feather name="trash-2" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Action Buttons */}
+              <View className="space-y-3 mb-10">
+                <TouchableOpacity
+                  onPress={handleSubmit}
+                  disabled={isSubmitting || isUploadingAvatar || isUploadingVaccine}
+                  className="bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm"
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text className="text-white font-semibold text-[16px]">Save Profile</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  disabled={isSubmitting}
+                  className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-4"
+                >
+                  <Text className="text-[#9CA3AF] font-medium text-[16px]">Cancel</Text>
+                </TouchableOpacity>
+              </View>
+
+            </ScrollView>
           </View>
-        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
       {/* ================= MODALS & PICKERS ================= */}
@@ -470,7 +483,7 @@ export default function AddPetScreen() {
                 </TouchableOpacity>
                 <Text className="font-bold text-gray-900 text-lg">Date of Birth</Text>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text className="text-orange-500 font-bold text-lg px-2">Done</Text>
+                  <Text className="text-[#EFA062] font-bold text-lg px-2">Done</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -495,7 +508,6 @@ export default function AddPetScreen() {
           />
         )
       )}
-
     </SafeAreaView>
   );
 }

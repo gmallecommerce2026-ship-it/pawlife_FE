@@ -1,141 +1,282 @@
 // app/organizer-profile.tsx
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Text } from '@/components/AppText';
+import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Image, ScrollView, TouchableOpacity, View } from 'react-native';
+import React, { memo, useState } from 'react';
+import { Dimensions, FlatList, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/AppText';
-// --- MOCK DATA ---
-const ORGANIZER = {
-  name: 'Pet Art Collective',
-  handle: '@petartcollective',
-  avatar: 'https://images.unsplash.com/photo-1517260739337-6799d239ce83?q=80&w=500&auto=format&fit=crop', // Ảnh tòa nhà/clock tower giả lập
+const { width } = Dimensions.get('window');
+
+// =========================================================================
+// 1. TYPES & MOCK DATA (Chuẩn hóa)
+// =========================================================================
+
+interface Organizer {
+    id: string;
+    name: string;
+    handle: string;
+    avatar: string;
+    coverImg: string;
+    followers: number;
+    totalEvents: number;
+    about: string;
+}
+
+const ORGANIZER: Organizer = {
+    id: 'org_1',
+    name: 'Pet Art Collective',
+    handle: '@petartcollective',
+    avatar: 'https://images.unsplash.com/photo-1517260739337-6799d239ce83?q=80&w=500&auto=format&fit=crop',
+    coverImg: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=1000&auto=format&fit=crop', // Cần ảnh bìa để làm nổi bật hiệu ứng cắt lòi avatar
+    followers: 1250,
+    totalEvents: 34,
+    about: 'We are a dedicated group organizing the best pet-friendly art events, workshops, and exhibitions across the country. Our mission is to bond humans and pets through creativity.'
 };
 
 const ORGANIZER_EVENTS = [
-  {
-    id: 1,
-    title: 'Dog art therapy & painting class',
-    location: 'New York',
-    date: 'Mon, Dec 23',
-    image: 'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?q=80&w=400&auto=format&fit=crop',
-  },
-  {
-    id: 2,
-    title: 'Pet portrait photography workshop',
-    location: 'Washington DC',
-    date: 'Tue, Dec 16',
-    image: null, // Trường hợp không có ảnh (hiển thị placeholder)
-  },
+    {
+        id: 'ev_1',
+        title: 'Dog art therapy & painting class',
+        locationName: 'New York Central Park',
+        startDate: '2026-12-23T07:00:00Z',
+        bannerUrl: 'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?q=80&w=400&auto=format&fit=crop',
+        interestedCount: 245
+    },
+    {
+        id: 'ev_2',
+        title: 'Pet portrait photography workshop',
+        locationName: 'Washington DC Studio',
+        startDate: '2026-12-16T15:30:00Z',
+        bannerUrl: null,
+        interestedCount: 112
+    },
 ];
 
-const TABS = ['Events', 'Collections', 'About'];
+const TABS = ['Events', 'About'] as const;
+type TabType = typeof TABS[number];
+
+// =========================================================================
+// 2. REUSABLE COMPONENTS (Đảm bảo 100% giống search.tsx)
+// =========================================================================
+
+const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
+    let displayDate = 'Đang cập nhật';
+    if (item.startDate) {
+        const d = new Date(item.startDate);
+        const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+        const formattedTime = timePart.replace('am', 'a.m').replace('pm', 'p.m');
+        displayDate = `${datePart} at ${formattedTime}`;
+    }
+
+    const mockAvatars = [
+        'https://i.pravatar.cc/100?img=12',
+        'https://i.pravatar.cc/100?img=13'
+    ];
+
+    return (
+        <TouchableOpacity 
+            className="bg-white rounded-[20px] flex-row shadow-sm border border-[#F3F4F6] mb-4 overflow-hidden"
+            activeOpacity={0.8}
+            onPress={() => onPress(item)}
+        >
+            <Image 
+                source={{ uri: item.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} 
+                className="w-[110px] min-h-[120px] bg-gray-200"
+                resizeMode="cover" 
+            />
+            <View className="flex-1 p-[14px] justify-between">
+                <View className="pr-6 relative"> 
+                    <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1" numberOfLines={2}>
+                        {item.title || 'Weekend Animal Event'}
+                    </Text>
+                    <Text className="text-[#8E8E93] text-[13px] font-regular" numberOfLines={1}>
+                        {item.locationName || item.address || 'District, City'}
+                    </Text>
+                    <TouchableOpacity className="absolute -top-1 right-0" hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                        <Feather name="bookmark" size={20} color="#9CA3AF" />
+                    </TouchableOpacity>
+                </View>
+                
+                <View className="flex-row items-center justify-between mt-4">
+                    <View className="flex-row items-center flex-1 pr-2">
+                        <Feather name="calendar" size={13} color="#E89B5A" />
+                        <Text className="text-[#E89B5A] text-[9px] font-medium ml-1.5" numberOfLines={1}>
+                            {displayDate}
+                        </Text>
+                    </View>
+                    <View className="flex-row items-center">
+                        <View className="flex-row">
+                            {mockAvatars.map((avatar, index) => (
+                                <Image 
+                                    key={index}
+                                    source={{ uri: avatar }} 
+                                    className={`w-[18px] h-[18px] rounded-full border-2 border-white ${index > 0 ? '-ml-2' : ''}`}
+                                />
+                            ))}
+                        </View>
+                        <Text className="text-[#8E8E93] text-[9px] font-regular ml-1">
+                            + {item.interestedCount || 123} interested
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+});
+
+// =========================================================================
+// 3. MAIN SCREEN
+// =========================================================================
+
+const SHADOW_OPACITY = 0.05;
+const SHADOW_RADIUS = 8;
+const ELEVATION = 3;
 
 export default function OrganizerProfileScreen() {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState('Events');
+    const router = useRouter();
+    const [activeTab, setActiveTab] = useState<TabType>('Events');
+    const [isFollowing, setIsFollowing] = useState(false);
 
-  return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-      
-      {/* --- HEADER --- */}
-      <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-50">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="chevron-left" size={28} color="#1F2937" />
-        </TouchableOpacity>
-        
-        <Text className="text-lg font-bold text-gray-900">Organizer</Text>
-        
-        <TouchableOpacity className="p-2 -mr-2">
-          <MaterialCommunityIcons name="dots-vertical" size={24} color="#1F2937" />
-        </TouchableOpacity>
-      </View>
+    const handleEventPress = (item: any) => {
+        router.push({ pathname: '/event-detail', params: { id: item.id } });
+    };
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        
-        {/* --- PROFILE INFO --- */}
-        <View className="items-center mt-6 mb-6">
-          <View className="w-24 h-24 rounded-full overflow-hidden shadow-sm border border-gray-100 mb-4">
-             <Image source={{ uri: ORGANIZER.avatar }} className="w-full h-full" resizeMode="cover" />
-          </View>
-          <Text className="text-xl font-bold text-gray-900 mb-1">{ORGANIZER.name}</Text>
-          <Text className="text-blue-400 font-medium text-sm">{ORGANIZER.handle}</Text>
-        </View>
+    return (
+        <View className="flex-1 bg-white">
+            {/* Ảnh bìa Cover Image */}
+            <View className="w-full h-[180px] absolute top-0 left-0 right-0">
+                <Image source={{ uri: ORGANIZER.coverImg }} className="w-full h-full opacity-90" resizeMode="cover" />
+                <LinearGradient colors={['rgba(0,0,0,0.6)', 'transparent']} style={StyleSheet.absoluteFillObject} />
+            </View>
 
-        {/* --- TABS --- */}
-        <View className="flex-row border-b border-gray-100 mb-6">
-            {TABS.map((tab) => {
-                const isActive = activeTab === tab;
-                return (
-                    <TouchableOpacity 
-                        key={tab} 
-                        onPress={() => setActiveTab(tab)}
-                        className={`flex-1 items-center py-3 border-b-2 ${isActive ? 'border-orange-400' : 'border-transparent'}`}
-                    >
-                        <Text className={`font-medium text-base ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>
-                            {tab}
-                        </Text>
+            <SafeAreaView className="flex-1" edges={['top']}>
+                {/* --- HEADER --- */}
+                <View className="flex-row items-center justify-between px-4 py-3 relative z-20">
+                    <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full items-center justify-center border border-white/20">
+                        <Feather name="chevron-left" size={24} color="white" />
                     </TouchableOpacity>
-                );
-            })}
-        </View>
+                </View>
 
-        {/* --- CONTENT LIST (EVENTS) --- */}
-        <View className="px-5">
-            {activeTab === 'Events' && (
-                <View className="gap-4">
-                    {ORGANIZER_EVENTS.map((event) => (
-                        <TouchableOpacity 
-                            key={event.id}
-                            className="bg-white rounded-2xl p-3 shadow-sm shadow-gray-200 border border-gray-100 flex-row"
-                            activeOpacity={0.7}
-                        >
-                            {/* Thumbnail */}
-                            <View className="w-24 h-24 rounded-xl bg-gray-100 overflow-hidden">
-                                {event.image ? (
-                                    <Image source={{ uri: event.image }} className="w-full h-full" resizeMode="cover" />
-                                ) : (
-                                    <View className="w-full h-full items-center justify-center bg-gray-50">
-                                        <Ionicons name="image-outline" size={32} color="#D1D5DB" />
+                {/* --- MAIN CONTENT SCROLL --- */}
+                <FlatList
+                    data={activeTab === 'Events' ? ORGANIZER_EVENTS : []}
+                    keyExtractor={(item) => item.id}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}
+                    ListHeaderComponent={
+                        <View className="mt-[60px]">
+                            {/* KHUNG THÔNG TIN CÓ AVATAR LÒI LÊN */}
+                            <View className="bg-white rounded-t-[32px] pt-[50px] pb-6 px-5" style={{ minHeight: 180 }}>
+                                
+                                {/* -- AVATAR CUTOUT Y HỆT VIEW-QR-CODE -- */}
+                                <View className="absolute -top-[46px] self-center w-[92px] h-[92px] z-10">
+                                    {/* LAYER 1: Nửa trên bo tròn bóng đổ */}
+                                    <View style={{ position: 'absolute', width: 140, height: 90, bottom: 46, left: -24, overflow: 'hidden' }}>
+                                        <View 
+                                            style={{ 
+                                                width: 92, height: 92, borderRadius: 46, 
+                                                bottom: -46, left: 24, 
+                                                backgroundColor: '#FFFFFF', 
+                                                borderWidth: 1, borderColor: '#F3F4F6',
+                                                shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+                                                shadowOpacity: SHADOW_OPACITY, shadowRadius: SHADOW_RADIUS, elevation: ELEVATION 
+                                            }}
+                                        />
                                     </View>
-                                )}
-                            </View>
+                                    {/* LAYER 2: Nửa dưới */}
+                                    <View style={{ position: 'absolute', width: 92, height: 46, top: 46, left: 0, overflow: 'hidden' }}>
+                                        <View style={{ width: 92, height: 92, borderRadius: 46, top: -46, left: 0, backgroundColor: '#FFFFFF' }} />
+                                    </View>
+                                    {/* LAYER 3: ẢNH AVATAR */}
+                                    <View className="absolute inset-0 items-center justify-center pointer-events-none">
+                                        <Image source={{ uri: ORGANIZER.avatar }} className="w-[80px] h-[80px] rounded-full bg-gray-200" resizeMode="cover" />
+                                    </View>
+                                </View>
 
-                            {/* Content */}
-                            <View className="flex-1 ml-4 py-1 justify-between">
-                                <View>
-                                    <View className="flex-row justify-between items-start">
-                                        <Text className="text-gray-900 font-bold text-[15px] flex-1 mr-2 leading-5" numberOfLines={2}>
-                                            {event.title}
+                                {/* -- STATS (Followers & Events) NẰM 2 BÊN AVATAR -- */}
+                                <View className="absolute top-4 left-0 right-0 flex-row justify-between px-8">
+                                    <View className="items-center">
+                                        <Text className="text-[16px] font-bold text-gray-900">{ORGANIZER.followers.toLocaleString()}</Text>
+                                        <Text className="text-[12px] text-[#8E8E93] mt-0.5">Followers</Text>
+                                    </View>
+                                    <View className="items-center">
+                                        <Text className="text-[16px] font-bold text-gray-900">{ORGANIZER.totalEvents}</Text>
+                                        <Text className="text-[12px] text-[#8E8E93] mt-0.5">Events</Text>
+                                    </View>
+                                </View>
+
+                                {/* -- NAME, ID & BUTTON FOLLOW -- */}
+                                <View className="items-center mt-2">
+                                    <Text className="text-[20px] font-bold text-gray-900 mb-1">{ORGANIZER.name}</Text>
+                                    <Text className="text-[14px] text-[#8E8E93] mb-5">{ORGANIZER.handle}</Text>
+                                    
+                                    <TouchableOpacity 
+                                        onPress={() => setIsFollowing(!isFollowing)}
+                                        className={`px-8 py-3 rounded-full flex-row items-center justify-center min-w-[140px] ${
+                                            isFollowing ? 'bg-gray-100' : 'bg-[#E89B5A]'
+                                        }`}
+                                    >
+                                        <Text className={`text-[15px] font-semibold ${isFollowing ? 'text-gray-900' : 'text-white'}`}>
+                                            {isFollowing ? 'Following' : 'Follow'}
                                         </Text>
-                                        <TouchableOpacity>
-                                            <Feather name="bookmark" size={20} color="#6B7280" />
-                                        </TouchableOpacity>
-                                    </View>
-                                    <Text className="text-gray-400 text-xs mt-1">{event.location}</Text>
-                                </View>
-
-                                {/* Date Row */}
-                                <View className="flex-row items-center">
-                                    <Feather name="calendar" size={14} color="#ffa053" />
-                                    <Text className="text-gray-500 text-xs font-medium ml-1.5">{event.date}</Text>
+                                    </TouchableOpacity>
                                 </View>
                             </View>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            )}
 
-            {/* Placeholder cho các tab chưa có nội dung */}
-            {(activeTab === 'Collections' || activeTab === 'About') && (
-                <View className="items-center justify-center py-10">
-                    <Text className="text-gray-400">No content available yet.</Text>
-                </View>
-            )}
+                            {/* --- TABS --- */}
+                            <View className="flex-row border-b border-gray-100 bg-white">
+                                {TABS.map((tab) => {
+                                    const isActive = activeTab === tab;
+                                    return (
+                                        <TouchableOpacity 
+                                            key={tab} 
+                                            onPress={() => setActiveTab(tab)}
+                                            className={`flex-1 items-center py-4 border-b-2 ${isActive ? 'border-[#E89B5A]' : 'border-transparent'}`}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text className={`font-semibold text-[15px] ${isActive ? 'text-[#E89B5A]' : 'text-gray-400'}`}>
+                                                {tab}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                            
+                            {/* Khoảng trống để list item không bị sát mép tab */}
+                            {activeTab === 'Events' && <View className="h-5 bg-white" />}
+                            
+                            {/* --- ABOUT TAB CONTENT --- */}
+                            {activeTab === 'About' && (
+                                <View className="p-6 bg-white">
+                                    <Text className="text-[16px] font-bold text-gray-900 mb-3">About Organizer</Text>
+                                    <Text className="text-[15px] text-gray-600 leading-6 text-justify">
+                                        {ORGANIZER.about}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    }
+                    // --- EVENTS TAB CONTENT (Render items) ---
+                    renderItem={({ item }) => {
+                        if (activeTab !== 'Events') return null;
+                        return (
+                            <View className="px-5 bg-white">
+                                <EventCard item={item} onPress={handleEventPress} />
+                            </View>
+                        );
+                    }}
+                    ListEmptyComponent={
+                        activeTab === 'Events' ? (
+                            <View className="items-center justify-center py-10 bg-white">
+                                <Text className="text-gray-400">No events currently hosted.</Text>
+                            </View>
+                        ) : null
+                    }
+                />
+            </SafeAreaView>
         </View>
-
-      </ScrollView>
-    </SafeAreaView>
-  );
+    );
 }

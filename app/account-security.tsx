@@ -1,7 +1,7 @@
 // app/account-security.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-import { AntDesign, Feather } from '@expo/vector-icons';
+import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useContext, useEffect, useState } from 'react';
@@ -22,6 +22,8 @@ import axiosClient from '../api/axiosClient';
 // Import thư viện sinh trắc học và bộ nhớ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { AppContext } from '@/contexts/AppContext';
 
 // Tái sử dụng component cho dạng bật/tắt (Toggle)
 const SettingToggle = ({ label, value, onValueChange }: { label: string, value: boolean, onValueChange: (val: boolean) => void }) => (
@@ -69,6 +71,8 @@ export default function AccountSecurityScreen() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [twoFaCode, setTwoFaCode] = useState('');
   const [isProcessing2FA, setIsProcessing2FA] = useState(false);
+  const { isFloatingButtonVisible, setIsFloatingButtonVisible } = useContext(AppContext) as any;
+const { t } = useLanguage();
   const handleTwoFaCodeChange = (text: string) => {
     setTwoFaCode(text);
     
@@ -296,7 +300,30 @@ export default function AccountSecurityScreen() {
                 isLast={true}
               />
             </View>
-
+            <View className="bg-white px-6 mt-6 border-y border-gray-100">
+  <View className="flex-row items-center justify-between py-4">
+    <View className="flex-row items-center flex-1 pr-4">
+      <View className="w-10 h-10 bg-[#F4F5F7] rounded-full items-center justify-center mr-3">
+        <Ionicons name="radio-button-on" size={20} color="#374151" />
+      </View>
+      <View className="flex-1">
+        <Text className="text-base font-semibold text-gray-900">
+          {t('Floating Home Button') || 'Floating Home Button'}
+        </Text>
+        <Text className="text-sm text-gray-500 mt-0.5">
+          {t('Show virtual home button on screen') || 'Show virtual home button on screen'}
+        </Text>
+      </View>
+    </View>
+    <Switch
+      value={isFloatingButtonVisible}
+      onValueChange={(val) => setIsFloatingButtonVisible(val)}
+      trackColor={{ false: '#D1D5DB', true: '#10B981' }} /* Dùng màu xanh đồng bộ với Face ID */
+      thumbColor={'#FFFFFF'}
+      ios_backgroundColor="#D1D5DB"
+    />
+  </View>
+</View>
             {/* --- DANGER ZONE --- */}
             <View className="bg-white px-6 mt-6 border-y border-gray-100">
             {/* <TouchableOpacity 
