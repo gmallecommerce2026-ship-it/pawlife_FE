@@ -376,7 +376,9 @@ export default function HomeScreen() {
                                 >
                                     <Image source={{ uri: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' }} className="w-14 h-14 rounded-2xl bg-gray-200 mr-3" resizeMode="cover" />
                                     <View className="flex-1">
-                                        <Text className="font-semibold text-gray-800 text-sm " numberOfLines={1}>{shelter.name}</Text>
+                                        <Text className="font-semibold text-gray-800 text-sm" numberOfLines={1}>
+                                            {shelter.name}
+                                        </Text>
                                         <View className="flex-row items-center mt-2">
                                             <Ionicons name="location-outline" size={12} color="#9CA3AF" />
                                             <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>{shelter.address || 'Đang cập nhật'}</Text>
@@ -415,7 +417,7 @@ export default function HomeScreen() {
                                     <View className="flex-1 flex-row items-center pl-6 pr-4 py-3">
                                         <View className="flex-1 justify-between h-full pr-2">
                                             <View>
-                                                <Text className="font-semibold text-gray-800 text-sm leading-tight mb-0.5" numberOfLines={2}>{event.title}</Text>
+                                                <Text className="font-semibold text-gray-800 text-sm leading-tight mb-0.5" numberOfLines={1}>{event.title}</Text>
                                                 <View className="flex-row items-center mt-1.5">
                                                     <Ionicons name="location" size={12} color="#9CA3AF" />
                                                     <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>{event.locationName || event.address}</Text>
