@@ -19,11 +19,12 @@ import { petService } from '../../services/petService';
 interface Pet {
   id: string;
   name: string;
-  species: string; // Dog, Cat...
+  species: string; 
   breed?: string | null;
-  dob?: string | null; // Sử dụng Ngày sinh (Date of Birth) thay vì Age
+  dob?: string | null; 
   avatarUrl?: string | null;
   status: string;
+  isLost?: boolean; // THÊM DÒNG NÀY
 }
 
 // Hàm tính tuổi tự động từ Ngày sinh
@@ -131,7 +132,7 @@ export default function MyPetsScreen() {
             {pet.name}
           </Text>
 
-          {pet.status === 'LOST' && (
+          {pet.isLost && (
             <View className="bg-red-50 px-3 py-1 rounded-full border border-red-100">
               <Text className="text-red-500 text-[10px] uppercase font-bold tracking-wider">
                 Lost
@@ -185,20 +186,37 @@ export default function MyPetsScreen() {
       </View>
 
       <ScrollView
-        className="flex-1" // 1. Bỏ px-6 và pt-0 ở đây đi
+        className="flex-1"
         showsVerticalScrollIndicator={false}
-        // style={{ overflow: 'visible' }} // 2. Thêm thuộc tính này để ScrollView không cắt các phần tử tràn viền (rất quan trọng trên Android)
         contentContainerStyle={{
           paddingBottom: 100,
-          paddingHorizontal: 24, // 4. Chuyển px-6 (tương đương 24px) từ ngoài vào trong đây
+          paddingHorizontal: 24,
           flexGrow: 1,
           justifyContent: (pets.length === 0 && !isLoading && !error) ? 'center' : 'flex-start'
         }}
       >
-
-
-        {/* --- STATE HANDLING --- */}
-        <View className=" flex items-center justify-center">
+        {/* --- STATE HANDLING LẠI LOGIC RENDER --- */}
+        
+        {/* 1. Đang tải dữ liệu */}
+        {isLoading ? (
+          <View className="flex-1 justify-center items-center mt-10">
+             <ActivityIndicator size="large" color="#F59E0B" />
+          </View>
+        ) : error ? (
+          /* 2. Bị lỗi khi fetch data */
+          <View className="flex-1 justify-center items-center mt-10">
+             <Text className="text-red-500">{error}</Text>
+          </View>
+        ) : pets.length > 0 ? (
+          /* 3. NẾU CÓ PET: Gọi Sub-component PetCard ra để hiển thị */
+          <View>
+            {pets.map((pet) => (
+              <PetCard key={pet.id} pet={pet} />
+            ))}
+          </View>
+        ) : (
+          /* 4. NẾU KHÔNG CÓ PET: Hiển thị màn hình trống */
+          <View className="flex items-center justify-center">
             <Image
               source={require('../../assets/images/my-pet-empty.png')}
               resizeMode="contain"
@@ -208,11 +226,12 @@ export default function MyPetsScreen() {
                 height: 232,
               }}
             />
+            <Text className="text-gray-800 text-lg font-bold mt-6">You don't have any pets yet</Text>
+            <Text className="text-gray-400 text-center mt-2 mb-6">Add your pet or adopt a new friend!</Text>
+          </View>
+        )}
 
-          <Text className="text-gray-800 text-lg font-bold mt-6">You don't have any pets yet</Text>
-          <Text className="text-gray-400 text-center mt-2 mb-6">Add your pet or adopt a new friend!</Text>
-        </View>
-
+        {/* --- NÚT ADD PET: Luôn nằm ở dưới cùng --- */}
         <TouchableOpacity
           className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-2"
           activeOpacity={0.7}

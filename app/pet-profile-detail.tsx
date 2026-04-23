@@ -111,6 +111,13 @@ export default function PetProfileDetailScreen() {
       setShowLostModeModal(true);
   };
 
+  const handleViewQRCode = () => {
+      // Đảm bảo có data rồi mới cho mở Modal
+      if (petData) {
+          setShowQRModal(true);
+      }
+  };
+
   const executeToggleMode = async () => {
     const isLost = pendingLostMode;
     try {
@@ -144,7 +151,7 @@ export default function PetProfileDetailScreen() {
         </View>
     </View>
   );
-
+  
   const InfoRow2 = ({ label1, value1, label2, value2 }: any) => (
     <View className="flex-row justify-between mb-8">
         <View className="flex-1">
@@ -236,7 +243,7 @@ export default function PetProfileDetailScreen() {
 
   // Format ID hiển thị (cắt ngắn id gốc nếu quá dài)
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId.substring(0, 8).toUpperCase();
-
+  
   return (
     <View className="flex-1 bg-[#FFFFFF]">
       <StatusBar style="dark" />
@@ -509,7 +516,7 @@ export default function PetProfileDetailScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => router.push('/view-qr-code')}
+                  onPress={handleViewQRCode}
                   activeOpacity={0.7}
                   className="w-full bg-white border border-[#FF9C56] py-5 rounded-[16px] items-center"
                 >
@@ -555,22 +562,22 @@ export default function PetProfileDetailScreen() {
 
             <View className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-4 w-full min-h-[220px] items-center justify-center">
                 {petData?.qrCodeUrl ? (
-                <Image 
-                    source={{ uri: petData.qrCodeUrl }} 
-                    style={{ width: 192, height: 192 }} 
-                    className="rounded-lg"
-                    resizeMode="contain"
-                />
-                ) : petData?.tags && petData.tags.length > 0 ? (
-                <View style={{ width: 192, height: 192, alignItems: 'center', justifyContent: 'center' }}>
-                    <QRCode
-                    value={petData.tags[0].id}
-                    size={180}
-                    color="black"
-                    backgroundColor="white"
-                    />
-                </View>
-                ) : (
+    <Image 
+        source={{ uri: petData.qrCodeUrl }} 
+        style={{ width: 192, height: 192 }} 
+        className="rounded-lg"
+        resizeMode="contain"
+    />
+) : petData?.tags && petData.tags.length > 0 ? (
+    <View style={{ width: 192, height: 192, alignItems: 'center', justifyContent: 'center' }}>
+        <QRCode
+            value={petData.tags[0].id}
+            size={180}
+            color="black"
+            backgroundColor="white"
+        />
+    </View>
+) : (
                 <View className="items-center py-4">
                     <MaterialCommunityIcons name="qrcode-remove" size={60} color="#D1D5DB" />
                     <Text className="text-gray-500 font-bold text-base text-center mt-4">

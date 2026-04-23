@@ -1,21 +1,20 @@
 // app/pet-detail-modal.tsx
 import { Text } from '@/components/AppText';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, TouchableOpacity, View, LayoutAnimation, Platform, UIManager, Dimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { petService } from '../services/petService';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { ActivityIndicator, Alert, Dimensions, Image, LayoutAnimation, Linking, Platform, TouchableOpacity, UIManager, View } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 import Animated, {
-  useAnimatedScrollHandler,
-  useSharedValue,
-  useAnimatedStyle,
+  Extrapolation,
   interpolate,
-  Extrapolation
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { petService } from '../services/petService';
 
 export default function PetDetailModal() {
   const router = useRouter();
@@ -200,9 +199,38 @@ export default function PetDetailModal() {
               <TouchableOpacity
                 activeOpacity={0.7}
                 className="w-[36px] h-[36px] rounded-full bg-[#FFF4EC] items-center justify-center"
-                onPress={() => {
-                  // TODO: Điều hướng sang màn hình Chat
-                  // router.push({ pathname: '/chat', params: { shelterId: pet?.shelter?.id } });
+                onPress={async () => {
+                  // Lấy số điện thoại từ data
+                  const phoneNumber = pet?.shelter?.phone; 
+
+                  if (phoneNumber) {
+                    // 1. Link Zalo Web/Universal (Mặc định)
+                    const webUrl = `https://zalo.me/${phoneNumber}`;
+                    
+                    // 2. App Scheme Zalo (Ép mở ứng dụng Zalo)
+                    // Cú pháp này trên Android/iOS sẽ ép gọi thẳng vào gói ứng dụng Zalo
+                    const appUrl = Platform.OS === 'ios' 
+                      ? `zalo://` // Mở app Zalo trên iOS
+                      : `intent://zalo.me/${phoneNumber}#Intent;package=com.zing.zalo;scheme=https;end`; // Ép Intent trên Android
+
+                    try {
+                      // Cố gắng kiểm tra xem máy có cài app Zalo không
+                      const canOpenApp = await Linking.canOpenURL(Platform.OS === 'ios' ? 'zalo://' : appUrl);
+
+                      if (canOpenApp) {
+                        // Nếu có cài app Zalo -> Ưu tiên mở App
+                        await Linking.openURL(Platform.OS === 'ios' ? webUrl : appUrl);
+                      } else {
+                        // Nếu không cài App -> Mở link Zalo trên nền Web
+                        await Linking.openURL(webUrl);
+                      }
+                    } catch (error) {
+                      // Fallback an toàn nếu có lỗi
+                      await Linking.openURL(webUrl);
+                    }
+                  } else {
+                    Alert.alert("Thông báo", "Trạm cứu hộ này chưa cung cấp số điện thoại Zalo.");
+                  }
                 }}
               >
                 <Ionicons name="chatbubble-ellipses-outline" size={18} color="#F2A465" />

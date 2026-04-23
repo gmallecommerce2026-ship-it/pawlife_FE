@@ -1,4 +1,3 @@
-// app/(tabs)/scanned-pet.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
@@ -9,36 +8,24 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Linking,
-  Modal,
-  Platform,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 
-// Import hook lấy vị trí 
-import { useLocation } from '../../hooks/useLocation';
+import LostModeShareModal, { FormData } from '@/components/LostModeShareModal';
 
 export default function ScannedPetScreen() {
   const router = useRouter();
   const { tagId } = useLocalSearchParams(); 
-  const { location, errorMsg } = useLocation();
-
+  
   const [pet, setPet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // State quản lý Modal và form
-  const [showModal, setShowModal] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [hasReported, setHasReported] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    scannedBy: '',
-    phoneNumber: '',
-    message: ''
-  });
 
   useEffect(() => {
     const fetchPetData = async () => {
@@ -48,13 +35,12 @@ export default function ScannedPetScreen() {
         const petData = response.data;
         setPet(petData);
 
-        // Lấy cờ isLost từ Backend (đã xử lý ở service trả về) hoặc dự phòng check status
         const isPetLost = petData.isLost || petData.status?.toUpperCase() === 'LOST';
 
-        // Nếu thú cưng đang đi lạc, tự động hiện form báo cáo sau khi load xong 0.5s
-        if (isPetLost) {
+        // Tự động bật Modal nếu thú cưng đi lạc
+        if (isPetLost && !hasReported) {
           setTimeout(() => {
-            setShowModal(true);
+            setIsModalVisible(true);
           }, 500);
         }
       } catch (error: any) {
@@ -68,17 +54,15 @@ export default function ScannedPetScreen() {
     else setLoading(false);
   }, [tagId]);
 
-  const handleSendReport = async (isSkipped = false) => {
-    if (!isSkipped && !formData.phoneNumber) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập số điện thoại để chủ thú cưng có thể liên hệ với bạn.');
-      return;
-    }
-
+  // HÀM XỬ LÝ GỌI API DUY NHẤT
+  const handleShareLocation = async (location: any, formData: FormData, isSkipped: boolean) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
+
     try {
       const finalTagId = Array.isArray(tagId) ? tagId[0] : tagId;
-      const lat = location?.lat || null;
-      const lng = location?.lng || null;
+      const lat = location?.latitude || null;
+      const lng = location?.longitude || null;
 
       const payload = isSkipped ? {
         tagId: finalTagId,
@@ -95,26 +79,23 @@ export default function ScannedPetScreen() {
 
       await axiosClient.post('/tags/report', payload);
       
+      setIsModalVisible(false);
+      setHasReported(true);
+
       if (!isSkipped) {
         Alert.alert(
           'Thành công', 
           'Đã gửi thông báo cùng vị trí GPS của bạn đến ứng dụng của chủ thú cưng!',
           [{ text: 'Đóng' }]
         );
-      }
-      
-      setHasReported(true);
-      setShowModal(false);
-      setFormData({ scannedBy: '', phoneNumber: '', message: '' });
-    } catch (error: any) {
-      if (!isSkipped) {
-        const errorData = error.response?.data;
-        const serverMsg = errorData?.message;
-        const displayMsg = Array.isArray(serverMsg) ? serverMsg.join('\n') : serverMsg;
-        Alert.alert('Gửi thất bại', displayMsg || 'Không thể gửi thông báo. Vui lòng thử lại sau.');
       } else {
-        setShowModal(false);
+         Alert.alert('Đã báo cáo', 'Vị trí ẩn danh đã được ghi nhận.');
       }
+    } catch (error: any) {
+      const errorData = error.response?.data;
+      const serverMsg = errorData?.message;
+      const displayMsg = Array.isArray(serverMsg) ? serverMsg.join('\n') : serverMsg;
+      Alert.alert('Gửi thất bại', displayMsg || 'Không thể gửi thông báo. Vui lòng thử lại sau.');
     } finally {
       setIsSubmitting(false);
     }
@@ -155,14 +136,12 @@ export default function ScannedPetScreen() {
     );
   }
 
-  // Cập nhật lấy biến isLost đồng bộ với API trả về
   const isLost = pet.isLost || pet.status?.toUpperCase() === 'LOST';
 
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
       
-      {/* --- HEADER CONTROLS --- */}
       <View className="absolute top-12 right-6 z-40">
         <TouchableOpacity 
           onPress={() => router.push('/')}
@@ -201,7 +180,6 @@ export default function ScannedPetScreen() {
         {/* --- 2. INFORMATION BODY --- */}
         <View className="px-5 mt-6">
             
-            {/* CARD: Owner Info */}
             {isLost && pet.owner ? (
                 <View className="bg-white border border-orange-100 rounded-[24px] p-5 shadow-sm shadow-orange-100">
                     <View className="flex-row items-center gap-2 mb-6">
@@ -210,7 +188,6 @@ export default function ScannedPetScreen() {
                     </View>
 
                     <View className="space-y-5">
-                      {/* Tên chủ nhân */}
                       <View className="flex-row gap-4">
                           <View className="w-10 h-10 bg-orange-50 rounded-full items-center justify-center overflow-hidden">
                               {pet.owner.avatarUrl ? (
@@ -225,7 +202,6 @@ export default function ScannedPetScreen() {
                           </View>
                       </View>
 
-                      {/* ĐỊA CHỈ (Thêm lại đoạn này) */}
                       {pet.owner.address && pet.owner.address !== 'Chưa cập nhật địa chỉ' && (
                         <View className="flex-row gap-4">
                             <View className="w-10 h-10 bg-orange-50 rounded-full items-center justify-center">
@@ -240,7 +216,6 @@ export default function ScannedPetScreen() {
                         </View>
                       )}
 
-                      {/* Số điện thoại */}
                       {pet.owner.phone && (
                         <View className="flex-row gap-4">
                             <View className="w-10 h-10 bg-orange-50 rounded-full items-center justify-center">
@@ -252,8 +227,6 @@ export default function ScannedPetScreen() {
                             </View>
                         </View>
                       )}
-                      
-                      {/* Ghi chú: Đã xóa phần Address vì User Schema không có trường address */}
                   </View>
                 </View>
             ) : (
@@ -293,7 +266,7 @@ export default function ScannedPetScreen() {
 
                         {!hasReported && (
                           <TouchableOpacity 
-                            onPress={() => setShowModal(true)}
+                            onPress={() => setIsModalVisible(true)}
                             className="w-full bg-gray-100 py-4 rounded-2xl flex-row justify-center items-center"
                           >
                                <Ionicons name="location" size={20} color="#4B5563" />
@@ -313,84 +286,12 @@ export default function ScannedPetScreen() {
         </View>
       </ScrollView>
 
-      {/* --- MODAL --- */}
-      <Modal
-        visible={showModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => handleSendReport(true)}
-      >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          className="flex-1 justify-end bg-black/60"
-        >
-          <View className="bg-white rounded-t-[32px] p-6 pb-10 shadow-lg">
-            
-            <View className="items-center mb-5">
-              <View className="w-12 h-1.5 bg-gray-200 rounded-full mb-4" />
-              <View className="w-12 h-12 bg-red-100 rounded-full items-center justify-center mb-3">
-                <Ionicons name="warning" size={24} color="#EF4444" />
-              </View>
-              <Text className="text-xl font-black text-gray-900 text-center">Bé đang đi lạc!</Text>
-              <Text className="text-gray-500 text-sm text-center mt-2 leading-5">
-                Vui lòng nhập SĐT để chủ nhân dễ dàng liên hệ với bạn. Nếu bạn bấm "Bỏ qua", chúng tôi vẫn sẽ gửi vị trí ẩn danh.
-              </Text>
-            </View>
-
-            <View className="space-y-3 mb-6">
-              <TextInput
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800"
-                  placeholder="Tên của bạn (Không bắt buộc)"
-                  placeholderTextColor="#9CA3AF"
-                  value={formData.scannedBy}
-                  onChangeText={(text) => setFormData({...formData, scannedBy: text})}
-              />
-              <TextInput
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800"
-                  placeholder="Số điện thoại của bạn *"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                  value={formData.phoneNumber}
-                  onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
-              />
-              <TextInput
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800 h-20"
-                  placeholder="Lời nhắn cho chủ nhân..."
-                  placeholderTextColor="#9CA3AF"
-                  multiline
-                  textAlignVertical="top"
-                  value={formData.message}
-                  onChangeText={(text) => setFormData({...formData, message: text})}
-              />
-            </View>
-
-            <TouchableOpacity 
-              onPress={() => handleSendReport(false)}
-              disabled={isSubmitting || !location}
-              className={`w-full py-4 rounded-full flex-row justify-center items-center mb-3 ${
-                (isSubmitting || !location) ? 'bg-gray-400' : 'bg-gray-900'
-              }`}
-            >
-              {isSubmitting ? (
-                 <ActivityIndicator color="white" />
-              ) : (
-                <Text className="text-white font-bold text-base">
-                  {location ? 'Gửi cho chủ nhân' : 'Đang lấy tọa độ...'}
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              onPress={() => handleSendReport(true)}
-              disabled={isSubmitting}
-              className="w-full py-3 rounded-full justify-center items-center"
-            >
-              <Text className="text-gray-500 font-bold text-sm">Bỏ qua (Chỉ báo vị trí ẩn danh)</Text>
-            </TouchableOpacity>
-            
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      {/* Render duy nhất Modal mới */}
+      <LostModeShareModal 
+        isVisible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onConfirm={handleShareLocation}
+      />
     </View>
   );
 }

@@ -18,12 +18,17 @@
       "bundleIdentifier": "com.annguyen.pawlife",
       "infoPlist": {
         "SKAdNetworkItems": [
-          { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
-          { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" }
+          {
+            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
+          }
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Ứng dụng cần quyền truy cập Camera để quét mã QR và tìm kiếm thú cưng bị thất lạc.",
-        "NSPhotoLibraryUsageDescription": "Ứng dụng cần quyền truy cập thư viện ảnh để cập nhật ảnh đại diện và hồ sơ thú cưng."
+        "NSPhotoLibraryUsageDescription": "Ứng dụng cần quyền truy cập thư viện ảnh để cập nhật ảnh đại diện và hồ sơ thú cưng.",
+        "LSApplicationQueriesSchemes": ["zalo"]
       }
     },
     "android": {
@@ -62,7 +67,7 @@
           "appID": "1465556478529591",
           "clientToken": "e53c55d304602fbdda9e9b910721eda0",
           "displayName": "PawLife",
-          "scheme": "fb1465556478529591" 
+          "scheme": "fb1465556478529591"
         }
       ],
       [
@@ -71,7 +76,20 @@
           "iosUrlScheme": "com.googleusercontent.apps.725064672703-l61bog4iims28n57sspk6hokcf1l86c7"
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Ứng dụng cần quyền vị trí để gửi tọa độ giúp chủ nhân tìm lại thú cưng bị lạc."
+        }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsDownloadToken": "",
+          "RNMapboxMapsImpl": "mapbox"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
