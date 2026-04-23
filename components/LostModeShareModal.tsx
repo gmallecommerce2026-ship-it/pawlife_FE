@@ -5,9 +5,11 @@ import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -42,30 +44,49 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
     message: '',
   });
 
-  useEffect(() => {
-    if (isVisible) {
-      (async () => {
-        setLoadingMap(true);
+  const fetchLocation = async () => {
+    setLoadingMap(true);
+
+    try {
+        let { status } = await Location.getForegroundPermissionsAsync();
+
+        if (status !== 'granted') {
+            const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+            status = newStatus;
+        }
+
+        if (status !== 'granted') {
+            Alert.alert(
+              "Location Permission Required",
+              "Location permission is currently denied. Please open your device Settings to grant permission.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Open Settings", onPress: () => Linking.openSettings() }
+              ]
+            );
+            setLoadingMap(false);
+            return;
+        }
+
         const locationPromise = Location.getCurrentPositionAsync({});
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000));
 
-        try {
-            let { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                setLoadingMap(false);
-                return;
-            }
-            let currentLocation: any = await Promise.race([locationPromise, timeoutPromise]);
-            setLocation({
-                latitude: currentLocation.coords.latitude,
-                longitude: currentLocation.coords.longitude,
-            });
-        } catch (error) {
-            console.error("Error getting location:", error);
-        } finally {
-            setLoadingMap(false);
-        }
-      })();
+        let currentLocation: any = await Promise.race([locationPromise, timeoutPromise]);
+        setLocation({
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude,
+        });
+
+    } catch (error) {
+        console.error("Error getting location:", error);
+    } finally {
+        setLoadingMap(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isVisible) {
+      fetchLocation();
     }
   }, [isVisible]);
 
@@ -88,7 +109,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
       visible={isVisible}
       onRequestClose={onClose}
     >
-      {/* Background overlay hơi tối nhẹ */}
       <TouchableWithoutFeedback onPress={onClose}>
         <View className="flex-1 justify-center items-center bg-black/40 px-6">
           <KeyboardAvoidingView 
@@ -96,7 +116,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
             className="w-full items-center"
           >
             <TouchableWithoutFeedback>
-              {/* Modal Container: Vẫn giữ border cam và custom shadow màu cam */}
               <View 
                 className="bg-white w-[90%] rounded-[30px] relative mt-8 border border-[#FF9C56]"
                 style={{ 
@@ -109,7 +128,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                 }}
               >
                 
-                {/* Hình tròn nhô lên ở cạnh trên */}
                 <View className="absolute -top-8 self-center w-16 h-16 bg-[#FF9C56] rounded-full border-4 border-white items-center justify-center shadow-sm z-20">
                    <Feather name="map-pin" size={24} color="white" />
                 </View>
@@ -119,12 +137,10 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                   contentContainerStyle={{ paddingBottom: 24, paddingTop: 40 }}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* Header */}
                   <View className="px-5 items-center mb-4 relative">
                     <Text className="text-xl font-extrabold text-gray-800 text-center">Share My Location</Text>
                   </View>
 
-                  {/* Map Preview */}
                   <View className="px-5">
                     <View className="w-full h-[140px] rounded-[20px] overflow-hidden bg-gray-100 relative justify-center items-center border border-gray-100">
                       {loadingMap ? (
@@ -153,19 +169,22 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                           />
                         </>
                       ) : (
-                        <View className="items-center justify-center p-4">
+                        <TouchableOpacity 
+                            activeOpacity={0.7}
+                            className="items-center justify-center p-4 w-full h-full"
+                            onPress={fetchLocation}
+                        >
                             <View className="w-12 h-12 rounded-full bg-gray-200/70 items-center justify-center mb-2">
                                 <Feather name="map-pin" size={20} color="#9CA3AF" />
                             </View>
                             <Text className="text-gray-400 text-xs font-medium text-center px-4">
                                 Tap to enable location services
                             </Text>
-                        </View>
+                        </TouchableOpacity>
                       )}
                     </View>
                   </View>
 
-                  {/* Slider */}
                   <View className="px-5 mt-4">
                     <View className="flex-row justify-between items-center">
                       <Text className="text-gray-600 font-bold text-sm">Radius</Text>
@@ -185,10 +204,8 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                     />
                   </View>
 
-                  {/* Form Inputs */}
                   <View className="px-5 mt-4">
                     
-                    {/* Name: Title Trái, Input Phải */}
                     <View className="flex-row items-center mb-3">
                       <Text className="w-[25%] text-gray-700 font-medium text-sm">Name</Text>
                       <View className="flex-1 bg-gray-50 rounded-xl border border-gray-100 px-4 py-2">
@@ -200,7 +217,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                       </View>
                     </View>
 
-                    {/* Phone: Title Trái, Input Phải */}
                     <View className="flex-row items-center mb-3">
                       <Text className="w-[25%] text-gray-700 font-medium text-sm">Phone</Text>
                       <View className="flex-1 bg-gray-50 rounded-xl border border-gray-100 px-4 py-2">
@@ -213,7 +229,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                       </View>
                     </View>
 
-                    {/* Notes: Title Trên, Input Dưới */}
                     <View className="mt-1">
                       <Text className="text-gray-700 font-medium text-sm mb-2">Notes</Text>
                       <View className="bg-gray-50 rounded-xl border border-gray-100 px-4 py-2">
@@ -230,7 +245,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
 
                   </View>
 
-                  {/* Buttons */}
                   <View className="px-5 mt-6 flex-row gap-3">
                     <TouchableOpacity 
                       onPress={onClose}
