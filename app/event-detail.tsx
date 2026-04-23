@@ -11,6 +11,7 @@ import { ActivityIndicator, Alert, Dimensions, Image, ImageBackground, ScrollVie
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { eventService } from '../services/eventService';
+import { useEngagementStore } from '../store/useEngagementStore';
 
 const { width } = Dimensions.get('window');
 
@@ -20,12 +21,14 @@ export default function EventDetailScreen() {
     const params = useLocalSearchParams();
     const eventId = params.id as string;
     const { user } = useContext(AuthContext);
+    const isInterested = useEngagementStore(state => state.interestedEvents[eventId] ?? eventData?.isInterested);
+    const toggleEventInterest = useEngagementStore(state => state.toggleEventInterest);
+
 
     const [eventData, setEventData] = useState<any>(null);
     const [similarEvents, setSimilarEvents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isNotFound, setIsNotFound] = useState(false);
-    const [isInterested, setIsInterested] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
 
     const onShare = async () => {
@@ -48,10 +51,10 @@ export default function EventDetailScreen() {
             }
             try {
                 setLoading(true);
-                
+
                 const res = await eventService.getEventDetail(eventId, user?.id);
                 if (res && res.data) {
-                    
+
                     // ==========================================
                     // 🚨 HARD MOCK DATA ORGANIZER ĐỂ TEST UI
                     // ==========================================
@@ -64,7 +67,7 @@ export default function EventDetailScreen() {
 
                     setEventData(res.data);
                     if (res.data.isInterested !== undefined) {
-                        setIsInterested(res.data.isInterested);
+                        useEngagementStore.getState().setInitialEventInterest(eventId, res.data.isInterested);
                     }
                 } else {
                     setIsNotFound(true);
@@ -84,21 +87,26 @@ export default function EventDetailScreen() {
         };
         fetchData();
     }, [eventId, user?.id]);
-    
+
     const handleInterest = async () => {
         if (actionLoading || !eventData) return;
+        setActionLoading(true);
+        toggleEventInterest(eventId);
+        setEventData((prev: any) => ({
+            ...prev,
+            interestedCount: !isInterested ? prev.interestedCount + 1 : prev.interestedCount - 1
+        }));
         try {
             setActionLoading(true);
             const res = await eventService.toggleInterest(eventId, user?.id || 'guest');
-            if (res.success) {
-                setIsInterested(res.isInterested);
-                setEventData((prev: any) => ({
-                    ...prev,
-                    interestedCount: res.isInterested ? prev.interestedCount + 1 : prev.interestedCount - 1
-                }));
-            }
+            if (!res.success) throw new Error("API Failed");
         } catch (error) {
-            console.log("Lỗi bấm quan tâm:", error);
+            // Rollback UI
+            toggleEventInterest(eventId);
+            setEventData((prev: any) => ({
+                ...prev,
+                interestedCount: isInterested ? prev.interestedCount + 1 : prev.interestedCount - 1
+            }));
         } finally {
             setActionLoading(false);
         }
@@ -124,7 +132,7 @@ export default function EventDetailScreen() {
                 <Text className="text-gray-500 text-center mb-8 px-4 leading-6">
                     Sự kiện này có thể đã bị xóa, hết hạn hoặc không có quyền truy cập. Vui lòng quay lại màn hình trước.
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                     className="bg-[#ffa053] px-8 py-4 rounded-full flex-row items-center shadow-sm shadow-orange-200"
                     onPress={() => router.back()}
                     activeOpacity={0.8}
@@ -144,7 +152,7 @@ export default function EventDetailScreen() {
     const timeString = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     const bannerImage = eventData.bannerUrl || eventData.images?.[0]?.url || 'https://via.placeholder.com/800x400.png?text=No+Image';
-    
+
     // Tọa độ mặc định (Hà Nội) nếu API không trả về
     const mapLatitude = eventData.latitude || 21.028511;
     const mapLongitude = eventData.longitude || 105.804817;
@@ -180,12 +188,12 @@ export default function EventDetailScreen() {
                             <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full items-center justify-center border border-white/20">
                                 <Feather name="chevron-left" size={24} color="white" />
                             </TouchableOpacity>
-                            
+
                             {/* Nút Share & Cờ */}
                             <View className="flex-row items-center space-x-3 gap-3">
-                                
-                                <TouchableOpacity 
-                                    onPress={handleInterest} 
+
+                                <TouchableOpacity
+                                    onPress={handleInterest}
                                     disabled={actionLoading}
                                     className={`w-10 h-10 backdrop-blur-md rounded-full items-center justify-center border ${isInterested ? 'bg-orange-500 border-orange-500' : 'bg-black/20 border-white/20'}`}
                                 >
@@ -202,10 +210,10 @@ export default function EventDetailScreen() {
                         </View>
                     </ImageBackground>
                 </View>
-                                    
+
                 {/* 2. MAIN CONTENT BODY */}
                 <View className="-mt-10 bg-white rounded-t-[24px] px-[21px] pt-[37px] pb-12 shadow-2xl shadow-black/10">
-                    
+
                     {/* CATEGORY - Căn lề trái, ôm khít nội dung */}
                     {eventData.category && (
                         <View className="flex-row mb-[20px]">
@@ -224,7 +232,7 @@ export default function EventDetailScreen() {
 
                     {/* THỜI GIAN VÀ ĐỊA ĐIỂM (Layout ngang, icon nhỏ gọn, không border) */}
                     <View className="flex-row items-center justify-between mb-6">
-                        
+
                         {/* Cột Địa Điểm */}
                         <View className="flex-row items-center flex-1 ml-2">
                             <View className="w-10 h-10 items-center justify-center mr-3">
@@ -257,26 +265,26 @@ export default function EventDetailScreen() {
                     <View className="flex-row items-center mb-[43px]">
                         <View className="flex-row items-center mr-3">
                             {/* Chú ý: Ở đây dùng ảnh placeholder, bạn có thể map dữ liệu thực tế từ API nếu có mảng users */}
-                            <Image 
-                                source={{ uri: 'https://i.pravatar.cc/100?img=1' }} 
-                                className="w-[40px] h-[40px] rounded-full border-2 border-white z-30 bg-gray-200" 
+                            <Image
+                                source={{ uri: 'https://i.pravatar.cc/100?img=1' }}
+                                className="w-[40px] h-[40px] rounded-full border-2 border-white z-30 bg-gray-200"
                             />
-                            <Image 
-                                source={{ uri: 'https://i.pravatar.cc/100?img=2' }} 
-                                className="w-[40px] h-[40px] rounded-full border-2 border-white -ml-3 z-20 bg-gray-200" 
+                            <Image
+                                source={{ uri: 'https://i.pravatar.cc/100?img=2' }}
+                                className="w-[40px] h-[40px] rounded-full border-2 border-white -ml-3 z-20 bg-gray-200"
                             />
-                            <Image 
-                                source={{ uri: 'https://i.pravatar.cc/100?img=3' }} 
-                                className="w-[40px] h-[40px] rounded-full border-2 border-white -ml-3 z-10 bg-gray-200" 
+                            <Image
+                                source={{ uri: 'https://i.pravatar.cc/100?img=3' }}
+                                className="w-[40px] h-[40px] rounded-full border-2 border-white -ml-3 z-10 bg-gray-200"
                             />
                         </View>
                         <Text className="text-[#8E8E93] text-[16px] font-regular">
-                            <Text className="text-[#8E8E93] font-regular">+ {eventData.interestedCount || 0} </Text> 
+                            <Text className="text-[#8E8E93] font-regular">+ {eventData.interestedCount || 0} </Text>
                             Interested
                         </Text>
                     </View>
 
-                    
+
 
                     {/* ABOUT EVENT */}
                     <View className="mb-[32px]">
@@ -286,35 +294,35 @@ export default function EventDetailScreen() {
                         </Text>
                     </View>
 
-                    
+
 
                     {/* ORGANIZER PROFILE */}
                     {eventData.organizer && (
-                    <View className="mb-[32px]">
-                        <Text className="text-[16px] font-medium text-black mb-[20px]">Organizer</Text>
-                        <TouchableOpacity
-                            className="flex-row items-center justify-between"
-                            activeOpacity={0.7}
-                            onPress={() => router.push({ 
-                                pathname: '/organizer-profile', 
-                                params: { id: eventData.organizer.id } 
-                            })}
-                        >
-                            <View className="flex-row items-center">
-                                <Image
-                                    source={{ uri: eventData.organizer.avatarUrl || 'https://via.placeholder.com/150.png?text=No+Avatar' }}
-                                    className="w-12 h-12 rounded-full mr-3 border border-gray-200"
-                                />
-                                <View>
-                                    <Text className="text-black font-medium text-[14px]">{eventData.organizer.name}</Text>
-                                    <Text className="text-[#8E8E93] font-regular text-[12px] mt-0.5">Event Organizer</Text>
+                        <View className="mb-[32px]">
+                            <Text className="text-[16px] font-medium text-black mb-[20px]">Organizer</Text>
+                            <TouchableOpacity
+                                className="flex-row items-center justify-between"
+                                activeOpacity={0.7}
+                                onPress={() => router.push({
+                                    pathname: '/organizer-profile',
+                                    params: { id: eventData.organizer.id }
+                                })}
+                            >
+                                <View className="flex-row items-center">
+                                    <Image
+                                        source={{ uri: eventData.organizer.avatarUrl || 'https://via.placeholder.com/150.png?text=No+Avatar' }}
+                                        className="w-12 h-12 rounded-full mr-3 border border-gray-200"
+                                    />
+                                    <View>
+                                        <Text className="text-black font-medium text-[14px]">{eventData.organizer.name}</Text>
+                                        <Text className="text-[#8E8E93] font-regular text-[12px] mt-0.5">Event Organizer</Text>
+                                    </View>
                                 </View>
-                            </View>
-                            <View className="w-8 h-8 items-center justify-center">
-                                <Feather name="chevron-right" size={18} color="#000000" />
-                            </View>
-                        </TouchableOpacity>
-                    </View>
+                                <View className="w-8 h-8 items-center justify-center">
+                                    <Feather name="chevron-right" size={18} color="#000000" />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
                     )}
 
                     {/* LOCATION MAP */}
@@ -326,7 +334,7 @@ export default function EventDetailScreen() {
                                 {eventData.address || eventData.locationName}
                             </Text>
                         </View>
-                        
+
                         {/* MapView Container dùng WebView */}
                         <View className="w-full h-[145px] rounded-[12px] overflow-hidden border border-gray-200 bg-gray-100 relative pointer-events-none">
                             <WebView
@@ -349,13 +357,13 @@ export default function EventDetailScreen() {
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                                 {eventData.images.map((img: any) => (
                                     <TouchableOpacity key={img.id} className='pb-4'
-                                    style={{
-                                        shadowColor: '#E89B5A', // Màu cam nhạt của bạn
-                                        shadowOffset: { width: 2, height: 3 }, // Quan trọng nhất: Cả 2 chiều bằng 0 để bóng tỏa đều 4 hướng
-                                        shadowOpacity: 0.25, // Độ đậm của bóng (từ 0 đến 1)
-                                        shadowRadius: 3, // Độ lan rộng của bóng
-                                        elevation: 4, // Đổ bóng cho Android (Android tự động tỏa khá đều)
-                                    }} activeOpacity={0.9}>
+                                        style={{
+                                            shadowColor: '#E89B5A', // Màu cam nhạt của bạn
+                                            shadowOffset: { width: 2, height: 3 }, // Quan trọng nhất: Cả 2 chiều bằng 0 để bóng tỏa đều 4 hướng
+                                            shadowOpacity: 0.25, // Độ đậm của bóng (từ 0 đến 1)
+                                            shadowRadius: 3, // Độ lan rộng của bóng
+                                            elevation: 4, // Đổ bóng cho Android (Android tự động tỏa khá đều)
+                                        }} activeOpacity={0.9}>
                                         <Image source={{ uri: img.url }} className="w-[81px] h-[81px] rounded-[16px] bg-gray-100" resizeMode="cover" />
                                     </TouchableOpacity>
                                 ))}
@@ -363,7 +371,7 @@ export default function EventDetailScreen() {
                         </View>
                     )}
 
-                    
+
 
                     {/* MORE EVENTS */}
                     {similarEvents.length > 0 && (
@@ -379,8 +387,8 @@ export default function EventDetailScreen() {
                                 {similarEvents.map(ev => {
                                     const evDate = new Date(ev.startDate);
                                     return (
-                                        <TouchableOpacity 
-                                            key={ev.id} 
+                                        <TouchableOpacity
+                                            key={ev.id}
                                             activeOpacity={0.8}
                                             onPress={() => router.push({ pathname: '/event-detail', params: { id: ev.id } })}
                                             className="w-64 bg-white border border-gray-100 rounded-2xl p-3 shadow-sm shadow-gray-100 flex-row items-center"

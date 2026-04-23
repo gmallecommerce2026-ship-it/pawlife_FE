@@ -1,8 +1,7 @@
 import axiosClient from '../api/axiosClient';
 
 export const shelterService = {
-  // Lấy danh sách trạm (có hỗ trợ search)
-  getShelters: async (params?: { search?: string; limit?: number; page?: number }) => {
+  getShelters: async (params?: { search?: string; limit?: number; page?: number; userId?: string }) => {
     try {
       const response = await axiosClient.get('shelters', { params });
       return response.data;
@@ -11,11 +10,11 @@ export const shelterService = {
     }
   },
 
-  // Lấy chi tiết trạm
-  getShelterDetail: async (shelterId: string, petSearch?: string) => {
+  // 2. Thêm userId vào hàm Detail
+  getShelterDetail: async (shelterId: string, userId?: string, petSearch?: string) => {
     try {
       const response = await axiosClient.get(`shelters/${shelterId}`, {
-        params: { petSearch } // Gửi query petSearch lên server
+        params: { userId, petSearch }
       });
       return response.data;
     } catch (error: any) {

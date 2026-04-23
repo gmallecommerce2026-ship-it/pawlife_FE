@@ -250,6 +250,7 @@ export default function PetProfileDetailScreen() {
             <Text className="text-[18px] font-semibold text-[#000000]">{petData.name} Profile</Text>
             <View className="w-10" /> 
         </View>
+        
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             

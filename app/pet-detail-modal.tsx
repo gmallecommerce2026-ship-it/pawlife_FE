@@ -1,178 +1,415 @@
 // app/pet-detail-modal.tsx
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Text } from '@/components/AppText';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Image, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, TouchableOpacity, View, LayoutAnimation, Platform, UIManager, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { Text } from '@/components/AppText';
-import { petService } from '../services/petService'; // Import petService
+import { petService } from '../services/petService';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { FlatList } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedScrollHandler,
+  useSharedValue,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation
+} from 'react-native-reanimated';
 
 export default function PetDetailModal() {
   const router = useRouter();
-  const params = useLocalSearchParams(); 
+  const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-
-  // State lưu trữ dữ liệu chi tiết gọi từ API
-  const [fullPetData, setFullPetData] = useState<any>(null);
+  const [pet, setPet] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const { width, height } = Dimensions.get('window');
+
+  const baseImage: string = 'https://images.unsplash.com/photo-1600804340584-c7db2eacf0bf?q=80&w=800&auto=format&fit=crop';
+
+  const CLONED_IMAGES: string[] = Array(3).fill(baseImage);
+  const images = CLONED_IMAGES;
+
+  const handleScroll = (event: any) => {
+    const scrollOffset = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollOffset / width);
+    setActiveIndex(index);
+  };
+
+  if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+
+  // --- REANIMATED SHARED VALUES ---
+  const scrollY = useSharedValue(0);
+
+  // Khoảng cách chừa lại ở trên cùng để thấy mặt Pet
+  const GAP = insets.top + 60;
+  const IMAGE_HEIGHT = height * 0.45;
+  // Giới hạn cuộn tối đa của ảnh trước khi thẻ kẹt lại
+  const MAX_SCROLL = IMAGE_HEIGHT - GAP - 30;
+
+  const toggleHistory = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowHistory(!showHistory);
+  };
 
   useEffect(() => {
-    const fetchPetDetail = async () => {
-      if (!params.id) return;
+    const fetchDetail = async () => {
       try {
         const res = await petService.getPetById(params.id as string);
-        setFullPetData(res.data || res);
+        setPet(res.data || res);
       } catch (error) {
-        console.error("Lỗi tải chi tiết thú cưng:", error);
+        console.error(error);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchPetDetail();
+    fetchDetail();
   }, [params.id]);
-  const rawPersonalityTags = fullPetData?.personalityTags || [];
-  const safeTagsArray = Array.isArray(rawPersonalityTags) ? rawPersonalityTags : [];
-  // Merge dữ liệu params truyền sang và dữ liệu lấy từ API
-  const pet = {
-    id: params.id, 
-    name: params.name || fullPetData?.name || 'Thú cưng',
-    age: params.age || fullPetData?.age || 'Đang cập nhật',
-    gender: params.gender || fullPetData?.gender || 'Unknown',
-    breed: params.breed || fullPetData?.breed || 'Đang cập nhật', 
-    image: params.image || fullPetData?.images?.[0]?.url || 'https://via.placeholder.com/400x600?text=No+Image',
-    distance: params.distance || fullPetData?.distance || 'Gần bạn',
-    tags: safeTagsArray.length > 0 ? safeTagsArray : ['Chưa có tag'],
-    description: fullPetData?.description || 'Chưa có thông tin mô tả chi tiết.',
-    traits: fullPetData?.traits || 'Chưa cập nhật đặc điểm tính cách.',
-    idealHome: fullPetData?.idealHome || 'Vui lòng liên hệ trạm cứu hộ để biết thêm chi tiết.',
-    shelter: fullPetData?.shelter || null
-  };
 
-  const handleInterest = () => {
-    router.push({
-      pathname: '/adoption-form',
-      params: {
-        id: pet.id,
-        name: pet.name,
-        age: pet.age,
-        breed: pet.breed,
-        image: pet.image,
-      }
-    });
-  };
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
 
-  const handleReport = () => {
-    // ... Giữ nguyên logic handleReport cũ
-    const options = ['Cancel', 'Report this post', 'Block this user'];
-    const destructiveButtonIndex = [1, 2];
-    const cancelButtonIndex = 0;
+  const imageAnimatedStyle = useAnimatedStyle(() => {
+    const scale = interpolate(scrollY.value, [-100, 0, MAX_SCROLL], [1.2, 1, 0.85], Extrapolation.CLAMP);
+    const translateY = interpolate(scrollY.value, [0, MAX_SCROLL], [0, -20], Extrapolation.CLAMP);
+    const opacity = interpolate(scrollY.value, [0, MAX_SCROLL], [1, 0.6], Extrapolation.CLAMP);
+    return { transform: [{ scale }, { translateY }], opacity };
+  });
 
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex, destructiveButtonIndex },
-        (selectedIndex) => {
-          if (selectedIndex === 1) Alert.alert("Reported", "Thank you for reporting.");
-          else if (selectedIndex === 2) { Alert.alert("Blocked"); router.back(); }
-        }
-      );
-    } else {
-      Alert.alert("Content Options", "What would you like to do?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Report Post", onPress: () => Alert.alert("Reported") },
-        { text: "Block User", onPress: () => router.back() }
-      ]);
-    }
-  };
+  const dotsAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(scrollY.value, [0, MAX_SCROLL / 2], [1, 0], Extrapolation.CLAMP);
+    return { opacity };
+  });
 
-  const shelterName = pet.shelter?.name || 'Trạm cứu hộ chưa cập nhật';
-  const shelterAddress = pet.shelter?.address || 'Địa chỉ chưa cập nhật';
-  const shelterAvatar = pet.shelter?.avatarUrl || pet.shelter?.coverUrl || 'https://via.placeholder.com/150';
+  if (isLoading || !pet) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white">
+        <ActivityIndicator color="#F2A465" />
+      </View>
+    );
+  }
+
+  const petImages = pet.images?.length > 0
+    ? pet.images.map((img: any) => img.url)
+    : [pet.imageUrl || 'https://images.unsplash.com/photo-1600804340584-c7db2eacf0bf?q=80&w=800'];
+
+
 
   return (
-    <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-      <StatusBar style="dark" />
+    <View className="flex-1 bg-black">
+      <StatusBar style="light" />
+      <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, height: IMAGE_HEIGHT }, imageAnimatedStyle]}>
+        <FlatList
+          data={petImages}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / width);
+            setActiveIndex(index);
+          }}
+          renderItem={({ item }) => (
+            <Image source={{ uri: item }} style={{ width, height: IMAGE_HEIGHT }} resizeMode="cover" />
+          )}
+          keyExtractor={(_, index) => index.toString()}
+        />
 
-      <View className="flex-row justify-between items-center px-6 py-3">
-        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-gray-50 rounded-full items-center justify-center border border-gray-100">
-          <Feather name="chevron-left" size={24} color="#374151" />
+        {/* Pagination Dots (Mờ dần khi kéo thẻ lên) */}
+        <Animated.View style={[dotsAnimatedStyle]} className="absolute bottom-10 w-full flex-row justify-center gap-2">
+          {petImages.map((_: string, index: number) => (
+            <View
+              key={index}
+              className={`h-1.5 rounded-full ${index === activeIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/50'}`}
+            />
+          ))}
+        </Animated.View>
+      </Animated.View>
+
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={{ top: insets.top + 10 }}
+        className="absolute left-5 w-10 h-10 bg-black/20 rounded-full items-center justify-center z-50"
+      >
+        <Ionicons name="chevron-back" size={24} color="white" />
+      </TouchableOpacity>
+      <Animated.ScrollView style={{ flex: 1, marginTop: GAP,borderTopLeftRadius: 30, 
+          borderTopRightRadius: 30, 
+           }}
+        showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        stickyHeaderIndices={[1]}>
+        <View style={{ height: MAX_SCROLL }} />
+        <View className="bg-white rounded-t-[30px] pt-4 pb-2 px-[25px]">
+          <View className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-3" />
+
+          <View className="flex-1 justify-between items-start mb-2">
+            <View className="flex-row items-baseline">
+              <Text className="text-[24px] font-semibold text-[#1C1C1E]">{pet.name}</Text>
+              <Text className="text-[16px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({pet.breed})</Text>
+            </View>
+            <View className="flex-row items-center mt-1.5">
+              <Feather name="map-pin" size={14} color="#F2A465" />
+              <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">1.2 km away</Text>
+            </View>
+          </View>
+        </View>
+
+        <View className="bg-white px-[25px] pb-10 min-h-screen">
+
+          <View className="flex-row justify-between mt-6 gap-[10px]">
+            <View className="flex-1 bg-[#EAF4FB] py-[12px] rounded-[16px] items-center">
+              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
+              <Text className="text-[#1C1C1E] text-[14px] font-semibold">Male</Text>
+            </View>
+            <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
+              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
+              <Text className="text-[#1C1C1E] text-[14px] font-semibold">Young</Text>
+            </View>
+            <View className="flex-1 bg-[#FAE8ED] py-[12px] rounded-[16px] items-center">
+              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Size</Text>
+              <Text className="text-[#1C1C1E] text-[14px] font-semibold">Large</Text>
+            </View>
+          </View>
+
+          {/* --- SHELTER INFO SECTION --- */}
+          <View className="flex-row items-center py-4 my-4">
+            {/* 1. Avatar */}
+            <Image
+              source={{ uri: pet.shelter?.avatar || 'https://cdn-icons-png.flaticon.com/512/3592/3592182.png' }}
+              className="w-[46px] h-[46px] rounded-full border border-gray-200 overflow-hidden items-center justify-center bg-white shadow-sm shadow-gray-100"
+            />
+
+            <View className="flex-1 mr-2 ml-3">
+              <Text className="text-[16px] font-semibold text-[#1C1C1E]" numberOfLines={1}>
+                {pet?.shelter?.name || 'Pawlife Shelter'}
+              </Text>
+              <Text className="text-[13px] text-[#8E8E93] mt-[2px]" numberOfLines={1}>
+                {pet?.shelter?.address || 'District 7, HCM'}
+              </Text>
+            </View>
+
+            <View className="flex-row items-center gap-2">
+
+              {/* Nút Gửi tin nhắn */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="w-[36px] h-[36px] rounded-full bg-[#FFF4EC] items-center justify-center"
+                onPress={() => {
+                  // TODO: Điều hướng sang màn hình Chat
+                  // router.push({ pathname: '/chat', params: { shelterId: pet?.shelter?.id } });
+                }}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#F2A465" />
+              </TouchableOpacity>
+
+              {/* Nút Xem trang cá nhân */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="w-[36px] h-[36px] rounded-full bg-[#FFF4EC] items-center justify-center"
+                onPress={() => {
+                  router.push({ pathname: '/shelter-profile', params: { id: pet?.shelter?.id } });
+                }}
+              >
+                <Feather name="chevron-right" size={20} color="#F2A465" />
+              </TouchableOpacity>
+
+            </View>
+          </View>
+
+          {/* --- DESCRIPTION --- */}
+          <View>
+            <Text className="text-[16px] font-medium text-[#1C1C1E] mb-2">About {pet.name}</Text>
+            <Text className="text-[14px] text-[#8E8E93] leading-[22px] font-normal">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam
+            </Text>
+
+            <View className="flex-row gap-2 mt-[9px]">
+              <View className="bg-[#FFF4E8] px-3.5 py-0.5 rounded-full">
+                <Text className="text-[#F3B27B] text-[12px] font-medium">Playful</Text>
+              </View>
+              <View className="bg-[#EBF4FE] px-3.5 py-0.5 rounded-full">
+                <Text className="text-[#88B2F3] text-[12px] font-medium">Clingy</Text>
+              </View>
+              <View className="bg-[#EAF8EF] px-3.5 py-0.5 rounded-full">
+                <Text className="text-[#8FD49D] text-[12px] font-medium">Friendly</Text>
+              </View>
+            </View>
+          </View>
+
+
+          {/* --- BEHAVIOR --- */}
+          <View className="mt-6 mb-2">
+            <Text className="text-[16px] font-medium text-[#1C1C1E] mb-2">{pet.name}'s Behavior</Text>
+            <View className="flex-row items-start mb-1">
+              <View className="flex-row items-center mr-2 mt-[2px]">
+                <FontAwesome5 name="check" size={14} color="#77C852" />
+                <Text className="ml-1.5 text-[15px] text-[#77C852]">
+                  Good with:
+                </Text>
+              </View>
+
+              <Text className="flex-1 text-[15px] text-[#8E8E93] leading-[22px]">
+                Children, Seniors, Dogs, Cats.
+              </Text>
+            </View>
+
+            <View className="flex-row items-start">
+              <View className="flex-row items-center mr-2 mt-[2px]">
+                <FontAwesome5 name="times" size={14} color="#FE7D66" />
+                <Text className="ml-2.5 text-[15px] text-[#FE7D66]">
+                  Not suitable:
+                </Text>
+              </View>
+
+              <Text className="flex-1 text-[15px] text-[#8E8E93] leading-[22px]">
+                Children, Seniors, Dogs, Cats.
+              </Text>
+            </View>
+          </View>
+
+          {/* --- IDEAL HOME --- */}
+          <View className="mt-6 mb-6">
+            <Text className="text-[16px] font-medium text-[#1C1C1E] mb-2">Ideal Home</Text>
+            <Text className="text-[14px] text-[#8E8E93] leading-[22px]">
+              {pet.idealHome || "This pet needs a loving home with space to run and play."}
+            </Text>
+          </View>
+
+          {/* --- PAW HISTORY SECTION --- */}
+          <View className="mb-10">
+
+            {/* 1. HEADER*/}
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-[18px] font-medium text-[#1C1C1E]">Paw History</Text>
+
+              <TouchableOpacity
+                onPress={toggleHistory}
+                activeOpacity={0.6}
+                className="flex-row items-center bg-[#F2A465]/10 px-3 py-1.5 rounded-full"
+              >
+                <Text className="text-[13px] text-[#F2A465] font-bold mr-1">
+                  {showHistory ? 'Hide' : 'View'}
+                </Text>
+                <Feather
+                  name={showHistory ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color="#F2A465"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* 2. CONTENT CARD */}
+            {showHistory && (
+              <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white shadow-sm overflow-hidden">
+
+                {/* Code các mốc timeline của bạn */}
+                <View className="relative">
+                  <View
+                    className="absolute left-[15px] top-[10px] bottom-[20px] w-[2px] bg-[#F2A465]/30"
+                  />
+
+                  <View className="flex-row mb-8">
+                    <View className="w-[32px] h-[32px] rounded-full bg-[#FFF4EC] items-center justify-center z-10 border-[3px] border-white shadow-sm">
+                      <FontAwesome5 name="user" size={13} color="#F2A465" />
+                    </View>
+
+                    <View className="ml-4 flex-1 pt-1">
+                      <View className="flex-row justify-between items-start">
+                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">Current Owner</Text>
+                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                      </View>
+                      <Text className="text-[13px] text-[#8E8E93] mt-1">Ownership transferred to Jane Doe</Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row mb-8">
+                    <View className="w-[32px] h-[32px] rounded-full bg-[#EBFFE2] items-center justify-center z-10 border-[3px] border-white shadow-sm">
+                      <FontAwesome5 name="check" size={13} color="#77C582" />
+                    </View>
+
+                    <View className="ml-4 flex-1 pt-1">
+                      <View className="flex-row justify-between items-start">
+                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">Anual Checkup</Text>
+                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                      </View>
+                      <Text className="text-[13px] text-[#8E8E93] mt-1">Vaccinated: hepatitis, rabies, parvo, and parainfluenza</Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row mb-8">
+                    <View className="w-[32px] h-[32px] rounded-full bg-[#E8F1FF] items-center justify-center z-10 border-[3px] border-white shadow-sm">
+                      <FontAwesome5 name="user" size={13} color="#5A90DA" />
+                    </View>
+
+                    <View className="ml-4 flex-1 pt-1">
+                      <View className="flex-row justify-between items-start">
+                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">DHPP Vaccination</Text>
+                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                      </View>
+                      <Text className="text-[13px] text-[#8E8E93] mt-1">Vaccinated: hepatitis, rabies, parvo, and parainfluenza</Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row mb-8">
+                    <View className="w-[32px] h-[32px] rounded-full bg-[#EAE7FB] items-center justify-center z-10 border-[3px] border-white shadow-sm">
+                      <FontAwesome5 name="expand" size={14} color="#885BF2" />
+                    </View>
+
+                    <View className="ml-4 flex-1 pt-1">
+                      <View className="flex-row justify-between items-start">
+                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">QR Code Registered</Text>
+                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                      </View>
+                      <Text className="text-[13px] mt-1 font-medium italic">
+                        Pawlife QR tag activated and liked to Luna
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row">
+                    <View className="w-[32px] h-[32px] rounded-full bg-[#FFF4EC] items-center justify-center z-10 border-[3px] border-white shadow-sm">
+                      <FontAwesome5 name="user" size={14} color="#F2A465" />
+                    </View>
+
+                    <View className="ml-4 flex-1 pt-1">
+                      <View className="flex-row justify-between items-start">
+                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">Date of Birth</Text>
+                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                      </View>
+                      <Text className="text-[13px] mt-1 font-medium italic">
+                        Luna was born
+                      </Text>
+                    </View>
+                  </View>
+
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Animated.ScrollView>
+      <View
+        style={{ paddingBottom: insets.bottom + 10 }}
+        className="px-[25px] pt-4 bg-white flex-row items-center gap-4 border-t border-gray-100"
+      >
+        <TouchableOpacity className="w-[56px] h-[56px] rounded-full border border-[#E5E5EA] items-center justify-center bg-white">
+          <Feather name="heart" size={24} color="#F2A465" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleReport} className="w-10 h-10 bg-gray-50 rounded-full items-center justify-center border border-gray-100">
-          <MaterialCommunityIcons name="dots-horizontal" size={24} color="#374151" />
+
+        <TouchableOpacity
+          onPress={() => router.push({ pathname: '/adoption-form', params: { id: pet.id } })}
+          className="flex-1 bg-[#F2A465] h-[56px] rounded-full items-center justify-center"
+        >
+          <Text className="text-white text-[16px] font-bold">Apply to Adopt</Text>
         </TouchableOpacity>
       </View>
-
-      <ScrollView className="flex-1 px-6 pt-2" showsVerticalScrollIndicator={false}>
-        
-        {/* --- TÊN & TAGS --- */}
-        <View className="flex-row items-center gap-3 mb-2 flex-wrap">
-            <Text className="text-4xl font-bold text-gray-900 tracking-tight">{pet.name}</Text>
-            {isLoading ? <ActivityIndicator size="small" color="#F97316" /> : pet.tags.map((tag: string, index: number) => (
-                <View key={index} className="bg-orange-100 px-3 py-1 rounded-full border border-orange-200 mt-1">
-                    <Text className="text-orange-500 text-[10px] font-bold uppercase tracking-wide">{tag}</Text>
-                </View>
-            ))}
-        </View>
-
-        {/* --- SUB INFO --- */}
-        <View className="flex-row items-center gap-2 mb-6">
-            <Feather name="calendar" size={14} color="#6B7280" />
-            <Text className="text-gray-500 text-sm font-medium">{pet.age}</Text>
-            <Text className="text-gray-300">•</Text>
-            <Text className="text-gray-500 text-sm font-medium capitalize">{pet.gender}</Text>
-            <Text className="text-gray-300">•</Text>
-            <Text className="text-gray-500 text-sm font-medium">{pet.breed}</Text>
-        </View>
-
-        {/* --- SHELTER INFO --- */}
-        <View className="flex-row items-center mb-8 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-            <Image 
-                source={{ uri: shelterAvatar }} 
-                className="w-12 h-12 rounded-full mr-3 border border-gray-200 bg-gray-200"
-            />
-            <View className="flex-1">
-                <View className="flex-row items-center justify-between">
-                     <Text className="font-bold text-gray-900 text-base" numberOfLines={1}>{shelterName}</Text>
-                </View>
-                <View className="flex-row items-center mt-1">
-                    <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                    <Text className="text-gray-500 text-xs ml-1 flex-1" numberOfLines={1}>
-                      {pet.distance} • {shelterAddress}
-                    </Text>
-                </View>
-            </View>
-        </View>
-
-        {/* --- SECTIONS --- */}
-        <View className="space-y-6 mb-8">
-            <View>
-                <Text className="text-lg font-bold text-gray-900 mb-2">Về {pet.name}</Text>
-                <Text className="text-gray-500 leading-6 text-[15px]">{pet.description}</Text>
-            </View>
-
-            <View>
-                <Text className="text-lg font-bold text-gray-900 mb-2">Đặc điểm tính cách</Text>
-                <Text className="text-gray-500 leading-6 text-[15px]">{pet.traits}</Text>
-            </View>
-
-            <View>
-                <Text className="text-lg font-bold text-gray-900 mb-2">Ngôi nhà lý tưởng</Text>
-                <Text className="text-gray-500 leading-6 text-[15px]">{pet.idealHome}</Text>
-            </View>
-        </View>
-
-        {/* --- FOOTER ACTION --- */}
-        <View className="pb-10 pt-2 items-center">
-            <TouchableOpacity 
-                className="w-full bg-[#F99C2E] py-4 rounded-full shadow-lg shadow-orange-200 items-center"
-                activeOpacity={0.8}
-                onPress={handleInterest} 
-            >
-                <Text className="text-white font-bold text-lg">Tôi muốn nhận nuôi</Text>
-            </TouchableOpacity>
-        </View>
-      </ScrollView>
     </View>
+    
   );
 }

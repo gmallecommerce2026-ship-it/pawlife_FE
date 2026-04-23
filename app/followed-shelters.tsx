@@ -1,6 +1,6 @@
 import { Text } from '@/components/AppText';
 import { shelterService } from '@/services/shelterService';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, FlatList, Image, RefreshControl, TouchableOpacity, View } from 'react-native';
@@ -23,7 +23,7 @@ export interface FollowedShelter {
 
 export default function FollowedSheltersScreen() {
   const router = useRouter();
-  
+
   const [shelters, setShelters] = useState<FollowedShelter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -55,7 +55,7 @@ export default function FollowedSheltersScreen() {
   const handleUnfollow = async (id: string) => {
     // 1. Optimistic Update cho UI hiện tại mượt mà
     setShelters(prev => prev.filter(shelter => shelter.id !== id));
-    
+
     // 2. Bắn event báo cho hệ thống (tab Search) biết shelter này đã bị unfollow
     DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', { shelterId: id, isFollowed: false });
 
@@ -78,17 +78,17 @@ export default function FollowedSheltersScreen() {
     const petAmount = item.petCount || item.totalPets || 20; // Default 20 như logic cũ
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         className="flex-row items-center mb-[21px] bg-transparent"
         activeOpacity={0.7}
-        onPress={() => router.push({ 
-          pathname: '/shelter-profile', 
-          params: { id: item.id, name: item.name, address: locationInfo, image: imageSource } 
+        onPress={() => router.push({
+          pathname: '/shelter-profile',
+          params: { id: item.id, name: item.name, address: locationInfo, image: imageSource }
         })}
       >
-        <Image 
-          source={{ uri: imageSource }} 
-          className="w-[54px] h-[54px] rounded-full bg-gray-200" 
+        <Image
+          source={{ uri: imageSource }}
+          className="w-[54px] h-[54px] rounded-full bg-gray-200"
         />
         <View className="flex-1 ml-[14px] pr-2 justify-center">
           <Text className="text-black font-semibold text-[16px] mb-[3px]" numberOfLines={1}>
@@ -98,9 +98,9 @@ export default function FollowedSheltersScreen() {
             {locationInfo} · {petAmount} pets
           </Text>
         </View>
-        
+
         {/* Nút có style của trạng thái "Đang Follow" - Bấm vào sẽ Unfollow */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => handleUnfollow(item.id)}
           className="px-5 py-[3.5px] rounded-full shadow-sm bg-[#F8F8F8] shadow-gray-100"
         >
@@ -113,22 +113,29 @@ export default function FollowedSheltersScreen() {
   };
 
   const renderEmptyState = () => (
-    <View className="flex-1 items-center justify-center px-6 pb-20 mt-20">
-      <View className="w-32 h-32 bg-orange-100 rounded-full items-center justify-center mb-6">
-        <MaterialCommunityIcons name="office-building-marker-outline" size={64} color="#ffa053" />
-      </View>
-      <Text className="text-2xl font-bold text-gray-900 mb-3 text-center">
-        No followed shelters yet
-      </Text>
-      <Text className="text-base text-gray-500 text-center mb-10 px-4 leading-6">
-        Start following shelters to stay updated.
-      </Text>
-      <TouchableOpacity 
-        className="bg-[#F97316] w-full py-4 rounded-full items-center shadow-sm"
-        onPress={() => router.push({ pathname: '/search', params: { type: 'Shelters' } })}
-        activeOpacity={0.8}
+    <View className="flex items-center justify-center px-6 pb-20 mt-20">
+     <Image
+          source={require('../assets/images/cat-in-house.png')}
+          resizeMode="contain"
+          className=""
+          style={{
+            width: 362,
+            height: 242,
+          }}
+        />
+
+      <Text className="text-gray-800 text-lg font-bold mt-8">A little empty here</Text>
+      <Text className="text-gray-400 text-center mt-2 mb-8">Look like we missing a paw...</Text>
+
+      <TouchableOpacity
+        className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-4"
+        activeOpacity={0.7}
+        onPress={() => router.push('/')}
       >
-        <Text className="text-white text-lg font-bold">Find Shelters</Text>
+        <View className=" rounded-full mr-2">
+          <Ionicons name="add" size={20} color="#F59E0B" />
+        </View>
+        <Text className="text-[#F59E0B] font-thin text-base">Browse shelters</Text>
       </TouchableOpacity>
     </View>
   );
@@ -136,7 +143,7 @@ export default function FollowedSheltersScreen() {
   return (
     <View className="flex-1 bg-white">
       <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
-        
+
         {/* HEADER */}
         <View className="flex-row items-center px-4 py-3 relative bg-white z-10">
           <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 z-10">
@@ -160,20 +167,19 @@ export default function FollowedSheltersScreen() {
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderShelterItem}
             ListEmptyComponent={renderEmptyState}
-            // 3. Setup chuẩn layout container padding y hệt màn search
-            contentContainerStyle={{ 
-              flexGrow: 1, 
-              paddingHorizontal: 20, 
-              paddingTop: 20, 
-              paddingBottom: 24 
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingHorizontal: 20,
+              paddingTop: 20,
+              paddingBottom: 24
             }}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl 
-                refreshing={isRefreshing} 
-                onRefresh={onRefresh} 
-                tintColor="#ffa053" 
-                colors={['#ffa053']} 
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
+                tintColor="#ffa053"
+                colors={['#ffa053']}
               />
             }
           />

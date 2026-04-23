@@ -28,6 +28,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   // Lấy tuỳ chọn tabBarStyle được truyền từ màn hình hiện tại
   const options = descriptors[activeRoute.key].options;
   const isHiddenByOptions = options.tabBarStyle?.display === 'none';
+  
 
   // 2. ẨN CỨNG Ở CÁC MÀN HÌNH NÀY
   const hiddenRoutes = ['scan', 'scanned-pet']; 

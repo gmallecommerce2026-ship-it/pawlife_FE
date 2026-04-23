@@ -197,7 +197,7 @@ export default function OrganizerProfileScreen() {
                                 </View>
 
                                 {/* -- STATS (Followers & Events) NẰM 2 BÊN AVATAR -- */}
-                                <View className="absolute top-4 left-0 right-0 flex-row justify-between px-8">
+                                <View className="absolute top-4 left-0 right-0 flex-row justify-between px-12">
                                     <View className="items-center">
                                         <Text className="text-[16px] font-bold text-gray-900">{ORGANIZER.followers.toLocaleString()}</Text>
                                         <Text className="text-[12px] text-[#8E8E93] mt-0.5">Followers</Text>

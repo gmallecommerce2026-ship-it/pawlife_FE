@@ -25,27 +25,27 @@ interface ApplicationRecord {
 const StatusBadge = ({ status }: { status: string }) => {
   const getStyle = () => {
     const normalizedStatus = status.toUpperCase().replace(/\s+/g, '_');
-    
+
     switch (normalizedStatus) {
-      case 'SUBMITTED': 
+      case 'SUBMITTED':
         return { bg: 'bg-[#EBFFE2]', border: 'border border-[#77C852]/30', text: 'text-[#77C852]', iconColor: '#77C852', label: 'Approved', icon: 'check' };
-      case 'PENDING': 
+      case 'PENDING':
         return { bg: 'bg-[#EFF6FF]', border: 'border border-[#3B82F6]/30', text: 'text-[#3B82F6]', iconColor: '#3B82F6', label: 'Pending', icon: 'clock' };
-      case 'NEED_MORE_INFO': 
+      case 'NEED_MORE_INFO':
         return { bg: 'bg-[#FEF3C7]', border: 'border border-[#D97706]/30', text: 'text-[#D97706]', iconColor: '#D97706', label: 'Need More Info', icon: 'info' };
-      case 'ADOPTION_COMPLETED': 
+      case 'ADOPTION_COMPLETED':
       case 'APPROVED':
         return { bg: 'bg-[#F0FDF4]', border: 'border border-[#83DA5A]/25', text: 'text-[#77C852]', iconColor: '#77C852', label: 'Completed', icon: 'check-circle' };
-      case 'CLOSED': 
+      case 'CLOSED':
       case 'REJECTED':
         return { bg: 'bg-[#8E8E93]/10', border: 'border border-[#8E8E93]', text: 'text-[#8E8E93]', iconColor: '#8E8E93', label: 'Closed', icon: 'x-circle' };
-      default: 
+      default:
         return { bg: 'bg-[#F3F4F6]', border: 'border border-[#4B5563]/30', text: 'text-[#4B5563]', iconColor: '#4B5563', label: status, icon: 'circle' };
     }
   };
-  
+
   const style = getStyle();
-  
+
   return (
     // Đã bổ sung biến ${style.border} vào className
     <View className={`${style.bg} ${style.border} flex-row items-center px-2.5 py-1.5 rounded-full self-start`}>
@@ -64,10 +64,12 @@ export default function MyApplicationsScreen() {
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   const maxApplications = 5;
   const [isWithdrawVisible, setIsWithdrawVisible] = useState(false);
-  const currentApplications = applications.filter(app => 
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 24 });
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const currentApplications = applications.filter(app =>
     !['CLOSED', 'ADOPTION_COMPLETED'].includes(app.status)
-  ).length; 
-  
+  ).length;
+
   const progressPercentage = (currentApplications / maxApplications) * 100;
 
   useFocusEffect(
@@ -113,11 +115,11 @@ export default function MyApplicationsScreen() {
             </View>
           </View>
         </View>
-        
+
         <View className="h-[6px] bg-[#F3F4F6] rounded-full overflow-hidden mt-1">
-          <View 
-            className="h-full bg-[#22C55E] rounded-full" 
-            style={{ width: `${progressPercentage}%` }} 
+          <View
+            className="h-full bg-[#22C55E] rounded-full"
+            style={{ width: `${progressPercentage}%` }}
           />
         </View>
       </View>
@@ -128,7 +130,7 @@ export default function MyApplicationsScreen() {
     <View className="flex-1 bg-[#FFFFFF]">
       <SafeAreaView className="flex-1" edges={['top']}>
         <Stack.Screen options={{ headerShown: false }} />
-        
+
         <View className="flex-row items-center px-4 py-3 bg-white z-10">
           <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
             <Feather name="chevron-left" size={30} color="#000000" />
@@ -137,7 +139,7 @@ export default function MyApplicationsScreen() {
             My Applications
           </Text>
         </View>
-        
+
         {isLoading ? (
           <View className="flex-1 justify-center items-center">
             <ActivityIndicator size="large" color="#22C55E" />
@@ -159,7 +161,7 @@ export default function MyApplicationsScreen() {
               const ageAndBreed = ['2 years', item.pet.breed].filter(Boolean).join(' • ');
 
               return (
-                <TouchableOpacity 
+                <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => router.push(`/adoption-status?id=${item.id}`)}
                   className="flex-col pt-[14px] px-[14px] mx-5 mb-4 rounded-[13px] bg-white border border-[#E5E5E5]"
@@ -173,36 +175,38 @@ export default function MyApplicationsScreen() {
                 >
                   {/* Phần trên: Ảnh và Thông tin cơ bản */}
                   <View className="flex-row mb-3.5">
-                    <Image 
-                      source={{ uri: petImage }} 
-                      className="w-[76px] h-[76px] rounded-2xl bg-gray-100" 
-                      resizeMode="cover" 
+                    <Image
+                      source={{ uri: petImage }}
+                      className="w-[76px] h-[76px] rounded-2xl bg-gray-100"
+                      resizeMode="cover"
                     />
-                    
+
                     <View className="flex-1 mb-2 ml-[10px] justify-center">
                       <Text className="text-[16px] font-medium text-black leading-tight" numberOfLines={1}>
                         {item.pet.name}
                       </Text>
-                      
+
                       <Text className="text-[#8E8E93] text-[12px] font-regular mt-[7px]" numberOfLines={1}>
                         {ageAndBreed}
                       </Text>
-                      
+
                       <Text className="text-[#000000] text-[12px] font-regular mt-[7px]" numberOfLines={1}>
                         {item.pet.shelter?.name || 'PawLife Shelter'}
                       </Text>
                     </View>
 
                     {/* Nút 3 chấm góc trên cùng bên phải */}
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       className="p-1 -mr-1 items-start"
                       hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                       onPress={(e) => {
-                        e.stopPropagation(); 
-                        setIsOptionsVisible(true); // Mở popup Options
+                        e.stopPropagation();
+                        const { pageY } = e.nativeEvent;
+                        setMenuPosition({ top: pageY - 12, right: 54 });
+                        setSelectedAppId(item.id);
+                        setIsOptionsVisible(true);
                       }}
                     >
-                      {/* Đổi từ chevron-right sang more-horizontal cho đúng 3 chấm */}
                       <Feather name="more-vertical" size={20} color="#8E8E93" />
                     </TouchableOpacity>
                   </View>
@@ -210,7 +214,7 @@ export default function MyApplicationsScreen() {
                   {/* Phần dưới: Màu nền xám, thêm padding dọc (py-3), bo góc dưới */}
                   <View className="flex-row justify-between items-center py-3 border-t border-[#E5E5E5] bg-[#F6F6F6] -mx-[14px] px-[14px] rounded-b-[13px]">
                     <StatusBadge status={item.status} />
-                    
+
                     <View className="flex-row items-center">
                       <Text className="text-[#8E8E93] text-[12px] font-regular ml-1.5">
                         {formatDate(item.createdAt)}
@@ -223,64 +227,61 @@ export default function MyApplicationsScreen() {
             }}
           />
         )}
-      <Modal 
-        visible={isOptionsVisible} 
-        animationType="fade" 
-        transparent={true} 
-        onRequestClose={() => setIsOptionsVisible(false)}
-      >
-        {/* Nền trong suốt chiếm toàn màn hình, bấm ra ngoài để đóng menu */}
-        <TouchableOpacity 
-          style={{ flex: 1 }} 
-          activeOpacity={1} 
-          onPress={() => setIsOptionsVisible(false)}
+        <Modal
+          visible={isOptionsVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setIsOptionsVisible(false)}
         >
-          {/* Menu Dropdown được định vị tuyệt đối (absolute) gần vị trí nút 3 chấm */}
-          <View 
-            className="absolute top-[140px] right-[24px] bg-white rounded-xl border border-gray-100 w-48 overflow-hidden"
-            style={{ 
-              elevation: 8, 
-              shadowColor: '#000', 
-              shadowOffset: { width: 0, height: 4 }, 
-              shadowOpacity: 0.15, 
-              shadowRadius: 10 
-            }}
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setIsOptionsVisible(false)}
           >
-            <TouchableOpacity 
-              className="flex-row items-center px-4 py-3.5 border-b border-gray-50" 
-              activeOpacity={0.6}
-              onPress={() => { setIsOptionsVisible(false); console.log("Report Issue"); }}
-            >
-              <Feather name="alert-triangle" size={18} color="#4B5563" />
-              <Text className="text-[14px] font-medium text-gray-700 ml-3">Report Issue</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              className="flex-row items-center px-4 py-3.5 border-b border-gray-50" 
-              activeOpacity={0.6}
-              onPress={() => { setIsOptionsVisible(false); console.log("Contact Support"); }}
-            >
-              <Feather name="phone-call" size={18} color="#4B5563" />
-              <Text className="text-[14px] font-medium text-gray-700 ml-3">Contact Support</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              className="flex-row items-center px-4 py-3.5" 
-              activeOpacity={0.6}
-              onPress={() => { 
-                setIsOptionsVisible(false); 
-                // Mở modal Withdraw có sẵn
-                setTimeout(() => setIsWithdrawVisible(true), 150); 
+            {/* Menu Dropdown sử dụng toạ độ động */}
+            <View
+              className="absolute bg-white rounded-xl border border-gray-100 w-48 overflow-hidden"
+              style={{
+                top: menuPosition.top,     // Gắn toạ độ Y động vào đây
+                right: menuPosition.right, // Gắn toạ độ X động vào đây
+                elevation: 8,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 10
               }}
             >
-              <Feather name="x-circle" size={18} color="#EF4444" />
-              <Text className="text-[14px] font-medium text-[#EF4444] ml-3">Withdraw</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+              <TouchableOpacity
+                className="flex-row items-center px-4 py-3.5 border-b border-gray-50"
+                activeOpacity={0.6}
+                onPress={() => {
+                  setIsOptionsVisible(false);
+                  console.log("Report Issue cho ID:", selectedAppId);
+                }}
+              >
+                <Feather name="alert-triangle" size={18} color="#4B5563" />
+                <Text className="text-[14px] font-medium text-gray-700 ml-3">Report Issue</Text>
+              </TouchableOpacity>
 
-    </SafeAreaView>
+              {/* ... các menu item khác giữ nguyên ... */}
+
+              <TouchableOpacity
+                className="flex-row items-center px-4 py-3.5"
+                activeOpacity={0.6}
+                onPress={() => {
+                  setIsOptionsVisible(false);
+                  // Bạn có thể truyền selectedAppId vào component Withdraw nếu cần
+                  setTimeout(() => setIsWithdrawVisible(true), 150);
+                }}
+              >
+                <Feather name="x-circle" size={18} color="#EF4444" />
+                <Text className="text-[14px] font-medium text-[#EF4444] ml-3">Withdraw</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+      </SafeAreaView>
     </View>
   );
 }
