@@ -1234,6 +1234,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
     const displayBreed = fullPet?.breed || currentPet.breed || 'Labrador Retriever';
     const shelter = fullPet?.shelter || currentPet.shelter || null;
 
+    const shelterId = shelter?.id;
     const shelterName = shelter?.name || 'Happy Paws Rescue Center';
     const shelterAddress = shelter?.address || '123 Rescue Street, San Francisco, CA 94102';
     const shelterAvatar = shelter?.avatarUrl || shelter?.coverUrl || currentPet.image || 'https://via.placeholder.com/150';
@@ -1275,12 +1276,12 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
                     <ScrollView className="flex-1 px-6 pt-2 bg-white" showsVerticalScrollIndicator={false} bounces={true}>
                         {/* Tiêu đề & Sub-info */}
-                        <View className='mb-4'>
+                        <View className='mb-6'>
                             <View className="pr-10">
                                 <View className="flex-row items-baseline gap-1">
-                                    <Text className="text-3xl font-semibold text-gray-900 tracking-wider">{currentPet.name}</Text>
+                                    <Text className="text-[24px] font-semibold text-black tracking-wider">{currentPet.name}</Text>
                                     {isLoading && <ActivityIndicator size="small" color="#F97316" />}
-                                    <Text className="text-[16px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({displayBreed})</Text>
+                                    <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({displayBreed})</Text>
                                 </View>
                             </View>
 
@@ -1291,27 +1292,28 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
                         </View>
 
-                        <View className="flex-row justify-between mt-2 mb-4 gap-3">
-                            <View className="flex-1 bg-[#EAF4FB] py-[12px] rounded-[16px] items-center">
+                        <View className="flex-row justify-between mb-6 gap-[10px]">
+                            <View className={`flex-1 ${pet.gender === 'Male' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'
+                                } py-[12px] rounded-[16px] items-center`}>
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
-                                <Text className="text-[#1C1C1E] text-[14px] font-semibold">{currentPet.gender === 'male' || currentPet.gender === 'MALE' ? 'Male' : 'Female'}</Text>
+                                <Text className="text-black text-[14px] font-semibold">{pet.gender}</Text>
                             </View>
                             <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
-                                <Text className="text-[#1C1C1E] text-[14px] font-semibold">1 Years old</Text>
+                                <Text className="text-black text-[14px] font-semibold">Young</Text>
                             </View>
-                            <View className="flex-1 bg-[#FAE8ED] py-[12px] rounded-[16px] items-center">
+                            <View className="flex-1 bg-[#E8F9E6] py-[12px] rounded-[16px] items-center">
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Size</Text>
-                                <Text className="text-[#1C1C1E] text-[14px] font-semibold">Large</Text>
+                                <Text className="text-black text-[14px] font-semibold">Large</Text>
                             </View>
                         </View>
 
 
                         {/* Shelter Info (Theo chuẩn design) */}
-                        <View className="flex-row items-center py-[16px] border-gray-100 mb-2">
+                        <View className="flex-row items-center border-gray-100 mb-6">
                             <Image
                                 source={{ uri: shelterAvatar }}
-                                style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12 }}
+                                style={{ width: 45, height: 45, borderRadius: 24, marginRight: 12 }}
                                 contentFit="cover"
                             />
                             <View className="flex-1 mr-2">
@@ -1323,11 +1325,21 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                 </Text>
                             </View>
                             <View className="flex-row items-center gap-2">
-                                <TouchableOpacity activeOpacity={0.7} className="w-[36px] h-[36px] rounded-full bg-[#FFF4EC] items-center justify-center">
-                                    <Ionicons name="chatbubble-ellipses-outline" size={18} color="#F2A465" />
+                                <TouchableOpacity activeOpacity={0.7} className="w-[41px] h-[41px] rounded-full bg-[#FFF4EC] items-center justify-center">
+                                    <Image
+                                                    source={require('../../assets/icon/message.png')}
+                                                    style={{ width: 24, height: 24 }}
+                                                    resizeMode="cover"
+                                                  />
                                 </TouchableOpacity>
-                                <TouchableOpacity activeOpacity={0.7} className="w-[36px] h-[36px] rounded-full bg-[#FFF4EC] items-center justify-center " onPress={() => router.push({ pathname: '/shelter-profile', params: { id: currentPet.shelterId } })}>
-                                    <Feather name="chevron-right" size={20} color="#F2A465" />
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    className="w-[36px] h-[36px] items-center justify-center"
+                                    onPress={() => {
+                                        router.push({ pathname: '/shelter-profile', params: { id: shelterId } });
+                                    }}
+                                >
+                                    <Feather name="chevron-right" size={18} color="#B8B8B8" />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -1335,8 +1347,8 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
                         {/* Section: About */}
                         <View className="mb-6">
-                            <Text className="font-semibold text-gray-900 text-lg mb-1">About {currentPet.name}</Text>
-                            <Text className="text-gray-500 text-sm leading-6 mb-3">{description}</Text>
+                            <Text className="font-medium text-black text-[16px] mb-2">About {currentPet.name}</Text>
+                            <Text className="text-[#8E8E93] text-[14px] leading-6 mb-2">{description}</Text>
 
                             {/* Trình bày Tags theo ảnh (Vàng nhạt cho tag đầu tiên) */}
                             <View className="flex-row flex-wrap gap-2.5">
@@ -1353,7 +1365,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                             key={index}
                                             className={`px-4 py-1.5 rounded-full ${isFirst ? 'bg-yellow-100/70' : 'bg-gray-50 border border-gray-100'}`}
                                         >
-                                            <Text className={`text-sm ${isFirst ? 'text-yellow-700 font-medium' : 'text-gray-600'}`}>
+                                            <Text className={`text-[12px] ${isFirst ? 'text-yellow-700 font-medium' : 'text-gray-600'}`}>
                                                 {tagText}
                                             </Text>
                                         </View>
@@ -1362,17 +1374,17 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                             </View>
                         </View>
 
-                        <View className="mt-2 mb-4">
-                            <Text className="font-semibold text-gray-900 text-lg mb-1">{currentPet.name}'s Behavior</Text>
+                        <View className="mb-4">
+                            <Text className="font-medium text-black text-[16px] mb-2">{currentPet.name}'s Behavior</Text>
                             <View className="flex-row items-start mb-1">
                                 <View className="flex-row items-center mr-2 mt-[2px]">
                                     <FontAwesome5 name="check" size={14} color="#77C852" />
-                                    <Text className="ml-1.5 text-[15px] text-[#77C852]">
+                                    <Text className="ml-1.5 text-[14px] text-[#77C852]">
                                         Good with:
                                     </Text>
                                 </View>
 
-                                <Text className="flex-1 text-[15px] text-[#8E8E93] leading-[22px]">
+                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
                                     Children, Seniors, Dogs, Cats.
                                 </Text>
                             </View>
@@ -1380,12 +1392,12 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                             <View className="flex-row items-start">
                                 <View className="flex-row items-center mr-2 mt-[2px]">
                                     <FontAwesome5 name="times" size={14} color="#FE7D66" />
-                                    <Text className="ml-2.5 text-[15px] text-[#FE7D66]">
+                                    <Text className="ml-2.5 text-[14px] text-[#FE7D66]">
                                         Not suitable:
                                     </Text>
                                 </View>
 
-                                <Text className="flex-1 text-[15px] text-[#8E8E93] leading-[22px]">
+                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
                                     Children, Seniors, Dogs, Cats.
                                 </Text>
                             </View>
@@ -1393,8 +1405,8 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
                         {/* Section: Ideal Home */}
                         <View className="mb-6">
-                            <Text className="font-semibold text-gray-900 text-lg mb-1">Ideal Home</Text>
-                            <Text className="text-gray-500 text-sm leading-6">{idealHome}</Text>
+                            <Text className="font-medium text-black text-lg mb-1">Ideal Home</Text>
+                            <Text className="text-[14px] text-[#8E8E93] leading-6">{idealHome}</Text>
                         </View>
 
                         {/* Spacer mỏng cuối nội dung cuộn để text không sát đáy */}

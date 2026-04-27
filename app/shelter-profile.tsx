@@ -25,6 +25,7 @@ export default function ShelterProfileScreen() {
   // === THÊM STATE CHO SEARCH TẠI ĐÂY ===
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
   const [modalConfig, setModalConfig] = useState({
     visible: false,
@@ -169,8 +170,8 @@ export default function ShelterProfileScreen() {
 
   const StatItem = ({ value, label }: { value: string | number, label: string }) => (
     <View className="flex-row items-center">
-      <Text className="text-[14px] font-bold text-[#1C1C1E]">{value}</Text>
-      <Text className="text-[13px] text-[#8E8E93] ml-1">{label}</Text>
+      <Text className="text-[14px] font-bold text-black">{value}</Text>
+      <Text className="text-[14px] text-black ml-1">{label}</Text>
     </View>
   );
 
@@ -291,72 +292,122 @@ export default function ShelterProfileScreen() {
 
       {/* CONTENT SECTION */}
       <View className="flex-1">
-        <View style={{ height: 200 }} />
-        <View className="bg-white rounded-t-[40px] px-6 pb-6 shadow-xl min-h-screen">
+        <View style={{ height: SCREEN_HEIGHT * 0.17 }} />
+        <View className="bg-white rounded-t-[24px] pb-6 shadow-xl min-h-screen">
           {/* HEADER THÔNG TIN TRẠM */}
-          <View className='flex-row items-end mb-6'>
-            <View className="-mt-5 bg-white p-1 rounded-full">
+          <View className='flex-row items-center px-3 -top-[15px]'>
+            <View className="bg-white p-1 rounded-full">
               <Image
                 source={{ uri: shelterInfo?.avatarUrl || 'https://via.placeholder.com/150' }}
-                className="w-[90px] h-[90px] rounded-full"
+                className="w-[80px] h-[80px] rounded-full"
               />
             </View>
-            <View className="ml-5 flex-1 pb-1 -top-6">
-              <Text className="text-[22px] font-medium text-[#1C1C1E]" numberOfLines={1}>
+            <View className="ml-4 flex-1 justify-center mt-4">
+              <Text className="text-[20px] font-semibold text-black mb-2" numberOfLines={1}>
                 {shelterInfo?.name}
               </Text>
+              <View className="flex-row items-center">
+                <StatItem value={shelterInfo._count?.pets || pets.length} label="pets" />
+                <Text className='text-[12px] px-2 font-extrabold'>•</Text>
 
-              <View className="flex-row items-center mt-1">
+                <StatItem value={shelterInfo._count?.followers || 0} label="followers" />
+                <Text className='text-[12px] px-2 font-extrabold'>•</Text>
 
-                <StatItem value={shelterInfo._count?.pets || pets.length} label="Pets" />
-                <View className="w-[1px] h-3 bg-gray-300 mx-3" />
-
-                <StatItem value={shelterInfo._count?.followers || 0} label="Followers" />
-                <View className="w-[1px] h-3 bg-gray-300 mx-3" />
-
-                <StatItem value={shelterInfo.adoptedCount || 0} label="Adopted" />
+                <StatItem value={shelterInfo.adoptedCount || 0} label="adopted" />
               </View>
             </View>
           </View>
-
-          <View className="mb-6">
-            <Text className="text-gray-400 text-[14px] font-regular mb-1">Animal Shelter & Rescue</Text>
-            <Text className="text-[16px] text-[#48484A] font-medium leading-[22px]">
-              {shelterInfo?.description || "Providing a second chance for furry friends in need with love and professional care."}
-            </Text>
-            <View className="flex-row items-center mt-2">
-              <Feather name="link" size={14} color="#F2A465" />
-              <Text className="ml-2 text-[16px] text-[#F2A465] flex-1">{shelterInfo?.emailAddress || 'pawlife@example.com'}</Text>
-            </View>
-
-            <View className="flex-row items-center mt-2">
-              <Feather name="map-pin" size={14} color="#8E8E93" />
-              <Text className="ml-2 text-[14px] text-[#8E8E93] flex-1">{shelterInfo?.address}</Text>
-            </View>
-          </View>
-          <View className="flex-row gap-3 mt-2 mb-6">
-            <TouchableOpacity
-              onPress={handleToggleFollow}
-              className={`flex-1 py-2.5 rounded-full items-center justify-center shadow-sm ${isFollowing ? 'bg-gray-200 shadow-gray-100' : 'bg-orange-400 shadow-orange-200'
-                }`}
-            >
-              <Text className={`font-bold text-sm ${isFollowing ? 'text-gray-700' : 'text-white'}`}>
-                {isFollowing ? 'Following' : 'Follow'}
+          {/* Content */}
+          <View className='mx-[22px]' style={{top: -5}}>
+            <View className="mb-6">
+              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1 leading-4">Animal Shelter & Rescue</Text>
+              <Text className="text-[14px] text-black font-regular leading-5">
+                {shelterInfo?.description || "Providing a second chance for furry friends in need with love and professional care."}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={openContact}
-              className="flex-1 bg-[#F6F6F6] py-2.5 rounded-full items-center justify-center"
-            >
-              <Text className="text-gray-600 font-bold text-sm">Contact</Text>
-            </TouchableOpacity>
+              <View className="flex-row items-center mt-1">
+                <Image
+                  source={require('../assets/icon/link-icon.png')}
+                  style={{ width: 12, height: 12 }}
+                  resizeMode="cover"
+                />
+                <Text className="ml-1 text-[14px] text-[#E89B5A] leading-4">{shelterInfo?.emailAddress || 'pawlife@example.com'}</Text>
+              </View>
+
+              <View className="flex-row items-center mt-1">
+                <Image
+                  source={require('../assets/icon/location-gray-icon.png')}
+                  style={{ width: 6, height: 7.5 }}
+                  resizeMode="cover"
+                />
+                <Text className="ml-2 text-[12px] text-[#8E8E93] flex-1 leading-4">{shelterInfo?.address}</Text>
+              </View>
+
+              <View className="flex-row items-center mt-4">
+
+                {/* --- 1. HIỆU ỨNG AVATAR STACK --- */}
+                <View className="flex-row items-center">
+                  <View>
+                    {/* Avatar 1: Nằm dưới cùng, không có margin âm */}
+                    <Image
+                      source={{ uri: 'https://i.pravatar.cc/100?img=1' }}
+                      className="w-4 h-4 rounded-full border-[1px] border-white z-10"
+                    />
+                  </View>
+
+                  <View style={{elevation: 2, marginLeft: -8 }}>
+                    {/* Avatar 2: Bị kéo lùi sang trái (-ml-2.5) để đè lên Avatar 1 */}
+                    <Image
+                      source={{ uri: 'https://i.pravatar.cc/100?img=2' }}
+                      className="w-4 h-4 rounded-full border-[1px] border-white z-20"
+                    />
+                  </View>
+
+                  <View style={{elevation: 2, marginLeft: -8 }}>
+                    {/* Avatar 3: Tiếp tục kéo lùi sang trái đè lên Avatar 2 */}
+                    <Image
+                      source={{ uri: 'https://i.pravatar.cc/100?img=3' }}
+                      className="w-4 h-4 rounded-full border-[1px] border-white z-30"
+                    />
+                  </View>
+                </View>
+
+                {/* --- 2. DÒNG TEXT TRỘN NHIỀU STYLE --- */}
+                {/* Thẻ Text cha bọc ngoài cùng sẽ định dạng màu xám mặc định */}
+                <Text className="ml-1 text-[12px] text-[#8E8E93] flex-1">
+                  Followed by{' '}
+                  {/* Các thẻ Text con lồng bên trong để bôi đen chữ */}
+                  <Text className="font-medium text-black">john doe</Text>,{' '}
+                  <Text className="font-medium text-black">james doe</Text>,{' '}
+                  <Text className="font-medium text-black">jane doe</Text> and{' '}
+                  <Text className="font-medium text-black">79 others</Text>
+                </Text>
+
+              </View>
+            </View>
+            <View className="flex-row gap-3 mb-6">
+              <TouchableOpacity
+                onPress={handleToggleFollow}
+                className={`flex-1 py-2 rounded-full items-center justify-center shadow-sm ${isFollowing ? 'bg-gray-200 shadow-gray-100' : 'bg-orange-400 shadow-orange-200'
+                  }`}
+              >
+                <Text className={`font-bold text-sm ${isFollowing ? 'text-gray-700' : 'text-white'}`}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={openContact}
+                className="flex-1 bg-[#F6F6F6] py-2 rounded-full items-center justify-center"
+              >
+                <Text className="text-gray-600 font-bold text-sm">Contact</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView className="flex-1"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: insets.bottom + 200 }}>
             {/* Grid Pets */}
-            <View className="flex-row flex-wrap gap-4">
+            <View className="flex-row flex-wrap gap-3 justify-between mx-[22px]">
               {pets.length === 0 ? (
                 <View className="flex-1 items-center justify-center py-10">
                   <Text className="text-gray-500">No pets found matching "{searchQuery}"</Text>
@@ -374,12 +425,12 @@ export default function ShelterProfileScreen() {
                     <TouchableOpacity
                       key={pet.id}
                       style={{ width: COLUMN_WIDTH }}
-                      className="mb-[21px]"
+                      className="mb-[12px]"
                       activeOpacity={0.8}
                       onPress={() => router.push(`/shelter-pet-detail?id=${pet.id}`)}
                     >
                       {/* 1. KHỐI ẢNH: Ép tỉ lệ 1:1, bo góc cực sâu 28px */}
-                      <View className="w-full aspect-square mb-[12px] relative">
+                      <View className="w-full aspect-square mb-[10px] relative">
                         <Image
                           source={{ uri: imageUrl }}
                           className="w-full h-full rounded-[24px] bg-gray-100"
@@ -398,7 +449,7 @@ export default function ShelterProfileScreen() {
                       <View className="px-1">
                         {/* Tên Pet: Đen tuyền, chữ to, bold, margin bottom rất nhỏ */}
                         <Text
-                          className="text-[#000000] font-bold text-[17px] tracking-tight mb-[7.6px]"
+                          className="text-[#000000] font-bold text-[16px] tracking-tight mb-[7.6px]"
                           numberOfLines={1}
                         >
                           {pet.name}
@@ -409,12 +460,12 @@ export default function ShelterProfileScreen() {
                           {/* Icon Giới tính với mã màu chuẩn chiết xuất từ ảnh */}
                           <Ionicons
                             name={isFemale ? "female" : "male"}
-                            size={14}
+                            size={12}
                             color={isFemale ? "#F471B5" : "#5BB0FF"}
                           />
 
                           <Text
-                            className="text-[#8B8B8B] text-[13px] font-normal ml-1.5"
+                            className="text-[#8B8B8B] text-[12px] font-normal ml-1.5"
                             numberOfLines={1}
                           >
                             {pet.age || '1 year'} · {pet.breed || 'Unknown'}

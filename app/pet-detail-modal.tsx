@@ -136,56 +136,61 @@ export default function PetDetailModal() {
       >
         <Ionicons name="chevron-back" size={24} color="white" />
       </TouchableOpacity>
-      <Animated.ScrollView style={{ flex: 1, marginTop: GAP,borderTopLeftRadius: 30, 
-          borderTopRightRadius: 30, 
-           }}
+      <Animated.ScrollView style={{
+        flex: 1, marginTop: GAP, borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+      }}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         stickyHeaderIndices={[1]}>
         <View style={{ height: MAX_SCROLL }} />
         <View className="bg-white rounded-t-[30px] pt-4 pb-2 px-[25px]">
-          <View className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-3" />
-
-          <View className="flex-1 justify-between items-start mb-2">
-            <View className="flex-row items-baseline">
-              <Text className="text-[24px] font-semibold text-[#1C1C1E]">{pet.name}</Text>
-              <Text className="text-[16px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({pet.breed})</Text>
-            </View>
-            <View className="flex-row items-center mt-1.5">
-              <Feather name="map-pin" size={14} color="#F2A465" />
-              <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">1.2 km away</Text>
-            </View>
-          </View>
+          <View className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto" />
         </View>
 
         <View className="bg-white px-[25px] pb-10 min-h-screen">
+          <View className="flex-1 justify-between items-start">
+            <View className="flex-row items-baseline">
+              <Text className="text-[24px] font-semibold text-black">{pet.name}</Text>
+              <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({pet.breed})</Text>
+            </View>
+            <View className="flex-row items-center mt-1.5">
+              <Image
+                source={require('../assets/icon/location_solid.png')}
+                style={{ width: 16, height: 16 }}
+                resizeMode="cover"
+              />
+              <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">1.2 km away</Text>
+            </View>
+          </View>
 
           <View className="flex-row justify-between mt-6 gap-[10px]">
-            <View className="flex-1 bg-[#EAF4FB] py-[12px] rounded-[16px] items-center">
+            <View className={`flex-1 ${pet.gender === 'Male' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'
+              } py-[12px] rounded-[16px] items-center`}>
               <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
-              <Text className="text-[#1C1C1E] text-[14px] font-semibold">Male</Text>
+              <Text className="text-black text-[14px] font-semibold">{pet.gender}</Text>
             </View>
             <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
               <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
-              <Text className="text-[#1C1C1E] text-[14px] font-semibold">Young</Text>
+              <Text className="text-black text-[14px] font-semibold">Young</Text>
             </View>
-            <View className="flex-1 bg-[#FAE8ED] py-[12px] rounded-[16px] items-center">
+            <View className="flex-1 bg-[#E8F9E6] py-[12px] rounded-[16px] items-center">
               <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Size</Text>
-              <Text className="text-[#1C1C1E] text-[14px] font-semibold">Large</Text>
+              <Text className="text-black text-[14px] font-semibold">Large</Text>
             </View>
           </View>
 
           {/* --- SHELTER INFO SECTION --- */}
-          <View className="flex-row items-center py-4 my-4">
+          <View className="flex-row items-center my-6">
             {/* 1. Avatar */}
             <Image
-              source={{ uri: pet.shelter?.avatar || 'https://cdn-icons-png.flaticon.com/512/3592/3592182.png' }}
-              className="w-[46px] h-[46px] rounded-full border border-gray-200 overflow-hidden items-center justify-center bg-white shadow-sm shadow-gray-100"
+              source={{ uri: pet.shelter?.avatarUrl || 'https://cdn-icons-png.flaticon.com/512/3592/3592182.png' }}
+              className="w-[45px] h-[45px] rounded-full border border-gray-200 overflow-hidden items-center justify-center bg-white shadow-sm shadow-gray-100"
             />
 
             <View className="flex-1 mr-2 ml-3">
-              <Text className="text-[16px] font-semibold text-[#1C1C1E]" numberOfLines={1}>
+              <Text className="text-[16px] font-semibold text-black" numberOfLines={1}>
                 {pet?.shelter?.name || 'Pawlife Shelter'}
               </Text>
               <Text className="text-[13px] text-[#8E8E93] mt-[2px]" numberOfLines={1}>
@@ -198,18 +203,18 @@ export default function PetDetailModal() {
               {/* Nút Gửi tin nhắn */}
               <TouchableOpacity
                 activeOpacity={0.7}
-                className="w-[36px] h-[36px] rounded-full bg-[#FFF4EC] items-center justify-center"
+                className="w-[41px] h-[41px] rounded-full bg-[#FDF5EF] items-center justify-center"
                 onPress={async () => {
                   // Lấy số điện thoại từ data
-                  const phoneNumber = pet?.shelter?.phone; 
+                  const phoneNumber = pet?.shelter?.phone;
 
                   if (phoneNumber) {
                     // 1. Link Zalo Web/Universal (Mặc định)
                     const webUrl = `https://zalo.me/${phoneNumber}`;
-                    
+
                     // 2. App Scheme Zalo (Ép mở ứng dụng Zalo)
                     // Cú pháp này trên Android/iOS sẽ ép gọi thẳng vào gói ứng dụng Zalo
-                    const appUrl = Platform.OS === 'ios' 
+                    const appUrl = Platform.OS === 'ios'
                       ? `zalo://` // Mở app Zalo trên iOS
                       : `intent://zalo.me/${phoneNumber}#Intent;package=com.zing.zalo;scheme=https;end`; // Ép Intent trên Android
 
@@ -233,18 +238,22 @@ export default function PetDetailModal() {
                   }
                 }}
               >
-                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#F2A465" />
+                <Image
+                source={require('../assets/icon/message.png')}
+                style={{ width: 24, height: 24 }}
+                resizeMode="cover"
+              />
               </TouchableOpacity>
 
               {/* Nút Xem trang cá nhân */}
               <TouchableOpacity
                 activeOpacity={0.7}
-                className="w-[36px] h-[36px] rounded-full bg-[#FFF4EC] items-center justify-center"
+                className="w-[36px] h-[36px] items-center justify-center"
                 onPress={() => {
                   router.push({ pathname: '/shelter-profile', params: { id: pet?.shelter?.id } });
                 }}
               >
-                <Feather name="chevron-right" size={20} color="#F2A465" />
+                <Feather name="chevron-right" size={18} color="#8E8E93" />
               </TouchableOpacity>
 
             </View>
@@ -252,12 +261,12 @@ export default function PetDetailModal() {
 
           {/* --- DESCRIPTION --- */}
           <View>
-            <Text className="text-[16px] font-medium text-[#1C1C1E] mb-2">About {pet.name}</Text>
+            <Text className="text-[16px] font-medium text-black mb-2">About {pet.name}</Text>
             <Text className="text-[14px] text-[#8E8E93] leading-[22px] font-normal">
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam
             </Text>
 
-            <View className="flex-row gap-2 mt-[9px]">
+            <View className="flex-row gap-2 mt-[6px]">
               <View className="bg-[#FFF4E8] px-3.5 py-0.5 rounded-full">
                 <Text className="text-[#F3B27B] text-[12px] font-medium">Playful</Text>
               </View>
@@ -273,16 +282,16 @@ export default function PetDetailModal() {
 
           {/* --- BEHAVIOR --- */}
           <View className="mt-6 mb-2">
-            <Text className="text-[16px] font-medium text-[#1C1C1E] mb-2">{pet.name}'s Behavior</Text>
+            <Text className="text-[16px] font-medium text-black mb-2">{pet.name}'s Behavior</Text>
             <View className="flex-row items-start mb-1">
               <View className="flex-row items-center mr-2 mt-[2px]">
                 <FontAwesome5 name="check" size={14} color="#77C852" />
-                <Text className="ml-1.5 text-[15px] text-[#77C852]">
+                <Text className="ml-1.5 text-[14px] text-[#77C852]">
                   Good with:
                 </Text>
               </View>
 
-              <Text className="flex-1 text-[15px] text-[#8E8E93] leading-[22px]">
+              <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
                 Children, Seniors, Dogs, Cats.
               </Text>
             </View>
@@ -290,12 +299,12 @@ export default function PetDetailModal() {
             <View className="flex-row items-start">
               <View className="flex-row items-center mr-2 mt-[2px]">
                 <FontAwesome5 name="times" size={14} color="#FE7D66" />
-                <Text className="ml-2.5 text-[15px] text-[#FE7D66]">
+                <Text className="ml-2.5 text-[14px] text-[#FE7D66]">
                   Not suitable:
                 </Text>
               </View>
 
-              <Text className="flex-1 text-[15px] text-[#8E8E93] leading-[22px]">
+              <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
                 Children, Seniors, Dogs, Cats.
               </Text>
             </View>
@@ -303,7 +312,7 @@ export default function PetDetailModal() {
 
           {/* --- IDEAL HOME --- */}
           <View className="mt-6 mb-6">
-            <Text className="text-[16px] font-medium text-[#1C1C1E] mb-2">Ideal Home</Text>
+            <Text className="text-[16px] font-medium text-black mb-2">Ideal Home</Text>
             <Text className="text-[14px] text-[#8E8E93] leading-[22px]">
               {pet.idealHome || "This pet needs a loving home with space to run and play."}
             </Text>
@@ -313,8 +322,8 @@ export default function PetDetailModal() {
           <View className="mb-10">
 
             {/* 1. HEADER*/}
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-[18px] font-medium text-[#1C1C1E]">Paw History</Text>
+            <View className="flex-row justify-between items-center mb-5">
+              <Text className="text-[16px] font-medium text-black">Paw History</Text>
 
               <TouchableOpacity
                 onPress={toggleHistory}
@@ -349,10 +358,10 @@ export default function PetDetailModal() {
 
                     <View className="ml-4 flex-1 pt-1">
                       <View className="flex-row justify-between items-start">
-                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">Current Owner</Text>
-                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                        <Text className="text-[16px] font-medium text-black">Current Owner</Text>
+                        <Text className="text-[12px] text-[#8E8E93] font-regular">01/01/2026</Text>
                       </View>
-                      <Text className="text-[13px] text-[#8E8E93] mt-1">Ownership transferred to Jane Doe</Text>
+                      <Text className="text-[12px] text-[#8E8E93] mt-1">Ownership transferred to Jane Doe</Text>
                     </View>
                   </View>
 
@@ -363,10 +372,10 @@ export default function PetDetailModal() {
 
                     <View className="ml-4 flex-1 pt-1">
                       <View className="flex-row justify-between items-start">
-                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">Anual Checkup</Text>
-                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                        <Text className="text-[16px] font-medium text-black">Anual Checkup</Text>
+                        <Text className="text-[12px] text-[#8E8E93] font-medium">01/01/2026</Text>
                       </View>
-                      <Text className="text-[13px] text-[#8E8E93] mt-1">Vaccinated: hepatitis, rabies, parvo, and parainfluenza</Text>
+                      <Text className="text-[12px] text-[#8E8E93] mt-1">Health examination completed</Text>
                     </View>
                   </View>
 
@@ -377,10 +386,10 @@ export default function PetDetailModal() {
 
                     <View className="ml-4 flex-1 pt-1">
                       <View className="flex-row justify-between items-start">
-                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">DHPP Vaccination</Text>
-                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                        <Text className="text-[16px] font-medium text-black">DHPP Vaccination</Text>
+                        <Text className="text-[12px] text-[#8E8E93] font-regular">01/01/2026</Text>
                       </View>
-                      <Text className="text-[13px] text-[#8E8E93] mt-1">Vaccinated: hepatitis, rabies, parvo, and parainfluenza</Text>
+                      <Text className="text-[12px] text-[#8E8E93] mt-1">Vaccinated: hepatitis, rabies, parvo, and parainfluenza</Text>
                     </View>
                   </View>
 
@@ -391,10 +400,10 @@ export default function PetDetailModal() {
 
                     <View className="ml-4 flex-1 pt-1">
                       <View className="flex-row justify-between items-start">
-                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">QR Code Registered</Text>
-                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                        <Text className="text-[16px] font-medium text-black">QR Code Registered</Text>
+                        <Text className="text-[12px] text-[#8E8E93] font-regular">01/01/2026</Text>
                       </View>
-                      <Text className="text-[13px] mt-1 font-medium italic">
+                      <Text className="text-[12px] text-[#8E8E93] mt-1 font-regular">
                         Pawlife QR tag activated and liked to Luna
                       </Text>
                     </View>
@@ -407,10 +416,10 @@ export default function PetDetailModal() {
 
                     <View className="ml-4 flex-1 pt-1">
                       <View className="flex-row justify-between items-start">
-                        <Text className="text-[16px] font-semibold text-[#1C1C1E]">Date of Birth</Text>
-                        <Text className="text-[13px] text-[#8E8E93] font-medium">01/01/2026</Text>
+                        <Text className="text-[16px] font-medium text-black">Date of Birth</Text>
+                        <Text className="text-[12px] text-[#8E8E93] font-regular">01/01/2026</Text>
                       </View>
-                      <Text className="text-[13px] mt-1 font-medium italic">
+                      <Text className="text-[12px] text-[#8E8E93] mt-1 font-regular">
                         Luna was born
                       </Text>
                     </View>
@@ -438,6 +447,6 @@ export default function PetDetailModal() {
         </TouchableOpacity>
       </View>
     </View>
-    
+
   );
 }
