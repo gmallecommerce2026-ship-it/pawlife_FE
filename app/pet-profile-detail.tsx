@@ -4,10 +4,8 @@ import { Feather, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ico
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { QrCodeIcon } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
 
@@ -27,13 +25,12 @@ export default function PetProfileDetailScreen() {
   const [isLostMode, setIsLostMode] = useState(false);
   const [isAddressVisible, setIsAddressVisible] = useState(true);
   const [expandHistory, setExpandHistory] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingLostMode, setIsTogglingLostMode] = useState(false);
   const [showLostModeModal, setShowLostModeModal] = useState(false);
   const [pendingLostMode, setPendingLostMode] = useState<boolean>(false);
   const { t } = useLanguage();
-
+  
   const handleRemovePet = () => {
     Alert.alert(
       "Xóa thú cưng",
@@ -112,10 +109,10 @@ export default function PetProfileDetailScreen() {
   };
 
   const handleViewQRCode = () => {
-      // Đảm bảo có data rồi mới cho mở Modal
-      if (petData) {
-          setShowQRModal(true);
-      }
+    if (petData) {
+        // Chuyển hướng sang màn hình view-qr-code và truyền theo petId
+        router.push(`/view-qr-code?id=${petId}`); 
+    }
   };
 
   const executeToggleMode = async () => {
@@ -244,6 +241,9 @@ export default function PetProfileDetailScreen() {
   // Format ID hiển thị (cắt ngắn id gốc nếu quá dài)
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId.substring(0, 8).toUpperCase();
   
+  // KIỂM TRA TRẠNG THÁI QR CODE TỪ SCHEMA CỦA BẠN
+  const hasValidQRCode = !!petData.qrCodeUrl && petData.qrVerificationStatus === 'VERIFIED';
+  
   return (
     <View className="flex-1 bg-[#FFFFFF]">
       <StatusBar style="dark" />
@@ -281,91 +281,105 @@ export default function PetProfileDetailScreen() {
             </View>
 
             
-            {/* 1. OUTER VIEW: Chứa Drop Shadow bên ngoài */}
-            <View 
-                className="mx-7 mb-8 rounded-[20px]"
-                style={isLostMode 
-                            ? {
-                    shadowColor: '#8B546B1A',
-                    shadowOffset: { width: 5, height: 5 },
-                    shadowOpacity: 1, 
-                    shadowRadius: 2,
-                    elevation: 3, 
-                    backgroundColor: isLostMode ? '#FEF2F2' : '#FFFFFF' 
-                } : ""}
-            >
-                {/* 2. INNER VIEW: Cắt góc overflow và xử lý màu nền */}
+            {/* --- LOST MODE / QR REQUIRED SECTION --- */}
+            {hasValidQRCode ? (
                 <View 
-                    className={`rounded-[20px] p-[18px] py-[21px] flex-row items-center justify-between overflow-hidden ${
-                        isLostMode 
-                            ? 'bg-[#FEF2F2] border border-[#FFE5E5]' 
-                            : 'bg-white border border-gray-200'
-                    }`}
-                    
+                    className="mx-7 mb-8 rounded-[20px]"
+                    style={isLostMode 
+                                ? {
+                        shadowColor: '#8B546B1A',
+                        shadowOffset: { width: 5, height: 5 },
+                        shadowOpacity: 1, 
+                        shadowRadius: 2,
+                        elevation: 3, 
+                        backgroundColor: isLostMode ? '#FEF2F2' : '#FFFFFF' 
+                    } : {}}
                 >
-                    
-                    {/* Nền Gradient khi bật Lost Mode */}
-                    {isLostMode && (
-                      <>
-                        <LinearGradient
-                          colors={['#FFF8F1', '#FFF8F1', '#FFEEF0']}
-                          // Ép bóng mờ đi rất nhanh ở đoạn 15% và biến mất hoàn toàn ở 35% của 24px
-                          // => Bóng thực tế chỉ mỏng khoảng 8px nhưng mượt mà ôm sát góc
-                          locations={[0, 0.15, 0.35]} 
-                          start={{ x: 1, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={{
-                              position: 'absolute',
-                              top: 0, left: 0, right: 0,
-                              // BẮT BUỘC lớn hơn borderRadius (20) để đường cong được vẽ trọn vẹn
-                              height: 3, 
-                              zIndex: 1,
-                          }}
-                        />
-                        <LinearGradient 
-                            colors={['#FFF8F1', '#FFEEF0']}
-                            locations={[0.3, 1]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                        />
-                      </>
-                    )}
-                    
-                    {/* KHỐI BÊN TRÁI: Icon và Text */}
-                    <View className="flex-row items-start flex-1 mr-4 z-10">
-                      <View className="mt-[1px] mr-3">
+                    {/* 2. INNER VIEW: Cắt góc overflow và xử lý màu nền */}
+                    <View 
+                        className={`rounded-[20px] p-[18px] py-[21px] flex-row items-center justify-between overflow-hidden ${
+                            isLostMode 
+                                ? 'bg-[#FEF2F2] border border-[#FFE5E5]' 
+                                : 'bg-white border border-gray-200'
+                        }`}
                         
-                          <Feather 
-                              name="alert-circle" 
-                              size={20} 
-                              color={isLostMode ? "#8B3A3A" : "#9ca3af00"} 
-                          />
-                      </View>
-                      <View className="flex-1">
-                          <Text className={`font-medium text-[16px] leading-6 ${isLostMode ? 'text-[#8B3A3A]' : 'text-[#000000]'}`}>
-                              Lost Pet Mode
-                          </Text>
-                          <Text className={`text-[14px] mt-0.5 font-light ${isLostMode ? 'text-[#8B3A3ACC]' : 'text-gray-400'}`}>
-                              {isLostMode ? "Active - See Pet's Activity" : "Inactive - Pet is safe"}
-                          </Text>
-                      </View>
-                    </View>
+                    >
+                        
+                        {/* Nền Gradient khi bật Lost Mode */}
+                        {isLostMode && (
+                          <>
+                            <LinearGradient
+                              colors={['#FFF8F1', '#FFF8F1', '#FFEEF0']}
+                              // Ép bóng mờ đi rất nhanh ở đoạn 15% và biến mất hoàn toàn ở 35% của 24px
+                              // => Bóng thực tế chỉ mỏng khoảng 8px nhưng mượt mà ôm sát góc
+                              locations={[0, 0.15, 0.35]} 
+                              start={{ x: 1, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={{
+                                  position: 'absolute',
+                                  top: 0, left: 0, right: 0,
+                                  // BẮT BUỘC lớn hơn borderRadius (20) để đường cong được vẽ trọn vẹn
+                                  height: 3, 
+                                  zIndex: 1,
+                              }}
+                            />
+                            <LinearGradient 
+                                colors={['#FFF8F1', '#FFEEF0']}
+                                locations={[0.3, 1]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                            />
+                          </>
+                        )}
+                        
+                        {/* KHỐI BÊN TRÁI: Icon và Text */}
+                        <View className="flex-row items-start flex-1 mr-4 z-10">
+                          <View className="mt-[1px] mr-3">
+                            
+                              <Feather 
+                                  name="alert-circle" 
+                                  size={20} 
+                                  color={isLostMode ? "#8B3A3A" : "#9ca3af00"} 
+                              />
+                          </View>
+                          <View className="flex-1">
+                              <Text className={`font-medium text-[16px] leading-6 ${isLostMode ? 'text-[#8B3A3A]' : 'text-[#000000]'}`}>
+                                  Lost Pet Mode
+                              </Text>
+                              <Text className={`text-[14px] mt-0.5 font-light ${isLostMode ? 'text-[#8B3A3ACC]' : 'text-gray-400'}`}>
+                                  {isLostMode ? "Active - See Pet's Activity" : "Inactive - Pet is safe"}
+                              </Text>
+                          </View>
+                        </View>
 
-                    {/* KHỐI BÊN PHẢI: Switch */}
-                    <View className="justify-center z-10">
-                        <Switch
-                            disabled={isTogglingLostMode}
-                            trackColor={{ false: '#E5E7EB', true: '#8B3A3A' }}
-                            thumbColor={'#FFFFFF'}
-                            ios_backgroundColor="#E5E7EB"
-                            onValueChange={handleLostModeToggle}
-                            value={isLostMode}
-                            style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }}
-                        />
+                        {/* KHỐI BÊN PHẢI: Switch */}
+                        <View className="justify-center z-10">
+                            <Switch
+                                disabled={isTogglingLostMode}
+                                trackColor={{ false: '#E5E7EB', true: '#8B3A3A' }}
+                                thumbColor={'#FFFFFF'}
+                                ios_backgroundColor="#E5E7EB"
+                                onValueChange={handleLostModeToggle}
+                                value={isLostMode}
+                                style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }}
+                            />
+                        </View>
                     </View>
                 </View>
-            </View>
+            ) : (
+                <View className="mx-7 mb-8 flex-row bg-[#FFFBEB] border border-[#FEF3C7] rounded-[20px] p-[18px] items-center shadow-sm shadow-yellow-100/50">
+                    <View className="bg-[#FEF3C7] p-3 rounded-full mr-4">
+                        <Feather name="alert-triangle" size={24} color="#D97706" />
+                    </View>
+                    <View className="flex-1">
+                        <Text className="text-[16px] font-bold text-[#D97706] mb-1">QR Code Required</Text>
+                        <Text className="text-[14px] text-[#92400E] leading-5">
+                            Link a physical Smart Tag to activate all features.
+                        </Text>
+                    </View>
+                </View>
+            )}
 
             {/* --- PET INFORMATION CARD --- */}
             <View className="mx-7 mb-8 ">
@@ -425,41 +439,6 @@ export default function PetProfileDetailScreen() {
                   />
               </View>
           </View>
-            {/* --- PAW HISTORY SECTION --- */}
-            {/* <View className="mx-5 mb-8 bg-white rounded-[24px] overflow-hidden shadow-sm shadow-gray-100 border border-gray-50">
-                <TouchableOpacity 
-                    className="flex-row items-center justify-between p-6 active:bg-gray-50"
-                    onPress={toggleHistory}
-                    activeOpacity={0.7}
-                >
-                    <Text className="text-lg font-bold text-gray-900">PawHistory</Text>
-                    <View className="flex-row items-center gap-1">
-                        <Text className="text-orange-500 text-xs font-bold">{expandHistory ? 'Hide' : 'View'}</Text>
-                        <Feather 
-                            name={expandHistory ? "chevron-up" : "chevron-down"} 
-                            size={20} 
-                            color="#ffa053" 
-                        />
-                    </View>
-                </TouchableOpacity>
-
-                {expandHistory && (
-                    <View className="px-6 pb-6">
-                        {HISTORY_DATA.map((item, index) => (
-                            <TimelineItem 
-                                key={item.id} 
-                                item={item} 
-                                isLast={index === HISTORY_DATA.length - 1} 
-                            />
-                        ))}
-                        <View className="mt-2 bg-gray-100 rounded-xl p-3">
-                            <Text className="text-gray-500 text-[11px] text-center">
-                                This complete timeline is permanent and only available for the current owner
-                            </Text>
-                        </View>
-                    </View>
-                )}
-            </View> */}
 
             {/* ========================================================= */}
             {/* --- VACCINATION RECORD SECTION (MỚI THÊM VÀO ĐÂY) --- */}
@@ -516,17 +495,35 @@ export default function PetProfileDetailScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={handleViewQRCode}
+                  onPress={() => {
+                    if (hasValidQRCode) {
+                        router.push(`/view-qr-code?id=${petId}`);
+                    } else {
+                        router.push('/(tabs)/scan');
+                    }
+                  }}
                   activeOpacity={0.7}
-                  className="w-full bg-white border border-[#FF9C56] py-5 rounded-[16px] items-center"
+                  className={`w-full py-5 rounded-[16px] items-center ${
+                      hasValidQRCode 
+                        ? 'bg-white border border-[#FF9C56]' 
+                        : 'bg-[#374151]' 
+                  }`}
                 >
                   <View className="flex-row items-center gap-2">
-                    <QrCodeIcon size={20} color="#E89B5A" className="mr-2.5" />
-                    <Text className="text-[#E89B5A] font-medium text-[16px]">
-                      View QR Code
+                    <MaterialCommunityIcons 
+                        name={hasValidQRCode ? "qrcode" : "qrcode-scan"} 
+                        size={20} 
+                        color={hasValidQRCode ? "#E89B5A" : "#FFFFFF"} 
+                        className="mr-2.5" 
+                    />
+                    <Text className={`font-medium text-[16px] ${
+                        hasValidQRCode ? 'text-[#E89B5A]' : 'text-white'
+                    }`}>
+                      {hasValidQRCode ? "View QR Code" : "Scan QR Code"}
                     </Text>
                   </View>
                 </TouchableOpacity>
+
                 <TouchableOpacity 
                     className="w-full py-4 rounded-full items-center mt-2 active:opacity-70"
                     onPress={handleRemovePet}
@@ -543,69 +540,6 @@ export default function PetProfileDetailScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* --- QR CODE MODAL --- */}
-      <Modal
-        visible={showQRModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowQRModal(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black/60 px-5">
-          <View className="bg-white rounded-[24px] p-6 w-full items-center shadow-lg">
-            
-            <View className="w-full flex-row justify-between items-center mb-6">
-              <Text className="text-lg font-bold text-gray-900">Pet QR Tag</Text>
-              <TouchableOpacity onPress={() => setShowQRModal(false)}>
-                <Feather name="x" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            <View className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm mb-4 w-full min-h-[220px] items-center justify-center">
-                {petData?.qrCodeUrl ? (
-    <Image 
-        source={{ uri: petData.qrCodeUrl }} 
-        style={{ width: 192, height: 192 }} 
-        className="rounded-lg"
-        resizeMode="contain"
-    />
-) : petData?.tags && petData.tags.length > 0 ? (
-    <View style={{ width: 192, height: 192, alignItems: 'center', justifyContent: 'center' }}>
-        <QRCode
-            value={petData.tags[0].id}
-            size={180}
-            color="black"
-            backgroundColor="white"
-        />
-    </View>
-) : (
-                <View className="items-center py-4">
-                    <MaterialCommunityIcons name="qrcode-remove" size={60} color="#D1D5DB" />
-                    <Text className="text-gray-500 font-bold text-base text-center mt-4">
-                        No QR Code Available
-                    </Text>
-                    <Text className="text-gray-400 text-xs text-center mt-2 px-2 leading-5">
-                        Please go to "Edit Profile" to upload a Smart Tag or QR Code for {petData?.name}.
-                    </Text>
-                </View>
-                )}
-            </View>
-
-            {(petData?.qrCodeUrl || (petData?.tags && petData.tags.length > 0)) && (
-              <Text className="text-gray-500 text-center text-sm mb-6 leading-5 px-2">
-                Others can scan this QR code using their camera app to view the profile and contact you if {petData?.name} is lost.
-              </Text>
-            )}
-
-            <TouchableOpacity 
-              className="w-full bg-orange-100 py-3.5 rounded-full items-center mt-2"
-              onPress={() => setShowQRModal(false)}
-            >
-              <Text className="text-orange-600 font-bold text-base">Close</Text>
-            </TouchableOpacity>
-
-          </View>
-        </View>
-      </Modal>
 
       {/* --- LOST MODE TOGGLE MODAL --- */}
       <Modal

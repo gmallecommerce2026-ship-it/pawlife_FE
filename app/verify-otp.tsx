@@ -4,7 +4,8 @@ import { Feather } from '@expo/vector-icons';
 import { Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
 import React, { useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+// IMPORT THÊM Keyboard và ScrollView
+import { ActivityIndicator, Alert, Keyboard, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 export default function VerifyOtpScreen() {
   const router = useRouter();
@@ -15,8 +16,12 @@ export default function VerifyOtpScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   
-  // Sửa thành 6 vì mã OTP từ file fill-profile gửi về yêu cầu 6 số
   const CODE_LENGTH = 6; 
+
+  // XỬ LÝ LỖI 1: Ép đóng bàn phím native mặc định từ màn hình trước
+  useEffect(() => {
+    Keyboard.dismiss();
+  }, []);
 
   const handleKeyPress = (value: string) => {
     if (value === 'delete') {
@@ -37,7 +42,7 @@ export default function VerifyOtpScreen() {
   const submitRegistration = async (otpCode: string) => {
     try {
       setIsLoading(true);
-      
+      console.log("Dữ liệu gửi lên Backend:", { email: params.email, otp: otpCode });
       await register({ 
         email: params.email as string, 
         password: params.password as string, 
@@ -59,7 +64,7 @@ export default function VerifyOtpScreen() {
 
     } catch (error: any) {
       Alert.alert("Registration Failed", error.message || "Invalid or expired OTP!");
-      setCode(''); // Reset code nếu lỗi
+      setCode(''); 
     } finally {
       setIsLoading(false);
     }
@@ -90,88 +95,95 @@ export default function VerifyOtpScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <View className="px-6 py-4">
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          disabled={isLoading}
-          className="w-10 h-10 justify-center -ml-2"
-        >
-          <Feather name="chevron-left" size={28} color="#000000" />
-        </TouchableOpacity>
-      </View>
-
-      <View className="flex-1 px-8 pt-4">
-        <View className="mb-10">
-          <Text className="text-[32px] font-bold text-black mb-4 flex-row items-center">
-            Enter OTP Code <Text className="text-[28px]">🔐</Text>
-          </Text>
-          <Text className="text-[15px] text-[#9CA3AF] leading-6 font-regular">
-            Email has been sent to <Text className="text-black font-semibold">{params.email || 'your email'}</Text>. Please enter the one-time verification code below.
-          </Text>
+      {/* XỬ LÝ LỖI 2: Dùng ScrollView chống tràn UI và xử lý chạm mượt mà */}
+      <ScrollView 
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="px-6 py-4">
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            disabled={isLoading}
+            className="w-10 h-10 justify-center -ml-2"
+          >
+            <Feather name="chevron-left" size={28} color="#000000" />
+          </TouchableOpacity>
         </View>
 
-        {/* Cập nhật thành 6 ô vuông nhỏ hơn thay vì 4 */}
-        <View className="flex-row justify-between mb-8 px-0">
-          {[0, 1, 2, 3, 4, 5].map((index) => {
-            const digit = code[index] || '';
-            const isActive = index === code.length;
-
-            return (
-              <View
-                key={index}
-                className={`w-[45px] h-[55px] rounded-[12px] justify-center items-center border-[1.5px] ${
-                  isActive ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'
-                } ${digit ? 'border-[#E89B5A] bg-[#FFF8F3]' : 'bg-white'}`}
-              >
-                <Text className="text-[24px] font-bold text-black">
-                  {digit}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-
-        {isLoading ? (
-          <View className="items-center mb-8">
-            <ActivityIndicator size="small" color="#E89B5A" />
-            <Text className="text-[#9CA3AF] text-[15px] mt-2 font-regular">Verifying...</Text>
-          </View>
-        ) : (
-          <View className="items-center mb-8">
-            <Text className="text-[#9CA3AF] text-[15px] font-regular">
-              Resend New Code 00:30
+        <View className="flex-1 px-8 pt-4">
+          <View className="mb-10">
+            <Text className="text-[32px] font-bold text-black mb-4 flex-row items-center">
+              Enter OTP Code <Text className="text-[28px]">🔐</Text>
+            </Text>
+            <Text className="text-[15px] text-[#9CA3AF] leading-6 font-regular">
+              Email has been sent to <Text className="text-black font-semibold">{params.email || 'your email'}</Text>. Please enter the one-time verification code below.
             </Text>
           </View>
-        )}
 
-        <View className="mt-auto pb-8">
-          <View className="flex-row justify-between w-full">
-            <KeyButton value="1" label="1" />
-            <KeyButton value="2" label="2" />
-            <KeyButton value="3" label="3" />
+          <View className="flex-row justify-between mb-8 px-0">
+            {[0, 1, 2, 3, 4, 5].map((index) => {
+              const digit = code[index] || '';
+              const isActive = index === code.length;
+
+              return (
+                <View
+                  key={index}
+                  className={`w-[45px] h-[55px] rounded-[12px] justify-center items-center border-[1.5px] ${
+                    isActive ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'
+                  } ${digit ? 'border-[#E89B5A] bg-[#FFF8F3]' : 'bg-white'}`}
+                >
+                  <Text className="text-[24px] font-bold text-black">
+                    {digit}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
-          <View className="flex-row justify-between w-full">
-            <KeyButton value="4" label="4" />
-            <KeyButton value="5" label="5" />
-            <KeyButton value="6" label="6" />
-          </View>
-          <View className="flex-row justify-between w-full">
-            <KeyButton value="7" label="7" />
-            <KeyButton value="8" label="8" />
-            <KeyButton value="9" label="9" />
-          </View>
-          <View className="flex-row justify-between w-full">
-            <KeyButton value="empty" label="" />
-            <KeyButton value="0" label="0" />
-            <KeyButton 
-              value="delete" 
-              icon={<Feather name="arrow-left" size={24} color="#6B7280" />} 
-            />
+
+          {isLoading ? (
+            <View className="items-center mb-8">
+              <ActivityIndicator size="small" color="#E89B5A" />
+              <Text className="text-[#9CA3AF] text-[15px] mt-2 font-regular">Verifying...</Text>
+            </View>
+          ) : (
+            <View className="items-center mb-8">
+              <Text className="text-[#9CA3AF] text-[15px] font-regular">
+                Resend New Code 00:30
+              </Text>
+            </View>
+          )}
+
+          {/* Keypad custom giữ nguyên */}
+          <View className="mt-auto pb-8 pt-4">
+            <View className="flex-row justify-between w-full">
+              <KeyButton value="1" label="1" />
+              <KeyButton value="2" label="2" />
+              <KeyButton value="3" label="3" />
+            </View>
+            <View className="flex-row justify-between w-full">
+              <KeyButton value="4" label="4" />
+              <KeyButton value="5" label="5" />
+              <KeyButton value="6" label="6" />
+            </View>
+            <View className="flex-row justify-between w-full">
+              <KeyButton value="7" label="7" />
+              <KeyButton value="8" label="8" />
+              <KeyButton value="9" label="9" />
+            </View>
+            <View className="flex-row justify-between w-full">
+              <KeyButton value="empty" label="" />
+              <KeyButton value="0" label="0" />
+              <KeyButton 
+                value="delete" 
+                icon={<Feather name="arrow-left" size={24} color="#6B7280" />} 
+              />
+            </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
 
-      {/* Modal báo tạo tài khoản thành công chuyển sang file này */}
+      {/* Modal */}
       <Modal visible={showSuccessModal} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/50 px-6">
           <View className="bg-white rounded-3xl p-8 items-center w-full shadow-2xl">
@@ -186,7 +198,6 @@ export default function VerifyOtpScreen() {
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }

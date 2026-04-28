@@ -8,15 +8,18 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useContext, useEffect, useRef, useState } from 'react';
-import { AppState, Text, TextInput, TouchableOpacity, View } from 'react-native';
+// BỔ SUNG 1: Thêm Alert vào import từ react-native
+import { Alert, AppState, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FloatingHomeButton from '../components/FloatingHomeButton';
 import './global.css';
 // Import thư viện bảo mật
+import { connectSocket, socket } from '@/utils/socket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
-
+import * as SecureStore from 'expo-secure-store';
+// BỔ SUNG 2: Import socket
 export { ErrorBoundary } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
@@ -33,6 +36,7 @@ const overrideDefaultFont = () => {
   TextInputRender.defaultProps.style = [{ fontFamily: 'Urbanist' }, TextInputRender.defaultProps.style];
 };
 overrideDefaultFont();
+
 // ------------------------------------------------------------------
 // Component Guard: Xử lý logic điều hướng và FaceID Lock
 // ------------------------------------------------------------------
@@ -45,6 +49,52 @@ function RootLayoutNavGuard() {
   const [isAppLocked, setIsAppLocked] = useState(false);
   const appState = useRef(AppState.currentState);
   const [hasSeenIntro, setHasSeenIntro] = useState<boolean | null>(null);
+  useEffect(() => {
+    const initSocket = async () => {
+      if (isAuthenticated && !socket.connected) {
+        const token = await SecureStore.getItemAsync('access_token'); // Dùng đúng key bạn đang lưu token
+        if (token) {
+          connectSocket(token);
+        }
+      }
+    };
+    initSocket();
+  }, [isAuthenticated]);
+  // BỔ SUNG 3: Global Socket Listener cho luồng Transfer Ownership
+  useEffect(() => {
+    // Chỉ kích hoạt socket listener nếu user đã đăng nhập hoàn tất
+    if (!isAuthenticated) return;
+
+    const handleIncomingTransfer = (data: { transferId: string, petId: string, senderId: string }) => {
+      Alert.alert(
+        "Yêu cầu chuyển nhượng",
+        `Bạn vừa nhận được yêu cầu chuyển nhượng thú cưng. Bạn có muốn kiểm tra và xác nhận ngay bây giờ không?`,
+        [
+          { text: "Để sau", style: "cancel" },
+          { 
+            text: "Xem ngay", 
+            onPress: () => {
+              // Nhảy thẳng vào trang transfer-ownership của bé pet đó
+              router.push({
+                pathname: '/transfer-ownership',
+                params: { petId: data.petId }
+              });
+            }
+          }
+        ]
+      );
+    };
+
+    // Lắng nghe sự kiện từ server
+    socket.on('transfer_requested', handleIncomingTransfer);
+
+    return () => {
+      // Dọn dẹp listener khi component unmount hoặc user đăng xuất
+      socket.off('transfer_requested', handleIncomingTransfer);
+    };
+  }, [isAuthenticated, router]);
+
+
   const verifyFaceId = async () => {
     try {
       const useFaceId = await AsyncStorage.getItem('useFaceId');
@@ -186,7 +236,7 @@ export default function RootLayout() {
   if (!loaded) {
     return <View />;
   }
-
+  
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>

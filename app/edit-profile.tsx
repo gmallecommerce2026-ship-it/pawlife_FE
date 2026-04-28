@@ -18,12 +18,12 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 // IMPORT CONTEXT AND HOOKS
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AuthContext } from '../contexts/AuthContext';
 import { useImageUpload } from '../hooks/useImageUpload';
+import { disconnectSocket } from '@/utils/socket';
 
 // --- CONSTANTS ---
 const COUNTRY_CODES = [
@@ -187,7 +187,11 @@ export default function EditProfileScreen() {
             style: "destructive",
             onPress: async () => {
               try {
-                if (logout) await logout();
+                if (logout) await logout(); // Xóa auth data/token
+                
+                // BỔ SUNG: Ngắt kết nối socket ngay lập tức
+                disconnectSocket();
+                
                 router.replace('/');
               } catch (error) {
                 Alert.alert(t('Error'), t('Unable to log out. Please try again!'));

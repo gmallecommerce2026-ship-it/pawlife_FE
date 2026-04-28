@@ -1,6 +1,6 @@
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
-import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
+import { AntDesign } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
@@ -67,13 +67,18 @@ export default function ScannedPetScreen() {
 
     try {
       const finalTagId = Array.isArray(tagId) ? tagId[0] : tagId;
+      
       const lat = location?.latitude || null;
       const lng = location?.longitude || null;
+      
+      // SỬA ĐÚNG DÒNG NÀY LÀ XONG
+      const radius = location?.radius || null; 
 
       const payload = isSkipped ? {
         tagId: finalTagId,
         latitude: lat,
         longitude: lng,
+        radius: radius,
       } : {
         tagId: finalTagId,
         scannedBy: formData.scannedBy.trim() || undefined,
@@ -81,7 +86,9 @@ export default function ScannedPetScreen() {
         message: formData.message.trim() || undefined,
         latitude: lat,
         longitude: lng,
+        radius: radius,
       };
+
 
       await axiosClient.post('/tags/report', payload);
 

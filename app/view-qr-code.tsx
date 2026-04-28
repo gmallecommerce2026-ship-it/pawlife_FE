@@ -1,15 +1,18 @@
 import { Text } from '@/components/AppText';
 import { Feather } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowRightLeft, RefreshCcw } from 'lucide-react-native';
-import React from 'react';
-import { Dimensions, Image, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { petService } from '../services/petService';
 
 const { width } = Dimensions.get('window');
 const QR_SIZE = Math.min(width * 0.45, 170);
+const LARGE_QR_SIZE = width * 0.65; // Kích thước QR khi phóng to
 
 const SHADOW_OPACITY = 0.05;
 const SHADOW_RADIUS = 8;
@@ -17,13 +20,73 @@ const ELEVATION = 3;
 
 export default function ViewQrCode() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const petId = params.id as string;
 
-  const petData = {
-    name: 'Luna',
-    id: 'ID: PL-98234710',
-    avatar: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=2043&auto=format&fit=crop',
-    qrValue: 'https://pawcare.app/pet/PL-98234710',
+  // --- STATE ---
+  const [petData, setPetData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showQrOverlay, setShowQrOverlay] = useState(false); // State quản lý hiển thị overlay
+
+  // --- FETCH DATA ---
+  useFocusEffect(
+    useCallback(() => {
+      const fetchPetDetail = async () => {
+        if (!petId) {
+          setIsLoading(false);
+          return;
+        }
+        try {
+          setIsLoading(true);
+          const data = await petService.getPetById(petId);
+          setPetData(data);
+        } catch (error) {
+          console.error("Lỗi khi tải thông tin thú cưng:", error);
+          Alert.alert("Lỗi", "Không thể tải thông tin chi tiết thú cưng.");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchPetDetail();
+    }, [petId])
+  );
+
+  const handleDownloadQr = () => {
+    // Xử lý logic tải QR code tại đây
+    Alert.alert("Thông báo", "Tính năng tải QR Code đang được phát triển.");
   };
+
+  // --- RENDER LOADING STATE ---
+  if (isLoading) {
+    return (
+      <View className="flex-1 justify-center items-center bg-[#FAFAFA]">
+        <ActivityIndicator size="large" color="#E89B5A" />
+        <Text className="mt-4 text-gray-500">Đang tải mã QR...</Text>
+      </View>
+    );
+  }
+
+  // --- RENDER NOT FOUND STATE ---
+  if (!petData) {
+    return (
+      <View className="flex-1 justify-center items-center bg-[#FAFAFA] px-4">
+        <Feather name="alert-circle" size={64} color="#E5E7EB" />
+        <Text className="text-gray-800 text-lg font-bold mt-4 text-center">Không tìm thấy thông tin thú cưng</Text>
+        <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-orange-100 px-6 py-2 rounded-full">
+          <Text className="text-orange-600 font-bold">Quay lại</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // --- XỬ LÝ DỮ LIỆU HIỂN THỊ ---
+  const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId?.substring(0, 8).toUpperCase();
+  const avatarUrl = petData.avatarUrl || petData.images?.[0]?.url || 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=2043&auto=format&fit=crop';
+  
+  const qrValue = (petData.tags && petData.tags.length > 0) 
+    ? petData.tags[0].id 
+    : `https://pawcare.app/pet/${petId}`;
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -64,8 +127,7 @@ export default function ViewQrCode() {
             >
               
               <View className="absolute -top-[41px] self-center w-[82px] h-[82px] z-10">
-                
-                {/* LAYER 1: NỬA TRÊN - Đã thêm borderRadius: 41 (Bo tròn tuyệt đối) */}
+                {/* LAYER 1: NỬA TRÊN */}
                 <View style={{ position: 'absolute', width: 120, height: 80, bottom: 41, left: -19, overflow: 'hidden' }}>
                   <View 
                     style={{ 
@@ -82,7 +144,7 @@ export default function ViewQrCode() {
                   />
                 </View>
 
-                {/* LAYER 2: NỬA DƯỚI - Đã thêm borderRadius: 41 (Bo tròn tuyệt đối) */}
+                {/* LAYER 2: NỬA DƯỚI */}
                 <View style={{ position: 'absolute', width: 82, height: 41, top: 41, left: 0, overflow: 'hidden' }}>
                   <View 
                     style={{ 
@@ -96,29 +158,33 @@ export default function ViewQrCode() {
                 {/* LAYER 3: ẢNH PET */}
                 <View className="absolute inset-0 items-center justify-center pointer-events-none">
                     <Image
-                        source={{ uri: petData.avatar }}
+                        source={{ uri: avatarUrl }}
                         className="w-[70px] h-[70px] rounded-full bg-gray-200"
                         resizeMode="cover"
                     />
                 </View>
-
               </View>
 
               <Text className="text-[16px] font-semibold text-black mt-[48px] mb-[4px] tracking-tight">
                   {petData.name}
               </Text>
               <Text className="text-[12px] font-regular text-[#8E8E93] mb-[4px] tracking-wider">
-                  {petData.id}
+                  ID: {displayId}
               </Text>
 
-              <View className="p-5 bg-white items-center justify-center">
+              {/* BỌC TOUCHABLE ĐỂ MỞ OVERLAY */}
+              <TouchableOpacity 
+                activeOpacity={0.8} 
+                onPress={() => setShowQrOverlay(true)}
+                className="p-5 bg-white items-center justify-center"
+              >
                   <QRCode
-                  value={petData.qrValue}
-                  size={QR_SIZE}
-                  color="#111827"
-                  backgroundColor="transparent"
+                    value={qrValue}
+                    size={QR_SIZE}
+                    color="#111827"
+                    backgroundColor="transparent"
                   />
-              </View>
+              </TouchableOpacity>
 
               <View className="flex-row items-center justify-center mt-6">
                   <Text className="text-[16px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
@@ -131,7 +197,11 @@ export default function ViewQrCode() {
             </Text>
 
             <View className="w-full">
-              <TouchableOpacity onPress={() => router.push('/transfer-ownership' as any)} activeOpacity={0.7} className="w-full bg-white border border-[#E89B5A] py-[16px] rounded-[20px] items-center justify-center">
+              <TouchableOpacity 
+                onPress={() => router.push({ pathname: '/transfer-ownership', params: { petId } })} 
+                activeOpacity={0.7} 
+                className="w-full bg-white border border-[#E89B5A] py-[16px] rounded-[20px] items-center justify-center"
+              >
                 <View className='flex-row items-center'>
                   <ArrowRightLeft size={24} color="#E89B5A" strokeWidth={2} />
                   <Text className="text-[16px] font-medium text-[#E89B5A] ml-2">Transfer Ownership</Text>
@@ -155,6 +225,52 @@ export default function ViewQrCode() {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* OVERLAY HIỂN THỊ QR PHÓNG TO */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showQrOverlay}
+        onRequestClose={() => setShowQrOverlay(false)}
+      >
+        <BlurView 
+          intensity={80} 
+          tint="dark" 
+          style={StyleSheet.absoluteFill}
+          className="flex-1 justify-center items-center"
+        >
+          {/* Nút Close góc trên bên phải */}
+          <SafeAreaView className="absolute top-0 right-0 w-full flex-row justify-end px-6 py-4 pointer-events-box-none">
+            <TouchableOpacity 
+              onPress={() => setShowQrOverlay(false)}
+              className="p-2 bg-white/20 rounded-full mt-2"
+            >
+              <Feather name="x" size={28} color="white" />
+            </TouchableOpacity>
+          </SafeAreaView>
+
+          {/* QR Code được scale to và bo tròn */}
+          <View className="bg-white p-6 rounded-[28px] shadow-2xl items-center justify-center mb-8 overflow-hidden">
+            <QRCode
+              value={qrValue}
+              size={LARGE_QR_SIZE}
+              color="#111827"
+              backgroundColor="transparent"
+            />
+          </View>
+
+          {/* Nút Download */}
+          <TouchableOpacity 
+            onPress={handleDownloadQr}
+            activeOpacity={0.8}
+            className="flex-row items-center bg-[#E89B5A] px-8 py-4 rounded-full shadow-lg"
+          >
+            <Feather name="download" size={20} color="white" />
+            <Text className="text-white font-semibold text-[16px] ml-3">Download QR code</Text>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
     </View>
   );
 }

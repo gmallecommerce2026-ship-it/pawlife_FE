@@ -1,5 +1,6 @@
 // app/add-pet.tsx
 import { Text } from '@/components/AppText';
+import { petService } from '@/services/petService';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
@@ -21,13 +22,30 @@ import { useImageUpload } from '../hooks/useImageUpload';
 
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
-
+type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
+const BREED_OPTIONS = {
+  Dog: [
+    { label: 'Poodle', value: 'Poodle' },
+    { label: 'Phú Quốc', value: 'Phu Quoc' },
+    { label: 'Golden Retriever', value: 'Golden' },
+    { label: 'Husky', value: 'Husky' },
+    { label: 'Other', value: 'Other' },
+  ],
+  Cat: [
+    { label: 'British Shorthair', value: 'British Shorthair' },
+    { label: 'Scottish Fold', value: 'Scottish Fold' },
+    { label: 'Persian', value: 'Persian' },
+    { label: 'Sphynx', value: 'Sphynx' },
+    { label: 'Other', value: 'Other' },
+  ]
+};
 interface AddPetFormData {
   name: string;
   species: SpeciesType;
   breed: string;
   color: string;
-  weight: string;
+  weight: string; // Vẫn để string ở form để dễ handle TextInput
+  size: SizeType; // Thêm trường size
   dob: string;
   microchip: string;
   description: string;
@@ -53,6 +71,7 @@ export default function AddPetScreen() {
   const [formData, setFormData] = useState<AddPetFormData>({
     name: '',
     species: 'Dog',
+    size: 'MEDIUM',
     breed: '',
     color: '',
     weight: '',
@@ -69,7 +88,30 @@ export default function AddPetScreen() {
   });
 
   const inputFontStyle = { fontFamily: 'Urbanist-Regular' };
+  const handleSelectOption = (title: string, options: { label: string, value: any }[], field: keyof AddPetFormData) => {
+    Alert.alert(
+      title,
+      "Vui lòng chọn",
+      [
+        ...options.map(opt => ({
+          text: opt.label,
+          onPress: () => handleChange(field, opt.value)
+        })),
+        { text: "Cancel", style: "cancel" }
+      ],
+      { cancelable: true }
+    );
+  };
+  const handlePickBreed = () => {
+    const currentSpecies = formData.species; // 'Dog' hoặc 'Cat'
+    const options = BREED_OPTIONS[currentSpecies];
 
+    handleSelectOption(
+      `Select ${currentSpecies} Breed`,
+      options,
+      'breed'
+    );
+  };
   // Xử lý upload Avatar
   const handlePickAvatar = async () => {
     const uploadedUrl = await pickAvatar({ 
@@ -119,28 +161,38 @@ export default function AddPetScreen() {
     try {
       setIsSubmitting(true);
       
-      const payload: any = {
+      const payload = {
         name: formData.name,
         species: formData.species,
-        breed: formData.breed || null,
-        gender: formData.gender !== 'UNKNOWN' ? formData.gender : null,
-        color: formData.color || null,
-        description: formData.description || null,
-        contactName: formData.contactName || null,
-        contactPhone: formData.contactPhone || null,
-        contactAddress: formData.contactAddress || null,
+        breed: formData.breed || undefined,
+        gender: formData.gender !== 'UNKNOWN' ? formData.gender : undefined,
+        color: formData.color || undefined,
+        // ÉP KIỂU SANG NUMBER CHUẨN DTO:
+        weight: formData.weight ? parseFloat(formData.weight) : undefined,
+        size: formData.size,
+        description: formData.description || undefined,
+        contactName: formData.contactName || undefined,
+        contactPhone: formData.contactPhone || undefined,
+        contactAddress: formData.contactAddress || undefined,
         images: formData.imageUrl ? [formData.imageUrl] : [],
-        vaccinationRecordUrl: formData.vaccinationRecordUrl || null,
+        vaccinationRecordUrl: formData.vaccinationRecordUrl || undefined,
+        // Nếu có ngày sinh
+        ...(formData.dob && { dob: formData.dob }),
       };
 
       if (formData.dob) {
         payload.dob = formData.dob;
       }
 
-      // Giả lập API call
-      // await petService.addPet(payload);
+      await petService.addPet(payload);
       Alert.alert('Success', 'Pet profile added successfully!', [
-        { text: 'OK', onPress: () => router.back() }
+        { 
+          text: 'OK', 
+          onPress: () => {
+            // Quay lại màn hình trước đó
+            router.back(); 
+          } 
+        }
       ]);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to add pet. Please try again.');
@@ -220,15 +272,12 @@ export default function AddPetScreen() {
                       {/* Thường thì Type (Species) nên dùng dropdown để giới hạn lựa chọn (Chó/Mèo) */}
                       <TouchableOpacity 
                         className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white"
-                        onPress={() => {
-                          // TODO: Implement ActionSheet hoặc Modal để chọn Dog/Cat
-                          Alert.alert("Select Type", "Tính năng chọn Chó/Mèo đang được phát triển.");
-                        }}
+                        onPress={() => handleSelectOption("Select Type", [
+                          { label: 'Dog', value: 'Dog' },
+                          { label: 'Cat', value: 'Cat' }
+                        ], 'species')}
                       >
-                        {/* Hiển thị giá trị từ formData.species (mặc định là Dog) */}
-                        <Text className="text-black text-[14px]">
-                          {formData.species === 'Dog' ? 'Dog' : 'Cat'}
-                        </Text>
+                        <Text className="text-black text-[14px]">{formData.species}</Text>
                         <Feather name="chevron-down" size={16} color="#A1A1AA" />
                       </TouchableOpacity>
                     </View>
@@ -238,15 +287,29 @@ export default function AddPetScreen() {
                   <View className="flex-row gap-3 mb-4">
                     <View className="flex-1">
                       <Text className="text-[13px] text-black font-medium mb-1.5">Gender</Text>
-                      <TouchableOpacity className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white">
-                        <Text className="text-[#A1A1AA] text-[14px]">Select</Text>
+                      <TouchableOpacity 
+                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white"
+                        onPress={() => handleSelectOption("Select Gender", [
+                          { label: 'Male', value: 'MALE' },
+                          { label: 'Female', value: 'FEMALE' },
+                          { label: 'Unknown', value: 'UNKNOWN' }
+                        ], 'gender')}
+                      >
+                        <Text className={formData.gender !== 'UNKNOWN' ? "text-black text-[14px]" : "text-[#A1A1AA] text-[14px]"}>
+                          {formData.gender === 'UNKNOWN' ? 'Select' : formData.gender}
+                        </Text>
                         <Feather name="chevron-down" size={16} color="#A1A1AA" />
                       </TouchableOpacity>
                     </View>
                     <View className="flex-1">
                       <Text className="text-[13px] text-black font-medium mb-1.5">Breed</Text>
-                      <TouchableOpacity className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white">
-                        <Text className="text-[#A1A1AA] text-[14px]">Select</Text>
+                      <TouchableOpacity 
+                        onPress={handlePickBreed}
+                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white"
+                      >
+                        <Text className={formData.breed ? "text-black text-[14px]" : "text-[#A1A1AA] text-[14px]"}>
+                          {formData.breed || 'Select'}
+                        </Text>
                         <Feather name="chevron-down" size={16} color="#A1A1AA" />
                       </TouchableOpacity>
                     </View>

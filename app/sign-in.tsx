@@ -2,6 +2,7 @@
 import axiosClient, { BASE_URL } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
+import { connectSocket } from '@/utils/socket';
 import { AntDesign, Feather, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -169,6 +170,10 @@ export default function SignInScreen() {
       if (setAuth) {
         await setAuth(response.data.accessToken, response.data.user);
         axiosClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+        
+        // BỔ SUNG: Kích hoạt socket ngay khi có token
+        connectSocket(response.data.accessToken); 
+        
       } else {
         Alert.alert("Error", "Could not save login session."); return;
       }
