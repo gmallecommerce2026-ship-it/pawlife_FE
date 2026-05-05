@@ -11,7 +11,7 @@ import {
   Trash2
 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Animated, Modal, RefreshControl, SectionList, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, RefreshControl, SectionList, TouchableOpacity, TouchableWithoutFeedback, View, Image } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient';
@@ -42,7 +42,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       setTimeout(() => setDragXNode(dragX), 0);
     }
   };
-  
+
   // NÚT XEM (XANH LÁ)
   const renderLeftActions = (progress: any, dragX: any) => {
     captureDragX(dragX);
@@ -54,16 +54,16 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
 
     return (
       <View style={{ width: 80, overflow: 'visible' }}>
-        <AnimatedTouchableOpacity 
+        <AnimatedTouchableOpacity
           activeOpacity={0.8}
           onPress={() => onView(item)}
-          style={{ 
-            position: 'absolute', top: 0, bottom: 0, left: 0, 
-            width: 150, 
-            backgroundColor: '#10B981', 
-            justifyContent: 'center', 
-            alignItems: 'flex-start', 
-            paddingLeft: 27, 
+          style={{
+            position: 'absolute', top: 0, bottom: 0, left: 0,
+            width: 150,
+            backgroundColor: '#00761D',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            paddingLeft: 27,
           }}
         >
           <Animated.View style={{ transform: [{ translateX: transX }] }}>
@@ -85,16 +85,16 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
 
     return (
       <View style={{ width: 80, overflow: 'visible' }}>
-        <AnimatedTouchableOpacity 
+        <AnimatedTouchableOpacity
           activeOpacity={0.8}
           onPress={() => onDelete(item)}
-          style={{ 
-            position: 'absolute', top: 0, bottom: 0, right: 0, 
-            width: 150, 
-            backgroundColor: '#EF4444', 
-            justifyContent: 'center', 
-            alignItems: 'flex-end', 
-            paddingRight: 27, 
+          style={{
+            position: 'absolute', top: 0, bottom: 0, right: 0,
+            width: 150,
+            backgroundColor: '#760000',
+            justifyContent: 'center',
+            alignItems: 'flex-end',
+            paddingRight: 27,
           }}
         >
           <Animated.View style={{ transform: [{ translateX: transX }] }}>
@@ -106,16 +106,16 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
   };
 
   const bgColorHex = !item.isRead ? '#FFF4ED' : '#FFFFFF';
-  
+
   const leftOpacity = dragXNode ? dragXNode.interpolate({
-    inputRange: [0, 40], 
-    outputRange: [1, 0], 
+    inputRange: [0, 40],
+    outputRange: [1, 0],
     extrapolate: 'clamp',
   }) : 1;
 
   const rightOpacity = dragXNode ? dragXNode.interpolate({
-    inputRange: [-40, 0], 
-    outputRange: [0, 1], 
+    inputRange: [-40, 0],
+    outputRange: [0, 1],
     extrapolate: 'clamp',
   }) : 1;
 
@@ -128,52 +128,52 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       friction={1.5}
     >
       <View style={{ position: 'relative' }}>
-        <Animated.View 
-          key={dragXNode ? 'left-active' : 'left-static'} 
+        <Animated.View
+          key={dragXNode ? 'left-active' : 'left-static'}
           style={{
             position: 'absolute', top: 0, bottom: 0, left: 0, width: 20,
             backgroundColor: bgColorHex,
             opacity: leftOpacity
-          }} 
+          }}
         />
-        <Animated.View 
+        <Animated.View
           key={dragXNode ? 'right-active' : 'right-static'}
           style={{
             position: 'absolute', top: 0, bottom: 0, right: 0, width: 20,
             backgroundColor: bgColorHex,
             opacity: rightOpacity
-          }} 
+          }}
         />
 
         <View style={{
-            borderRadius: 16,
-            backgroundColor: bgColorHex,
-            overflow: 'hidden',
+          borderRadius: 16,
+          backgroundColor: bgColorHex,
+          overflow: 'hidden',
         }}>
-          <TouchableOpacity 
+          <TouchableOpacity
             activeOpacity={1}
             className="flex-row items-start px-5 py-4 border-b border-gray-50"
             onPress={() => onPress(item)}
           >
             <View className="relative mr-4 mt-1">
-                <View className="w-12 h-12 rounded-full border border-gray-100 items-center justify-center bg-white shadow-sm">
-                    {getIconByType(item.type)}
-                </View>
-                {!item.isRead && (
-                    <View className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ffa053] rounded-full border-2 border-[#FFF4ED]" />
-                )}
+              <View className="w-12 h-12 rounded-full border border-gray-100 items-center justify-center bg-white shadow-sm">
+                {getIconByType(item.type)}
+              </View>
+              {!item.isRead && (
+                <View className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ffa053] rounded-full border-2 border-[#FFF4ED]" />
+              )}
             </View>
 
             <View className="flex-1 justify-center">
-                <Text className="text-[14.5px] leading-5 text-gray-600 mb-2" numberOfLines={3}>
-                    <Text className={`font-bold ${!item.isRead ? 'text-gray-900' : 'text-gray-800'}`}>
-                        {item.title}:{" "}
-                    </Text>
-                    {item.body} {item.emoji}
+              <Text className="text-[14px] leading-[18px] text-gray-600 mb-2" numberOfLines={3}>
+                <Text className={`font-bold ${!item.isRead ? 'text-gray-900' : 'text-gray-800'}`}>
+                  {item.title}:{" "}
                 </Text>
-                <Text className="text-[12px] text-gray-400 font-medium">
-                    {dayjs(item.createdAt).format('hh:mm A')}
-                </Text>
+                {item.body} {item.emoji}
+              </Text>
+              <Text className="text-[12px] text-gray-400 font-medium">
+                {dayjs(item.createdAt).format('hh:mm A')}
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -188,7 +188,7 @@ export default function NotificationsScreen() {
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -203,18 +203,18 @@ export default function NotificationsScreen() {
     try {
       if (isRefresh) setRefreshing(true);
       else if (pageNum > 1) setLoadingMore(true);
-      
+
       const limit = 20;
       const res = await axiosClient.get(`/notifications?page=${pageNum}&limit=${limit}`);
       const newData = res.data.data;
-      
+
       if (newData.length < limit) setHasMore(false);
 
       setSections(prevSections => {
-          const allData = isRefresh || pageNum === 1 
-              ? newData 
-              : [...prevSections.flatMap(s => s.data), ...newData];
-          return groupNotifications(allData);
+        const allData = isRefresh || pageNum === 1
+          ? newData
+          : [...prevSections.flatMap(s => s.data), ...newData];
+        return groupNotifications(allData);
       });
       setPage(pageNum);
     } catch (error) {
@@ -227,7 +227,7 @@ export default function NotificationsScreen() {
   useEffect(() => { fetchNotifications(1); }, []);
 
   const handleLoadMore = () => {
-      if (!loadingMore && hasMore && !loading) fetchNotifications(page + 1);
+    if (!loadingMore && hasMore && !loading) fetchNotifications(page + 1);
   };
 
   const handleMarkAllAsRead = async () => {
@@ -238,7 +238,7 @@ export default function NotificationsScreen() {
       await axiosClient.patch('/notifications/read-all');
     } catch (error) {
       console.error("Error mark all as read:", error);
-      fetchNotifications(1, true); 
+      fetchNotifications(1, true);
     }
   };
 
@@ -251,7 +251,7 @@ export default function NotificationsScreen() {
       await axiosClient.delete(`/notifications/${item.id}`);
     } catch (error) {
       console.error("Error deleting notification:", error);
-      fetchNotifications(1, true); 
+      fetchNotifications(1, true);
     }
   };
 
@@ -262,56 +262,56 @@ export default function NotificationsScreen() {
   const handlePressItem = async (item: any) => {
     // 1. Mark as read in state and API
     if (!item.isRead) {
-        axiosClient.patch(`/notifications/${item.id}/read`).catch(console.error);
-        setSections(prevSections => prevSections.map(section => ({
-            ...section,
-            data: section.data.map((note: any) => note.id === item.id ? { ...note, isRead: true } : note)
-        })));
+      axiosClient.patch(`/notifications/${item.id}/read`).catch(console.error);
+      setSections(prevSections => prevSections.map(section => ({
+        ...section,
+        data: section.data.map((note: any) => note.id === item.id ? { ...note, isRead: true } : note)
+      })));
     }
 
     const showCustomAlert = (title: string, message: string, type: 'error' | 'feature' | 'system', buttonText: string) => {
-        setPopupConfig({ visible: true, title, message, type, buttonText });
+      setPopupConfig({ visible: true, title, message, type, buttonText });
     };
 
     // 2. CHECK FOR TRANSFER OWNERSHIP NOTIFICATION FIRST
     // Determine if this is a transfer request based on title content and having a referenceId (petId)
-    const isTransferNotification = 
-      item.title?.toLowerCase().includes('yêu cầu chuyển nhượng') || 
+    const isTransferNotification =
+      item.title?.toLowerCase().includes('yêu cầu chuyển nhượng') ||
       item.title?.toLowerCase().includes('transfer ownership') ||
       item.title?.toLowerCase().includes('chuyển nhượng');
 
     if (isTransferNotification && item.referenceId) {
-       router.push({
-         pathname: '/transfer-ownership',
-         params: { petId: item.referenceId }
-       });
-       return; // Exit function so it doesn't show the popup below
+      router.push({
+        pathname: '/transfer-ownership',
+        params: { petId: item.referenceId }
+      });
+      return; // Exit function so it doesn't show the popup below
     }
 
     // 3. Normal switch case for other notification types
     switch (item.type) {
-        case 'TAG_SCANNED': 
-            if (!item.id) return;
-            router.push({
-              pathname: '/tag-report-detail',
-              params: { 
-                reportId: item.referenceId 
-              }
-            });
-            break;
-        case 'TAG': 
-            showCustomAlert(item.title, item.body, "system", "Got it"); break;
-        case 'EVENT':
-            if (!item.referenceId) { showCustomAlert("Event not found", "This event may have been cancelled.", "error", "Close"); return; }
-            router.push(`/event-detail?id=${item.referenceId}`); break;
-        case 'SECURITY':
-        case 'PASSWORD':
-            router.push('/account-security'); break;
-        case 'FEATURE':
-            if (!item.referenceId) showCustomAlert("New Feature ✨", item.body, "feature", "Awesome"); break;
-        case 'SYSTEM':
-            showCustomAlert("System Notification", item.body, "system", "Got it"); break;
-        default: console.log("Pressed generic notification");
+      case 'TAG_SCANNED':
+        if (!item.id) return;
+        router.push({
+          pathname: '/tag-report-detail',
+          params: {
+            reportId: item.referenceId
+          }
+        });
+        break;
+      case 'TAG':
+        showCustomAlert(item.title, item.body, "system", "Got it"); break;
+      case 'EVENT':
+        if (!item.referenceId) { showCustomAlert("Event not found", "This event may have been cancelled.", "error", "Close"); return; }
+        router.push(`/event-detail?id=${item.referenceId}`); break;
+      case 'SECURITY':
+      case 'PASSWORD':
+        router.push('/account-security'); break;
+      case 'FEATURE':
+        if (!item.referenceId) showCustomAlert("New Feature ✨", item.body, "feature", "Awesome"); break;
+      case 'SYSTEM':
+        showCustomAlert("System Notification", item.body, "system", "Got it"); break;
+      default: console.log("Pressed generic notification");
     }
   };
 
@@ -320,47 +320,51 @@ export default function NotificationsScreen() {
       <SafeAreaView className="flex-1 bg-white" edges={['top']}>
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 py-3 bg-white z-10 relative">
-            <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 rounded-full active:bg-gray-50 z-20">
-                <ChevronLeft size={28} color="#111827" strokeWidth={2.5} />
-            </TouchableOpacity>
-            <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-                <Text className="text-[20px] font-bold text-gray-900 tracking-tight">Notifications</Text>
-            </View>
-            <TouchableOpacity onPress={() => console.log("Share")} className="p-2 -mr-2 rounded-full active:bg-gray-50 z-20">
-                <Share2 size={24} color="#111827" strokeWidth={2} />
-            </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 rounded-full active:bg-gray-50 z-20">
+            <ChevronLeft size={28} color="#111827" strokeWidth={2.5} />
+          </TouchableOpacity>
+          <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
+            <Text className="text-[24px] font-bold text-gray-900 tracking-tight">Notifications</Text>
+          </View>
+          <TouchableOpacity onPress={() => console.log("Share")} className="p-2 -mr-2 rounded-full active:bg-gray-50 z-20">
+            <Image
+              source={require('../assets/icon/share.png')}
+              style={{ width: 20, height: 20 }}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
         </View>
 
         {loading ? (
-            <View className="flex-1 justify-center items-center"><ActivityIndicator size="large" color="#ffa053" /></View>
+          <View className="flex-1 justify-center items-center"><ActivityIndicator size="large" color="#ffa053" /></View>
         ) : (
-            <SectionList
-                sections={sections}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                    <NotificationItem item={item} onPress={handlePressItem} onDelete={handleDeleteNotification} onView={handleViewNotification} />
-                )}
-                renderSectionHeader={({ section: { title } }) => (
-                    <View className="bg-white px-5 pt-6 pb-3 flex-row justify-between items-end">
-                        <Text className="text-gray-900 font-bold text-[18px] capitalize">{title}</Text>
-                        <TouchableOpacity onPress={handleMarkAllAsRead}>
-                            <Text className="text-[#ffa053] font-medium text-[14px]">Mark all as read</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 40 }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchNotifications(1, true)} tintColor="#ffa053" />}
-                onEndReached={handleLoadMore}
-                onEndReachedThreshold={0.5}
-                ListFooterComponent={loadingMore ? <View className="py-6 items-center"><ActivityIndicator size="small" color="#ffa053" /></View> : null}
-                ListEmptyComponent={
-                    <View className="py-20 items-center justify-center">
-                        <View className="w-20 h-20 bg-gray-50 rounded-full items-center justify-center mb-4"><Feather name="bell-off" size={32} color="#D1D5DB" /></View>
-                        <Text className="text-gray-500 font-medium text-[15px]">You have no notifications.</Text>
-                    </View>
-                }
-            />
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <NotificationItem item={item} onPress={handlePressItem} onDelete={handleDeleteNotification} onView={handleViewNotification} />
+            )}
+            renderSectionHeader={({ section: { title } }) => (
+              <View className="bg-white px-5 pt-6 pb-3 flex-row justify-between items-end">
+                <Text className="text-gray-900 font-bold text-[18px] capitalize">{title}</Text>
+                <TouchableOpacity onPress={handleMarkAllAsRead}>
+                  <Text className="text-[#ffa053] font-medium text-[14px]">Mark all as read</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchNotifications(1, true)} tintColor="#ffa053" />}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={loadingMore ? <View className="py-6 items-center"><ActivityIndicator size="small" color="#ffa053" /></View> : null}
+            ListEmptyComponent={
+              <View className="py-20 items-center justify-center">
+                <View className="w-20 h-20 bg-gray-50 rounded-full items-center justify-center mb-4"><Feather name="bell-off" size={32} color="#D1D5DB" /></View>
+                <Text className="text-gray-500 font-medium text-[15px]">You have no notifications.</Text>
+              </View>
+            }
+          />
         )}
       </SafeAreaView>
 

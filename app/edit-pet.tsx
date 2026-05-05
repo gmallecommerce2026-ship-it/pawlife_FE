@@ -234,13 +234,13 @@ export default function EditPetScreen() {
 
               {/* Pet Information Section */}
               <View className="mb-6">
-                <Text className="text-[15px] font-semibold text-black mb-3">Pet Information</Text>
+                <Text className="text-[16px] font-semibold text-black mb-3">Pet Information</Text>
                 
                 <View className="bg-white p-6 rounded-[20px] border border-gray-200">
                   {/* Name & Type Row */}
                   <View className="flex-row gap-3 mb-4">
                     <View className="flex-1">
-                      <Text className="text-[13px] text-black font-medium mb-1.5">Name</Text>
+                      <Text className="text-[14px] text-black font-medium mb-1.5">Name</Text>
                       <TextInput
                         style={inputFontStyle}
                         className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
@@ -251,7 +251,7 @@ export default function EditPetScreen() {
                       />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-[13px] text-black font-medium mb-1.5">Type</Text>
+                      <Text className="text-[14px] text-black font-medium mb-1.5">Type</Text>
                       <TouchableOpacity 
                         className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white"
                         onPress={() => Alert.alert("Select Type", "Tính năng chọn Chó/Mèo đang được phát triển.")}
@@ -267,7 +267,7 @@ export default function EditPetScreen() {
                   {/* Gender & Breed Row */}
                   <View className="flex-row gap-3 mb-4">
                     <View className="flex-1">
-                      <Text className="text-[13px] text-black font-medium mb-1.5">Gender</Text>
+                      <Text className="text-[14px] text-black font-medium mb-1.5">Gender</Text>
                       <TouchableOpacity className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white">
                         <Text className="text-[#A1A1AA] text-[14px] capitalize">
                           {formData.gender === 'UNKNOWN' ? 'Select' : formData.gender.toLowerCase()}
@@ -276,7 +276,7 @@ export default function EditPetScreen() {
                       </TouchableOpacity>
                     </View>
                     <View className="flex-1">
-                      <Text className="text-[13px] text-black font-medium mb-1.5">Breed</Text>
+                      <Text className="text-[14px] text-black font-medium mb-1.5">Breed</Text>
                       <TextInput
                         style={inputFontStyle}
                         className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
@@ -291,7 +291,7 @@ export default function EditPetScreen() {
                   {/* Color & Weight Row */}
                   <View className="flex-row gap-3 mb-4">
                     <View className="flex-1">
-                      <Text className="text-[13px] text-black font-medium mb-1.5">Color</Text>
+                      <Text className="text-[14px] text-black font-medium mb-1.5">Color</Text>
                       <TextInput
                         style={inputFontStyle}
                         className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
@@ -302,7 +302,7 @@ export default function EditPetScreen() {
                       />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-[13px] text-black font-medium mb-1.5">Weight (kg)</Text>
+                      <Text className="text-[14px] text-black font-medium mb-1.5">Weight (kg)</Text>
                       <TextInput
                         style={inputFontStyle}
                         className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
@@ -318,7 +318,7 @@ export default function EditPetScreen() {
                   {/* Birthday & Microchip Row */}
                   <View className="flex-row gap-3">
                     <View className="flex-1">
-                      <Text className="text-[13px] text-black font-medium mb-1.5">Birthday</Text>
+                      <Text className="text-[14px] text-black font-medium mb-1.5">Birthday</Text>
                       <TouchableOpacity
                         onPress={() => setShowDatePicker(true)}
                         className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 justify-center bg-white"
@@ -329,7 +329,7 @@ export default function EditPetScreen() {
                       </TouchableOpacity>
                     </View>
                     <View className="flex-1">
-                      <Text className="text-[13px] text-black font-medium mb-1.5">Microchip</Text>
+                      <Text className="text-[14px] text-black font-medium mb-1.5">Microchip</Text>
                       <TextInput
                         style={inputFontStyle}
                         className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
@@ -346,7 +346,7 @@ export default function EditPetScreen() {
 
                   {/* Notes */}
                   <View>
-                    <Text className="text-[13px] text-black font-medium mb-1.5">Notes</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Notes</Text>
                     <TextInput
                       style={[inputFontStyle, { paddingTop: 12 }]}
                       className="border border-gray-200 rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
@@ -363,14 +363,14 @@ export default function EditPetScreen() {
 
               {/* Owner Information Section */}
               <View className="mb-6">
-                <Text className="text-[15px] font-semibold text-black mb-3">Owner Information</Text>
+                <Text className="text-[16px] font-semibold text-black mb-3">Owner Information</Text>
                 
                 <View className="bg-white rounded-[20px] border border-gray-200 px-4 py-2">
                   <View className="flex-row items-center py-3 border-b border-gray-100">
-                    <Text className="text-[14px] font-medium text-black w-[80px]">Name</Text>
+                    <Text className="text-[16px] font-medium text-black w-[80px]">Name</Text>
                     <TextInput
                       style={inputFontStyle}
-                      className="flex-1 text-right text-[14px] text-black p-0"
+                      className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
                       value={formData.contactName}
                       onChangeText={(text) => handleChange('contactName', text)}
                       placeholder="Full Name"
@@ -379,10 +379,10 @@ export default function EditPetScreen() {
                   </View>
 
                   <View className="flex-row items-center py-3 border-b border-gray-100">
-                    <Text className="text-[14px] font-medium text-black w-[80px]">Phone</Text>
+                    <Text className="text-[16px] font-medium text-black w-[80px]">Phone</Text>
                     <TextInput
                       style={inputFontStyle}
-                      className="flex-1 text-right text-[14px] text-black p-0"
+                      className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
                       value={formData.contactPhone}
                       onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
                       keyboardType="phone-pad"
@@ -393,10 +393,10 @@ export default function EditPetScreen() {
                   </View>
 
                   <View className="flex-row items-center py-3">
-                    <Text className="text-[14px] font-medium text-black w-[80px]">Address</Text>
+                    <Text className="text-[16px] font-medium text-black w-[80px]">Address</Text>
                     <TextInput
                       style={inputFontStyle}
-                      className="flex-1 text-right text-[14px] text-black p-0"
+                      className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
                       value={formData.contactAddress}
                       onChangeText={(text) => handleChange('contactAddress', text)}
                       placeholder="Street, District, City"
@@ -409,7 +409,7 @@ export default function EditPetScreen() {
               {/* Vaccination Record Section */}
               {/* Vaccination Record Section */}
               <View className="mb-8">
-                <Text className="text-[15px] font-semibold text-[#111827] mb-3">Vaccination Record</Text>
+                <Text className="text-[16px] font-semibold text-[#111827] mb-3">Vaccination Record</Text>
                 
                 {/* 1. Dropzone LUÔN HIỂN THỊ để chuẩn bị cho multiple uploads/PDF sau này */}
                 <TouchableOpacity
@@ -424,7 +424,7 @@ export default function EditPetScreen() {
                     <Text className="text-[#EFA062]">Click to upload</Text> or drag and drop
                   </Text>
                   {/* Cập nhật thêm PDF vào text hướng dẫn */}
-                  <Text className="text-[12px] text-[#9CA3AF]">SVG, PNG, JPG, GIF or PDF (max. 10MB)</Text>
+                  <Text className="text-[12px] text-[#9CA3AF]">JPEG, PNG, PDF, and MP4 formats, up to 50MB</Text>
                 </TouchableOpacity>
 
                 {/* 2. Trạng thái Đang tải lên */}
@@ -435,7 +435,7 @@ export default function EditPetScreen() {
                     </View>
                     <View className="flex-1 mx-3">
                       <View className="flex-row justify-between items-center mb-1.5">
-                        <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>Uploading_document...</Text>
+                        <Text className="text-[14px] text-[#111827] font-medium" numberOfLines={1}>Uploading_document...</Text>
                         <Text className="text-[12px] text-[#6B7280]">45%</Text>
                       </View>
                       <View className="h-1.5 w-full bg-[#F3F4F6] rounded-full overflow-hidden">
@@ -450,32 +450,43 @@ export default function EditPetScreen() {
 
                 {/* 3. Trạng thái Đã tải lên xong */}
                 {formData.vaccinationRecordUrl ? (
-                  <View className="border border-[#EFA062] rounded-[12px] p-3 flex-row items-center bg-[#FEF3EB]/30 shadow-sm shadow-orange-100/50">
-                    <Image 
-                      source={{ uri: formData.vaccinationRecordUrl }} 
-                      className="w-10 h-10 rounded-lg bg-[#F3F4F6]" 
-                      resizeMode="cover"
-                    />
-                    <View className="flex-1 mx-3">
-                      <View className="flex-row justify-between items-center mb-0.5">
-                        <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>vaccination_record.jpg</Text>
-                      </View>
-                      <View className="flex-row items-center">
-                        <Text className="text-[12px] text-[#6B7280] mr-2">1.2 MB</Text>
-                        <View className="flex-row items-center">
-                           <Feather name="check-circle" size={12} color="#EFA062" />
-                           <Text className="text-[12px] text-[#EFA062] ml-1 font-medium">Completed</Text>
-                        </View>
-                      </View>
-                    </View>
-                    <TouchableOpacity 
-                      onPress={() => handleChange('vaccinationRecordUrl', '')}
-                      className="p-1"
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Feather name="trash-2" size={18} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
+                  <View className="border border-[#E5E5E5] rounded-[12px] p-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
+                                  <Image
+                                    source={{ uri: formData.vaccinationRecordUrl }}
+                                    className="w-10 h-10 rounded-lg bg-[#F3F4F6]"
+                                    resizeMode="cover"
+                                  />
+                                  <View className="flex-1 mx-3">
+                                    <View className="flex-row justify-between items-center mb-0.5">
+                                      <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>vaccination_record.jpg</Text>
+                                    </View>
+                                    <View className="flex-row items-center">
+                                      <Text className="text-[12px] text-[#6B7280] mr-2">1.2 MB</Text>
+                                      <View className="flex-row items-center">
+                                        <Feather name="check-circle" size={12} color="#EFA062" />
+                                        <Text className="text-[12px] text-[#EFA062] ml-1 font-medium">Completed</Text>
+                                      </View>
+                                    </View>
+                                  </View>
+                                  {/* Thay icon thùng rác bằng icon Xem chi tiết (Eye) */}
+                                  <TouchableOpacity
+                                    className="p-2"
+                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    onPress={(e) => {
+                                      // Ngăn chặn sự kiện lan truyền
+                                      e.stopPropagation();
+                  
+                                      // Lấy toạ độ Y của phần tử vừa click trên màn hình
+                                      const { pageY } = e.nativeEvent;
+                  
+                                      // Set toạ độ cho menu (cộng thêm một chút offset để menu nằm dưới nút)
+                                      // setMenuPosition({ top: pageY + 10, right: 32 });
+                                      // setShowVaccineMenu(true);
+                                    }}
+                                  >
+                                    <Feather name="more-vertical" size={20} color="#6B7280" />
+                                  </TouchableOpacity>
+                                </View>
                 ) : null}
               </View>
 
@@ -507,7 +518,7 @@ export default function EditPetScreen() {
                     </View>
                     <View className="flex-1 mx-3">
                       <View className="flex-row justify-between items-center mb-1.5">
-                        <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>Uploading_QR...</Text>
+                        <Text className="text-[14px] text-[#111827] font-medium" numberOfLines={1}>Uploading_QR...</Text>
                         <Text className="text-[12px] text-[#6B7280]">Uploading...</Text>
                       </View>
                       <View className="h-1.5 w-full bg-[#F3F4F6] rounded-full overflow-hidden">
@@ -526,7 +537,7 @@ export default function EditPetScreen() {
                     />
                     <View className="flex-1 mx-3">
                       <View className="flex-row justify-between items-center mb-0.5">
-                        <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>qr_code.jpg</Text>
+                        <Text className="text-[14px] text-[#111827] font-medium" numberOfLines={1}>qr_code.jpg</Text>
                       </View>
                       <View className="flex-row items-center">
                         <View className="flex-row items-center">
@@ -563,7 +574,7 @@ export default function EditPetScreen() {
                 <TouchableOpacity
                   onPress={() => router.back()}
                   disabled={isSubmitting}
-                  className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-4"
+                  className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-5"
                 >
                   <Text className="text-[#9CA3AF] font-medium text-[16px]">Cancel</Text>
                 </TouchableOpacity>

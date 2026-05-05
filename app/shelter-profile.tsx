@@ -26,6 +26,7 @@ export default function ShelterProfileScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+  const [activeTab, setActiveTab] = useState<'pets' | 'info'>('pets');
 
   const [modalConfig, setModalConfig] = useState({
     visible: false,
@@ -318,7 +319,7 @@ export default function ShelterProfileScreen() {
             </View>
           </View>
           {/* Content */}
-          <View className='mx-[22px]' style={{top: -5}}>
+          <View className='mx-[22px]' style={{ top: -5 }}>
             <View className="mb-6">
               <Text className="text-[#8E8E93] text-[12px] font-regular mb-1 leading-4">Animal Shelter & Rescue</Text>
               <Text className="text-[14px] text-black font-regular leading-5">
@@ -354,7 +355,7 @@ export default function ShelterProfileScreen() {
                     />
                   </View>
 
-                  <View style={{elevation: 2, marginLeft: -8 }}>
+                  <View style={{ elevation: 2, marginLeft: -8 }}>
                     {/* Avatar 2: Bị kéo lùi sang trái (-ml-2.5) để đè lên Avatar 1 */}
                     <Image
                       source={{ uri: 'https://i.pravatar.cc/100?img=2' }}
@@ -362,7 +363,7 @@ export default function ShelterProfileScreen() {
                     />
                   </View>
 
-                  <View style={{elevation: 2, marginLeft: -8 }}>
+                  <View style={{ elevation: 2, marginLeft: -8 }}>
                     {/* Avatar 3: Tiếp tục kéo lùi sang trái đè lên Avatar 2 */}
                     <Image
                       source={{ uri: 'https://i.pravatar.cc/100?img=3' }}
@@ -390,15 +391,19 @@ export default function ShelterProfileScreen() {
                 className={`flex-1 py-2 rounded-full items-center justify-center shadow-sm ${isFollowing ? 'bg-gray-200 shadow-gray-100' : 'bg-orange-400 shadow-orange-200'
                   }`}
               >
-                <Text className={`font-bold text-sm ${isFollowing ? 'text-gray-700' : 'text-white'}`}>
+                <Text className={`font-semibold text-[14px] ${isFollowing ? 'text-gray-700' : 'text-white'}`}>
                   {isFollowing ? 'Following' : 'Follow'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={openContact}
-                className="flex-1 bg-[#F6F6F6] py-2 rounded-full items-center justify-center"
+                onPress={() => setActiveTab(prev => prev === 'pets' ? 'info' : 'pets')}
+                className={`flex-1 py-2 rounded-full items-center justify-center ${activeTab === 'info' ? 'bg-orange-100' : 'bg-[#F6F6F6]'
+                  }`}
               >
-                <Text className="text-gray-600 font-bold text-sm">Contact</Text>
+                <Text className={`font-semibold text-[14px] ${activeTab === 'info' ? 'text-orange-500' : 'text-gray-600'
+                  }`}>
+                  {activeTab === 'pets' ? 'Contact' : 'View Pets'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -406,77 +411,146 @@ export default function ShelterProfileScreen() {
           <ScrollView className="flex-1"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: insets.bottom + 200 }}>
-            {/* Grid Pets */}
-            <View className="flex-row flex-wrap gap-3 justify-between mx-[22px]">
-              {pets.length === 0 ? (
-                <View className="flex-1 items-center justify-center py-10">
-                  <Text className="text-gray-500">No pets found matching "{searchQuery}"</Text>
+            {activeTab === 'info' ? (
+              <View className="px-[22px]">
+                {/* About Shelter */}
+                <Text className="text-[16px] font-medium text-black mb-2">About Shelter</Text>
+                <Text className="text-[14px] text-[#8E8E93] leading-5 mb-5">
+                  {shelterInfo?.description || "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam"}
+                </Text>
+
+                {/* Contact Info */}
+                <Text className="text-[16px] font-medium text-black mb-2">Contact Info</Text>
+                <View className="gap-y-3 mb-5">
+                  <View className="flex-row items-center gap-x-3">
+                    <Image
+                      source={require('../assets/icon/message.png')}
+                      style={{ width: 13, height: 13 }}
+                      resizeMode="cover"
+                    />
+                    <Text className="text-[14px] text-[#8E8E93]">Send message</Text>
+                  </View>
+                  <TouchableOpacity onPress={handleCall} className="flex-row items-center gap-x-3">
+                   <Image
+                      source={require('../assets/icon/phone-info.png')}
+                      style={{ width: 13, height: 13 }}
+                      resizeMode="cover"
+                    />
+                    <Text className="text-[14px] text-[#8E8E93]">{shelterInfo?.contactInfo || "(+84) 0912345678"}</Text>
+                  </TouchableOpacity>
+                  <View className="flex-row items-center gap-x-3">
+                    <Image
+                      source={require('../assets/icon/email.png')}
+                      style={{ width: 13, height: 10 }}
+                      resizeMode="cover"
+                    />
+                    <Text className="text-[14px] text-[#8E8E93]">{shelterInfo?.emailAddress || "sannhanhieucho@email.com"}</Text>
+                  </View>
                 </View>
-              ) : (
-                pets.map((pet) => {
-                  const imageUrl = pet.images && pet.images.length > 0
-                    ? pet.images[0].url
-                    : 'https://via.placeholder.com/400';
 
-                  // Giả lập logic lấy giới tính (nếu API trả về 'female' hoặc 'male')
-                  const isFemale = pet.gender?.toLowerCase() === 'female';
+                {/* More Info */}
+                <Text className="text-[16px] font-medium text-black mb-2">More Info</Text>
+                <View className="gap-y-3">
+                  <View className="flex-row items-center gap-x-3">
+                    <Image
+                      source={require('../assets/icon/earth.png')}
+                      style={{ width: 13, height: 13 }}
+                      resizeMode="cover"
+                    />
+                    <Text className="text-[14px] text-[#8E8E93]">Based in {shelterInfo?.address || "Vietnam"}</Text>
+                  </View>
+                  <View className="flex-row items-center gap-x-3">
+                    <Image
+                      source={require('../assets/icon/info.png')}
+                      style={{ width: 13, height: 13 }}
+                      resizeMode="cover"
+                    />
+                    <Text className="text-[14px] text-[#8E8E93]">Joined Jan 1, 2023</Text>
+                  </View>
+                  <View className="flex-row items-center gap-x-3">
+                    <Image
+                      source={require('../assets/icon/real-tick.png')}
+                      style={{ width: 13, height: 13 }}
+                      resizeMode="cover"
+                    />
+                    <Text className="text-[14px] text-[#8E8E93]">Verified Jan 1, 2023</Text>
+                  </View>
+                </View>
+              </View>
 
-                  return (
-                    <TouchableOpacity
-                      key={pet.id}
-                      style={{ width: COLUMN_WIDTH }}
-                      className="mb-[12px]"
-                      activeOpacity={0.8}
-                      onPress={() => router.push(`/shelter-pet-detail?id=${pet.id}`)}
-                    >
-                      {/* 1. KHỐI ẢNH: Ép tỉ lệ 1:1, bo góc cực sâu 28px */}
-                      <View className="w-full aspect-square mb-[10px] relative">
-                        <Image
-                          source={{ uri: imageUrl }}
-                          className="w-full h-full rounded-[24px] bg-gray-100"
-                          resizeMode="cover"
-                        />
+            ) : (
 
-                        {/* Icon Heart (mô phỏng theo ảnh mẫu có trái tim màu cam phấn) */}
-                        {pet.isFavorite && (
-                          <View className="absolute top-3.5 right-3.5">
-                            <Ionicons name="heart" size={22} color="#E89B5F" />
-                          </View>
-                        )}
-                      </View>
+              <View className="flex-row flex-wrap gap-3 justify-between mx-[22px]">
+                {pets.length === 0 ? (
+                  <View className="flex-1 items-center justify-center py-10">
+                    <Text className="text-gray-500">No pets found matching "{searchQuery}"</Text>
+                  </View>
+                ) : (
+                  pets.map((pet) => {
+                    const imageUrl = pet.images && pet.images.length > 0
+                      ? pet.images[0].url
+                      : 'https://via.placeholder.com/400';
 
-                      {/* 2. KHỐI TEXT: Padding = 0 để thẳng hàng hoàn toàn với lề trái của ảnh */}
-                      <View className="px-1">
-                        {/* Tên Pet: Đen tuyền, chữ to, bold, margin bottom rất nhỏ */}
-                        <Text
-                          className="text-[#000000] font-bold text-[16px] tracking-tight mb-[7.6px]"
-                          numberOfLines={1}
-                        >
-                          {pet.name}
-                        </Text>
+                    // Giả lập logic lấy giới tính (nếu API trả về 'female' hoặc 'male')
+                    const isFemale = pet.gender?.toLowerCase() === 'female';
 
-                        {/* Thông tin: Giới tính + Tuổi + Giống */}
-                        <View className="flex-row items-center">
-                          {/* Icon Giới tính với mã màu chuẩn chiết xuất từ ảnh */}
-                          <Ionicons
-                            name={isFemale ? "female" : "male"}
-                            size={12}
-                            color={isFemale ? "#F471B5" : "#5BB0FF"}
+                    return (
+                      <TouchableOpacity
+                        key={pet.id}
+                        style={{ width: COLUMN_WIDTH }}
+                        className="mb-[12px]"
+                        activeOpacity={0.8}
+                        onPress={() => router.push(`/shelter-pet-detail?id=${pet.id}`)}
+                      >
+                        {/* 1. KHỐI ẢNH: Ép tỉ lệ 1:1, bo góc cực sâu 28px */}
+                        <View className="aspect-square mb-[10px] relative">
+                          <Image
+                            source={{ uri: imageUrl }}
+                            className="w-full h-full rounded-[24px] bg-gray-100"
+                            resizeMode="cover"
                           />
 
+                          {/* Icon Heart (mô phỏng theo ảnh mẫu có trái tim màu cam phấn) */}
+                          {pet.isFavorite && (
+                            <View className="absolute top-3.5 right-3.5">
+                              <Ionicons name="heart" size={22} color="#E89B5F" />
+                            </View>
+                          )}
+                        </View>
+
+                        {/* 2. KHỐI TEXT: Padding = 0 để thẳng hàng hoàn toàn với lề trái của ảnh */}
+                        <View className="p-0">
+                          {/* Tên Pet: Đen tuyền, chữ to, bold, margin bottom rất nhỏ */}
                           <Text
-                            className="text-[#8B8B8B] text-[12px] font-normal ml-1.5"
+                            className="text-black font-semibold text-[16px] mb-[7.6px]"
                             numberOfLines={1}
                           >
-                            {pet.age || '1 year'} · {pet.breed || 'Unknown'}
+                            {pet.name}
                           </Text>
+
+                          {/* Thông tin: Giới tính + Tuổi + Giống */}
+                          <View className="flex-row items-start">
+                            {/* Icon Giới tính với mã màu chuẩn chiết xuất từ ảnh */}
+                            <Ionicons
+                              name={isFemale ? "female" : "male"}
+                              size={12}
+                              color={isFemale ? "#F471B5" : "#5BB0FF"}
+                            />
+
+                            <Text
+                              className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
+                              numberOfLines={1}
+                            >
+                              {pet.age || '1 year'} · {pet.breed || 'Unknown'}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+            )}
           </ScrollView>
         </View>
       </View>

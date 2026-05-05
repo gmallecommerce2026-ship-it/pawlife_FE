@@ -7,7 +7,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Text as RNText, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Text as RNText, TextInput, TouchableOpacity, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
@@ -352,142 +352,152 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
     const stepValid = isValid();
 
     return (
-        <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-            <View className="flex-1 px-6 pt-2">
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
 
-                {/* --- HEADER MỚI VỚI NÚT BACK --- */}
-                <View className="flex-row items-center justify-between mb-4 mt-2">
-                    <TouchableOpacity
-                        onPress={handleBack}
-                        activeOpacity={0.7}
-                        className="w-10 h-10 items-center justify-center"
-                    >
-                        <Feather name="chevron-left" size={24} color="#374151" />
-                    </TouchableOpacity>
+            <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+                <View className="flex-1 px-6 pt-2">
 
-                </View>
-                {/* -------------------------------- */}
+                    {/* --- HEADER MỚI VỚI NÚT BACK --- */}
+                    <View className="flex-row items-center justify-between mb-4 mt-2">
+                        <TouchableOpacity
+                            onPress={handleBack}
+                            activeOpacity={0.7}
+                            className="w-10 h-10 items-center justify-center"
+                        >
+                            <Feather name="chevron-left" size={24} color="#374151" />
+                        </TouchableOpacity>
 
-                <ProgressBar current={surveyStep} />
+                    </View>
+                    {/* -------------------------------- */}
 
-                <View className="flex-1 mt-2">
-                    {/* STEP 1: TYPE */}
-                    {surveyStep === 1 && (
-                        <View>
-                            <Text className="text-[30px] font-semibold text-black mb-2">Let's Find Your Match!</Text>
-                            <Text className="text-[16px] font-medium text-[#8E8E93] my-4">What type of pet are you looking to adopt?</Text>
-                            <View className="flex-row justify-between gap-3 mt-5">
-                                {[{ id: 'dog', label: 'Dogs', icon: require('../../assets/images/dog-icon.png') }, { id: 'cat', label: 'Cats', icon: require('../../assets/images/cat-icon.png') }, { id: 'both', label: 'Both', icon: require('../../assets/images/both-icon.png') }].map((item) => (
-                                    <TouchableOpacity
-                                        key={item.id}
-                                        activeOpacity={0.7}
-                                        onPress={() => setSelectedType(item.id)}
-                                        className={`flex-1 aspect-square rounded-2xl items-center justify-center border-[1.5px] ${selectedType === item.id ? 'border-[#E89B5A] bg-orange-50' : 'border-gray-100 bg-white'}`}
-                                    >
+                    <ProgressBar current={surveyStep} />
+
+                    <View className="mt-2">
+                        {/* STEP 1: TYPE */}
+                        {surveyStep === 1 && (
+                            <View>
+                                <Text className="text-[30px] font-semibold text-black  mb-[18px]">Let's Find Your Match!</Text>
+                                <Text className="text-[16px] font-medium text-[#8E8E93] mb-[32px]">What type of pet are you looking to adopt?</Text>
+                                <View className=''>
+
+                                    <View className="flex-row justify-between gap-3">
+                                        {[{ id: 'dog', label: 'Dogs', icon: require('../../assets/images/dog-icon.png') }, { id: 'cat', label: 'Cats', icon: require('../../assets/images/cat-icon.png') }, { id: 'both', label: 'Both', icon: require('../../assets/images/both-icon.png') }].map((item) => (
+                                            <TouchableOpacity
+                                                key={item.id}
+                                                activeOpacity={0.7}
+                                                onPress={() => setSelectedType(item.id)}
+                                                className={`flex-1 aspect-square rounded-2xl items-center justify-center border-[1.5px] ${selectedType === item.id ? 'border-[#E89B5A] bg-orange-50' : 'border-gray-100 bg-white'}`}
+                                            >
+                                                <Image
+                                                    source={item.icon}
+                                                    style={{ width: 40, height: 40 }}
+                                                />
+                                                {/* <FontAwesome5 name={item.icon as any} size={32} color={selectedType === item.id ? '#E89B5A' : '#9CA3AF'} /> */}
+                                                <Text className={`mt-3 font-medium text-[14px] ${selectedType === item.id ? 'text-[#E89B5A]' : 'text-black'}`}>{item.label}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* STEP 2: AGE */}
+                        {surveyStep === 2 && (
+                            <View>
+                                <Text className="text-[30px] font-semibold text-black mb-[18px]">Age Preference</Text>
+                                <Text className="text-[16px] font-medium text-[#8E8E93] mb-[30px]">What age range are you looking for?</Text>
+                                <View className="gap-3">
+                                    {AGE_PREFERENCES.map((age) => (
+                                        <TouchableOpacity
+                                            key={age}
+                                            activeOpacity={0.7}
+                                            onPress={() => setSelectedAge(age)}
+                                            className={`p-[14px] rounded-[16px] border ${selectedAge === age ? 'border-[#E89B5A] bg-orange-50' : 'border-[#E5E5E5] bg-white'}`}
+                                        >
+                                            <Text className={`font-medium text-[16px] ${selectedAge === age ? 'text-[#E89B5A]' : 'text-gray-600'}`}>{age}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* STEP 3: LOCATION */}
+                        {surveyStep === 3 && (
+                            <View>
+                                <Text className="text-[30px] font-semibold text-black mb-[18px]">Your Location</Text>
+                                <Text className="text-[16px] font-medium text-[#8E8E93] mb-[30px]">We'll help you find adoption shelters near you</Text>
+
+                                <View
+                                    className={`p-4 rounded-2xl flex-row items-center border-[1.5px] mb-4 ${locationText.trim().length > 0
+                                        ? 'bg-orange-50 border-[#E89B5A]'
+                                        : 'bg-gray-50 border-gray-100'
+                                        } mt-5`}
+                                >
+                                    <TextInput
+                                        placeholder="Enter your district or city"
+                                        placeholderTextColor="#9CA3AF"
+                                        className={`ml-3 flex-1 font-medium text-[16px] text-black`}
+                                        value={locationText}
+                                        style={{ fontFamily: "Urbanist" }}
+                                        onChangeText={(text) => {
+                                            setLocationText(text);
+                                            setIsUsingGps(false);
+                                        }}
+                                    />
+                                    {locationText.trim().length > 0 && (
+                                        <TouchableOpacity onPress={() => {
+                                            setLocationText('');
+                                            setIsUsingGps(false);
+                                        }} className="p-1">
+                                            <Ionicons name="close" size={18} color="#D1D5DB" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={handleUseGps}
+                                    disabled={isRequestingGps}
+                                    className="flex-row items-center justify-center py-4 border border-[#E5E5E5] rounded-[16px] bg-white active:bg-gray-50"
+                                >
+                                    {isRequestingGps ? (
+                                        <ActivityIndicator size="small" color="#F97316" />
+                                    ) : (
                                         <Image
-                                            source={item.icon}
-                                            style={{ width: 40, height: 40 }}
+                                            source={require('../../assets/icon/location_solid.png')}
+                                            style={{ width: 18, height: 18 }}
+                                            resizeMode="cover"
                                         />
-                                        {/* <FontAwesome5 name={item.icon as any} size={32} color={selectedType === item.id ? '#E89B5A' : '#9CA3AF'} /> */}
-                                        <Text className={`mt-3 font-medium text-[14px] ${selectedType === item.id ? 'text-[#E89B5A]' : 'text-gray-400'}`}>{item.label}</Text>
-                                    </TouchableOpacity>
-                                ))}
+                                    )}
+                                    <Text className="ml-2 font-medium text-[16px] text-black">Use Current Location</Text>
+                                </TouchableOpacity>
                             </View>
-                        </View>
-                    )}
-
-                    {/* STEP 2: AGE */}
-                    {surveyStep === 2 && (
-                        <View>
-                            <Text className="text-[30px] font-semibold text-black mb-2">Age Preference</Text>
-                            <Text className="text-[16px] font-medium text-[#8E8E93] my-4">What age range are you looking for?</Text>
-                            <View className="gap-3 mt-5">
-                                {AGE_PREFERENCES.map((age) => (
-                                    <TouchableOpacity
-                                        key={age}
-                                        activeOpacity={0.7}
-                                        onPress={() => setSelectedAge(age)}
-                                        className={`p-[14px] rounded-[16px] border ${selectedAge === age ? 'border-[#E89B5A] bg-orange-50' : 'border-[#E5E5E5] bg-white'}`}
-                                    >
-                                        <Text className={`font-medium text-[16px] ${selectedAge === age ? 'text-[#E89B5A]' : 'text-gray-600'}`}>{age}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-                    )}
-
-                    {/* STEP 3: LOCATION */}
-                    {surveyStep === 3 && (
-                        <View>
-                            <Text className="text-[30px] font-semibold text-black mb-2">Your Location</Text>
-                            <Text className="text-[16px] font-medium text-[#8E8E93] my-4">We'll help you find adoption shelters near you</Text>
-
-                            <View
-                                className={`p-4 rounded-2xl flex-row items-center border-[1.5px] mb-4 ${locationText.trim().length > 0
-                                    ? 'bg-orange-50 border-[#E89B5A]'
-                                    : 'bg-gray-50 border-gray-100'
-                                    } mt-5`}
-                            >
-                                <TextInput
-                                    placeholder="Enter your district or city"
-                                    placeholderTextColor="#9CA3AF"
-                                    className={`ml-3 flex-1 font-medium text-[16px] text-black`}
-                                    value={locationText}
-                                    style={{ fontFamily: "Urbanist" }}
-                                    onChangeText={(text) => {
-                                        setLocationText(text);
-                                        setIsUsingGps(false);
-                                    }}
-                                />
-                                {locationText.trim().length > 0 && (
-                                    <TouchableOpacity onPress={() => {
-                                        setLocationText('');
-                                        setIsUsingGps(false);
-                                    }} className="p-1">
-                                        <Ionicons name="close" size={18} color="#D1D5DB" />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            <TouchableOpacity
-                                activeOpacity={0.7}
-                                onPress={handleUseGps}
-                                disabled={isRequestingGps}
-                                className="flex-row items-center justify-center py-4 border border-[#E5E5E5] rounded-[16px] bg-white active:bg-gray-50"
-                            >
-                                {isRequestingGps ? (
-                                    <ActivityIndicator size="small" color="#F97316" />
-                                ) : (
-                                    <Ionicons name="navigate-circle-outline" size={20} color="#F97316" />
-                                )}
-                                <Text className="ml-2 font-medium text-[16px] text-black">Use Current Location</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
+                        )}
+                    </View>
                 </View>
-            </View>
 
-            {/* VÙNG BOTTOM ACTION */}
-            <View
-                style={{
-                    paddingBottom: Math.max(insets.bottom, 16),
-                    paddingHorizontal: 24,
-                    paddingTop: 16,
-                }}
-            >
-                <TouchableOpacity
-                    onPress={handleContinue}
-                    disabled={!stepValid}
-                    activeOpacity={0.8}
-                    className={`w-full py-[18px] rounded-[36px] items-center justify-center ${stepValid ? 'bg-[#E89B5A]' : 'bg-[#E89B5A]/60'
-                        }`}
+                {/* VÙNG BOTTOM ACTION */}
+                <View
+                    style={{
+                        paddingBottom: Math.max(insets.bottom, 16),
+                        paddingHorizontal: 24,
+                        paddingTop: 16,
+                    }}
                 >
-                    <Text className={`font-bold text-[16px] text-white`}>
-                        {surveyStep === 3 ? 'Apply Filters' : 'Continue'}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-        </SafeAreaView>
+                    <TouchableOpacity
+                        onPress={handleContinue}
+                        disabled={!stepValid}
+                        activeOpacity={0.8}
+                        className={`w-full py-[18px] rounded-[36px] items-center justify-center ${stepValid ? 'bg-[#E89B5A]' : 'bg-[#E89B5A]/60'
+                            }`}
+                    >
+                        <Text className={`font-bold text-[16px] text-white`}>
+                            {surveyStep === 3 ? 'Apply Filters' : 'Continue'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        </TouchableWithoutFeedback>
     );
 };
 // ==================================================================
@@ -1327,10 +1337,10 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                             <View className="flex-row items-center gap-2">
                                 <TouchableOpacity activeOpacity={0.7} className="w-[41px] h-[41px] rounded-full bg-[#FFF4EC] items-center justify-center">
                                     <Image
-                                                    source={require('../../assets/icon/message.png')}
-                                                    style={{ width: 24, height: 24 }}
-                                                    resizeMode="cover"
-                                                  />
+                                        source={require('../../assets/icon/message.png')}
+                                        style={{ width: 24, height: 24 }}
+                                        resizeMode="cover"
+                                    />
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     activeOpacity={0.7}

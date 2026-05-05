@@ -54,7 +54,7 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
             )}
         </View>
         <View className="pt-[12px]">
-            <Text className="text-gray-900 font-semibold text-[16px] mb-1">{item.name}</Text>
+            <Text className="text-black font-semibold text-[16px] mb-1">{item.name}</Text>
             <View className="flex-row items-center">
                 <Text className="text-gray-400 text-[12px] font-regular">{item.age || '2 years'} · {item.breed || 'Unknown'}</Text>
             </View>

@@ -210,12 +210,12 @@ export default function ScannedPetScreen() {
 
                 <View className="absolute bottom-0 left-0 right-0 mb-4 items-center">
                   <Text
-                    className="text-white text-[24px] font-bold text-center capitalize mb-3"
+                    className="text-white text-[24px] font-bold text-center capitalize mb-2"
                   >
                     {pet?.name.toLowerCase()}
                   </Text>
                   <Text
-                    className="text-white text-[12px] font-medium text-center"
+                    className="text-white text-[12px] font-semibold text-center tracking-[0.5px]"
                   >
                     {pet?.age || 'Unknown'} years old • {pet?.breed}
                   </Text>
