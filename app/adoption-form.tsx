@@ -4,6 +4,7 @@ import { Text } from '@/components/AppText';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useModalStore } from '../store/useModalStore';
 import {
   ActivityIndicator,
   Alert,
@@ -22,41 +23,41 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 // --- DATA CONSTANTS ---
 const LOCATIONS = [
-  "Quận Ba Đình", "Quận Đống Đa", "Quận Hoàn Kiếm", "Quận Tây Hồ", 
-  "Quận Long Biên", "Quận Cầu Giấy", "Quận Hoàng Mai", "Quận Thanh Xuân", 
+  "Quận Ba Đình", "Quận Đống Đa", "Quận Hoàn Kiếm", "Quận Tây Hồ",
+  "Quận Long Biên", "Quận Cầu Giấy", "Quận Hoàng Mai", "Quận Thanh Xuân",
   "Quận Bắc Từ Liêm", "Quận Nam Từ Liêm", "Ngoại thành Hà Nội"
 ];
 
 const HOUSING_TYPES = [
-  "House", 
-  "House with a garden", 
-  "Apartment (allows pet ownership)", 
-  "Apartment (pets not allowed, but willing to keep a pet discreetly)", 
-  "Rented house", 
+  "House",
+  "House with a garden",
+  "Apartment (allows pet ownership)",
+  "Apartment (pets not allowed, but willing to keep a pet discreetly)",
+  "Rented house",
   "Other"
 ];
 
 const PET_EXPERIENCES = [
-  "Yes, I used to have one", 
-  "My pet is still living with me now", 
+  "Yes, I used to have one",
+  "My pet is still living with me now",
   "No, I haven't"
 ];
 
 const EMPLOYMENT_STATUSES = [
-  "Currently employed", 
-  "Currently employed (occasionally travels for work)", 
-  "Currently employed (frequently travels for work)", 
-  "Self-employed", 
-  "Student (without a stable income)", 
+  "Currently employed",
+  "Currently employed (occasionally travels for work)",
+  "Currently employed (frequently travels for work)",
+  "Self-employed",
+  "Student (without a stable income)",
   "Pupil"
 ];
 
 const ADOPTION_REASONS = [
-  "Garden guarding", 
-  "Parking lot guarding", 
-  "Breeding", 
-  "Gift for children", 
-  "Because I want to give them a forever home", 
+  "Garden guarding",
+  "Parking lot guarding",
+  "Breeding",
+  "Gift for children",
+  "Because I want to give them a forever home",
   "Other"
 ];
 
@@ -97,9 +98,8 @@ const CustomInput = ({
 }) => (
   <View className="">
     <TextInput
-      className={`w-full bg-white border border-gray-200 rounded-2xl px-4 text-gray-800 ${
-        multiline ? 'h-24 py-3' : 'h-14'
-      }`}
+      className={`w-full bg-white border border-gray-200 rounded-2xl px-4 text-gray-800 ${multiline ? 'h-24 py-3' : 'h-14'
+        }`}
       placeholder={placeholder}
       placeholderTextColor="#9CA3AF"
       value={value}
@@ -110,15 +110,15 @@ const CustomInput = ({
   </View>
 );
 
-const CustomDropdown = ({ 
-  placeholder, 
-  value, 
-  options = [], 
-  onSelect 
-}: { 
-  placeholder: string; 
-  value?: string; 
-  options?: string[]; 
+const CustomDropdown = ({
+  placeholder,
+  value,
+  options = [],
+  onSelect
+}: {
+  placeholder: string;
+  value?: string;
+  options?: string[];
   onSelect?: (val: string) => void;
 }) => {
   const [visible, setVisible] = useState(false);
@@ -137,43 +137,43 @@ const CustomDropdown = ({
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="fade">
-         <TouchableWithoutFeedback onPress={() => setVisible(false)}>
-            <View className="flex-1 bg-black/40 justify-center px-6">
-                <TouchableWithoutFeedback>
-                    <View className="bg-white rounded-3xl max-h-[60%] overflow-hidden shadow-2xl">
-                        <View className="px-5 py-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
-                            <Text className="font-bold text-gray-700 text-base">{placeholder}</Text>
-                            <TouchableOpacity onPress={() => setVisible(false)}>
-                                <AntDesign name="close" size={20} color="#9CA3AF" />
-                            </TouchableOpacity>
-                        </View>
-                        
-                        <FlatList
-                            data={options}
-                            keyExtractor={(item) => item}
-                            showsVerticalScrollIndicator={false}
-                            renderItem={({ item }) => {
-                                const isSelected = item === value;
-                                return (
-                                    <TouchableOpacity 
-                                        className={`px-5 py-4 border-b border-gray-50 flex-row items-center justify-between ${isSelected ? 'bg-blue-50' : 'active:bg-gray-50'}`}
-                                        onPress={() => {
-                                            if (onSelect) onSelect(item);
-                                            setVisible(false);
-                                        }}
-                                    >
-                                        <Text className={`text-sm ${isSelected ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
-                                            {item}
-                                        </Text>
-                                        {isSelected && <Ionicons name="checkmark" size={18} color="#2563EB" />}
-                                    </TouchableOpacity>
-                                );
-                            }}
-                        />
-                    </View>
-                </TouchableWithoutFeedback>
-            </View>
-         </TouchableWithoutFeedback>
+        <TouchableWithoutFeedback onPress={() => setVisible(false)}>
+          <View className="flex-1 bg-black/40 justify-center px-6">
+            <TouchableWithoutFeedback>
+              <View className="bg-white rounded-3xl max-h-[60%] overflow-hidden shadow-2xl">
+                <View className="px-5 py-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
+                  <Text className="font-bold text-gray-700 text-base">{placeholder}</Text>
+                  <TouchableOpacity onPress={() => setVisible(false)}>
+                    <AntDesign name="close" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+
+                <FlatList
+                  data={options}
+                  keyExtractor={(item) => item}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item }) => {
+                    const isSelected = item === value;
+                    return (
+                      <TouchableOpacity
+                        className={`px-5 py-4 border-b border-gray-50 flex-row items-center justify-between ${isSelected ? 'bg-blue-50' : 'active:bg-gray-50'}`}
+                        onPress={() => {
+                          if (onSelect) onSelect(item);
+                          setVisible(false);
+                        }}
+                      >
+                        <Text className={`text-sm ${isSelected ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                          {item}
+                        </Text>
+                        {isSelected && <Ionicons name="checkmark" size={18} color="#2563EB" />}
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
@@ -181,11 +181,11 @@ const CustomDropdown = ({
 
 const PolicyItem = ({ number, title, content }: { number: string; title: string; content: string }) => (
   <View className="flex-row items-start mb-5">
-      <Text className="font-medium text-[16px] text-gray-900 w-5 mt-0.5">{number}.</Text>
-      <View className="flex-1">
-          <Text className="text-gray-800 font-medium text-[16px] mb-1">{title}</Text>
-          <Text className="text-gray-500 font-regular text-[14px] leading-4">{content}</Text>
-      </View>
+    <Text className="font-medium text-[16px] text-gray-900 w-5 mt-0.5">{number}.</Text>
+    <View className="flex-1">
+      <Text className="text-gray-800 font-medium text-[16px] mb-1">{title}</Text>
+      <Text className="text-gray-500 font-regular text-[14px] leading-4">{content}</Text>
+    </View>
   </View>
 );
 
@@ -206,16 +206,14 @@ const OptionGroup = ({
           key={opt}
           onPress={() => onSelect(opt)}
           activeOpacity={0.9}
-          className={`flex-1 py-[9px] rounded-[12px] items-center border ${
-            isActive
-              ? 'bg-[#E89B5A] border-[#E5E5E5]/0'
-              : 'bg-white border-gray-100 border-[#E5E5E5]'
-          }`}
+          className={`flex-1 py-[9px] rounded-[12px] items-center border ${isActive
+            ? 'bg-[#E89B5A] border-[#E5E5E5]/0'
+            : 'bg-white  border-[#E5E5E5]'
+            }`}
         >
           <Text
-            className={`font-semibold text-[14px] ${
-              isActive ? 'text-white' : 'text-[#757575]'
-            }`}
+            className={`font-semibold text-[14px] ${isActive ? 'text-white' : 'text-[#757575]'
+              }`}
           >
             {opt}
           </Text>
@@ -226,6 +224,7 @@ const OptionGroup = ({
 );
 
 export default function AdoptionFormScreen() {
+  const showModal = useModalStore((state) => state.showModal);
   const router = useRouter();
   const rawParams = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -241,7 +240,7 @@ export default function AdoptionFormScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingLimit, setIsCheckingLimit] = useState(true);
   const [showLimitModal, setShowLimitModal] = useState(false); // <--- State mới cho popup custom
-  
+
   const petId = params.id || params.petId;
 
   const pet = {
@@ -273,26 +272,26 @@ export default function AdoptionFormScreen() {
   const [updateStatus, setUpdateStatus] = useState('Yes');
   const [homeVisit, setHomeVisit] = useState('Yes');
   const [provideID, setProvideID] = useState('Yes');
-  const [isAgreed, setIsAgreed] = useState(false); // Trạng thái checkbox
-  const [showPolicyModal, setShowPolicyModal] = useState(false); // Trạng thái hiện modal policy
+  const [isAgreed, setIsAgreed] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
   // --- USE EFFECT CHECK LIMIT ---
   useEffect(() => {
     const checkLimit = async () => {
       try {
         const response = await axiosClient.get('/applications/my-applications');
         const applications = response.data?.data || [];
-        
+
         const activeApps = applications.filter(
           (app: any) => app.status !== 'CLOSED' && app.status !== 'ADOPTION_COMPLETED'
         );
 
         if (activeApps.length >= 5) {
-          setShowLimitModal(true); // <--- Hiển thị Modal tuỳ chỉnh
+          setShowLimitModal(true);
         }
       } catch (error) {
         console.error("Failed to check application limit", error);
       } finally {
-        setIsCheckingLimit(false); 
+        setIsCheckingLimit(false);
       }
     };
 
@@ -341,7 +340,19 @@ export default function AdoptionFormScreen() {
       };
 
       await axiosClient.post('/applications', payload);
-      router.push('/application-success');
+      showModal({
+        title: 'Terms of Service!',
+        message: 'Mauris id massa quis odio egestas interdum eget at felis. ',
+        buttonText: 'Back',
+        onConfirm: () => {
+          router.dismissAll();
+          router.replace({
+            pathname: '/(tabs)/matching',
+            params: { returnFromSuccess: '1' }
+          });
+          console.log('User bấm OK');
+        }
+      });
     } catch (error: any) {
       Alert.alert('Gửi đơn thất bại', error.response?.data?.message || 'Đã có lỗi xảy ra.');
     } finally {
@@ -365,12 +376,10 @@ export default function AdoptionFormScreen() {
         <Modal visible={showLimitModal} transparent animationType="fade">
           <View className="flex-1 bg-black/50 justify-center items-center px-6">
             <View className="bg-white w-full rounded-[28px] p-6 items-center shadow-2xl">
-              {/* Icon */}
               <View className="w-16 h-16 bg-red-50 rounded-full items-center justify-center mb-5">
                 <Ionicons name="warning-outline" size={32} color="#EF4444" />
               </View>
-              
-              {/* Text content */}
+
               <Text className="text-xl font-bold text-gray-900 mb-2 text-center">
                 Đạt giới hạn đăng ký
               </Text>
@@ -378,7 +387,6 @@ export default function AdoptionFormScreen() {
                 Bạn đang có 5 đơn đăng ký chờ xử lý. Vui lòng đợi kết quả của các đơn cũ trước khi nộp thêm hồ sơ mới nhé!
               </Text>
 
-              {/* Action Button */}
               <TouchableOpacity
                 className="w-full bg-[#F99C2E] py-4 rounded-xl items-center shadow-sm"
                 activeOpacity={0.8}
@@ -396,27 +404,27 @@ export default function AdoptionFormScreen() {
         <Modal visible={showPolicyModal} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setShowPolicyModal(false)}>
           <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
             <View className="flex-row items-center justify-between px-4 pt-3">
-                <View className="w-10" />
-                <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 tracking-wide">
-                    Adoption Pawlicy
-                </Text>
-                <TouchableOpacity 
-                    onPress={() => setShowPolicyModal(false)} 
-                    className="w-10 items-end py-1.5"
-                >
-                    <Feather name="x" size={22} color="#374151" />
-                </TouchableOpacity>
+              <View className="w-10" />
+              <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 tracking-wide">
+                Adoption Pawlicy
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowPolicyModal(false)}
+                className="w-10 items-end py-1.5"
+              >
+                <Feather name="x" size={22} color="#374151" />
+              </TouchableOpacity>
             </View>
 
             <ScrollView className="flex-1 px-[35px] pt-[50px]" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-                <View className="mb-4">
-                    <PolicyItem number="1" title="Love and care for your pet for life" content="Do not abandon, harm, or use the pet for any illegal or inhumane purposes." />
-                    <PolicyItem number="2" title="Provide a safe and suitable living environment" content="This includes proper food, shelter, attention, and veterinary care when needed." />
-                    <PolicyItem number="3" title="Take care of your pet's health" content="Check-ups, vaccinations, and rabies shots as recommended." />
-                    <PolicyItem number="4" title="Stay in touch" content="During the first 6 months, share updates to ensure pet is doing well." />
-                    <PolicyItem number="5" title="Do not transfer your pet" content="Contact PawLife if you can no longer care for the pet." />
-                    <PolicyItem number="6" title="Provide truthful personal information" content="Basic info helps ensure your pet's safety." />
-                </View>
+              <View className="mb-4">
+                <PolicyItem number="1" title="Love and care for your pet for life" content="Do not abandon, harm, or use the pet for any illegal or inhumane purposes." />
+                <PolicyItem number="2" title="Provide a safe and suitable living environment" content="This includes proper food, shelter, attention, and veterinary care when needed." />
+                <PolicyItem number="3" title="Take care of your pet's health" content="Check-ups, vaccinations, and rabies shots as recommended." />
+                <PolicyItem number="4" title="Stay in touch" content="During the first 6 months, share updates to ensure pet is doing well." />
+                <PolicyItem number="5" title="Do not transfer your pet" content="Contact PawLife if you can no longer care for the pet." />
+                <PolicyItem number="6" title="Provide truthful personal information" content="Basic info helps ensure your pet's safety." />
+              </View>
             </ScrollView>
           </View>
         </Modal>
@@ -468,26 +476,26 @@ export default function AdoptionFormScreen() {
             <SectionTitle title="Section B – Living Conditions" />
 
             <Label text="Where will your pet stay?" required />
-            <CustomDropdown 
-                placeholder="Select district" 
-                value={location} 
-                options={LOCATIONS} 
-                onSelect={setLocation} 
+            <CustomDropdown
+              placeholder="Select district"
+              value={location}
+              options={LOCATIONS}
+              onSelect={setLocation}
             />
 
             <Label text="Specify your type of housing" required />
-            <CustomDropdown 
-                placeholder="Select housing type" 
-                value={housing} 
-                options={HOUSING_TYPES} 
-                onSelect={setHousing} 
+            <CustomDropdown
+              placeholder="Select housing type"
+              value={housing}
+              options={HOUSING_TYPES}
+              onSelect={setHousing}
             />
             {housing === 'Other' && (
-                <CustomInput 
-                    placeholder="Please specify your housing type" 
-                    value={otherHousing} 
-                    onChangeText={setOtherHousing}
-                />
+              <CustomInput
+                placeholder="Please specify your housing type"
+                value={otherHousing}
+                onChangeText={setOtherHousing}
+              />
             )}
 
             <Label text="Are there children in your household?" required />
@@ -502,11 +510,11 @@ export default function AdoptionFormScreen() {
 
             <Label text="Have you raised any pet before?" required />
             <AdviceText text="Some pets in the rescue center are not suitable for living with other pets" />
-            <CustomDropdown 
-                placeholder="Select an option" 
-                value={exp} 
-                options={PET_EXPERIENCES} 
-                onSelect={setExp} 
+            <CustomDropdown
+              placeholder="Select an option"
+              value={exp}
+              options={PET_EXPERIENCES}
+              onSelect={setExp}
             />
 
             <Label text="If your pet(s) is no longer with you, what happened to them?" required />
@@ -515,30 +523,30 @@ export default function AdoptionFormScreen() {
             {/* --- SECTION D --- */}
             <SectionTitle title="Section D – Employment & Personal" />
             <Label text="Specify your employment status?" required />
-            <CustomDropdown 
-                placeholder="Select employment status" 
-                value={job} 
-                options={EMPLOYMENT_STATUSES} 
-                onSelect={setJob} 
+            <CustomDropdown
+              placeholder="Select employment status"
+              value={job}
+              options={EMPLOYMENT_STATUSES}
+              onSelect={setJob}
             />
 
             {/* --- SECTION E --- */}
             <SectionTitle title="Section E – Adoption Commitment" />
 
             <Label text="Reason of adoption" required />
-            <CustomDropdown 
-                placeholder="Select reason" 
-                value={reason} 
-                options={ADOPTION_REASONS} 
-                onSelect={setReason} 
+            <CustomDropdown
+              placeholder="Select reason"
+              value={reason}
+              options={ADOPTION_REASONS}
+              onSelect={setReason}
             />
             {reason === 'Other' && (
-                <CustomInput 
-                    placeholder="Please specify your reason" 
-                    value={otherReason} 
-                    onChangeText={setOtherReason}
-                    multiline={true}
-                />
+              <CustomInput
+                placeholder="Please specify your reason"
+                value={otherReason}
+                onChangeText={setOtherReason}
+                multiline={true}
+              />
             )}
 
             <Label text="Are you willing to provide yearly vaccinations and medical care for the pet?" required />
@@ -562,51 +570,51 @@ export default function AdoptionFormScreen() {
             <OptionGroup options={['Yes', 'No']} selected={provideID} onSelect={setProvideID} />
 
             {/* --- SUBMIT BUTTON --- */}
-            <View className="flex-row items-center mt-[50px] mb-[21px]"> {/* Đổi items-start thành items-center */}
-            <TouchableOpacity 
-              onPress={() => setIsAgreed(!isAgreed)} 
-              className="mr-3" // Xóa mt-0.5 ở đây
-              activeOpacity={0.7}
-            >
-              <Ionicons
+            <View className="flex-row items-center mt-[50px] mb-[21px]">
+              <TouchableOpacity
+                onPress={() => setIsAgreed(!isAgreed)}
+                className="mr-3" // Xóa mt-0.5 ở đây
+                activeOpacity={0.7}
+              >
+                <Ionicons
                   name={isAgreed ? "checkbox" : "square-outline"}
                   size={24}
-                  color={isAgreed ? "#E89B5A" : "#9CA3AF"} 
-              />
-            </TouchableOpacity>
-            <Text className="flex-1 text-gray-600 text-[14px] leading-5">
-              I agree to {" "}
-              <Text
+                  color={isAgreed ? "#E89B5A" : "#9CA3AF"}
+                />
+              </TouchableOpacity>
+              <Text className="flex-1 text-gray-600 text-[14px] leading-5">
+                I agree to {" "}
+                <Text
                   className="text-[#E89B5A] font-bold"
                   onPress={() => setShowPolicyModal(true)}
-              >
+                >
                   conditions of PawLife Adoption Policy.
+                </Text>
               </Text>
-            </Text>
-          </View>
+            </View>
 
             {/* --- SUBMIT BUTTON --- */}
             <TouchableOpacity
-            // Bỏ các class bg- ra khỏi className
-            className="w-full py-4 rounded-full mt-4 mb-8 flex-row justify-center items-center"
-            style={{
-              // Quản lý màu nền trực tiếp qua style
-              backgroundColor: isLoading 
-                ? '#fcd3a0' 
-                : (!isAgreed ? '#F6F6F6' : '#E89B5A') // #D1D5DB tương đương bg-gray-300
-            }}
-            activeOpacity={0.8}
-            onPress={handleSubmit}
-            disabled={isLoading || !isAgreed} 
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className={`font-bold text-center text-lg ${!isAgreed ? 'text-[#B8B8B8]' : 'text-white'}`}>
-                Send Application
-              </Text>
-            )}
-          </TouchableOpacity>
+              // Bỏ các class bg- ra khỏi className
+              className="w-full py-4 rounded-full mt-4 mb-8 flex-row justify-center items-center"
+              style={{
+                // Quản lý màu nền trực tiếp qua style
+                backgroundColor: isLoading
+                  ? '#fcd3a0'
+                  : (!isAgreed ? '#F6F6F6' : '#E89B5A') // #D1D5DB tương đương bg-gray-300
+              }}
+              activeOpacity={0.8}
+              onPress={handleSubmit}
+              disabled={isLoading || !isAgreed}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text className={`font-bold text-center text-lg ${!isAgreed ? 'text-[#B8B8B8]' : 'text-white'}`}>
+                  Send Application
+                </Text>
+              )}
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

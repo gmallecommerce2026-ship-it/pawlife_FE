@@ -9,9 +9,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { BlurView } from 'expo-blur';
+import SearchOverlay from '@/components/SearchOverlay';
 
 // Sử dụng components chuẩn của React Native để NativeWind (Tailwind) nhận diện được className
-import { ActivityIndicator, FlatList, Image, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Image, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 
 import Animated, {
     Easing,
@@ -24,6 +25,7 @@ import Animated, {
     withRepeat,
     withSequence,
     withTiming,
+    runOnJS
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axiosClient from '../../api/axiosClient';
@@ -31,6 +33,8 @@ import { useLocation } from '../../hooks/useLocation';
 import { eventService } from '../../services/eventService';
 import { petService } from '../../services/petService';
 import { shelterService } from '../../services/shelterService';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CATEGORIES = [
     { id: 1, label: 'Training', icon: require('../../assets/images/training-icon.png') },
@@ -56,19 +60,83 @@ export default function HomeScreen() {
     const rotation = useSharedValue(0);
     const translateY = useSharedValue(0);
     const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+    const searchWidth = useSharedValue(40);
+    const searchOpacity = useSharedValue(0);
+    const searchInputRef = useRef<TextInput>(null);
 
     const [pets, setPets] = useState<any[]>([]);
     const [shelters, setShelters] = useState<any[]>([]);
     const [events, setEvents] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [hasUnread, setHasUnread] = useState(false);
+    const [isSearchVisible, setIsSearchVisible] = useState(false);
+    const [activeTab, setActiveTab] = useState<'Pet' | 'Shelter' | 'Event'>('Pet');
+    const [searchText, setSearchText] = useState('');
+    const scrollY = useSharedValue(0);
 
     const HEADER_MAX_HEIGHT = 320;
     const CURVE_HEIGHT = 28;
     const HEADER_MIN_HEIGHT = insets.top + 116;
     const SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
-    const scrollY = useSharedValue(0);
+    function useDebounce<T>(value: T, delay: number): T {
+        const [debouncedValue, setDebouncedValue] = useState<T>(value);
+        useEffect(() => {
+            const handler = setTimeout(() => {
+                setDebouncedValue(value);
+            }, delay);
+            return () => clearTimeout(handler);
+        }, [value, delay]);
+        return debouncedValue;
+    }
+
+    const debouncedSearchQuery = useDebounce(searchText, 500);
+
+    const searchBodyAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            opacity: searchOpacity.value, // Dùng chung biến opacity của thanh search
+            transform: [
+                {
+                    // Hiệu ứng trượt nhẹ từ dưới lên (20px -> 0px)
+                    translateY: interpolate(searchOpacity.value, [0, 1], [20, 0])
+                }
+            ],
+        };
+    });
+
+    const openSearch = () => {
+        setIsSearchVisible(true);
+        searchOpacity.value = withTiming(1, { duration: 200 });
+        // Mở rộng ra bằng chiều rộng màn hình trừ đi padding 2 bên (24px * 2)
+        searchWidth.value = withTiming(SCREEN_WIDTH - 48, { duration: 300, easing: Easing.out(Easing.ease) }, (isFinished) => {
+            if (isFinished) {
+                runOnJS(focusInput)();
+            }
+        });
+    };
+
+    const closeSearch = () => {
+        setSearchText('');
+        searchInputRef.current?.blur(); // Tắt bàn phím trước khi thu hẹp
+        searchWidth.value = withTiming(40, { duration: 300, easing: Easing.inOut(Easing.ease) });
+        searchOpacity.value = withTiming(0, { duration: 300 }, (isFinished) => {
+            if (isFinished) {
+                runOnJS(setIsSearchVisible)(false);
+            }
+        });
+    };
+
+    const inlineSearchAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            width: searchWidth.value,
+            opacity: searchOpacity.value,
+        };
+    });
+
+
+    const focusInput = useCallback(() => {
+        searchInputRef.current?.focus();
+    }, []);
 
     const scrollHandler = useAnimatedScrollHandler({
         onScroll: (event) => {
@@ -517,62 +585,84 @@ export default function HomeScreen() {
                 </Animated.View>
 
                 <View className="px-6 w-full h-full" pointerEvents="box-none" style={{ paddingTop: insets.top + 10, zIndex: 10 }}>
-                    <View className="flex-row justify-between content-center items-start z-20" pointerEvents="box-none">
+                    <View className="relative flex-row justify-between content-center items-start z-20" pointerEvents="box-none">
+
+                        {/* LỚP NỀN: AVATAR VÀ CÁC NÚT (Sẽ bị đè khi Search Bar mở ra) */}
                         <View className="flex-row items-center flex-1" pointerEvents="box-none">
-                            {/* AVATAR */}
                             <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/edit-profile')}>
-                                <Animated.View
-                                    style={[
-                                        avatarAnimatedStyle,
-                                        {
-                                            // Shadow cho iOS
-                                            shadowColor: '#000',
-                                            shadowOffset: { width: 0, height: 4 },
-                                            shadowOpacity: 0.1,
-                                            shadowRadius: 1,
-                                            // Shadow cho Android
-                                            elevation: 8,
-                                            zIndex: 50,
-                                        }
-                                    ]}
-                                >
-                                    {/* View con xử lý clipping và border */}
-                                    <View
-                                        style={{
-                                            flex: 1,
-                                            backgroundColor: '#ffedd5',
-                                            overflow: 'hidden',
-                                            borderWidth: 2.5,
-                                            borderColor: '#FFFFFF',
-                                            borderRadius: 1000, // Đảm bảo luôn bo tròn theo kích thước của cha
-                                        }}
-                                    >
-                                        <Image
-                                            source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }}
-                                            className="w-full h-full"
-                                        />
+                                <Animated.View style={[avatarAnimatedStyle, { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 8, zIndex: 50 }]}>
+                                    <View style={{ flex: 1, backgroundColor: '#ffedd5', overflow: 'hidden', borderWidth: 2.5, borderColor: '#FFFFFF', borderRadius: 1000 }}>
+                                        <Image source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }} className="w-full h-full" />
                                     </View>
                                 </Animated.View>
                             </TouchableOpacity>
-
                         </View>
 
                         <View className="flex-row gap-5 items-center mt-2" pointerEvents="box-none">
-                            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/search')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                            {/* NÚT SEARCH GIẢ (Lớp nền) - Kích hoạt Animation */}
+                            <TouchableOpacity activeOpacity={0.7} onPress={openSearch} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                                 <Feather name="search" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
                             </TouchableOpacity>
 
                             <TouchableOpacity activeOpacity={0.7} className="relative" onPress={() => router.push('/notifications')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                                 <Ionicons name="notifications" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                                {hasUnread && (
-                                    <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-[#E89B5A] rounded-full border border-white" />
-                                )}
+                                {hasUnread && <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-[#E89B5A] rounded-full border border-white" />}
                             </TouchableOpacity>
 
                             <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/profile-settings')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                                 <Feather name="menu" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
                             </TouchableOpacity>
                         </View>
+
+                        {/* LỚP ĐÈ: THANH SEARCH THỰC SỰ (Animated & Absolute) */}
+                        <Animated.View
+                            pointerEvents={isSearchVisible ? "auto" : "none"}
+                            style={[
+                                inlineSearchAnimatedStyle,
+                                {
+                                    position: 'absolute',
+                                    right: 0, // Bám sát lề phải, ngay vị trí icon search cũ
+                                    top: 0,
+                                    height: 44, // Chiều cao phù hợp đè lấp các icon
+                                    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Nền trắng mờ để nổi bật nội dung search
+                                    borderRadius: 22,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingHorizontal: 12,
+                                    zIndex: 100, // Z-index cao nhất để đè lên avatar
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.1,
+                                    shadowRadius: 4,
+                                    elevation: 5,
+                                }
+                            ]}
+                        >
+                            <TouchableOpacity onPress={closeSearch} className="mr-2" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                <Feather name="arrow-right" size={20} color="#1F2937" />
+                            </TouchableOpacity>
+
+                            <TextInput
+                                ref={searchInputRef}
+                                style={{ flex: 1, fontSize: 15, color: '#1F2937', height: '100%' }}
+                                placeholder="Search pets, shelters, events..."
+                                placeholderTextColor="#9CA3AF"
+                                value={searchText}
+                                onChangeText={setSearchText}
+                                returnKeyType="search"
+                                onSubmitEditing={() => {
+                                    // Xử lý logic search thực tế ở đây
+                                    console.log("Searching for:", searchText);
+                                }}
+                            />
+
+                            {searchText.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchText('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                                </TouchableOpacity>
+                            )}
+                        </Animated.View>
+
                     </View>
 
                     <Animated.View
@@ -598,7 +688,10 @@ export default function HomeScreen() {
                     pointerEvents="none"
                 />
             </Animated.View>
-
+            {/* <SearchOverlay
+                visible={isSearchVisible}
+                onClose={() => setIsSearchVisible(false)}
+            /> */}
         </View>
     );
 }

@@ -19,6 +19,7 @@ import { connectSocket, socket } from '@/utils/socket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+import { SuccessModal } from '../components/SuccessModal';
 // BỔ SUNG 2: Import socket
 export { ErrorBoundary } from 'expo-router';
 
@@ -243,6 +244,7 @@ export default function RootLayout() {
         <AuthProvider>
           <LanguageProvider>
             <RootLayoutNavGuard />
+            <SuccessModal />
           </LanguageProvider>
         </AuthProvider>
       </AppProvider>
