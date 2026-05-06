@@ -269,7 +269,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       
       {/* SỬA LỖI 2: ĐÃ XÓA `scan`, `scanned-pet`, và `matching` VÌ CHÚNG THUỘC VỀ (tabs) */}
-
+      <Stack.Screen name="tag-route-details" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="shelter-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pet-detail-modal" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pet-profile-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -302,6 +302,7 @@ function RootLayoutNav() {
       <Stack.Screen name="transfer-ownership" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pawcare/[category]" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="intro" options={{ headerShown: false, animation: 'fade' }} />
+
     </Stack>
   );
 }
