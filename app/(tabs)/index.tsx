@@ -90,6 +90,15 @@ export default function HomeScreen() {
         return debouncedValue;
     }
 
+    const baseLayerAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            // Khi thanh search mở (searchOpacity = 1), lớp nền sẽ mờ dần về 0
+            opacity: interpolate(searchOpacity.value, [0, 1], [1, 0], Extrapolation.CLAMP),
+            // Tuỳ chọn: Cho lớp nền hơi chìm xuống (scale nhỏ lại) để tạo chiều sâu
+            transform: [{ scale: interpolate(searchOpacity.value, [0, 1], [1, 0.95], Extrapolation.CLAMP) }]
+        };
+    });
+
     const debouncedSearchQuery = useDebounce(searchText, 500);
 
     const searchBodyAnimatedStyle = useAnimatedStyle(() => {
@@ -588,31 +597,39 @@ export default function HomeScreen() {
                     <View className="relative flex-row justify-between content-center items-start z-20" pointerEvents="box-none">
 
                         {/* LỚP NỀN: AVATAR VÀ CÁC NÚT (Sẽ bị đè khi Search Bar mở ra) */}
-                        <View className="flex-row items-center flex-1" pointerEvents="box-none">
-                            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/edit-profile')}>
-                                <Animated.View style={[avatarAnimatedStyle, { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 8, zIndex: 50 }]}>
-                                    <View style={{ flex: 1, backgroundColor: '#ffedd5', overflow: 'hidden', borderWidth: 2.5, borderColor: '#FFFFFF', borderRadius: 1000 }}>
-                                        <Image source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }} className="w-full h-full" />
-                                    </View>
-                                </Animated.View>
-                            </TouchableOpacity>
-                        </View>
+                        <Animated.View
+                            style={[
+                                baseLayerAnimatedStyle,
+                                { flex: 1, flexDirection: 'row', justifyContent: 'space-between' }
+                            ]}
+                            pointerEvents={isSearchVisible ? "none" : "box-none"}
+                        >
+                            <View className="flex-row items-center flex-1" pointerEvents="box-none">
+                                <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/edit-profile')}>
+                                    <Animated.View style={[avatarAnimatedStyle, { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 8, zIndex: 50 }]}>
+                                        <View style={{ flex: 1, backgroundColor: '#ffedd5', overflow: 'hidden', borderWidth: 2.5, borderColor: '#FFFFFF', borderRadius: 1000 }}>
+                                            <Image source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }} className="w-full h-full" />
+                                        </View>
+                                    </Animated.View>
+                                </TouchableOpacity>
+                            </View>
 
-                        <View className="flex-row gap-5 items-center mt-2" pointerEvents="box-none">
-                            {/* NÚT SEARCH GIẢ (Lớp nền) - Kích hoạt Animation */}
-                            <TouchableOpacity activeOpacity={0.7} onPress={openSearch} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-                                <Feather name="search" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                            </TouchableOpacity>
+                            {/* XOÁ class 'mt-2' ở View này để các nút không bị đẩy xuống */}
+                            <View className="flex-row gap-5 items-center" pointerEvents="box-none">
+                                <TouchableOpacity activeOpacity={0.7} onPress={openSearch} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                                    <Feather name="search" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                                </TouchableOpacity>
 
-                            <TouchableOpacity activeOpacity={0.7} className="relative" onPress={() => router.push('/notifications')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-                                <Ionicons name="notifications" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                                {hasUnread && <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-[#E89B5A] rounded-full border border-white" />}
-                            </TouchableOpacity>
+                                <TouchableOpacity activeOpacity={0.7} className="relative" onPress={() => router.push('/notifications')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                                    <Ionicons name="notifications" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                                    {hasUnread && <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-[#E89B5A] rounded-full border border-white" />}
+                                </TouchableOpacity>
 
-                            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/profile-settings')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-                                <Feather name="menu" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                            </TouchableOpacity>
-                        </View>
+                                <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/profile-settings')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                                    <Feather name="menu" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                                </TouchableOpacity>
+                            </View>
+                        </Animated.View>
 
                         {/* LỚP ĐÈ: THANH SEARCH THỰC SỰ (Animated & Absolute) */}
                         <Animated.View
@@ -621,15 +638,16 @@ export default function HomeScreen() {
                                 inlineSearchAnimatedStyle,
                                 {
                                     position: 'absolute',
-                                    right: 0, // Bám sát lề phải, ngay vị trí icon search cũ
+                                    right: 0,
                                     top: 0,
-                                    height: 44, // Chiều cao phù hợp đè lấp các icon
-                                    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Nền trắng mờ để nổi bật nội dung search
+                                    height: 44,
+                                    backgroundColor: 'rgba(255, 255, 255, 1)', // Đổi lên 1 (đục hoàn toàn) thay vì 0.95 để không lộ viền lớp nền
+                                    borderColor: '#EBEBEB',
                                     borderRadius: 22,
                                     flexDirection: 'row',
                                     alignItems: 'center',
                                     paddingHorizontal: 12,
-                                    zIndex: 100, // Z-index cao nhất để đè lên avatar
+                                    zIndex: 100,
                                     shadowColor: '#000',
                                     shadowOffset: { width: 0, height: 2 },
                                     shadowOpacity: 0.1,
@@ -642,6 +660,8 @@ export default function HomeScreen() {
                                 <Feather name="arrow-right" size={20} color="#1F2937" />
                             </TouchableOpacity>
 
+                            <Feather name="search" size={18} color="#8E8E93" />
+
                             <TextInput
                                 ref={searchInputRef}
                                 style={{ flex: 1, fontSize: 15, color: '#1F2937', height: '100%' }}
@@ -651,16 +671,22 @@ export default function HomeScreen() {
                                 onChangeText={setSearchText}
                                 returnKeyType="search"
                                 onSubmitEditing={() => {
-                                    // Xử lý logic search thực tế ở đây
                                     console.log("Searching for:", searchText);
                                 }}
                             />
 
+                            {/* Nút Clear Text */}
                             {searchText.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearchText('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                <TouchableOpacity onPress={() => setSearchText('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} className="mr-2">
                                     <Ionicons name="close-circle" size={18} color="#9CA3AF" />
                                 </TouchableOpacity>
                             )}
+
+                            {/* THÊM NÚT FILTER TỪ TỆP SEARCH.TSX */}
+                            <TouchableOpacity onPress={() => router.push('/filter-modal')} activeOpacity={0.6} className="p-1">
+                                <Ionicons name="options-outline" size={20} color="#8E8E93" />
+                            </TouchableOpacity>
+
                         </Animated.View>
 
                     </View>

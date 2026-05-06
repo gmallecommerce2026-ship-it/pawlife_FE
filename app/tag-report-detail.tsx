@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
-import dayjs from 'dayjs';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +21,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Lấy chính xác kích thước Container chứa Map để không bị vỡ tỷ lệ
 const MAP_HEIGHT = Math.round(SCREEN_HEIGHT * 0.4);
 const MAP_WIDTH = Math.round(SCREEN_WIDTH);
+
 
 /**
  * Hàm tính số mét / 1 pixel trên bản đồ (Hệ chiếu Web Mercator)
@@ -59,7 +60,7 @@ const TimelineItem = ({ item, isLast }: { item: ActivityProp; isLast: boolean })
     if (!item.contactPhone) return;
 
     const phoneNumber = `tel:${item.contactPhone}`;
-    
+
     // Kiểm tra và mở trình gọi điện
     Linking.canOpenURL(phoneNumber)
       .then((supported) => {
@@ -177,6 +178,9 @@ export default function TagReportDetailScreen() {
 
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState<any>(null);
+  const snapPoints = useMemo(() => ['50%', '85%'], []);
+  const BACKGROUND_MAP_HEIGHT = SCREEN_HEIGHT * 0.65;
+
 
   useEffect(() => {
     const fetchReportDetail = async () => {
@@ -246,24 +250,27 @@ export default function TagReportDetailScreen() {
   const exactCircleSize = (radius / metersPerPx) * 2; // Đường kính tính bằng Pixel hiển thị
 
   return (
-    <View className="flex-1 bg-white">
-      {/* MAP SECTION */}
-      <View style={{ height: MAP_HEIGHT, width: MAP_WIDTH }} className="relative justify-center items-center bg-gray-100 overflow-hidden">
-        <TouchableOpacity
-          className="absolute top-12 left-5 z-20 w-10 h-10 bg-white/80 rounded-full items-center justify-center shadow-sm"
-          onPress={() => router.back()}
-        >
-          <Feather name="chevron-left" size={24} color="black" />
-        </TouchableOpacity>
+    <View className="flex-1 bg-white relative">
+      {/* --- NÚT BACK (Luôn nằm trên cùng, z-index cao nhất) --- */}
+      <TouchableOpacity
+        className="absolute top-12 left-5 z-50 w-10 h-10 bg-white/80 rounded-full items-center justify-center shadow-sm"
+        onPress={() => router.back()}
+      >
+        <Feather name="chevron-left" size={24} color="black" />
+      </TouchableOpacity>
 
-        {/* resizeMode="cover" giờ đây sẽ hoạt động chuẩn tỷ lệ 1:1 vì ảnh Mapbox tải về đã bằng đúng Width x Height */}
+      {/* --- LAYER 1: BACKGROUND BẢN ĐỒ TĨNH --- */}
+      <View
+        style={{ height: BACKGROUND_MAP_HEIGHT, width: MAP_WIDTH, position: 'absolute', top: 0 }}
+        className="justify-center items-center bg-gray-100 overflow-hidden"
+      >
         <Image
           source={{ uri: mapboxStaticUrl }}
-          style={{ width: MAP_WIDTH, height: MAP_HEIGHT, position: 'absolute' }}
+          style={{ width: MAP_WIDTH, height: BACKGROUND_MAP_HEIGHT, position: 'absolute' }}
           resizeMode="cover"
         />
 
-        {/* VẼ VÒNG TRÒN KHI KHÔNG HIỆN MARKER (Bán kính lớn hơn 5) */}
+        {/* Vẽ vòng tròn khi không hiện Marker */}
         {!showPin && radius > 0 && (
           <View
             pointerEvents="none"
@@ -281,129 +288,133 @@ export default function TagReportDetailScreen() {
         )}
       </View>
 
-      {/* BOTTOM SHEET INFO */}
-      <ScrollView
-        className="flex-1 bg-white rounded-t-[30px] -mt-6 px-6 pt-5 z-20"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+      {/* --- LAYER 2: BOTTOM SHEET FOREGROUND --- */}
+      <BottomSheet
+        index={0}
+        snapPoints={snapPoints}
+        backgroundStyle={{ backgroundColor: 'white', borderRadius: 30 }}
+        handleIndicatorStyle={{ backgroundColor: '#E5E5EA', width: 48, height: 6 }}
       >
-        <View className="w-12 h-1.5 bg-gray-300 rounded-full self-center mb-5" />
-
-        {/* Pet Header */}
-        <View className="flex-row items-center justify-between mb-6">
-          <View className="flex-row items-center flex-1">
-            <Image source={{ uri: petImage }} className="rounded-full mr-4" style={{ width: 60, height: 60 }} />
-            <View>
-              <View className="flex-row items-center mb-2">
-                <Text className="text-xl font-bold text-black mr-2">{pet.name || 'Thú cưng'}</Text>
-                <View className="bg-[#FFE8E8] border border-[#DA5A5A]/25 px-2 py-0.5 rounded-full">
-                  <Text className="text-[#DA5A5A] text-[10px] font-regular">
-                    {reportData.tag?.status === 'LOST' ? 'Missing' : 'Scanned'}
-                  </Text>
+        <BottomSheetScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 24, paddingTop: 10 }}
+        >
+          {/* === BÊ TOÀN BỘ NỘI DUNG TỪ SCROLLVIEW CŨ VÀO ĐÂY === */}
+          <View className="flex-row items-center justify-between mb-6">
+            <View className="flex-row items-center flex-1">
+              <Image source={{ uri: petImage }} className="rounded-full mr-4" style={{ width: 60, height: 60 }} />
+              <View>
+                <View className="flex-row items-center mb-2">
+                  <Text className="text-xl font-bold text-black mr-2">{pet.name || 'Thú cưng'}</Text>
+                  <View className="bg-[#FFE8E8] border border-[#DA5A5A]/25 px-2 py-0.5 rounded-full">
+                    <Text className="text-[#DA5A5A] text-[10px] font-regular">
+                      {reportData.tag?.status === 'LOST' ? 'Missing' : 'Scanned'}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <Text className="text-[10px] text-[#757575] mb-2"> {pet?.age || 'Unknown'} years old • {pet.breed || 'Chưa rõ giống'}</Text>
+                <Text className="text-[10px] text-[#757575] mb-2"> {pet?.age || 'Unknown'} years old • {pet.breed || 'Chưa rõ giống'}</Text>
 
-              <View className='flex-row'>
-                <Image
-                  source={require('../assets/images/pen.png')}
-                  style={{ width: 8, height: 8 }}
-                  resizeMode="cover"
-                />
-                <TouchableOpacity>
-                  <Text className="text-[10px] text-[#8E8E93] font-regular underline"> Edit pet information</Text>
-                </TouchableOpacity>
-              </View>
+                <View className='flex-row'>
+                  <Image
+                    source={require('../assets/images/pen.png')}
+                    style={{ width: 8, height: 8 }}
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity>
+                    <Text className="text-[10px] text-[#8E8E93] font-regular underline"> Edit pet information</Text>
+                  </TouchableOpacity>
+                </View>
 
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Owner / Contact Information */}
+          {/* Owner / Contact Information */}
 
-        <View className="bg-white">
-          <Text className="text-[16px] font-semibold text-black leading-[16px] mb-[10px]">Owner Information</Text>
-          <View className="flex justify-center items-center mb-4">
-            <View className='bg-white border w-full border-[#E5E5E5] rounded-[16px] px-4 pt-[21px] pb-[23.15px]'>
-              <View className="mx-[15px]">
-                <View className="flex-row items-center pr-8 mb-6">
-                  <Image className='mr-3 top-1' source={require('../assets/icon/person-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
-                  <View className='flex-row border-b border-[#E5E5E5] w-full pt-2 pb-1 justify-between'>
-                    <Text className="text-black text-[14px] font-regular leading-[16px]">Owner Name</Text>
-                    <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{pet.owner.name}</Text>
+          <View className="bg-white">
+            <Text className="text-[16px] font-semibold text-black leading-[16px] mb-[10px]">Owner Information</Text>
+            <View className="flex justify-center items-center mb-4">
+              <View className='bg-white border w-full border-[#E5E5E5] rounded-[16px] px-4 pt-[21px] pb-[23.15px]'>
+                <View className="mx-[15px]">
+                  <View className="flex-row items-center pr-8 mb-6">
+                    <Image className='mr-3 top-1' source={require('../assets/icon/person-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
+                    <View className='flex-row border-b border-[#E5E5E5] w-full pt-2 pb-1 justify-between'>
+                      <Text className="text-black text-[14px] font-regular leading-[16px]">Owner Name</Text>
+                      <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{pet.owner.name}</Text>
+                    </View>
                   </View>
-                </View>
 
-                <View className="flex-row items-center pr-8 mb-6">
-                  <Image className='mr-3 top-1' source={require('../assets/icon/phone-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
-                  <View className='flex-row border-b border-[#E5E5E5] w-full pt-2 pb-1 justify-between'>
-                    <Text className="text-black text-[14px] font-regular leading-[16px]">Phone Number</Text>
-                    <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{pet.owner.phone}</Text>
+                  <View className="flex-row items-center pr-8 mb-6">
+                    <Image className='mr-3 top-1' source={require('../assets/icon/phone-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
+                    <View className='flex-row border-b border-[#E5E5E5] w-full pt-2 pb-1 justify-between'>
+                      <Text className="text-black text-[14px] font-regular leading-[16px]">Phone Number</Text>
+                      <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{pet.owner.phone}</Text>
+                    </View>
                   </View>
-                </View>
 
-                <View className="flex-row items-center pr-8 mb-4">
-                  <Image className='mr-4 top-1' source={require('../assets/icon/location-gray.png')} style={{ width: 11, height: 15 }} resizeMode="cover" />
-                  <View className='flex-row border-b border-[#E5E5E5] w-full pt-2 pb-1 justify-between'>
-                    <Text className="text-black text-[14px] font-regular leading-[16px]">Address</Text>
-                    <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{pet.owner.address || 'Address not provided'}</Text>
+                  <View className="flex-row items-center pr-8 mb-4">
+                    <Image className='mr-4 top-1' source={require('../assets/icon/location-gray.png')} style={{ width: 11, height: 15 }} resizeMode="cover" />
+                    <View className='flex-row border-b border-[#E5E5E5] w-full pt-2 pb-1 justify-between'>
+                      <Text className="text-black text-[14px] font-regular leading-[16px]">Address</Text>
+                      <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{pet.owner.address || 'Address not provided'}</Text>
+                    </View>
                   </View>
-                </View>
 
+                </View>
+              </View>
+              <View className="flex items-center w-4/5 bg-[#FAFAFA] px-2.5 rounded-full border border-[#D9D9D9] bottom-5">
+                <Text className="text-[#757575] text-[14px] font-regular leading-[20px] py-[6px]">
+                  "Please contact me ASAP"
+                </Text>
               </View>
             </View>
-            <View className="flex items-center w-4/5 bg-[#FAFAFA] px-2.5 rounded-full border border-[#D9D9D9] bottom-5">
-              <Text className="text-[#757575] text-[14px] font-regular leading-[20px] py-[6px]">
-                "Please contact me ASAP"
-              </Text>
-            </View>
           </View>
-        </View>
 
-        {/* Scan Activities */}
-        <Text className="text-[16px] font-semibold text-black mb-4">Scan Activity</Text>
-        <View className="ml-1">
-          {/* Mảng data giả lập theo design. Sau này bạn thay bằng res.data.activities */}
-          {[
-            {
-              id: '1',
-              type: 'SCAN',
-              title: 'Tag Scanned by Janet Doe',
-              time: '12:45 PM at 03/01/2026',
-              location: 'Near Happy Land Park, District 7, HCM',
-              contactName: 'Janet Doe',
-              contactPhone: '0123456789',
-            },
-            {
-              id: '2',
-              type: 'LOCATION',
-              title: 'Location Shared by Janet Doe',
-              time: '12:45 PM at 03/01/2026',
-              location: 'Happy Land Park, District 7, HCM',
-              note: 'Luna is with me, safe and sound.',
-              contactName: 'Janet Doe',
-              contactPhone: '0123456789',
-            },
-            {
-              id: '3',
-              type: 'REPORT',
-              title: `Luna reported as lost by ${pet.owner?.name || 'Sarah'}`,
-              time: '12:45 PM at 03/01/2026',
-              location: 'Happy Land Park, District 7, HCM',
-            }
-          ].map((activity, index, array) => (
-            <TimelineItem
-              key={activity.id}
-              item={activity as ActivityProp}
-              isLast={index === array.length - 1}
-            />
-          ))}
-        </View>
+          {/* Scan Activities */}
+          <Text className="text-[16px] font-semibold text-black mb-4">Scan Activity</Text>
+          <View className="ml-1">
+            {/* Mảng data giả lập theo design. Sau này bạn thay bằng res.data.activities */}
+            {[
+              {
+                id: '1',
+                type: 'SCAN',
+                title: 'Tag Scanned by Janet Doe',
+                time: '12:45 PM at 03/01/2026',
+                location: 'Near Happy Land Park, District 7, HCM',
+                contactName: 'Janet Doe',
+                contactPhone: '0123456789',
+              },
+              {
+                id: '2',
+                type: 'LOCATION',
+                title: 'Location Shared by Janet Doe',
+                time: '12:45 PM at 03/01/2026',
+                location: 'Happy Land Park, District 7, HCM',
+                note: 'Luna is with me, safe and sound.',
+                contactName: 'Janet Doe',
+                contactPhone: '0123456789',
+              },
+              {
+                id: '3',
+                type: 'REPORT',
+                title: `Luna reported as lost by ${pet.owner?.name || 'Sarah'}`,
+                time: '12:45 PM at 03/01/2026',
+                location: 'Happy Land Park, District 7, HCM',
+              }
+            ].map((activity, index, array) => (
+              <TimelineItem
+                key={activity.id}
+                item={activity as ActivityProp}
+                isLast={index === array.length - 1}
+              />
+            ))}
+          </View>
 
-        <TouchableOpacity className='items-center justify-center border border-[#E89B5A] bg-[#E89B5A] py-4 rounded-[16px]'>
-          <Text className='font-semibold text-[16px] text-[#FFFF]'>Mark {pet.name} as Found</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity className='items-center justify-center border border-[#E89B5A] bg-[#E89B5A] py-4 rounded-[16px]'>
+            <Text className='font-semibold text-[16px] text-[#FFFF]'>Mark {pet.name} as Found</Text>
+          </TouchableOpacity>
+        </BottomSheetScrollView>
+      </BottomSheet>
     </View>
   );
 }
