@@ -3,29 +3,29 @@ import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 // Đã tạm tắt hook useInfiniteSlider để khắc phục lỗi liệt cảm ứng do re-render loop
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
-import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { BlurView } from 'expo-blur';
-import SearchOverlay from '@/components/SearchOverlay';
 
 // Sử dụng components chuẩn của React Native để NativeWind (Tailwind) nhận diện được className
-import { ActivityIndicator, Dimensions, FlatList, Image, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 
 import Animated, {
     Easing,
     Extrapolation,
     interpolate,
+    runOnJS,
     useAnimatedScrollHandler,
     useAnimatedStyle,
     useSharedValue,
     withDelay,
     withRepeat,
     withSequence,
-    withTiming,
-    runOnJS
+    withTiming
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axiosClient from '../../api/axiosClient';
@@ -35,6 +35,9 @@ import { petService } from '../../services/petService';
 import { shelterService } from '../../services/shelterService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// BlurHash để ảnh hiển thị mượt mà trong lúc load (UX chuẩn chỉnh)
+const BLUR_HASH = 'LKN]~^%2_NoLDRj[ayj[@~oLASay';
 
 const CATEGORIES = [
     { id: 1, label: 'Training', icon: require('../../assets/images/training-icon.png') },
@@ -92,31 +95,16 @@ export default function HomeScreen() {
 
     const baseLayerAnimatedStyle = useAnimatedStyle(() => {
         return {
-            // Khi thanh search mở (searchOpacity = 1), lớp nền sẽ mờ dần về 0
             opacity: interpolate(searchOpacity.value, [0, 1], [1, 0], Extrapolation.CLAMP),
-            // Tuỳ chọn: Cho lớp nền hơi chìm xuống (scale nhỏ lại) để tạo chiều sâu
             transform: [{ scale: interpolate(searchOpacity.value, [0, 1], [1, 0.95], Extrapolation.CLAMP) }]
         };
     });
 
     const debouncedSearchQuery = useDebounce(searchText, 500);
 
-    const searchBodyAnimatedStyle = useAnimatedStyle(() => {
-        return {
-            opacity: searchOpacity.value, // Dùng chung biến opacity của thanh search
-            transform: [
-                {
-                    // Hiệu ứng trượt nhẹ từ dưới lên (20px -> 0px)
-                    translateY: interpolate(searchOpacity.value, [0, 1], [20, 0])
-                }
-            ],
-        };
-    });
-
     const openSearch = () => {
         setIsSearchVisible(true);
         searchOpacity.value = withTiming(1, { duration: 200 });
-        // Mở rộng ra bằng chiều rộng màn hình trừ đi padding 2 bên (24px * 2)
         searchWidth.value = withTiming(SCREEN_WIDTH - 48, { duration: 300, easing: Easing.out(Easing.ease) }, (isFinished) => {
             if (isFinished) {
                 runOnJS(focusInput)();
@@ -126,7 +114,7 @@ export default function HomeScreen() {
 
     const closeSearch = () => {
         setSearchText('');
-        searchInputRef.current?.blur(); // Tắt bàn phím trước khi thu hẹp
+        searchInputRef.current?.blur();
         searchWidth.value = withTiming(40, { duration: 300, easing: Easing.inOut(Easing.ease) });
         searchOpacity.value = withTiming(0, { duration: 300 }, (isFinished) => {
             if (isFinished) {
@@ -136,12 +124,8 @@ export default function HomeScreen() {
     };
 
     const inlineSearchAnimatedStyle = useAnimatedStyle(() => {
-        return {
-            width: searchWidth.value,
-            opacity: searchOpacity.value,
-        };
+        return { width: searchWidth.value, opacity: searchOpacity.value };
     });
-
 
     const focusInput = useCallback(() => {
         searchInputRef.current?.focus();
@@ -164,10 +148,10 @@ export default function HomeScreen() {
     });
 
     const textContainerAnimatedStyle = useAnimatedStyle(() => {
-        const translateY = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, 38], Extrapolation.CLAMP);
-        const translateX = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, 50], Extrapolation.CLAMP);
-        const scale = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [1, 0.9], Extrapolation.CLAMP);
-        return { transform: [{ translateY }, { translateX }, { scale }] };
+        const ty = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, 38], Extrapolation.CLAMP);
+        const tx = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, 50], Extrapolation.CLAMP);
+        const s = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [1, 0.9], Extrapolation.CLAMP);
+        return { transform: [{ translateY: ty }, { translateX: tx }, { scale: s }] };
     });
 
     const subtitleAnimatedStyle = useAnimatedStyle(() => {
@@ -178,15 +162,9 @@ export default function HomeScreen() {
     });
 
     const backgroundImageAnimatedStyle = useAnimatedStyle(() => {
-        const translateY = interpolate(
-            scrollY.value,
-            [0, SCROLL_DISTANCE],
-            [0, -132],
-            Extrapolation.CLAMP
-        );
+        const translateY = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, -132], Extrapolation.CLAMP);
         return { transform: [{ translateY }] };
     });
-
 
     useFocusEffect(
         useCallback(() => {
@@ -234,9 +212,7 @@ export default function HomeScreen() {
             const fetchedShelters = sheltersRes?.data?.data || sheltersRes?.data || sheltersRes || [];
             setShelters(Array.isArray(fetchedShelters) ? fetchedShelters : []);
         } catch (error: any) {
-            if (error?.response?.status === 401) {
-                setPets([]); setEvents([]); setShelters([]);
-            }
+            console.error("Lỗi data:", error);
         } finally {
             if (!isSilentRefresh) setIsLoading(false);
         }
@@ -244,13 +220,8 @@ export default function HomeScreen() {
 
     useEffect(() => {
         if (!isLocationLoaded) return;
-        const initLoad = async () => {
-            setIsLoading(true);
-            await loadHomeData(location?.lat, location?.lng);
-            setIsLoading(false);
-        };
-        initLoad();
-    }, [isLocationLoaded, location, errorMsg, user?.id]);
+        loadHomeData(location?.lat, location?.lng);
+    }, [isLocationLoaded, location]);
 
     useEffect(() => {
         rotation.value = withRepeat(
@@ -271,14 +242,8 @@ export default function HomeScreen() {
             )), -1, false);
     }, []);
 
-
     const cornerOverlayAnimatedStyle = useAnimatedStyle(() => {
-        const opacity = interpolate(
-            scrollY.value,
-            [SCROLL_DISTANCE * 0.3, SCROLL_DISTANCE],
-            [0, 1],
-            Extrapolation.CLAMP
-        );
+        const opacity = interpolate(scrollY.value, [SCROLL_DISTANCE * 0.3, SCROLL_DISTANCE], [0, 1], Extrapolation.CLAMP);
         return { opacity };
     });
 
@@ -289,7 +254,7 @@ export default function HomeScreen() {
     const renderPetItem = useCallback(({ item: pet }: { item: any }) => {
         const petImageUrl = (pet.images && pet.images.length > 0) ? pet.images[0]?.url : 'https://via.placeholder.com/200x300.png?text=No+Image';
         const fullAddress = pet.location || pet.shelter?.address;
-        let displayCity = 'Chưa cập nhật';
+        let displayCity = 'Nearby';
         if (fullAddress) {
             const addressParts = fullAddress.split(',');
             displayCity = addressParts[addressParts.length - 1].trim();
@@ -311,7 +276,14 @@ export default function HomeScreen() {
                 })}
             >
                 <View className="w-full h-full rounded-[24px] overflow-hidden relative">
-                    <Image source={{ uri: petImageUrl }} className="w-full h-full absolute" resizeMode="cover" />
+                    <Image 
+                        source={{ uri: petImageUrl }} 
+                        style={{ width: '100%', height: '100%', position: 'absolute' }} 
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        placeholder={BLUR_HASH}
+                        transition={300}
+                    />
                     <LinearGradient
                         colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.7)']}
                         locations={[0.1, 0.2, 1]}
@@ -345,12 +317,9 @@ export default function HomeScreen() {
 
     return (
         <View className="flex-1 bg-[#ffffff]  ">
-            {/* SỬA LỖI: Đổi keyboardShouldPersistTaps thành "handled" */}
             <Animated.ScrollView
                 showsVerticalScrollIndicator={false}
-                style={{
-                    flex: 1, zIndex: 1
-                }}
+                style={{ flex: 1, zIndex: 1 }}
                 contentContainerStyle={{ paddingBottom: 120 }}
                 onScroll={scrollHandler}
                 scrollEventThrottle={16}
@@ -369,10 +338,7 @@ export default function HomeScreen() {
                             <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/scan')}>
                                 <View
                                     className="relative p-[20px] rounded-[32px] flex-row items-center bg-white/50"
-                                    style={{
-                                        shadowColor: '#E89B5A5D', shadowOffset: { width: 0, height: 0 },
-                                        shadowOpacity: 0.6, shadowRadius: 5, elevation: 4,
-                                    }}
+                                    style={{ shadowColor: '#E89B5A5D', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 5, elevation: 4 }}
                                 >
                                     <LinearGradient
                                         colors={['#FFFFFF', '#FCF8ED']} locations={[0.3, 0.8]}
@@ -410,7 +376,7 @@ export default function HomeScreen() {
                                                 className="w-20 h-20 bg-white rounded-full items-center justify-center mb-3 border border-gray-50"
                                                 style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 2, elevation: 4 }}
                                             >
-                                                <Image source={cat.icon} className="w-11 h-11" />
+                                                <Image source={cat.icon} style={{ width: 44, height: 44 }} contentFit="contain" />
                                             </View>
                                             <Text className="text-gray-500 text-xs font-medium">{cat.label}</Text>
                                         </TouchableOpacity>
@@ -423,27 +389,23 @@ export default function HomeScreen() {
                         <View className="mt-[38px]">
                             <SectionHeader title="Pets Near You" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })} />
                             {pets.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có thú cưng nào gần đây</Text>
+                                <Text className="px-6 text-gray-400">Chưa có thú cưng nào gần đây</Text>
                             ) : (
                                 <FlatList
                                     horizontal
                                     showsHorizontalScrollIndicator={false}
                                     nestedScrollEnabled={true}
-                                    automaticallyAdjustContentInsets={false}
-                                    contentContainerStyle={{ paddingRight: 24, marginBottom: 5 }}
+                                    contentContainerStyle={{ paddingRight: 24 }}
                                     ListHeaderComponent={<View style={{ width: 24 }} />}
                                     data={pets}
                                     keyExtractor={(item, index) => item.fakeId ? item.fakeId : item.id.toString() + index}
                                     getItemLayout={getItemLayout}
                                     renderItem={renderPetItem}
                                     initialNumToRender={7}
-                                    maxToRenderPerBatch={5}
-                                    windowSize={7}
-                                    removeClippedSubviews={false}
-                                    decelerationRate="fast"
+                                    removeClippedSubviews={true}
                                     snapToInterval={140}
                                     snapToAlignment="start"
-                                    overScrollMode="never"
+                                    decelerationRate="fast"
                                 />
                             )}
                         </View>
@@ -452,7 +414,7 @@ export default function HomeScreen() {
                         <View className="mt-[38px]">
                             <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} />
                             {shelters.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
+                                <Text className="px-6 text-gray-400">Chưa có trạm cứu hộ nào</Text>
                             ) : (
                                 <ScrollView
                                     horizontal
@@ -465,13 +427,11 @@ export default function HomeScreen() {
                                             key={shelter.id}
                                             className="w-72 bg-white -ml-1 p-3 rounded-[20px] mb-3 mt-1 flex-row items-center active:opacity-70"
                                             style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 6 }}
-                                            onPress={() => router.push({ pathname: '/shelter-profile', params: { id: shelter.id, name: shelter.name, address: shelter.address || 'Đang cập nhật', image: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' } })}
+                                            onPress={() => router.push({ pathname: '/shelter-profile', params: { id: shelter.id } })}
                                         >
-                                            <Image source={{ uri: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' }} className="w-14 h-14 rounded-2xl bg-gray-200 mr-3" resizeMode="cover" />
-                                            <View className="flex-1">
-                                                <Text className="font-semibold text-gray-800 text-sm" numberOfLines={1}>
-                                                    {shelter.name}
-                                                </Text>
+                                            <Image source={{ uri: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' }} style={{ width: 56, height: 56, borderRadius: 16 }} contentFit="cover" cachePolicy="memory-disk" />
+                                            <View className="flex-1 ml-3">
+                                                <Text className="font-semibold text-gray-800 text-sm" numberOfLines={1}>{shelter.name}</Text>
                                                 <View className="flex-row items-center mt-2">
                                                     <Ionicons name="location-outline" size={12} color="#9CA3AF" />
                                                     <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>{shelter.address || 'Đang cập nhật'}</Text>
@@ -487,7 +447,7 @@ export default function HomeScreen() {
                         <View className="mt-[38px] mb-6">
                             <SectionHeader title="Upcoming Events" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })} />
                             {events.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có sự kiện nào sắp tới</Text>
+                                <Text className="px-6 text-gray-400">Chưa có sự kiện nào sắp tới</Text>
                             ) : (
                                 <ScrollView
                                     horizontal
@@ -500,13 +460,12 @@ export default function HomeScreen() {
                                         return (
                                             <TouchableOpacity
                                                 key={event.id}
-                                                className="w-[340px] h-[79px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98]"
+                                                className="w-[340px] h-[79px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98] overflow-hidden"
                                                 style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 6 }}
-                                                activeOpacity={0.85}
                                                 onPress={() => router.push(`/event-detail?id=${event.id}`)}
                                             >
-                                                <View className="flex-1 flex-row rounded-[20px] overflow-hidden">
-                                                    <Image source={{ uri: event.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} className="w-[98px] h-full bg-gray-100" resizeMode="cover" />
+                                                <View className="flex-1 flex-row">
+                                                    <Image source={{ uri: event.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1' }} style={{ width: 98, height: '100%' }} contentFit="cover" cachePolicy="memory-disk" />
                                                     <View className="flex-1 flex-row items-center pl-6 pr-4 py-3">
                                                         <View className="flex-1 justify-between h-full pr-2">
                                                             <View>
@@ -516,11 +475,13 @@ export default function HomeScreen() {
                                                                     <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>{event.locationName || event.address}</Text>
                                                                 </View>
                                                             </View>
+                                                            
+                                                            {/* --- PHẦN 3 AVATAR CON ĐÃ ĐƯỢC KHÔI PHỤC --- */}
                                                             <View className="flex-row mt-2 items-center">
                                                                 <View className="flex-row">
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=1' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 z-30" />
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=5' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-20" />
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=8' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-10" />
+                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=1' }} style={{ width: 15, height: 15, borderRadius: 7.5, borderWidth: 1.5, borderColor: 'white', backgroundColor: '#E5E7EB', zIndex: 30 }} cachePolicy="memory-disk" />
+                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=5' }} style={{ width: 15, height: 15, borderRadius: 7.5, borderWidth: 1.5, borderColor: 'white', backgroundColor: '#E5E7EB', marginLeft: -6, zIndex: 20 }} cachePolicy="memory-disk" />
+                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=8' }} style={{ width: 15, height: 15, borderRadius: 7.5, borderWidth: 1.5, borderColor: 'white', backgroundColor: '#E5E7EB', marginLeft: -6, zIndex: 10 }} cachePolicy="memory-disk" />
                                                                 </View>
                                                             </View>
                                                         </View>
@@ -538,186 +499,60 @@ export default function HomeScreen() {
                         </View>
                     </LinearGradient>
                 </View>
-
             </Animated.ScrollView>
 
-            {/* SỬA LỖI: Header được trả về thuộc tính an toàn nhất */}
+            {/* --- HEADER SECTION (Giữ nguyên 100% Animation của An) --- */}
             <Animated.View style={[headerAnimatedStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: '#FFDDA2', overflow: 'hidden' }]} pointerEvents="box-none">
-
-                <Animated.View
-                    pointerEvents="none"
-                    style={[
-                        { position: 'absolute', top: 0, left: 0, width: '100%', height: HEADER_MAX_HEIGHT },
-                        backgroundImageAnimatedStyle
-                    ]}
-                >
-                    <Image
-                        source={require('../../assets/images/home-tab.png')}
-                        style={{ width: '100%', height: '100%' }} // Sửa thành style nội tuyến
-                        resizeMode="cover"
-                    />
+                <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, width: '100%', height: HEADER_MAX_HEIGHT }, backgroundImageAnimatedStyle]}>
+                    <Image source={require('../../assets/images/home-tab.png')} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                 </Animated.View>
 
-                <Animated.View
-                    pointerEvents="none"
-                    style={[
-                        cornerOverlayAnimatedStyle,
-                        {
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: CURVE_HEIGHT + 14,
-                            borderBottomLeftRadius: 40,
-                            zIndex: 2,
-                            overflow: 'hidden', // Cực kỳ quan trọng để cắt gọt kính theo bo góc
-                            borderWidth: 2.5,
-                            borderColor: 'rgba(234, 164, 100, 0.5)',
-                        }
-                    ]}
-                >
-                    {/* Lớp 1: Kính mờ nguyên bản (KHÔNG cho màu vào đây) */}
-                    <BlurView
-                        tint="light"
-                        intensity={7}
-                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                    />
-
-                    {/* Lớp 2: Lớp phủ màu cam mờ đè lên trên tấm kính */}
-                    <View
-                        style={{
-                            position: 'absolute',
-                            top: 0, left: 0, right: 0, bottom: 0,
-                            backgroundColor: 'rgba(232, 155, 90, 0.15)'
-                        }}
-                    />
+                <Animated.View pointerEvents="none" style={[cornerOverlayAnimatedStyle, { position: 'absolute', top: 0, left: 0, right: 0, bottom: CURVE_HEIGHT + 14, borderBottomLeftRadius: 40, zIndex: 2, overflow: 'hidden', borderWidth: 2.5, borderColor: 'rgba(234, 164, 100, 0.5)' }]}>
+                    <BlurView tint="light" intensity={7} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+                    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(232, 155, 90, 0.15)' }} />
                 </Animated.View>
 
                 <View className="px-6 w-full h-full" pointerEvents="box-none" style={{ paddingTop: insets.top + 10, zIndex: 10 }}>
-                    <View className="relative flex-row justify-between content-center items-start z-20" pointerEvents="box-none">
+                    <View className="relative flex-row justify-between items-start z-20" pointerEvents="box-none">
+                        <Animated.View style={[baseLayerAnimatedStyle, { flex: 1, flexDirection: 'row', justifyContent: 'space-between' }]} pointerEvents={isSearchVisible ? "none" : "box-none"}>
+                            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/edit-profile')}>
+                                <Animated.View style={[avatarAnimatedStyle, { elevation: 8, zIndex: 50 }]}>
+                                    <View style={{ flex: 1, backgroundColor: '#ffedd5', overflow: 'hidden', borderWidth: 2.5, borderColor: '#FFFFFF', borderRadius: 1000 }}>
+                                        <Image source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150' }} style={{ width: '100%', height: '100%' }} cachePolicy="memory-disk" />
+                                    </View>
+                                </Animated.View>
+                            </TouchableOpacity>
 
-                        {/* LỚP NỀN: AVATAR VÀ CÁC NÚT (Sẽ bị đè khi Search Bar mở ra) */}
-                        <Animated.View
-                            style={[
-                                baseLayerAnimatedStyle,
-                                { flex: 1, flexDirection: 'row', justifyContent: 'space-between' }
-                            ]}
-                            pointerEvents={isSearchVisible ? "none" : "box-none"}
-                        >
-                            <View className="flex-row items-center flex-1" pointerEvents="box-none">
-                                <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/edit-profile')}>
-                                    <Animated.View style={[avatarAnimatedStyle, { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 8, zIndex: 50 }]}>
-                                        <View style={{ flex: 1, backgroundColor: '#ffedd5', overflow: 'hidden', borderWidth: 2.5, borderColor: '#FFFFFF', borderRadius: 1000 }}>
-                                            <Image source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }} className="w-full h-full" />
-                                        </View>
-                                    </Animated.View>
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* XOÁ class 'mt-2' ở View này để các nút không bị đẩy xuống */}
-                            <View className="flex-row gap-5 items-center" pointerEvents="box-none">
-                                <TouchableOpacity activeOpacity={0.7} onPress={openSearch} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-                                    <Feather name="search" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity activeOpacity={0.7} className="relative" onPress={() => router.push('/notifications')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-                                    <Ionicons name="notifications" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                            <View className="flex-row gap-5 items-center">
+                                <TouchableOpacity onPress={openSearch}><Feather name="search" size={26} color="white" /></TouchableOpacity>
+                                <TouchableOpacity className="relative" onPress={() => router.push('/notifications')}>
+                                    <Ionicons name="notifications" size={26} color="white" />
                                     {hasUnread && <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-[#E89B5A] rounded-full border border-white" />}
                                 </TouchableOpacity>
-
-                                <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/profile-settings')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-                                    <Feather name="menu" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => router.push('/profile-settings')}><Feather name="menu" size={26} color="white" /></TouchableOpacity>
                             </View>
                         </Animated.View>
 
-                        {/* LỚP ĐÈ: THANH SEARCH THỰC SỰ (Animated & Absolute) */}
-                        <Animated.View
-                            pointerEvents={isSearchVisible ? "auto" : "none"}
-                            style={[
-                                inlineSearchAnimatedStyle,
-                                {
-                                    position: 'absolute',
-                                    right: 0,
-                                    top: 0,
-                                    height: 44,
-                                    backgroundColor: 'rgba(255, 255, 255, 1)', // Đổi lên 1 (đục hoàn toàn) thay vì 0.95 để không lộ viền lớp nền
-                                    borderColor: '#EBEBEB',
-                                    borderRadius: 22,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    paddingHorizontal: 12,
-                                    zIndex: 100,
-                                    shadowColor: '#000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.1,
-                                    shadowRadius: 4,
-                                    elevation: 5,
-                                }
-                            ]}
-                        >
-                            <TouchableOpacity onPress={closeSearch} className="mr-2" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                <Feather name="arrow-right" size={20} color="#1F2937" />
-                            </TouchableOpacity>
-
+                        {/* THANH SEARCH BAR */}
+                        <Animated.View pointerEvents={isSearchVisible ? "auto" : "none"} style={[inlineSearchAnimatedStyle, { position: 'absolute', right: 0, top: 0, height: 44, backgroundColor: 'white', borderRadius: 22, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, zIndex: 100, elevation: 5 }]}>
+                            <TouchableOpacity onPress={closeSearch} className="mr-2"><Feather name="arrow-right" size={20} color="#1F2937" /></TouchableOpacity>
                             <Feather name="search" size={18} color="#8E8E93" />
-
-                            <TextInput
-                                ref={searchInputRef}
-                                style={{ flex: 1, fontSize: 15, color: '#1F2937', height: '100%' }}
-                                placeholder="Search pets, shelters, events..."
-                                placeholderTextColor="#9CA3AF"
-                                value={searchText}
-                                onChangeText={setSearchText}
-                                returnKeyType="search"
-                                onSubmitEditing={() => {
-                                    console.log("Searching for:", searchText);
-                                }}
-                            />
-
-                            {/* Nút Clear Text */}
+                            <TextInput ref={searchInputRef} style={{ flex: 1, fontSize: 15, color: '#1F2937', marginLeft: 8 }} placeholder="Search PawLife..." value={searchText} onChangeText={setSearchText} returnKeyType="search" />
                             {searchText.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearchText('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} className="mr-2">
-                                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => setSearchText('')}><Ionicons name="close-circle" size={18} color="#9CA3AF" /></TouchableOpacity>
                             )}
-
-                            {/* THÊM NÚT FILTER TỪ TỆP SEARCH.TSX */}
-                            <TouchableOpacity onPress={() => router.push('/filter-modal')} activeOpacity={0.6} className="p-1">
-                                <Ionicons name="options-outline" size={20} color="#8E8E93" />
-                            </TouchableOpacity>
-
+                            <TouchableOpacity onPress={() => router.push('/filter-modal')} className="p-1"><Ionicons name="options-outline" size={20} color="#8E8E93" /></TouchableOpacity>
                         </Animated.View>
-
                     </View>
 
-                    <Animated.View
-                        pointerEvents="none"
-                        style={[
-                            textContainerAnimatedStyle,
-                            { position: 'absolute', bottom: CURVE_HEIGHT + 83, left: 24, zIndex: 10 }
-                        ]}
-                        className={'-ml-1'}
-                    >
-                        <Text className="text-white font-semibold text-[20px] shadow-black/10" style={{ transformOrigin: 'left center' }}>
-                            Hello, {user?.name || 'Người dùng'}!
-                        </Text>
-                        <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium shadow-sm tracking-tight overflow-hidden">
-                            Let’s dive into your account
-                        </Animated.Text>
+                    <Animated.View pointerEvents="none" style={[textContainerAnimatedStyle, { position: 'absolute', bottom: CURVE_HEIGHT + 83, left: 24, zIndex: 10 }]}>
+                        <Text className="text-white font-semibold text-[20px]">Hello, {user?.name || 'An'}!</Text>
+                        <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium tracking-tight overflow-hidden">Let’s dive into your account</Animated.Text>
                     </Animated.View>
                 </View>
 
-                <View
-                    className="absolute bottom-0 w-full bg-[#FEFBF5] rounded-t-[60px]"
-                    style={{ height: CURVE_HEIGHT - 5, zIndex: 0 }}
-                    pointerEvents="none"
-                />
+                <View className="absolute bottom-0 w-full bg-[#FEFBF5] rounded-t-[60px]" style={{ height: CURVE_HEIGHT - 5 }} pointerEvents="none" />
             </Animated.View>
-            {/* <SearchOverlay
-                visible={isSearchVisible}
-                onClose={() => setIsSearchVisible(false)}
-            /> */}
         </View>
     );
 }
