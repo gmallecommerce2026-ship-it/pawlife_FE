@@ -32,7 +32,7 @@ const getIconByType = (type: string) => {
 // Tạo Animated Component cho Nút bấm
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-// --- Component Item với hiệu ứng Swipe Premium, Parallax & Border Masking ---
+// --- Component Item với UI gốc + Logic vuốt dứt khoát kích hoạt luôn ---
 const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPress: any, onDelete: any, onView: any }) => {
   const [dragXNode, setDragXNode] = useState<any>(null);
   const swipeableRef = useRef<Swipeable>(null);
@@ -44,24 +44,24 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
     }
   };
 
-  // Lắng nghe khoảng cách kéo để tự động kích hoạt hành động (Full Swipe)
+  // Lắng nghe thao tác kéo để kích hoạt ngay hành động của nút khi vuốt thẳng qua
   useEffect(() => {
     if (!dragXNode) return;
-    const listenerId = dragXNode.addListener(({ value }: { value: number }) => {
-      const threshold = 110; // Đã giảm xuống 110 để thao tác dứt khoát là kích hoạt ngay
+    const listenerId = dragXNode.addListener(({ value }) => {
+      const threshold = 120; // Ngưỡng vuốt dứt khoát (qua khấc 80px)
 
       if (value > threshold && !triggeredRef.current) {
-        // Full Swipe Right (Xem)
+        // Vuốt phải qua ngưỡng -> Kích hoạt ngay nút XEM
         triggeredRef.current = true;
-        onView(item);
+        onView(item); 
         swipeableRef.current?.close();
       } else if (value < -threshold && !triggeredRef.current) {
-        // Full Swipe Left (Xóa)
+        // Vuốt trái qua ngưỡng -> Kích hoạt ngay nút XÓA
         triggeredRef.current = true;
         onDelete(item);
         swipeableRef.current?.close();
       } else if (Math.abs(value) < 80) {
-        // Reset trạng thái nếu nhả tay ở khấc hoặc kéo ngược lại
+        // Hủy trạng thái nếu người dùng nhả tay ở khấc
         triggeredRef.current = false;
       }
     });
@@ -88,7 +88,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
           }}
           style={{
             position: 'absolute', top: 0, bottom: 0, left: 0,
-            width: 1000, 
+            width: 1500, // Kéo dài width ra để che khoảng trắng khi vuốt mạnh
             backgroundColor: '#00761D',
             justifyContent: 'center',
             alignItems: 'flex-start',
@@ -122,7 +122,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
           }}
           style={{
             position: 'absolute', top: 0, bottom: 0, right: 0,
-            width: 1000, 
+            width: 1500, // Kéo dài width ra để che khoảng trắng khi vuốt mạnh
             backgroundColor: '#760000',
             justifyContent: 'center',
             alignItems: 'flex-end',
@@ -156,10 +156,10 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       ref={swipeableRef}
       renderLeftActions={renderLeftActions}
       renderRightActions={renderRightActions}
-      overshootLeft={true} 
-      overshootRight={true} 
-      friction={1} // Đã trả về 1 để vuốt nhẹ và mượt mà nhất
-      overshootFriction={1} // Không tạo lực ghì khi cố tình kéo dài
+      overshootLeft={true} // Bật để kéo vượt qua khấc
+      overshootRight={true} // Bật để kéo vượt qua khấc
+      friction={1} // Lực cản = 1: Vuốt mượt 1:1 theo ngón tay, không bị chậm
+      overshootFriction={1} // Triệt tiêu "bức tường vô hình" khi gạt mạnh
     >
       <View style={{ position: 'relative' }}>
         <Animated.View
@@ -324,9 +324,7 @@ export default function NotificationsScreen() {
         if (!item.id) return;
         router.push({
           pathname: '/tag-report-detail',
-          params: {
-            reportId: item.referenceId
-          }
+          params: { reportId: item.referenceId }
         });
         break;
       case 'TAG':
