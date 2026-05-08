@@ -16,19 +16,19 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.annguyen.pawlife",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDSiggtEz29dOMLPbALCl4YBAvxJTWKgAU"
+      },
       "infoPlist": {
         "SKAdNetworkItems": [
-          {
-            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
-          },
-          {
-            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
-          }
+          { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
+          { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" }
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Ứng dụng cần quyền truy cập Camera để quét mã QR và tìm kiếm thú cưng bị thất lạc.",
         "NSPhotoLibraryUsageDescription": "Ứng dụng cần quyền truy cập thư viện ảnh để cập nhật ảnh đại diện và hồ sơ thú cưng.",
-        "LSApplicationQueriesSchemes": ["zalo"]
+        "LSApplicationQueriesSchemes": ["zalo"],
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần quyền vị trí để gửi tọa độ giúp chủ nhân tìm lại thú cưng bị lạc." 
       }
     },
     "android": {
@@ -42,7 +42,9 @@
       "permissions": [
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
       ]
     },
     "web": {

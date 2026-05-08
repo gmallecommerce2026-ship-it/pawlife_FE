@@ -12,7 +12,6 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import FloatingHomeButton from '../components/FloatingHomeButton';
 import './global.css';
 // Import thư viện bảo mật
 import { connectSocket, socket } from '@/utils/socket';
@@ -177,10 +176,6 @@ function RootLayoutNavGuard() {
     }
   }, [isAuthenticated, isLoading, segments, hasSeenIntro]);
 
-  const isSignInScreen = inSignInScreen;
-  const isHomeScreen = segments[0] === '(tabs)' && (segments.length === 1 || segments[1] === 'index');
-  const isIntroScreen = segments[0] === 'intro';
-  const shouldHideFloatingButton = isSignInScreen || isHomeScreen || isIntroScreen;
   
   // Render Màn Hình Khóa nếu hết hạn 1 tiếng
   if (isAppLocked) {
@@ -206,7 +201,6 @@ function RootLayoutNavGuard() {
   return (
     <>
       <RootLayoutNav />
-      {!shouldHideFloatingButton && <FloatingHomeButton />}
     </>
   );
 }

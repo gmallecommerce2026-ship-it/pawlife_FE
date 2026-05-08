@@ -6,12 +6,11 @@ import {
   AlertTriangle, Calendar, ChevronLeft,
   Eye,
   Info, Lock,
-  Share2,
   ShieldCheck, Sparkles,
   Trash2
 } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Animated, Modal, RefreshControl, SectionList, TouchableOpacity, TouchableWithoutFeedback, View, Image } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Image, Modal, RefreshControl, SectionList, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient';
@@ -36,12 +35,39 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 // --- Component Item với hiệu ứng Swipe Premium, Parallax & Border Masking ---
 const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPress: any, onDelete: any, onView: any }) => {
   const [dragXNode, setDragXNode] = useState<any>(null);
+  const swipeableRef = useRef<Swipeable>(null);
+  const triggeredRef = useRef(false);
 
   const captureDragX = (dragX: any) => {
     if (!dragXNode) {
       setTimeout(() => setDragXNode(dragX), 0);
     }
   };
+
+  // Lắng nghe khoảng cách kéo để tự động kích hoạt hành động (Full Swipe)
+  useEffect(() => {
+    if (!dragXNode) return;
+    const listenerId = dragXNode.addListener(({ value }: { value: number }) => {
+      const threshold = 110; // Đã giảm xuống 110 để thao tác dứt khoát là kích hoạt ngay
+
+      if (value > threshold && !triggeredRef.current) {
+        // Full Swipe Right (Xem)
+        triggeredRef.current = true;
+        onView(item);
+        swipeableRef.current?.close();
+      } else if (value < -threshold && !triggeredRef.current) {
+        // Full Swipe Left (Xóa)
+        triggeredRef.current = true;
+        onDelete(item);
+        swipeableRef.current?.close();
+      } else if (Math.abs(value) < 80) {
+        // Reset trạng thái nếu nhả tay ở khấc hoặc kéo ngược lại
+        triggeredRef.current = false;
+      }
+    });
+
+    return () => dragXNode.removeListener(listenerId);
+  }, [dragXNode, item, onView, onDelete]);
 
   // NÚT XEM (XANH LÁ)
   const renderLeftActions = (progress: any, dragX: any) => {
@@ -56,10 +82,13 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       <View style={{ width: 80, overflow: 'visible' }}>
         <AnimatedTouchableOpacity
           activeOpacity={0.8}
-          onPress={() => onView(item)}
+          onPress={() => {
+            onView(item);
+            swipeableRef.current?.close();
+          }}
           style={{
             position: 'absolute', top: 0, bottom: 0, left: 0,
-            width: 150,
+            width: 1000, 
             backgroundColor: '#00761D',
             justifyContent: 'center',
             alignItems: 'flex-start',
@@ -87,10 +116,13 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       <View style={{ width: 80, overflow: 'visible' }}>
         <AnimatedTouchableOpacity
           activeOpacity={0.8}
-          onPress={() => onDelete(item)}
+          onPress={() => {
+            onDelete(item);
+            swipeableRef.current?.close();
+          }}
           style={{
             position: 'absolute', top: 0, bottom: 0, right: 0,
-            width: 150,
+            width: 1000, 
             backgroundColor: '#760000',
             justifyContent: 'center',
             alignItems: 'flex-end',
@@ -121,11 +153,13 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
 
   return (
     <Swipeable
+      ref={swipeableRef}
       renderLeftActions={renderLeftActions}
       renderRightActions={renderRightActions}
-      overshootLeft={false}
-      overshootRight={false}
-      friction={1.5}
+      overshootLeft={true} 
+      overshootRight={true} 
+      friction={1} // Đã trả về 1 để vuốt nhẹ và mượt mà nhất
+      overshootFriction={1} // Không tạo lực ghì khi cố tình kéo dài
     >
       <View style={{ position: 'relative' }}>
         <Animated.View
@@ -260,7 +294,6 @@ export default function NotificationsScreen() {
   };
 
   const handlePressItem = async (item: any) => {
-    // 1. Mark as read in state and API
     if (!item.isRead) {
       axiosClient.patch(`/notifications/${item.id}/read`).catch(console.error);
       setSections(prevSections => prevSections.map(section => ({
@@ -273,8 +306,6 @@ export default function NotificationsScreen() {
       setPopupConfig({ visible: true, title, message, type, buttonText });
     };
 
-    // 2. CHECK FOR TRANSFER OWNERSHIP NOTIFICATION FIRST
-    // Determine if this is a transfer request based on title content and having a referenceId (petId)
     const isTransferNotification =
       item.title?.toLowerCase().includes('yêu cầu chuyển nhượng') ||
       item.title?.toLowerCase().includes('transfer ownership') ||
@@ -285,10 +316,9 @@ export default function NotificationsScreen() {
         pathname: '/transfer-ownership',
         params: { petId: item.referenceId }
       });
-      return; // Exit function so it doesn't show the popup below
+      return; 
     }
 
-    // 3. Normal switch case for other notification types
     switch (item.type) {
       case 'TAG_SCANNED':
         if (!item.id) return;
