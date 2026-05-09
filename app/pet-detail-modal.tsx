@@ -210,10 +210,10 @@ export default function PetDetailModal() {
                 className="w-[45px] h-[45px] rounded-full border border-gray-200 overflow-hidden items-center justify-center bg-white shadow-sm shadow-gray-100"
               />
               <View className="flex-1 mr-2 ml-3">
-                <Text className="text-[16px] font-semibold text-black" numberOfLines={1}>
+                <Text className="text-[14px] font-medium text-black mb-[6px]" numberOfLines={1}>
                   {pet?.shelter?.name || 'Pawlife Shelter'}
                 </Text>
-                <Text className="text-[13px] text-[#8E8E93] mt-[2px]" numberOfLines={1}>
+                <Text className="text-[12px] text-[#8E8E93]" numberOfLines={1}>
                   {pet?.shelter?.address || 'District 7, HCM'}
                 </Text>
               </View>
@@ -259,7 +259,7 @@ export default function PetDetailModal() {
             {/* Description */}
             <View>
               <Text className="text-[16px] font-medium text-black mb-2">About {pet.name}</Text>
-              <Text className="text-[14px] text-[#8E8E93] leading-[22px] font-normal">
+              <Text className="text-[14px] text-[#8E8E93] leading-[22px] font-regular tracking-[0.06px]">
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam
               </Text>
               <View className="flex-row gap-2 mt-[6px]">
@@ -270,19 +270,19 @@ export default function PetDetailModal() {
             </View>
 
             {/* Behavior */}
-            <View className="mt-6 mb-2">
+            <View className="mt-6">
               <Text className="text-[16px] font-medium text-black mb-2">{pet.name}'s Behavior</Text>
               <View className="flex-row items-start mb-1">
                 <View className="flex-row items-center mr-2 mt-[2px]">
-                  <FontAwesome5 name="check" size={14} color="#77C852" />
-                  <Text className="ml-1.5 text-[14px] text-[#77C852]">Good with:</Text>
+                  <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                  <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">Good with:</Text>
                 </View>
                 <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
               </View>
               <View className="flex-row items-start">
                 <View className="flex-row items-center mr-2 mt-[2px]">
-                  <FontAwesome5 name="times" size={14} color="#FE7D66" />
-                  <Text className="ml-2.5 text-[14px] text-[#FE7D66]">Not suitable:</Text>
+                  <Image source={require('../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                  <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">Not suitable:</Text>
                 </View>
                 <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
               </View>
@@ -303,9 +303,9 @@ export default function PetDetailModal() {
                 <TouchableOpacity
                   onPress={toggleHistory}
                   activeOpacity={0.6}
-                  className="flex-row items-center bg-[#F2A465]/10 px-3 py-1.5 rounded-full"
+                  className="flex-row items-center px-3 py-1.5 rounded-full"
                 >
-                  <Text className="text-[13px] text-[#F2A465] font-bold mr-1">{showHistory ? 'Hide' : 'View'}</Text>
+                  <Text className="text-[13px] text-[#F2A465] font-medium mr-1">{showHistory ? 'Hide' : 'View'}</Text>
                   <Feather name={showHistory ? "chevron-up" : "chevron-down"} size={16} color="#F2A465" />
                 </TouchableOpacity>
               </View>

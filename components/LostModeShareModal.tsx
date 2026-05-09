@@ -30,7 +30,7 @@ const getMetersPerPixel = (latitude: number, zoom: number) => {
 };
 const getOptimalZoom = (radius: number, latitude: number, mapWidth: number) => {
   if (radius <= 5) return 15;
-  const targetDiameterPx = mapWidth * 0.7; 
+  const targetDiameterPx = mapWidth * 0.7;
   const targetMetersPerPx = (radius * 2) / targetDiameterPx;
   const zoom = Math.log2((156543.03392 * Math.cos((latitude * Math.PI) / 180)) / targetMetersPerPx);
   return Math.max(10, Math.min(16, zoom));
@@ -94,7 +94,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
       const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
 
       const currentLocation: any = await Promise.race([locationPromise, timeoutPromise]);
-      
+
       if (isMounted) {
         setLocation({
           latitude: currentLocation.coords.latitude,
@@ -127,7 +127,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
 
   const handleConfirm = () => {
     Keyboard.dismiss(); // Ẩn bàn phím trước khi xử lý
-    
+
     // Validate dữ liệu đầu vào bắt buộc
     if (!formData.phoneNumber.trim()) {
       Alert.alert("Thiếu thông tin", "Vui lòng nhập Số điện thoại để chủ thú cưng có thể liên hệ.");
@@ -143,7 +143,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
 
     setIsSubmitting(true);
     const locationData = { ...location, radius };
-    
+
     // Gọi callback, parent component (như Scan Screen) sẽ xử lý gọi API NestJS ở đây
     onConfirm(locationData, formData, false);
     setIsSubmitting(false);
@@ -157,7 +157,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
   const currentLat = location?.latitude || 21.028511;
   const currentLng = location?.longitude || 105.804817;
   const zoomLevel = 14;
-  
+
   const metersPerPx = getMetersPerPixel(currentLat, zoomLevel);
   const exactCircleSize = (radius / metersPerPx) * 2;
   return (
@@ -168,11 +168,11 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
       onRequestClose={onClose}
     >
       <TouchableWithoutFeedback onPress={onClose}>
-        <BlurView 
-          intensity={30} 
-          tint="dark" 
+        <BlurView
+          intensity={30}
+          tint="dark"
           className="flex-1 justify-center items-center bg-black/40 px-6">
-          
+
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             className="w-full items-center"
@@ -286,6 +286,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                           className="flex-1 text-[14px] text-[#1C1C1E] p-0 text-right"
                           value={formData.phoneNumber}
                           onChangeText={(t) => setFormData({ ...formData, phoneNumber: t })}
+                          style={{ fontFamily: "Urbanist" }}
                         />
                       </View>
                     </View>
@@ -301,31 +302,48 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                           className="flex-1 text-[14px] text-[#1C1C1E] p-0 text-right"
                           value={formData.scannedBy}
                           onChangeText={(t) => setFormData({ ...formData, scannedBy: t })}
+                          style={{ fontFamily: "Urbanist" }}
                         />
                       </View>
                     </View>
 
                     {/* Message */}
-                    <View className='mt-1'>
-                      <View className="flex-row items-center pr-8 mt-2">
-                        <Image className='mr-3' source={require('../assets/icon/note-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
+                    <View className="flex-row items-center pr-8 mt-2">
+                      <Image className='mr-3' source={require('../assets/icon/note-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
+                      <View className='flex-row border-b border-gray-300 w-full pt-2 pb-1'>
                         <Text className="text-[14px] font-medium text-black">Notes</Text>
-                      </View>
-                      <View className='border-b border-gray-300 pb-1 ml-7'>
                         <TextInput
-                          placeholder="Leave a short note for owner"
+                          placeholder="Leave a short note"
                           placeholderTextColor="#9CA3AF"
                           className="flex-1 text-[14px] text-[#1C1C1E] p-0 text-right"
                           value={formData.message}
                           onChangeText={(t) => setFormData({ ...formData, message: t })}
+                          style={{ fontFamily: "Urbanist" }}
                         />
                       </View>
                     </View>
+
+
+                      <View className='mt-1'>
+                        <TouchableOpacity
+                          onPress={() => { }}
+                          activeOpacity={0.7}
+                          className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] items-center justify-center mt-1"
+                        >
+                          <View className="flex-row items-center justify-center py-5">
+                            <Image className='mr-3' source={require('../assets/icon/upload.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
+                            <Text className="text-[12px] text-black font-medium">
+                              Upload photos
+                            </Text>
+                          </View>
+
+                        </TouchableOpacity>
+                      </View>
                   </View>
 
                   {/* BUTTONS */}
                   <View className="px-5 mt-6 flex-row gap-3">
-                    <TouchableOpacity onPress={onClose} className="flex-1 rounded-[16px] border border-[#8E8E93] py-3.5 items-center">
+                    <TouchableOpacity onPress={onClose} className="flex-1 rounded-[16px] border border-[#E5E5E5] py-3.5 items-center">
                       <Text className="text-[#8E8E93] text-[14px] font-regular">Cancel</Text>
                     </TouchableOpacity>
 

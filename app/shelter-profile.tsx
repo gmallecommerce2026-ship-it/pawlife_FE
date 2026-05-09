@@ -468,11 +468,11 @@ export default function ShelterProfileScreen() {
                     <Text className="text-[14px] text-[#8E8E93]">Joined Jan 1, 2023</Text>
                   </View>
                   <View className="flex-row items-center gap-x-3">
-                    <Image
+                    {/* <Image
                       source={require('../assets/icon/real-tick.png')}
                       style={{ width: 13, height: 13 }}
                       resizeMode="cover"
-                    />
+                    /> */}
                     <Text className="text-[14px] text-[#8E8E93]">Verified Jan 1, 2023</Text>
                   </View>
                 </View>

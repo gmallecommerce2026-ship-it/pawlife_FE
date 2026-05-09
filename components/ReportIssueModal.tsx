@@ -89,14 +89,14 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                             <View className="bg-white rounded-[32px] overflow-hidden p-6 relative">
 
                                 <View className="relative items-center justify-center mb-[30px] pt-2">
-                                    <Text className="text-[18px] font-bold text-[#1C1C1E]">Report concern</Text>
+                                    <Text className="text-[20px] font-semibold text-[#1C1C1E]">Report concern</Text>
                                     <TouchableOpacity onPress={onClose} className="absolute right-0" style={{ padding: 4 }}>
                                         <Ionicons name="close" size={24} color="#8E8E93" />
                                     </TouchableOpacity>
                                 </View>
 
                                 <Text className="font-semibold mb-[15px] text-[16px]">
-                                    Why are you concerned? <Text className="text-[#EF4444]"> *</Text>
+                                    Why are you concerned?
                                 </Text>
 
                                 <View className="mx-4 gap-y-3 mb-[30px]">
@@ -132,26 +132,26 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                                     })}
                                 </View>
 
-                                <Text className="font-semibold mb-[15px] text-[16px]">Where did you see Princess?</Text>
+                                <Text className="font-semibold mb-[15px] text-[16px] tracking-[0.06px]">Where did you see Princess?</Text>
 
                                 <View className='mb-[30px] rounded-[16px] border border-[#E5E5E5]'>
-                                    <View className='flex-row border-b border-[#E5E5E5] py-3 px-2 mx-2 items-center'>
-                                        <Image source={require('../assets/icon/location-gray-icon.png')} style={{ width: 9, height: 11 }} resizeMode="cover" />
-                                        <Text className="text-[13px] font-medium text-[#8E8E93] px-1">Location</Text>
-                                        <TextInput placeholder="123 Street, District, City" placeholderTextColor="#9CA3AF" className="flex-1 text-[13px] text-[#1C1C1E] p-0 text-right" />
+                                    <View className='flex-row border-b border-[#E5E5E5] py-3 mx-4 items-center'>
+                                        <Image source={require('../assets/icon/location-gray-icon.png')} style={{ width: 9, height: 11 }} resizeMode="cover"  />
+                                        <Text className="text-[13px] font-medium text-[#8E8E93] px-2">Location</Text>
+                                        <TextInput placeholder="123 Street, District, City" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="flex-1 text-[13px] text-[#1C1C1E] p-0 text-right tracking-[0.06px]" />
                                     </View>
 
                                     {/* Mở Date Picker */}
-                                    <TouchableOpacity onPress={openDatePicker} className='flex-row border-b border-[#E5E5E5] py-3 px-2 mx-2 items-center'>
+                                    <TouchableOpacity onPress={openDatePicker} className='flex-row border-b border-[#E5E5E5] py-3 mx-4 items-center'>
                                         <Image source={require('../assets/icon/date-time-gray-icon.png')} style={{ width: 9, height: 9 }} resizeMode="cover" />
-                                        <Text className="text-[13px] font-medium text-[#8E8E93] px-1">Date & Time</Text>
+                                        <Text className="text-[13px] font-medium text-[#8E8E93] px-2">Date & Time</Text>
                                         <Text className="flex-1 text-[13px] text-[#1C1C1E] text-right">{formattedDate}</Text>
                                     </TouchableOpacity>
 
-                                    <View className='flex-row py-3 px-2 mx-2 items-center'>
+                                    <View className='flex-row py-3 mx-4 items-center'>
                                         <Image source={require('../assets/icon/note-gray.png')} style={{ width: 9, height: 9 }} resizeMode="cover" />
-                                        <Text className="text-[13px] font-medium text-[#8E8E93] px-1">Note (optional)</Text>
-                                        <TextInput placeholder="Tell us what happened" placeholderTextColor="#9CA3AF" className="flex-1 text-[13px] text-[#1C1C1E] p-0 text-right" />
+                                        <Text className="text-[13px] font-medium text-[#8E8E93] px-2">Note (optional)</Text>
+                                        <TextInput placeholder="Tell us what happened" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="font-regular flex-1 text-[12px] text-[#1C1C1E] p-0 text-right tracking-[0.06px]" />
                                     </View>
                                 </View>
 

@@ -93,23 +93,19 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
                     className={`${actionButtonClasses} w-14 h-14 border-[2px] border-blue-500 ${!canReload ? 'opacity-40' : 'opacity-100'}`}
                     onPress={() => onAction && onAction('reload')}
                 >
-                    <MaterialCommunityIcons name="reload" size={26} color="#3b82f6" />
+                    <Image className='mr-3' source={require('../../assets/icon/reload-pawdoption.png')} style={{ width: 18, height: 18 }} resizeMode="cover" />
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-red-500`} onPress={() => onAction && onAction('left')}>
-                    <Entypo name="cross" size={30} color="#ef4444" />
+                    <Image className='mr-3' source={require('../../assets/icon/x-pawdoption.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-orange-500`} onPress={() => onAction && onAction('heart')}>
-                    <Ionicons
-                        name={isFavorited ? "heart" : "heart-outline"}
-                        size={28} // Tăng lên 28 một chút vì form của Ionicons hơi nhỏ hơn AntDesign
-                        color="#ffa053"
-                    />
+                    <Image className='mr-3' source={require('../../assets/icon/heart-pawdoption.png')} style={{ width: 19, height: 17 }} resizeMode="cover" />
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-green-500`} onPress={() => onAction && onAction('right')}>
-                    <Ionicons name="checkmark" size={28} color="#22c55e" />
+                    <Image className='mr-3' source={require('../../assets/icon/tick-pawdoption.png')} style={{ width: 19, height: 13 }} resizeMode="cover" />
                 </TouchableOpacity>
 
             </View>
@@ -616,6 +612,30 @@ const TUTORIAL_DATA = [
         instruction: "Not this one",
         subInstruction: "",
         iconName: "arrow-left"
+    },
+    {
+        id: 'step2',
+        image: require('../../assets/images/t-right.jpg'),
+        forcedDir: 'right',
+        instruction: "Hmm... this one!",
+        subInstruction: "",
+        iconName: "arrow-right"
+    },
+    {
+        id: 'step3',
+        image: require('../../assets/images/t-top.jpg'),
+        forcedDir: 'up',
+        instruction: "What’s their story?",
+        subInstruction: "",
+        iconName: "arrow-up"
+    },
+    {
+        id: 'step4',
+        image: require('../../assets/images/t-center.jpg'),
+        forcedDir: 'heart',
+        instruction: "Maybe later, might be forever",
+        subInstruction: "",
+        iconName: "gesture-double-tap"
     }
 ];
 // Component tạo hiệu ứng vầng sáng mặt trời
@@ -1079,7 +1099,7 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                 <View className="flex-row items-center">
                     <Text className="text-3xl font-normal text-gray-900 tracking-tight">Pawdoption</Text>
                     <TouchableOpacity onPress={onBack} className="p-2 ml-1">
-                        <Ionicons name="options" size={20} color="#374151" />
+                        <Image className='mr-3' source={require('../../assets/icon/Sliders.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
                     </TouchableOpacity>
                 </View>
 

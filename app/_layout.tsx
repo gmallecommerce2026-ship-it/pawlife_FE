@@ -3,7 +3,7 @@
 import { AppProvider } from '@/contexts/AppContext';
 import { AuthContext, AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
-import { Urbanist_400Regular, Urbanist_400Regular_Italic, Urbanist_500Medium, Urbanist_600SemiBold, Urbanist_700Bold, useFonts } from '@expo-google-fonts/urbanist';
+import { Urbanist_400Regular, Urbanist_400Regular_Italic, Urbanist_500Medium, Urbanist_600SemiBold, Urbanist_700Bold, Urbanist_800ExtraBold, useFonts } from '@expo-google-fonts/urbanist';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -215,7 +215,8 @@ export default function RootLayout() {
     UrbanistMedium: Urbanist_500Medium,
     UrbanistSemiBold: Urbanist_600SemiBold,
     UrbanistBold: Urbanist_700Bold,
-    UrbanistItalic: Urbanist_400Regular_Italic
+    UrbanistItalic: Urbanist_400Regular_Italic,
+    UrbanistExtraBold: Urbanist_800ExtraBold,
   });
 
   useEffect(() => {

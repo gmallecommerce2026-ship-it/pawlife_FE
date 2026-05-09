@@ -204,7 +204,7 @@ export default function ScannedPetScreen() {
 
                 {isLost && (
                   <View className="absolute top-5 right-5 bg-[#E89B5A] px-4 py-1 rounded-full z-10">
-                    <Text className="text-white font-extrabold text-[12px] tracking-[0.5px] leading-5 uppercase">Lost</Text>
+                    <Text className="text-white font-extrabold text-[16px] tracking-[0.5px] leading-5 uppercase">Lost</Text>
                   </View>
                 )}
 
@@ -215,7 +215,7 @@ export default function ScannedPetScreen() {
                     {pet?.name.toLowerCase()}
                   </Text>
                   <Text
-                    className="text-white text-[12px] font-semibold text-center tracking-[0.5px]"
+                    className="text-white text-[14px] font-regular text-center tracking-[0.5px]"
                   >
                     {pet?.age || 'Unknown'} years old • {pet?.breed}
                   </Text>
@@ -255,19 +255,19 @@ export default function ScannedPetScreen() {
 
           {isLost && pet.owner ? (
             <View className="bg-white">
-              <Text className="text-[16px] font-semibold text-[#AB5C1A] my-[21px] leading-[16px]">Owner Information</Text>
+              <Text className="text-[18px] font-semibold text-[#AB5C1A] my-[21px]">Owner Information</Text>
               <View className="flex justify-center items-center mb-4">
                 <View className='bg-white border w-full border-[#E89B5A] rounded-[16px] px-4 pt-[21px] pb-[23.15px]'>
                   <View className="space-y-5 mx-4">
                     <View className="flex-row gap-4 pb-[12.15px]">
-                      <View className="justify-center mb-5">
+                      <View className="justify-center mb-5 bottom-1">
                         <Image
                           source={require('../../assets/icon/person.png')}
                           style={{ width: 16, height: 16 }}
                           resizeMode="cover"
                         />
                       </View>
-                      <View className="flex-1 justify-center -mx-1">
+                      <View className="flex-1 justify-center">
                         <Text className="text-[#AB5C1A] text-[16px] font-semibold leading-[16px] mb-[7px]">Owner Name</Text>
                         <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{pet.owner.name}</Text>
                       </View>
@@ -275,14 +275,14 @@ export default function ScannedPetScreen() {
 
                     {pet.owner.phone && (
                       <View className="flex-row gap-4 pb-[12.15px]">
-                        <View className="justify-center mb-5">
+                        <View className="justify-center mb-5 bottom-1">
                           <Image
                             source={require('../../assets/icon/phone.png')}
                             style={{ width: 16, height: 16 }}
                             resizeMode="cover"
                           />
                         </View>
-                        <View className="flex-1 justify-center -mx-1">
+                        <View className="flex-1 justify-center">
                           <Text className="text-[#AB5C1A] text-[16px] font-semibold  leading-[16px] mb-[7px]">Phone Number</Text>
                           <Text className="text-[#8E8E93] text-[14px] font-regular mt leading-[16px]">{pet.owner.phone}</Text>
                         </View>
@@ -290,7 +290,7 @@ export default function ScannedPetScreen() {
                     )}
 
                     <View className="flex-row gap-4 pb-[12.15px]">
-                      <View className="justify-center mb-5">
+                      <View className="justify-center mb-5 bottom-1">
                         <Image
                           source={require('../../assets/icon/address-marker.png')}
                           style={{ width: 18, height: 18 }}
@@ -373,6 +373,7 @@ export default function ScannedPetScreen() {
                       source={require('../../assets/icon/location-gray.png')}
                       style={{ width: 10, height: 14 }}
                       resizeMode="cover"
+                      className='bottom-[2px]'
                     />
                     <Text className="text-[#8E8E93] font-medium text-[16px] leading-5 ml-2">Share My Location</Text>
                   </TouchableOpacity>
