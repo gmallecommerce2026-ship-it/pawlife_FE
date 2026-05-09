@@ -15,7 +15,10 @@
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN": "pk.eyJ1... (DÁN CHÍNH XÁC TOKEN VÀO ĐÂY)"
+      }
     }
   },
   "submit": {

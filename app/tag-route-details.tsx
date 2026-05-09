@@ -18,19 +18,32 @@ import {
 import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const decodeGooglePolyline = (t: string, e = 5) => {
-    let n = 0, r = 0, o = 0, l = 0, i = 0, a = [];
-    let c = Math.pow(10, e || 5);
-    while (n < t.length) {
-        o = 0, i = 0;
-        do { i |= (31 & t.charCodeAt(n) - 63) << o, o += 5, n++ } while (t.charCodeAt(n - 1) >= 95);
-        r += 1 & i ? ~(i >> 1) : i >> 1, o = 0, i = 0;
-        do { i |= (31 & t.charCodeAt(n) - 63) << o, o += 5, n++ } while (t.charCodeAt(n - 1) >= 95);
-        l += 1 & i ? ~(i >> 1) : i >> 1;
-        a.push({ latitude: r / c, longitude: l / c });
-    }
-    return a;
+
+// Hàm giải mã Polyline của Google Maps
+const decodeGooglePolyline = (t: string) => {
+  let n = 0, r = 0, o = 0, l = 0, i = 0, a = [];
+  while (n < t.length) {
+    o = 0, i = 0;
+    do { i |= (31 & t.charCodeAt(n) - 63) << o, o += 5, n++ } while (t.charCodeAt(n - 1) >= 95);
+    r += 1 & i ? ~(i >> 1) : i >> 1, o = 0, i = 0;
+    do { i |= (31 & t.charCodeAt(n) - 63) << o, o += 5, n++ } while (t.charCodeAt(n - 1) >= 95);
+    l += 1 & i ? ~(i >> 1) : i >> 1;
+    a.push({ latitude: r / 1e5, longitude: l / 1e5 });
+  }
+  return a;
 };
+
+// Hàm hỗ trợ rút gọn địa chỉ từ Google Geocoding API
+const getShortAddress = (geoData: any) => {
+  if (geoData?.status === 'OK' && geoData.results?.[0]) {
+    const formatted = geoData.results[0].formatted_address;
+    const parts = formatted.split(', ');
+    // Lấy 2 thành phần đầu để có tên đường và phường/quận (VD: "123 Lê Lợi, Quận 1")
+    return parts.slice(0, 2).join(', ');
+  }
+  return null;
+};
+
 export default function TagRouteDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -51,7 +64,7 @@ export default function TagRouteDetailsScreen() {
   const [isFetchingRoute, setIsFetchingRoute] = useState(true);
   
   const [routeCoordinates, setRouteCoordinates] = useState<{latitude: number, longitude: number}[]>([]);
-  const [currentLoc, setCurrentLoc] = useState({ lat: targetLat, lng: targetLng }); // Khởi tạo bằng target để tránh map nhảy xa
+  const [currentLoc, setCurrentLoc] = useState({ lat: targetLat, lng: targetLng }); 
   const [realStats, setRealStats] = useState({ distance: '...', duration: 0 });
   const [addresses, setAddresses] = useState({ origin: 'Locating...', destination: 'Loading...' });
 
@@ -67,10 +80,8 @@ export default function TagRouteDetailsScreen() {
 
         if (status === 'granted') {
           try {
-            // 1. Lấy vị trí nhanh nhất có thể
             let location = await Location.getLastKnownPositionAsync();
             if (!location) {
-              // Dùng Balanced thay vì High cho lần đầu để load map nhanh hơn (giảm nghẽn)
               location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
             }
 
@@ -85,18 +96,21 @@ export default function TagRouteDetailsScreen() {
 
         if (!isMounted) return;
 
-        // 2. MỞ KHÓA UI NGAY LẬP TỨC: Cập nhật toạ độ và tắt màn hình chờ GPS
         setCurrentLoc({ lat: curLat, lng: curLng });
         setIsGpsReady(true); 
 
-        // 3. Gọi các API của Mapbox SONG SONG (Không block MapView)
-        const dirUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${curLng},${curLat};${targetLng},${targetLat}?geometries=geojson&access_token=${process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN}`;
-        const geoUrl = (lng: number, lat: number) => `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN}`;
+        const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY; 
+        if (!GOOGLE_API_KEY) {
+          console.warn("Thiếu EXPO_PUBLIC_GOOGLE_MAPS_API_KEY");
+        }
+
+        const dirUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${curLat},${curLng}&destination=${targetLat},${targetLng}&key=${GOOGLE_API_KEY}`;
+        const geoUrl = (lat: number, lng: number) => `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_API_KEY}`; // Thêm language=vi
 
         const [dirRes, oriRes, destRes] = await Promise.all([
           fetch(dirUrl).catch(() => null),
-          fetch(geoUrl(curLng, curLat)).catch(() => null),
-          fetch(geoUrl(targetLng, targetLat)).catch(() => null)
+          fetch(geoUrl(curLat, curLng)).catch(() => null),
+          fetch(geoUrl(targetLat, targetLng)).catch(() => null)
         ]);
 
         if (isMounted) {
@@ -106,38 +120,45 @@ export default function TagRouteDetailsScreen() {
             destRes ? destRes.json() : null
           ]);
 
-          // Xử lý Route
-          if (dirData?.routes?.[0]) {
+          // --- XỬ LÝ ĐƯỜNG ĐI & THÔNG SỐ ---
+          if (dirData?.status === 'OK' && dirData.routes?.[0]) {
             const route = dirData.routes[0];
-            const coords = route.geometry.coordinates.map((coord: any[]) => ({
-              latitude: parseFloat(coord[1]),
-              longitude: parseFloat(coord[0])
-            }));
-            setRouteCoordinates(coords);
+            const leg = route.legs[0];
+            
+            try {
+              const coords = decodeGooglePolyline(route.overview_polyline.points);
+              setRouteCoordinates(coords);
+            } catch (err) {
+              console.error("Lỗi giải mã Polyline:", err);
+            }
+            
             setRealStats({
-              distance: (route.distance / 1000).toFixed(1),
-              duration: Math.round(route.duration / 60)
+              distance: (leg.distance.value / 1000).toFixed(1),
+              duration: Math.round(leg.duration.value / 60)
             });
             
-            // Tự động zoom bản đồ để vừa cả vị trí user và điểm quét
             if (mapRef.current) {
-                mapRef.current.fitToCoordinates(
-                    [{ latitude: curLat, longitude: curLng }, { latitude: targetLat, longitude: targetLng }],
-                    { edgePadding: { top: 150, right: 50, bottom: 450, left: 50 }, animated: true }
+              // Delay nhỏ giúp map render xong mới fit tọa độ
+              setTimeout(() => {
+                mapRef.current?.fitToCoordinates(
+                  [{ latitude: curLat, longitude: curLng }, { latitude: targetLat, longitude: targetLng }],
+                  { edgePadding: { top: 150, right: 50, bottom: 450, left: 50 }, animated: true }
                 );
+              }, 500);
             }
+          } else {
+            console.warn("Google Directions API Error:", dirData?.status, dirData?.error_message);
           }
 
-          // Xử lý Addresses
+          // --- XỬ LÝ ĐỊA CHỈ TỐI ƯU HƠN ---
           setAddresses({
-            origin: oriData?.features?.[0]?.place_name?.split(',')[0] || 'Your Location',
-            destination: destData?.features?.[0]?.place_name?.split(',')[0] || 'Scanned Target'
+            origin: getShortAddress(oriData) || 'Your Location',
+            destination: getShortAddress(destData) || 'Scanned Point'
           });
 
           setIsFetchingRoute(false);
         }
 
-        // 4. Bật the dõi vị trí ngầm với độ chính xác cao khi mọi thứ đã load xong
         if (status === 'granted') {
           locationSubscription = await Location.watchPositionAsync(
             { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
@@ -245,7 +266,6 @@ export default function TagRouteDetailsScreen() {
       {/* --- MAP TƯƠNG TÁC --- */}
       <View className="flex-1 bg-[#F3F4F6] relative">
         
-        {/* Render MapView nhanh nhất có thể */}
         {isGpsReady && (
           <MapView
             ref={mapRef}
@@ -297,7 +317,6 @@ export default function TagRouteDetailsScreen() {
           </MapView>
         )}
 
-        {/* Chỉ che màn hình trong 0.5 - 1s đầu tiên để lấy GPS */}
         {!isGpsReady && (
           <View className="absolute inset-0 justify-center items-center bg-[#F3F4F6] z-10 pb-[20%]">
             <ActivityIndicator size="large" color="#3B82F6" />
