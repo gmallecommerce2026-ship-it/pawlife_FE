@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
+import Svg, { Rect } from 'react-native-svg';
 import {
   ActivityIndicator,
   Alert,
@@ -179,22 +180,24 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
           >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <View className="bg-white w-[90%] rounded-[30px] relative mt-8 border border-[#FF9C56]">
+                <View className="px-5 items-center mt-6 relative">
+                  <Text className="text-[18px] font-semibold text-black text-center leading-[22px] w-full z-10">Share My Location</Text>
+                </View>
                 {/* ICON HEADER */}
-                <View className="absolute -top-[35px] self-center w-[73px] h-[73px] z-20">
+                <View className="absolute -top-[35px] self-center w-[73px] h-[73px] -z-10">
                   <View className="absolute top-0 w-[73px] h-[36.5px] bg-white border-t-[1px] border-l-[1px] border-r-[1px] border-[#E89B5A] rounded-t-[40px]" />
                   <View className="absolute bottom-0 w-[73px] h-[36.6px] bg-white border-b-[1px] border-l-[1px] border-r-[1px] border-white rounded-b-[40px]" />
                   <View className="absolute inset-0 items-center justify-center">
                     <Image
+                      className='left-[1px] bottom-1'
                       source={require('../assets/icon/share-location-icon.png')}
-                      style={{ width: 30, height: 30 }}
+                      style={{ width: 31.5, height: 31.5 }}
                       resizeMode="cover"
                     />
                   </View>
                 </View>
 
-                <View className="px-5 items-center mt-10 relative">
-                  <Text className="text-[18px] font-semibold text-black text-center leading-[22px] w-full">Share My Location</Text>
-                </View>
+
 
                 <ScrollView
                   showsVerticalScrollIndicator={false}
@@ -324,21 +327,45 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                     </View>
 
 
-                      <View className='mt-1'>
-                        <TouchableOpacity
-                          onPress={() => { }}
-                          activeOpacity={0.7}
-                          className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] items-center justify-center mt-1"
-                        >
-                          <View className="flex-row items-center justify-center py-5">
-                            <Image className='mr-3' source={require('../assets/icon/upload.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
-                            <Text className="text-[12px] text-black font-medium">
-                              Upload photos
-                            </Text>
-                          </View>
+                    <View className='mt-1'>
+                      <TouchableOpacity
+                        onPress={() => { }}
+                        activeOpacity={0.7}
+                        // Xóa các class border cũ đi, thêm relative để chứa SVG
+                        className="bg-white rounded-[12px] items-center justify-center mt-1 relative overflow-hidden"
+                      >
+                        {/* --- BẮT ĐẦU: KHỐI SVG VẼ VIỀN NÉT ĐỨT --- */}
+                        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                          <Svg width="100%" height="100%">
+                            <Rect
+                              width="100%"
+                              height="100%"
+                              fill="none"
+                              stroke="#D1D5DB" // Màu viền
+                              strokeWidth={2}  // Độ dày của viền (tùy chỉnh)
+                              rx={16}          // Độ bo góc (phải khớp với rounded-[12px])
+                              // THẦN CHÚ NẰM Ở ĐÂY: [Chiều dài nét đứt, Khoảng cách gap]
+                              strokeDasharray="5, 5"
+                            />
+                          </Svg>
+                        </View>
+                        {/* --- KẾT THÚC --- */}
 
-                        </TouchableOpacity>
-                      </View>
+                        {/* Nội dung bên trong giữ nguyên */}
+                        <View className="flex-row items-center justify-center py-5">
+                          <Image
+                            className='mr-3'
+                            source={require('../assets/icon/upload.png')}
+                            style={{ width: 15, height: 15 }}
+                            resizeMode="cover"
+                          />
+                          <Text className="text-[12px] text-black font-medium">
+                            Upload photos
+                          </Text>
+                        </View>
+
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   {/* BUTTONS */}

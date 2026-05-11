@@ -163,6 +163,17 @@ export default function PetDetailModal() {
         snapPoints={snapPoints}
         backgroundStyle={{ backgroundColor: 'white', borderRadius: 30 }}
         handleIndicatorStyle={{ backgroundColor: '#E5E5EA', width: 48, height: 6 }}
+        style={{
+          // --- 🍎 DÀNH CHO iOS ---
+          shadowColor: '#000000',
+          shadowOffset: {
+            width: 0,
+            height: -10 // Y: -10 (Bóng đổ lên trên)
+          },
+          shadowOpacity: 0.25, // 25% Color opacity
+          shadowRadius: 10,    // Blur: 10
+          elevation: 10,
+        }}
       >
         <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
@@ -263,9 +274,9 @@ export default function PetDetailModal() {
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam
               </Text>
               <View className="flex-row gap-2 mt-[6px]">
-                <View className="bg-[#FFF4E8] px-3.5 py-0.5 rounded-full"><Text className="text-[#F3B27B] text-[12px] font-medium">Playful</Text></View>
-                <View className="bg-[#EBF4FE] px-3.5 py-0.5 rounded-full"><Text className="text-[#88B2F3] text-[12px] font-medium">Clingy</Text></View>
-                <View className="bg-[#EAF8EF] px-3.5 py-0.5 rounded-full"><Text className="text-[#8FD49D] text-[12px] font-medium">Friendly</Text></View>
+                <View className="bg-[#FFF4E8] px-3.5 py-0.5 rounded-full border border-[#E8A53C]/25"><Text className="text-[#E8A53C] text-[12px] font-medium">Playful</Text></View>
+                <View className="bg-[#EBF4FE] px-3.5 py-0.5 rounded-full border border-[#5A90DA]/25"><Text className="text-[#5A90DA] text-[12px] font-medium">Clingy</Text></View>
+                <View className="bg-[#EAF8EF] px-3.5 py-0.5 rounded-full border border-[#83DA5A]/25"><Text className="text-[#77C852] text-[12px] font-medium">Friendly</Text></View>
               </View>
             </View>
 
@@ -273,14 +284,14 @@ export default function PetDetailModal() {
             <View className="mt-6">
               <Text className="text-[16px] font-medium text-black mb-2">{pet.name}'s Behavior</Text>
               <View className="flex-row items-start mb-1">
-                <View className="flex-row items-center mr-2 mt-[2px]">
+                <View className="flex-row items-center mr-1 mt-[2px]">
                   <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                   <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">Good with:</Text>
                 </View>
                 <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
               </View>
               <View className="flex-row items-start">
-                <View className="flex-row items-center mr-2 mt-[2px]">
+                <View className="flex-row items-center mr-1 mt-[2px]">
                   <Image source={require('../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                   <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">Not suitable:</Text>
                 </View>

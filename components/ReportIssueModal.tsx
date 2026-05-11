@@ -89,7 +89,7 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                             <View className="bg-white rounded-[32px] overflow-hidden p-6 relative">
 
                                 <View className="relative items-center justify-center mb-[30px] pt-2">
-                                    <Text className="text-[20px] font-semibold text-[#1C1C1E]">Report concern</Text>
+                                    <Text className="text-[20px] font-semibold text-[#1C1C1E]">Report Concern</Text>
                                     <TouchableOpacity onPress={onClose} className="absolute right-0" style={{ padding: 4 }}>
                                         <Ionicons name="close" size={24} color="#8E8E93" />
                                     </TouchableOpacity>
@@ -111,7 +111,7 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                                                     <View className={`w-4 h-4 rounded-[4px] border-[1px] items-center justify-center ${isSelected ? 'bg-[#F2A465] border-[#F2A465]' : 'bg-white border-[#E5E5E5]'}`}>
                                                         {isSelected && <Ionicons name="checkmark" size={12} color="white" />}
                                                     </View>
-                                                    <Text className={`ml-3 text-[14px] ${isSelected ? 'font-bold text-[#1C1C1E]' : 'text-black font-regular'}`}>
+                                                    <Text className={`ml-3 text-[14px] text-black font-regular`}>
                                                         {option}
                                                     </Text>
                                                 </TouchableOpacity>
