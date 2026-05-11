@@ -45,6 +45,7 @@ const TimelineItem = ({ item, isLast }: { item: ActivityProp; isLast: boolean })
   const renderIcon = () => {
     switch (item.type) {
       case 'SCAN':
+        return <Image source={require('../assets/icon/scan.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />;
       case 'LOCATION':
         return <Image source={require('../assets/icon/location-gray-icon.png')} style={{ width: 13, height: 16 }} resizeMode="cover" />;
       case 'REPORT':
@@ -56,7 +57,7 @@ const TimelineItem = ({ item, isLast }: { item: ActivityProp; isLast: boolean })
 
   return (
     <View className="flex-row">
-      <View className="items-center mr-4 relative w-8">
+      <View className="items-center mr-4 relative">
         <View className="w-13 h-13 rounded-full bg-white items-center justify-center z-10 pt-1">
           {renderIcon()}
         </View>
@@ -66,19 +67,19 @@ const TimelineItem = ({ item, isLast }: { item: ActivityProp; isLast: boolean })
       <View className="flex-1 pb-6">
         <View className="flex-row justify-between items-start mb-1">
           <Text className="text-black text-[14px] font-medium flex-1 pr-2 leading-5">{item.title}</Text>
-          <Text className="text-[#8E8E93] font-regular text-[10px] mt-0.5">{item.time}</Text>
+          <Text className="text-[#8E8E93] font-regular text-[10px] mt-0.5 tracking-[0.06px]">{item.time}</Text>
         </View>
 
         {item.location && (
           <View className="flex-row items-start mt-1">
-            <Image source={require('../assets/icon/location-gray-icon.png')} style={{ width: 8, height: 10 }} resizeMode="cover" />
+            <Image className='top-[2px]' source={require('../assets/icon/location-gray-icon.png')} style={{ width: 8, height: 10 }} resizeMode="cover" />
             <Text className="text-[#8E8E93] text-[12px] ml-1 font-regular leading-5">{item.location}</Text>
           </View>
         )}
 
         {item.note && (
           <View className="flex-row items-start mt-1">
-            <Image source={require('../assets/icon/note-gray.png')} style={{ width: 9, height: 9 }} resizeMode="cover" />
+            <Image className='top-[3px]' source={require('../assets/icon/note-gray.png')} style={{ width: 9, height: 9 }} resizeMode="cover" />
             <Text className="text-[#8E8E93] text-[12px] ml-1 font-regular italic leading-5">{item.note}</Text>
           </View>
         )}
@@ -148,7 +149,7 @@ export default function TagReportDetailScreen() {
   const pet = reportData.tag?.pet || {};
   const owner = pet.owner || {};
   const petImage = pet.images?.[0]?.url || 'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=150&q=80';
-  
+
   // 3. Lấy scanHistory nếu bạn đã update Backend như hướng dẫn ở trên
   const scanHistory = reportData.scanHistory || [];
 
@@ -186,8 +187,8 @@ export default function TagReportDetailScreen() {
   const handlePinPress = () => {
     router.push({
       pathname: '/tag-route-details',
-      params: { 
-        targetLat: lat.toString(), 
+      params: {
+        targetLat: lat.toString(),
         targetLng: lng.toString(),
         // Truyền thêm dữ liệu động để hiển thị ở Bottom Card
         scannerName: reportData.scannedBy || 'Người ẩn danh',
@@ -256,7 +257,7 @@ export default function TagReportDetailScreen() {
               <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 6, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#DA5A5A' }} />
               <View className="h-1.5" />
               <View style={{ borderColor: '#DA5A5A', borderWidth: 2.5 }} className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm">
-                 <Ionicons name="scan-outline" size={20} color="#DA5A5A" />
+                <Ionicons name="scan-outline" size={20} color="#DA5A5A" />
               </View>
               <View style={{ width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#DA5A5A' }} />
             </View>
@@ -272,7 +273,7 @@ export default function TagReportDetailScreen() {
         handleIndicatorStyle={{ backgroundColor: '#E5E5EA', width: 48, height: 6 }}
       >
         <BottomSheetScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 24, paddingTop: 10 }}>
-          
+
           {/* Thông tin thú cưng */}
           <View className="flex-row items-center justify-between mb-6">
             <View className="flex-row items-center flex-1">
@@ -280,22 +281,31 @@ export default function TagReportDetailScreen() {
               <View>
                 <View className="flex-row items-center mb-2">
                   <Text className="text-xl font-bold text-black mr-2">{pet.name || 'Unknown Pet'}</Text>
-                  <View className="bg-[#FFE8E8] border border-[#DA5A5A]/25 px-2 py-0.5 rounded-full">
-                    <Text className="text-[#DA5A5A] text-[10px] font-regular">
+                  <View className="bg-[#FFE8E8] border border-[#DA5A5A]/25 px-[10px] py-1 rounded-full">
+                    <Text className="text-[#DA5A5A] text-[10px] leading-[10px] font-regular">
                       {reportData.tag?.status === 'LOST' ? 'Missing' : 'Scanned'}
                     </Text>
                   </View>
                 </View>
-                <Text className="text-[10px] text-[#757575] mb-2">{pet.age || '?'} years old • {pet.breed || 'Unknown breed'}</Text>
+                <Text className="text-[12px] text-[#757575] font-regular mb-2">{pet.age || '?'} years old • {pet.breed || 'Unknown breed'}</Text>
+                <TouchableOpacity onPress={() => { }}>
+                  <View className='flex-row items-center'>
+                    <Image className='bottom-1 mr-1' source={require('../assets/icon/pen.png')} style={{ width: 7, height: 8 }} resizeMode="cover" />
+                    <Text className="text-[10px] text-[#8E8E93] mb-2 underline tracking-[0.06px]">Edit pet information</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
+            <TouchableOpacity className='bottom-6'>
+              <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 18, height: 18 }} resizeMode="cover" />
+            </TouchableOpacity>
           </View>
-          
+
           {/* Thông tin Chủ (Owner) */}
           <View className="bg-white">
             <Text className="text-[16px] font-semibold text-black leading-[16px] mb-[10px]">Owner Information</Text>
             <View className="flex justify-center items-center mb-4">
-              <View className='bg-white border w-full border-[#E5E5E5] rounded-[16px] px-4 pt-[21px] pb-[23.15px]'>
+              <View className='bg-white border w-full border-[#E5E5E5] rounded-[16px] pt-[21px] pb-[23.15px]'>
                 <View className="mx-[15px]">
                   <View className="flex-row items-center pr-8 mb-6">
                     <Image className='mr-3 top-1' source={require('../assets/icon/person-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
@@ -321,6 +331,11 @@ export default function TagReportDetailScreen() {
                     </View>
                   </View>
                 </View>
+              </View>
+              <View className="flex items-center w-4/5 bg-[#FAFAFA] px-2.5 rounded-full border border-[#D9D9D9] bottom-5">
+                <Text className="text-[#757575] text-[12px] font-regular leading-[20px] py-[6px]">
+                  "Please contact me ASAP"
+                </Text>
               </View>
             </View>
           </View>

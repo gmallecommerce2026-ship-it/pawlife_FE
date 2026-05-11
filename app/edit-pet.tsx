@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { petService } from '../services/petService';
+import { useModalStore } from '@/store/useModalStore';
 
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 
@@ -43,16 +44,17 @@ interface EditPetFormData {
 export default function EditPetScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  
+  const showModal = useModalStore((state) => state.showModal);
+
   // Tách biệt hook upload cho 3 loại ảnh
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
   const { pickAndUploadImage: pickVaccine, isUploading: isUploadingVaccine } = useImageUpload();
   const { pickAndUploadImage: pickQR, isUploading: isUploadingQR } = useImageUpload();
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+
   const [formData, setFormData] = useState<EditPetFormData>({
     name: '',
     species: 'Dog',
@@ -88,7 +90,7 @@ export default function EditPetScreen() {
           microchip: data.microchipNumber || '',
           description: data.description || '',
           gender: (data.gender as GenderType) || 'UNKNOWN',
-          imageUrl: data.avatarUrl || data.images?.[0]?.url || '', 
+          imageUrl: data.avatarUrl || data.images?.[0]?.url || '',
           contactName: data.contactName || '',
           contactPhone: data.contactPhone || '',
           contactAddress: data.contactAddress || '',
@@ -129,7 +131,7 @@ export default function EditPetScreen() {
 
   const onDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
-    
+
     if (event.type === 'set' && selectedDate) {
       handleChange('dob', selectedDate.toISOString());
     } else if (event.type === 'dismissed') {
@@ -145,7 +147,7 @@ export default function EditPetScreen() {
 
     try {
       setIsSubmitting(true);
-      
+
       const payload: any = {
         name: formData.name,
         species: formData.species,
@@ -168,9 +170,14 @@ export default function EditPetScreen() {
       }
 
       await petService.updatePet(id as string, payload);
-      Alert.alert('Success', 'Pet profile updated successfully!', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+
+      showModal({
+        title: 'Success',
+        message: 'Pet profile updated successfully! ',
+        buttonText: 'Back',
+        onConfirm: () => router.back(),
+      });
+
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update pet. Please try again.');
     } finally {
@@ -189,310 +196,310 @@ export default function EditPetScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-          <View className="flex-1">
-            {/* Header */}
-            <View className="flex-row items-center justify-between px-5 py-4 bg-white z-10">
-              <TouchableOpacity 
-                onPress={() => router.back()} 
-                className="w-8 h-8 items-start justify-center"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        <View className="flex-1">
+          {/* Header */}
+          <View className="flex-row items-center justify-between px-5 py-4 bg-white z-10">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="w-8 h-8 items-start justify-center"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Feather name="chevron-left" size={24} color="#000000" />
+            </TouchableOpacity>
+            <Text className="text-[18px] font-semibold text-[#000000]">Edit Pet Profile</Text>
+            <View className="w-8" />
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 20 }}
+            className="flex-1"
+          >
+            {/* Avatar Section */}
+            <View className="items-center mt-6 mb-8">
+              <TouchableOpacity
+                onPress={handlePickAvatar}
+                disabled={isUploadingAvatar}
+                className="w-32 h-32 rounded-full bg-[#FAFAFA] border border-gray-200 items-center justify-center overflow-hidden shadow-sm"
               >
-                <Feather name="chevron-left" size={24} color="#000000" />
+                {isUploadingAvatar ? (
+                  <ActivityIndicator size="large" color="#EFA062" />
+                ) : formData.imageUrl ? (
+                  <Image
+                    source={{ uri: formData.imageUrl }}
+                    className="w-full h-full"
+                  />
+                ) : (
+                  <Feather name="camera" size={32} color="#9CA3AF" />
+                )}
               </TouchableOpacity>
-              <Text className="text-[18px] font-semibold text-[#000000]">Edit Pet Profile</Text>
-              <View className="w-8" />
             </View>
 
-            <ScrollView 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 20 }}
-              className="flex-1"
-            >
-              {/* Avatar Section */}
-              <View className="items-center mt-6 mb-8">
-                <TouchableOpacity 
-                    onPress={handlePickAvatar}
-                    disabled={isUploadingAvatar}
-                    className="w-32 h-32 rounded-full bg-[#FAFAFA] border border-gray-200 items-center justify-center overflow-hidden shadow-sm"
-                >
-                  {isUploadingAvatar ? (
-                    <ActivityIndicator size="large" color="#EFA062" />
-                  ) : formData.imageUrl ? (
-                    <Image 
-                      source={{ uri: formData.imageUrl }} 
-                      className="w-full h-full"
-                    />
-                  ) : (
-                    <Feather name="camera" size={32} color="#9CA3AF" />
-                  )}
-                </TouchableOpacity>
-              </View>
+            {/* Pet Information Section */}
+            <View className="mb-6">
+              <Text className="text-[16px] font-semibold text-black mb-3">Pet Information</Text>
 
-              {/* Pet Information Section */}
-              <View className="mb-6">
-                <Text className="text-[16px] font-semibold text-black mb-3">Pet Information</Text>
-                
-                <View className="bg-white p-6 rounded-[20px] border border-gray-200">
-                  {/* Name & Type Row */}
-                  <View className="flex-row gap-3 mb-4">
-                    <View className="flex-1">
-                      <Text className="text-[14px] text-black font-medium mb-1.5">Name</Text>
-                      <TextInput
-                        style={inputFontStyle}
-                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
-                        value={formData.name}
-                        onChangeText={(text) => handleChange('name', text)}
-                        placeholder="Enter pet name"
-                        placeholderTextColor="#A1A1AA"
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[14px] text-black font-medium mb-1.5">Type</Text>
-                      <TouchableOpacity 
-                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white"
-                        onPress={() => Alert.alert("Select Type", "Tính năng chọn Chó/Mèo đang được phát triển.")}
-                      >
-                        <Text className="text-black text-[14px]">
-                          {formData.species === 'Cat' ? 'Cat' : 'Dog'}
-                        </Text>
-                        <Feather name="chevron-down" size={16} color="#A1A1AA" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Gender & Breed Row */}
-                  <View className="flex-row gap-3 mb-4">
-                    <View className="flex-1">
-                      <Text className="text-[14px] text-black font-medium mb-1.5">Gender</Text>
-                      <TouchableOpacity className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white">
-                        <Text className="text-[#A1A1AA] text-[14px] capitalize">
-                          {formData.gender === 'UNKNOWN' ? 'Select' : formData.gender.toLowerCase()}
-                        </Text>
-                        <Feather name="chevron-down" size={16} color="#A1A1AA" />
-                      </TouchableOpacity>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[14px] text-black font-medium mb-1.5">Breed</Text>
-                      <TextInput
-                        style={inputFontStyle}
-                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
-                        value={formData.breed}
-                        onChangeText={(text) => handleChange('breed', text)}
-                        placeholder="e.g. Corgi"
-                        placeholderTextColor="#A1A1AA"
-                      />
-                    </View>
-                  </View>
-
-                  {/* Color & Weight Row */}
-                  <View className="flex-row gap-3 mb-4">
-                    <View className="flex-1">
-                      <Text className="text-[14px] text-black font-medium mb-1.5">Color</Text>
-                      <TextInput
-                        style={inputFontStyle}
-                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
-                        value={formData.color}
-                        onChangeText={(text) => handleChange('color', text)}
-                        placeholder="e.g. Brown"
-                        placeholderTextColor="#A1A1AA"
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[14px] text-black font-medium mb-1.5">Weight (kg)</Text>
-                      <TextInput
-                        style={inputFontStyle}
-                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
-                        value={formData.weight}
-                        onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
-                        keyboardType="decimal-pad"
-                        placeholder="0.0"
-                        placeholderTextColor="#A1A1AA"
-                      />
-                    </View>
-                  </View>
-
-                  {/* Birthday & Microchip Row */}
-                  <View className="flex-row gap-3">
-                    <View className="flex-1">
-                      <Text className="text-[14px] text-black font-medium mb-1.5">Birthday</Text>
-                      <TouchableOpacity
-                        onPress={() => setShowDatePicker(true)}
-                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 justify-center bg-white"
-                      >
-                        <Text className={`text-[14px] ${formData.dob ? 'text-black' : 'text-[#A1A1AA]'}`}>
-                          {formData.dob ? new Date(formData.dob).toLocaleDateString('en-GB') : 'DD/MM/YYYY'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[14px] text-black font-medium mb-1.5">Microchip</Text>
-                      <TextInput
-                        style={inputFontStyle}
-                        className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
-                        value={formData.microchip}
-                        onChangeText={(text) => handleChange('microchip', text)}
-                        placeholder="ID Number"
-                        placeholderTextColor="#A1A1AA"
-                      />
-                    </View>
-                  </View>
-
-                  {/* Divider */}
-                  <View className="h-[1px] bg-gray-100 my-5" />
-
-                  {/* Notes */}
-                  <View>
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Notes</Text>
-                    <TextInput
-                      style={[inputFontStyle, { paddingTop: 12 }]}
-                      className="border border-gray-200 rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
-                      value={formData.description}
-                      onChangeText={(text) => handleChange('description', text)}
-                      placeholder="Loves belly rubs and playing fetch. Very friendly with children."
-                      placeholderTextColor="#A1A1AA"
-                      multiline
-                      textAlignVertical="top"
-                    />
-                  </View>
-                </View>
-              </View>
-
-              {/* Owner Information Section */}
-              <View className="mb-6">
-                <Text className="text-[16px] font-semibold text-black mb-3">Owner Information</Text>
-                
-                <View className="bg-white rounded-[20px] border border-gray-200 px-4 py-2">
-                  <View className="flex-row items-center py-3 border-b border-gray-100">
-                    <Text className="text-[16px] font-medium text-black w-[80px]">Name</Text>
+              <View className="bg-white p-6 rounded-[20px] border border-gray-200">
+                {/* Name & Type Row */}
+                <View className="flex-row gap-3 mb-4">
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Name</Text>
                     <TextInput
                       style={inputFontStyle}
-                      className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
-                      value={formData.contactName}
-                      onChangeText={(text) => handleChange('contactName', text)}
-                      placeholder="Full Name"
+                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                      value={formData.name}
+                      onChangeText={(text) => handleChange('name', text)}
+                      placeholder="Enter pet name"
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
-
-                  <View className="flex-row items-center py-3 border-b border-gray-100">
-                    <Text className="text-[16px] font-medium text-black w-[80px]">Phone</Text>
-                    <TextInput
-                      style={inputFontStyle}
-                      className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
-                      value={formData.contactPhone}
-                      onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
-                      keyboardType="phone-pad"
-                      placeholder="Phone Number"
-                      placeholderTextColor="#A1A1AA"
-                      maxLength={15}
-                    />
-                  </View>
-
-                  <View className="flex-row items-center py-3">
-                    <Text className="text-[16px] font-medium text-black w-[80px]">Address</Text>
-                    <TextInput
-                      style={inputFontStyle}
-                      className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
-                      value={formData.contactAddress}
-                      onChangeText={(text) => handleChange('contactAddress', text)}
-                      placeholder="Street, District, City"
-                      placeholderTextColor="#A1A1AA"
-                    />
-                  </View>
-                </View>
-              </View>
-
-              {/* Vaccination Record Section */}
-              {/* Vaccination Record Section */}
-              <View className="mb-8">
-                <Text className="text-[16px] font-semibold text-[#111827] mb-3">Vaccination Record</Text>
-                
-                {/* 1. Dropzone LUÔN HIỂN THỊ để chuẩn bị cho multiple uploads/PDF sau này */}
-                <TouchableOpacity
-                  onPress={handlePickVaccine}
-                  activeOpacity={0.7}
-                  className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center mb-4"
-                >
-                  <View className="w-10 h-10 bg-[#F3F4F6] rounded-full items-center justify-center mb-2">
-                    <Feather name="upload-cloud" size={20} color="#6B7280" />
-                  </View>
-                  <Text className="text-[14px] text-[#374151] font-medium mb-1">
-                    <Text className="text-[#EFA062]">Click to upload</Text> or drag and drop
-                  </Text>
-                  {/* Cập nhật thêm PDF vào text hướng dẫn */}
-                  <Text className="text-[12px] text-[#9CA3AF]">JPEG, PNG, PDF, and MP4 formats, up to 50MB</Text>
-                </TouchableOpacity>
-
-                {/* 2. Trạng thái Đang tải lên */}
-                {isUploadingVaccine && (
-                  <View className="border border-[#E5E7EB] rounded-[12px] p-3 flex-row items-center mb-3 bg-white shadow-sm shadow-gray-100">
-                    <View className="w-10 h-10 rounded-lg bg-[#F3F4F6] items-center justify-center">
-                      <Feather name="file" size={20} color="#9CA3AF" />
-                    </View>
-                    <View className="flex-1 mx-3">
-                      <View className="flex-row justify-between items-center mb-1.5">
-                        <Text className="text-[14px] text-[#111827] font-medium" numberOfLines={1}>Uploading_document...</Text>
-                        <Text className="text-[12px] text-[#6B7280]">45%</Text>
-                      </View>
-                      <View className="h-1.5 w-full bg-[#F3F4F6] rounded-full overflow-hidden">
-                        <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '45%' }} />
-                      </View>
-                    </View>
-                    <TouchableOpacity className="p-1">
-                      <Feather name="x" size={16} color="#9CA3AF" />
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Type</Text>
+                    <TouchableOpacity
+                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white"
+                      onPress={() => Alert.alert("Select Type", "Tính năng chọn Chó/Mèo đang được phát triển.")}
+                    >
+                      <Text className="text-black text-[14px]">
+                        {formData.species === 'Cat' ? 'Cat' : 'Dog'}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color="#A1A1AA" />
                     </TouchableOpacity>
                   </View>
-                )}
+                </View>
 
-                {/* 3. Trạng thái Đã tải lên xong */}
-                {formData.vaccinationRecordUrl ? (
-                  <View className="border border-[#E5E5E5] rounded-[12px] p-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
-                                  <Image
-                                    source={{ uri: formData.vaccinationRecordUrl }}
-                                    className="w-10 h-10 rounded-lg bg-[#F3F4F6]"
-                                    resizeMode="cover"
-                                  />
-                                  <View className="flex-1 mx-3">
-                                    <View className="flex-row justify-between items-center mb-0.5">
-                                      <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>vaccination_record.jpg</Text>
-                                    </View>
-                                    <View className="flex-row items-center">
-                                      <Text className="text-[12px] text-[#6B7280] mr-2">1.2 MB</Text>
-                                      <View className="flex-row items-center">
-                                        <Feather name="check-circle" size={12} color="#EFA062" />
-                                        <Text className="text-[12px] text-[#EFA062] ml-1 font-medium">Completed</Text>
-                                      </View>
-                                    </View>
-                                  </View>
-                                  {/* Thay icon thùng rác bằng icon Xem chi tiết (Eye) */}
-                                  <TouchableOpacity
-                                    className="p-2"
-                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                    onPress={(e) => {
-                                      // Ngăn chặn sự kiện lan truyền
-                                      e.stopPropagation();
-                  
-                                      // Lấy toạ độ Y của phần tử vừa click trên màn hình
-                                      const { pageY } = e.nativeEvent;
-                  
-                                      // Set toạ độ cho menu (cộng thêm một chút offset để menu nằm dưới nút)
-                                      // setMenuPosition({ top: pageY + 10, right: 32 });
-                                      // setShowVaccineMenu(true);
-                                    }}
-                                  >
-                                    <Feather name="more-vertical" size={20} color="#6B7280" />
-                                  </TouchableOpacity>
-                                </View>
-                ) : null}
+                {/* Gender & Breed Row */}
+                <View className="flex-row gap-3 mb-4">
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Gender</Text>
+                    <TouchableOpacity className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white">
+                      <Text className="text-[#A1A1AA] text-[14px] capitalize">
+                        {formData.gender === 'UNKNOWN' ? 'Select' : formData.gender.toLowerCase()}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color="#A1A1AA" />
+                    </TouchableOpacity>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Breed</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                      value={formData.breed}
+                      onChangeText={(text) => handleChange('breed', text)}
+                      placeholder="e.g. Corgi"
+                      placeholderTextColor="#A1A1AA"
+                    />
+                  </View>
+                </View>
+
+                {/* Color & Weight Row */}
+                <View className="flex-row gap-3 mb-4">
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Color</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                      value={formData.color}
+                      onChangeText={(text) => handleChange('color', text)}
+                      placeholder="e.g. Brown"
+                      placeholderTextColor="#A1A1AA"
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Weight (kg)</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                      value={formData.weight}
+                      onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
+                      keyboardType="decimal-pad"
+                      placeholder="0.0"
+                      placeholderTextColor="#A1A1AA"
+                    />
+                  </View>
+                </View>
+
+                {/* Birthday & Microchip Row */}
+                <View className="flex-row gap-3">
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Birthday</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowDatePicker(true)}
+                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 justify-center bg-white"
+                    >
+                      <Text className={`text-[14px] ${formData.dob ? 'text-black' : 'text-[#A1A1AA]'}`}>
+                        {formData.dob ? new Date(formData.dob).toLocaleDateString('en-GB') : 'DD/MM/YYYY'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Microchip</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                      value={formData.microchip}
+                      onChangeText={(text) => handleChange('microchip', text)}
+                      placeholder="ID Number"
+                      placeholderTextColor="#A1A1AA"
+                    />
+                  </View>
+                </View>
+
+                {/* Divider */}
+                <View className="h-[1px] bg-gray-100 my-5" />
+
+                {/* Notes */}
+                <View>
+                  <Text className="text-[14px] text-black font-medium mb-1.5">Notes</Text>
+                  <TextInput
+                    style={[inputFontStyle, { paddingTop: 12 }]}
+                    className="border border-gray-200 rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
+                    value={formData.description}
+                    onChangeText={(text) => handleChange('description', text)}
+                    placeholder="Loves belly rubs and playing fetch. Very friendly with children."
+                    placeholderTextColor="#A1A1AA"
+                    multiline
+                    textAlignVertical="top"
+                  />
+                </View>
               </View>
+            </View>
+
+            {/* Owner Information Section */}
+            <View className="mb-6">
+              <Text className="text-[16px] font-semibold text-black mb-3">Owner Information</Text>
+
+              <View className="bg-white rounded-[20px] border border-gray-200 px-4 py-2">
+                <View className="flex-row items-center py-3 border-b border-gray-100">
+                  <Text className="text-[16px] font-medium text-black w-[80px]">Name</Text>
+                  <TextInput
+                    style={inputFontStyle}
+                    className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
+                    value={formData.contactName}
+                    onChangeText={(text) => handleChange('contactName', text)}
+                    placeholder="Full Name"
+                    placeholderTextColor="#A1A1AA"
+                  />
+                </View>
+
+                <View className="flex-row items-center py-3 border-b border-gray-100">
+                  <Text className="text-[16px] font-medium text-black w-[80px]">Phone</Text>
+                  <TextInput
+                    style={inputFontStyle}
+                    className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
+                    value={formData.contactPhone}
+                    onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
+                    keyboardType="phone-pad"
+                    placeholder="Phone Number"
+                    placeholderTextColor="#A1A1AA"
+                    maxLength={15}
+                  />
+                </View>
+
+                <View className="flex-row items-center py-3">
+                  <Text className="text-[16px] font-medium text-black w-[80px]">Address</Text>
+                  <TextInput
+                    style={inputFontStyle}
+                    className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
+                    value={formData.contactAddress}
+                    onChangeText={(text) => handleChange('contactAddress', text)}
+                    placeholder="Street, District, City"
+                    placeholderTextColor="#A1A1AA"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Vaccination Record Section */}
+            {/* Vaccination Record Section */}
+            <View className="mb-8">
+              <Text className="text-[16px] font-semibold text-[#111827] mb-3">Vaccination Record</Text>
+
+              {/* 1. Dropzone LUÔN HIỂN THỊ để chuẩn bị cho multiple uploads/PDF sau này */}
+              <TouchableOpacity
+                onPress={handlePickVaccine}
+                activeOpacity={0.7}
+                className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center mb-4"
+              >
+                <View className="w-10 h-10 bg-[#F3F4F6] rounded-full items-center justify-center mb-2">
+                  <Feather name="upload-cloud" size={20} color="#6B7280" />
+                </View>
+                <Text className="text-[14px] text-[#374151] font-medium mb-1">
+                  <Text className="text-[#EFA062]">Click to upload</Text> or drag and drop
+                </Text>
+                {/* Cập nhật thêm PDF vào text hướng dẫn */}
+                <Text className="text-[12px] text-[#9CA3AF]">JPEG, PNG, PDF, and MP4 formats, up to 50MB</Text>
+              </TouchableOpacity>
+
+              {/* 2. Trạng thái Đang tải lên */}
+              {isUploadingVaccine && (
+                <View className="border border-[#E5E7EB] rounded-[12px] p-3 flex-row items-center mb-3 bg-white shadow-sm shadow-gray-100">
+                  <View className="w-10 h-10 rounded-lg bg-[#F3F4F6] items-center justify-center">
+                    <Feather name="file" size={20} color="#9CA3AF" />
+                  </View>
+                  <View className="flex-1 mx-3">
+                    <View className="flex-row justify-between items-center mb-1.5">
+                      <Text className="text-[14px] text-[#111827] font-medium" numberOfLines={1}>Uploading_document...</Text>
+                      <Text className="text-[12px] text-[#6B7280]">45%</Text>
+                    </View>
+                    <View className="h-1.5 w-full bg-[#F3F4F6] rounded-full overflow-hidden">
+                      <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '45%' }} />
+                    </View>
+                  </View>
+                  <TouchableOpacity className="p-1">
+                    <Feather name="x" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* 3. Trạng thái Đã tải lên xong */}
+              {formData.vaccinationRecordUrl ? (
+                <View className="border border-[#E5E5E5] rounded-[12px] p-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
+                  <Image
+                    source={{ uri: formData.vaccinationRecordUrl }}
+                    className="w-10 h-10 rounded-lg bg-[#F3F4F6]"
+                    resizeMode="cover"
+                  />
+                  <View className="flex-1 mx-3">
+                    <View className="flex-row justify-between items-center mb-0.5">
+                      <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>vaccination_record.jpg</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Text className="text-[12px] text-[#6B7280] mr-2">1.2 MB</Text>
+                      <View className="flex-row items-center">
+                        <Feather name="check-circle" size={12} color="#EFA062" />
+                        <Text className="text-[12px] text-[#EFA062] ml-1 font-medium">Completed</Text>
+                      </View>
+                    </View>
+                  </View>
+                  {/* Thay icon thùng rác bằng icon Xem chi tiết (Eye) */}
+                  <TouchableOpacity
+                    className="p-2"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={(e) => {
+                      // Ngăn chặn sự kiện lan truyền
+                      e.stopPropagation();
+
+                      // Lấy toạ độ Y của phần tử vừa click trên màn hình
+                      const { pageY } = e.nativeEvent;
+
+                      // Set toạ độ cho menu (cộng thêm một chút offset để menu nằm dưới nút)
+                      // setMenuPosition({ top: pageY + 10, right: 32 });
+                      // setShowVaccineMenu(true);
+                    }}
+                  >
+                    <Feather name="more-vertical" size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </View>
 
 
-              {/* QR Code Section (Áp dụng style Dropzone giống hệt) */}
-              {/* <View className="mb-8">
+            {/* QR Code Section (Áp dụng style Dropzone giống hệt) */}
+            {/* <View className="mb-8">
                 <Text className="text-[15px] font-semibold text-[#111827] mb-3">Smart Tag / QR Code</Text>
                 
                 {!formData.qrCodeUrl && !isUploadingQR && (
@@ -557,31 +564,31 @@ export default function EditPetScreen() {
                 ) : null}
               </View> */}
 
-              {/* Action Buttons */}
-              <View className="space-y-3 mb-10">
-                <TouchableOpacity
-                  onPress={handleSubmit}
-                  disabled={isSubmitting || isUploadingAvatar || isUploadingVaccine || isUploadingQR}
-                  className="bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm"
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Text className="text-white font-semibold text-[16px]">Save Changes</Text>
-                  )}
-                </TouchableOpacity>
+            {/* Action Buttons */}
+            <View className="space-y-3 mb-10">
+              <TouchableOpacity
+                onPress={handleSubmit}
+                disabled={isSubmitting || isUploadingAvatar || isUploadingVaccine || isUploadingQR}
+                className="bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm"
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className="text-white font-semibold text-[16px]">Save Changes</Text>
+                )}
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => router.back()}
-                  disabled={isSubmitting}
-                  className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-5"
-                >
-                  <Text className="text-[#9CA3AF] font-medium text-[16px]">Cancel</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                disabled={isSubmitting}
+                className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-5"
+              >
+                <Text className="text-[#9CA3AF] font-medium text-[16px]">Cancel</Text>
+              </TouchableOpacity>
+            </View>
 
-            </ScrollView>
-          </View>
+          </ScrollView>
+        </View>
       </KeyboardAvoidingView>
 
       {/* ================= MODALS & PICKERS ================= */}

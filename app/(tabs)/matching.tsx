@@ -1,13 +1,13 @@
 // app/(tabs)/matching.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-import { AntDesign, Entypo, Feather, FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AntDesign, Feather, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Text as RNText, TextInput, TouchableOpacity, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { ActivityIndicator, Dimensions, Keyboard, Text as RNText, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
@@ -1479,12 +1479,44 @@ export default function MatchingScreen() {
     const [appStage, setAppStage] = useState<number>(3);
     const [isLoadingStage, setIsLoadingStage] = useState<boolean>(true);
     const [selectedPet, setSelectedPet] = useState<any>(null);
+    const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+
+    const COMPLETED_USERS_KEY = 'completed_onboarding_users_list';
 
     // ---> THÊM STATE ĐỂ NHẬN BIẾT LÀ ĐANG CHỈNH SỬA
     const [isEditing, setIsEditing] = useState<boolean>(false);
 
     // ---> THÊM STATE ĐỂ NHẬN BIẾT USER CŨ (Đã từng hoàn thành Onboarding)
     const [isReturningUser, setIsReturningUser] = useState<boolean>(false);
+
+    useEffect(() => {
+        const checkUserStatus = async () => {
+            // Nếu chưa có user (chưa đăng nhập), bỏ qua
+            if (!user?.id) {
+                setIsCheckingStatus(false);
+                return;
+            }
+
+            try {
+                const storedUsersJSON = await AsyncStorage.getItem(COMPLETED_USERS_KEY);
+                
+                const completedUsers: string[] = storedUsersJSON ? JSON.parse(storedUsersJSON) : [];
+
+                if (completedUsers.includes(user.id)) {
+                    setAppStage(3); // Đã có -> Nhảy thẳng vào Main Swipe
+                } else {
+                    setAppStage(0); // Chưa có -> Bắt đầu Onboarding (hoặc Stage 1 tùy bạn)
+                }
+            } catch (error) {
+                console.error("Lỗi khi đọc danh sách user:", error);
+                setAppStage(0); // Lỗi thì cứ cho xem lại từ đầu
+            } finally {
+                setIsCheckingStatus(false); // Hoàn thành việc check
+            }
+        };
+
+        checkUserStatus();
+    }, [user?.id]);
 
     useEffect(() => {
         const checkOnboardingStatus = async () => {
@@ -1537,18 +1569,37 @@ export default function MatchingScreen() {
 
     const handleCompleteOnboarding = async () => {
         try {
-            const userId = user?.id || 'guest';
-            await AsyncStorage.setItem(`@matching_onboarding_${userId}`, 'true');
+            if (user?.id) {
+                // 1. Lấy lại mảng danh sách user hiện tại
+                const storedUsersJSON = await AsyncStorage.getItem(COMPLETED_USERS_KEY);
+                const completedUsers: string[] = storedUsersJSON ? JSON.parse(storedUsersJSON) : [];
+
+                // 2. Nếu ID chưa có trong mảng thì thêm vào
+                if (!completedUsers.includes(user.id)) {
+                    completedUsers.push(user.id);
+                    
+                    // 3. Lưu mảng mới (đã có thêm ID này) trở lại AsyncStorage
+                    await AsyncStorage.setItem(COMPLETED_USERS_KEY, JSON.stringify(completedUsers));
+                }
+            }
+            // 4. Chuyển sang màn hình chính
+            setAppStage(3);
         } catch (error) {
-            console.error("Lỗi khi lưu AsyncStorage:", error);
+            console.error("Lỗi khi lưu danh sách user:", error);
+            setAppStage(3);
         }
-        setIsReturningUser(true); // Cập nhật lại cờ
-        setAppStage(3);
-        setIsEditing(false); // Reset cờ chỉnh sửa khi hoàn thành
     };
 
     if (isLoadingStage) {
         return <View className="flex-1 bg-white" />;
+    }
+
+    if (isCheckingStatus) {
+        return (
+            <View className="flex-1 justify-center items-center bg-white">
+                <ActivityIndicator size="large" color="#E89B5A" />
+            </View>
+        );
     }
 
     return (
@@ -1589,6 +1640,12 @@ export default function MatchingScreen() {
                         // Nếu user bấm X ở màn Policy, lùi về màn Survey
                         setAppStage(0);
                     }}
+                />
+            )}
+
+            {appStage === 2 && (
+                <TutorialScreen
+                    onComplete={handleCompleteOnboarding}
                 />
             )}
 

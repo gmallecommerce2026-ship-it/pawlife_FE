@@ -260,21 +260,28 @@ export default function TagRouteDetailsScreen() {
                   elevation: 3,
                 }}
               >
-                <View className="overflow-hidden rounded-full">
+                <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 28,
+                    borderWidth: 1.5,
+                    borderTopColor: 'white',
+                    borderLeftColor: 'white',
+                    borderBottomColor: 'transparent',
+                    borderRightColor: 'transparent',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                  }}>
                   <LinearGradient
                     colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    locations={[0, 0.5, 1]}
+                    locations={[0, 0.3, 1]}
 
                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                   />
-                  <BlurView
-                    intensity={30}
-                    tint="light"
-                    className="w-[36px] h-[36px] items-center justify-center bg-white/40 border border-white/60"
-                  >
-                    <Feather name="chevron-left" size={20} color="#1F2937" />
-                  </BlurView>
+                  <Feather name="chevron-left" size={20} color="#1F2937" />
                 </View>
               </TouchableOpacity>
 
@@ -297,21 +304,28 @@ export default function TagRouteDetailsScreen() {
                 }}
 
               >
-                <View className="overflow-hidden rounded-full">
+                <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 28,
+                    borderWidth: 1.5,
+                    borderTopColor: 'white',
+                    borderLeftColor: 'white',
+                    borderBottomColor: 'transparent',
+                    borderRightColor: 'transparent',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                  }}>
                   <LinearGradient
                     colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    locations={[0, 0.5, 1]}
+                    locations={[0, 0.3, 1]}
 
                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                   />
-                  <BlurView
-                    intensity={30}
-                    tint="light"
-                    className="w-[36px] h-[36px] items-center justify-center bg-white/40 border border-white/60"
-                  >
-                    <Feather name="more-horizontal" size={20} color="#111827" />
-                  </BlurView>
+                  <Feather name="more-horizontal" size={20} color="#111827" />
                 </View>
               </TouchableOpacity>
             </View>

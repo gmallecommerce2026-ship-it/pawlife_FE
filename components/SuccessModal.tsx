@@ -28,8 +28,8 @@ export const SuccessModal = () => {
                     </View>
 
                     {/* Texts */}
-                    <Text className='text-[24px] font-semibold text-[#E89B5A] text-center mb-6'>{title}</Text>
-                    <Text className='text-[16px] text-[#656565] text-center mb-8 font-regular'>{message}</Text>
+                    <Text style={{fontFamily: 'Urbanist'}} className='text-[24px] font-semibold text-[#E89B5A] text-center mb-6'>{title}</Text>
+                    <Text style={{fontFamily: 'Urbanist'}} className='text-[16px] text-[#656565] text-center mb-8 font-regular'>{message}</Text>
 
                     {/* Button */}
                     <TouchableOpacity style={styles.button} onPress={handlePress}>
