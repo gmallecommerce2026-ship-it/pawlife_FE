@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
+
 import {
   ActivityIndicator,
   Alert,
@@ -17,11 +18,17 @@ import {
   TouchableOpacity,
   View,
   Image,
-  Modal
+  Modal,
+  LayoutAnimation,
+  UIManager
 } from 'react-native';
 import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // Hàm giải mã Polyline của Google Maps
 const decodeGooglePolyline = (t: string) => {
@@ -72,6 +79,13 @@ export default function TagRouteDetailsScreen() {
   const [currentLoc, setCurrentLoc] = useState({ lat: targetLat, lng: targetLng });
   const [realStats, setRealStats] = useState({ distance: '...', duration: 0 });
   const [addresses, setAddresses] = useState({ origin: 'Locating...', destination: 'Loading...' });
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const toggleExpand = () => {
+    // Tạo hiệu ứng mượt mà khi thay đổi layout
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsExpanded(!isExpanded);
+  };
 
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
@@ -391,98 +405,132 @@ export default function TagRouteDetailsScreen() {
           }}
         >
           <View className="flex-row items-center">
-            <View className="w-11 h-11 rounded-full bg-blue-50 border border-gray-100 items-center justify-center">
+            <View className="w-[60px] h-[60px] rounded-full bg-blue-50 border border-gray-100 items-center justify-center">
               <Text className="text-[16px] font-bold text-blue-500">{scannerName.charAt(0).toUpperCase()}</Text>
             </View>
             <View className="ml-3.5 flex-1 justify-center">
               <View className="flex-row items-center">
-                <Text className="text-[16px] font-medium text-[#1E1E1E]">{scannerName}</Text>
+                <Text className="text-[16px] font-medium text-[#1E1E1E] leading-[24px]">{scannerName}</Text>
                 <Image className='ml-2' source={require('../assets/icon/real-tick.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
               </View>
-              <Text className="text-[12px] text-[#8E8E93]" numberOfLines={1}>
+              <Text className="text-[12px] text-[#8E8E93] tracking-[0.06px]" numberOfLines={1}>
                 "{scannerMessage}"
               </Text>
             </View>
-          </View>
-
-          <View className="h-[1px] bg-gray-100 w-full my-5" />
-
-          <View className="flex-row justify-between items-start mb-6">
-            <View>
-              <Text className="text-[12px] font-regular text-[#757575] tracking-widest mb-1.5">
-                Distance
-              </Text>
-              <Text className="text-[40px] font-bold text-black">
-                {realStats.distance} <Text className="text-[16px] font-medium text-black">km</Text>
-              </Text>
-            </View>
-
-            <View className="items-start mr-7">
-              <Text className="text-[12px] font-regular text-[#757575] mb-7">Travel time: <Text className="text-[14px] font-bold text-black">{realStats.duration} min</Text></Text>
-              <View className="flex-row">
-                <View className="flex-row items-center">
-                  <Image className='' source={require('../assets/icon/drive-moto.png')} style={{ width: 10, height: 16 }} resizeMode="cover" />
-                  <Text className="text-[12px] font-regular ml-2 text-[#757575]">{realStats.duration} min</Text>
-                </View>
-                <View className="flex-row items-center ml-3">
-                  <Image className='' source={require('../assets/icon/drive-car.png')} style={{ width: 20, height: 16 }} resizeMode="cover" />
-                  <Text className="text-[12px] font-regular ml-2 text-[#757575]">{Math.max(1, Math.round(realStats.duration * 0.7))} min</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          <View className="pl-1">
-
-            <View className="flex-row items-start mb-[24px]">
-              <View className="items-center w-4 mr-3.5 relative">
-                <View className="w-[18px] h-[18px] rounded-full border-[3px] border-[#D7E5FF] bg-[#3478F5] z-10 mt-1" />
-                <View className="w-[1.5px] h-[27px] bg-gray-200 absolute top-[20px] mt-1.5" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[14px] font-bold text-black">Your Location</Text>
-                <Text className="text-[12px] text-[#757575] font-regular mt-1" numberOfLines={1}>{addresses.origin}</Text>
-              </View>
-            </View>
-
-            <View className="flex-row items-start">
-              <View className="items-center w-4 mr-3.5 mt-1">
-                <View className="w-4 h-4 rounded-full bg-red-50 items-center justify-center z-10">
-                  <View className="w-[18px] h-[18px] rounded-full border-[3px] border-[#FFECDB] bg-[#E89B5A]" />
-                </View>
-              </View>
-              <View className="flex-1">
-                <Text className="text-[14px] font-bold text-black">Scanned Point</Text>
-                <Text className="text-[12px] text-[#757575] font-regular mt-1">{addresses.destination}</Text>
-              </View>
-            </View>
-          </View>
-
-          <View className="w-full mt-6">
-            <TouchableOpacity
-              activeOpacity={0.7}
-              className="w-full bg-[#E89B5A] h-[52px] rounded-[16px] flex-row items-center justify-center mb-3 shadow-sm shadow-[#E89B5A]/30"
-            >
-              <Image className='' source={require('../assets/icon/phone-white.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
-              <Text className="text-[#ffffff] text-[16px] font-bold ml-2.5 tracking-tight">Contact Now</Text>
-              <LinearGradient
-                // Thiết lập hướng đổ màu từ góc trên trái xuống góc dưới phải
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                // Mảng màu (Bạn có thể chọn 2 tone cam khác nhau để tạo chiều sâu)
-                colors={['#E89B5A', '#F2A465']}
-                style={{ borderRadius: 16, marginBottom: 12 }} // Bo góc giống thiết kế cũ
-                className="shadow-sm shadow-[#E89B5A]/30"
+            <TouchableOpacity onPress={toggleExpand} className="p-2">
+              <Feather
+                name={isExpanded ? "chevron-down" : "chevron-up"}
+                size={22}
+                color="#8E8E93"
               />
             </TouchableOpacity>
+          </View>
 
-            <TouchableOpacity
-              activeOpacity={0.85}
-              className="w-full bg-white h-[52px] rounded-[16px] flex-row items-center justify-center border border-gray-200"
-            >
-              <Image className='' source={require('../assets/icon/location-gray.png')} style={{ width: 12, height: 17 }} resizeMode="cover" />
-              <Text className="text-[#8E8E93] text-[16px] font-medium ml-2.5 tracking-tight">Open in Maps</Text>
-            </TouchableOpacity>
+          {isExpanded && (
+            <View>
+              <View className="h-[1px] bg-gray-100 w-full my-5" />
+
+              <View className="flex-row justify-between items-start mb-6">
+                <View>
+                  <Text className="text-[12px] font-regular text-[#757575] tracking-widest mb-1.5">
+                    Distance
+                  </Text>
+                  <Text className="text-[40px] font-bold text-black">
+                    {realStats.distance} <Text className="text-[16px] font-medium text-black">km</Text>
+                  </Text>
+                </View>
+
+                <View className="items-start mr-7">
+                  <Text className="text-[12px] font-regular text-[#757575] mb-7">Travel time: <Text className="text-[14px] font-bold text-black">{realStats.duration} min</Text></Text>
+                  <View className="flex-row">
+                    <View className="flex-row items-center">
+                      <Image className='' source={require('../assets/icon/drive-moto.png')} style={{ width: 10, height: 16 }} resizeMode="cover" />
+                      <Text className="text-[12px] font-regular ml-2 text-[#757575]">{realStats.duration} min</Text>
+                    </View>
+                    <View className="flex-row items-center ml-3">
+                      <Image className='' source={require('../assets/icon/drive-car.png')} style={{ width: 20, height: 16 }} resizeMode="cover" />
+                      <Text className="text-[12px] font-regular ml-2 text-[#757575]">{Math.max(1, Math.round(realStats.duration * 0.7))} min</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <View className="pl-1">
+
+                <View className="flex-row items-start mb-[24px]">
+                  <View className="items-center w-4 mr-3.5 relative">
+                    <View className="w-[18px] h-[18px] rounded-full border-[3px] border-[#D7E5FF] bg-[#3478F5] z-10 mt-1" />
+                    <View className="w-[1.5px] h-[27px] bg-gray-200 absolute top-[20px] mt-1.5" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[14px] font-bold text-black">Your Location</Text>
+                    <Text className="text-[12px] text-[#757575] font-regular mt-1" numberOfLines={1}>{addresses.origin}</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-start">
+                  <View className="items-center w-4 mr-3.5 mt-1">
+                    <View className="w-4 h-4 rounded-full bg-red-50 items-center justify-center z-10">
+                      <View className="w-[18px] h-[18px] rounded-full border-[3px] border-[#FFECDB] bg-[#E89B5A]" />
+                    </View>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[14px] font-bold text-black">Scanned Point</Text>
+                    <Text className="text-[12px] text-[#757575] font-regular mt-1">{addresses.destination}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+
+
+
+          <View className="w-full mt-6">
+            <View style={{
+              shadowColor: '#B45C11',
+              shadowOffset: {
+                width: 0,
+                height: 2
+              },
+              shadowOpacity: 0.25,
+              shadowRadius: 5,
+              elevation: 5,
+            }}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="w-full h-[52px] rounded-[16px] flex-row overflow-hidden items-center justify-center mb-3"
+              >
+                <LinearGradient
+                  colors={['#FFC593', '#E89B5A']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  locations={[0.3, 1]}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+
+                />
+                <Image className='' source={require('../assets/icon/phone-white.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
+                <Text className="text-[#ffffff] text-[16px] font-semibold ml-2.5 tracking-tight">Contact Now</Text>
+              </TouchableOpacity>
+
+            </View>
+            <View style={{
+              shadowColor: '#000000',
+              shadowOffset: {
+                width: 0,
+                height: 2
+              },
+              shadowOpacity: 0.1,
+              shadowRadius: 5,
+              elevation: 5,
+            }}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                className="w-full bg-white h-[52px] rounded-[16px] flex-row items-center justify-center border border-gray-200"
+              >
+                <Image className='' source={require('../assets/icon/location-gray.png')} style={{ width: 12, height: 17 }} resizeMode="cover" />
+                <Text className="text-[#8E8E93] text-[16px] font-medium ml-2.5 tracking-tight">Open in Maps</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
         </View>

@@ -80,7 +80,7 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
 
                 </View>
                 <View className="flex-row items-center opacity-90">
-                    <Ionicons name="location-sharp" size={16} color="white" />
+                    <Image source={require('../../assets/icon/location_solid.png')} style={{ width: 13, height: 16 }} resizeMode="cover" />
                     <Text className="text-white ml-1 text-base">{data.location}  ·  {data.distance}</Text>
                 </View>
             </View>
@@ -506,11 +506,11 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
     const [isAgreed, setIsAgreed] = useState(false);
 
     const PolicyItem = ({ number, title, content }: any) => (
-        <View className="flex-row items-start mb-8">
-            <Text className="font-medium text-[16px] text-gray-900 w-5 mt-0.5">{number}.</Text>
+        <View className="flex-row items-start mb-[21px]">
+            <Text className="font-medium text-[16px] text-black w-4">{number}.</Text>
             <View className="flex-1">
-                <Text className="text-gray-800 font-medium text-[16px] mb-1">{title}</Text>
-                <Text className="text-gray-500 font-regular text-[14px] leading-6">{content}</Text>
+                <Text className="text-gray-800 font-medium text-[16px] mb-[4px]" numberOfLines={1}>{title}</Text>
+                <Text className="text-gray-500 font-regular text-[14px] leading-[20px] tracking-[0.06px]">{content}</Text>
             </View>
         </View>
     );
@@ -535,17 +535,17 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
             {/* NỘI DUNG CUỘN */}
             <View className="flex-1">
                 <Animated.ScrollView
-                    className="flex-1 px-[35px] pt-[50px]"
+                    className="flex-1 px-[35px] pt-[30px]"
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 40 }}
                 >
                     <View className="mb-4">
-                        <PolicyItem number="1" title="Love and care for your pet for life" content="Do not abandon, harm, or use the pet for any illegal or inhumane purposes." />
-                        <PolicyItem number="2" title="Provide a safe and suitable living environment" content="This includes proper food, shelter, attention, and veterinary care when needed." />
+                        <PolicyItem number="1" title="Love and care for your pet for life" content="Do not abandon, harm, or use the pet for any illegal or inhumane purposes" />
+                        <PolicyItem number="2" title="Provide a safe & suitable living environment" content="This includes proper food, shelter, attention, and veterinary care when needed" />
                         <PolicyItem number="3" title="Take care of your pet's health" content="Check-ups, vaccinations, and rabies shots as recommended." />
-                        <PolicyItem number="4" title="Stay in touch" content="During the first 6 months, share updates to ensure pet is doing well." />
+                        <PolicyItem number="4" title="Stay in touch after adoption & when needed" content="During the first 6 months, share updates to ensure pet is doing well." />
                         <PolicyItem number="5" title="Do not transfer your pet" content="Contact PawLife if you can no longer care for the pet." />
-                        <PolicyItem number="6" title="Provide truthful personal information" content="Basic info helps ensure your pet's safety." />
+                        <PolicyItem number="6" title="Provide truthful personal information" content="Basic personal and address information helps ensure your pet's safety and well-being after adoption." />
                     </View>
                 </Animated.ScrollView>
             </View>
@@ -557,34 +557,37 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                     paddingHorizontal: 24,
                     paddingTop: 16,
                     backgroundColor: 'white',
-                    borderTopWidth: 1,
-                    borderTopColor: 'rgba(0,0,0,0.03)'
                 }}
+                className='items-center justify-center'
             >
+
                 {/* Custom Checkbox */}
                 <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => setIsAgreed(!isAgreed)}
                     className="flex-row items-center mb-5"
                 >
-                    <Ionicons
-                        name={isAgreed ? "checkbox" : "square-outline"}
-                        size={24}
-                        color={isAgreed ? "#E89B5A" : "#9CA3AF"}
-                    />
-                    <Text className={`ml-3 text-[14px] flex-1 ${isAgreed ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
-                        I agree to{' '}
-                        <Text
-                            onPress={() => {
-                                // Thêm hành động mở link hoặc màn hình Policy của bạn ở đây
-                                router.push('/terms-of-service');
-                            }}
-                            className="text-[#E89B5A]"
-                        >
-                            Policy Terms & Privacy Conditions
+                    <View className='flex-row items-center w-full justify-center'>
+
+                        <Ionicons
+                            name={isAgreed ? "checkbox" : "square-outline"}
+                            size={24}
+                            color={isAgreed ? "#E89B5A" : "#9CA3AF"}
+                        />
+                        <Text className={`ml-3 text-[14px] ${isAgreed ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
+                            I agree to{' '}
+                            <Text
+                                onPress={() => {
+                                    // Thêm hành động mở link hoặc màn hình Policy của bạn ở đây
+                                    router.push('/terms-of-service');
+                                }}
+                                className="text-[#E89B5A]"
+                            >
+                                Policy Terms & Privacy Conditions
+                            </Text>
+                            .
                         </Text>
-                        .
-                    </Text>
+                    </View>
                 </TouchableOpacity>
 
                 {/* Nút Submit */}
