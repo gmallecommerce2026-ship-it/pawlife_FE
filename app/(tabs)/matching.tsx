@@ -101,11 +101,15 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#E89B5A]`} onPress={() => onAction && onAction('heart')}>
-                    <Image className='mr-3' source={require('../../assets/icon/heart-pawdoption.png')} style={{ width: 19, height: 17 }} resizeMode="cover" />
+                    <Image className='mr-3' source={
+                        isFavorited
+                            ? require('../../assets/icon/heart-filled-pawdoption.png') // Trái tim tô kín (khi đã double tap)
+                            : require('../../assets/icon/heart-pawdoption.png') // Trái tim rỗng (mặc định)
+                    } style={{ width: 19, height: 17 }} resizeMode="cover" />
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#77C852]`} onPress={() => onAction && onAction('right')}>
-                    <Image className='mr-3' source={require('../../assets/icon/tick-pawdoption.png')} style={{ width: 19, height: 13 }} resizeMode="cover"/>
+                    <Image className='mr-3' source={require('../../assets/icon/tick-pawdoption.png')} style={{ width: 19, height: 13 }} resizeMode="cover" />
                 </TouchableOpacity>
 
             </View>
@@ -1499,7 +1503,7 @@ export default function MatchingScreen() {
 
             try {
                 const storedUsersJSON = await AsyncStorage.getItem(COMPLETED_USERS_KEY);
-                
+
                 const completedUsers: string[] = storedUsersJSON ? JSON.parse(storedUsersJSON) : [];
 
                 if (completedUsers.includes(user.id)) {
@@ -1577,7 +1581,7 @@ export default function MatchingScreen() {
                 // 2. Nếu ID chưa có trong mảng thì thêm vào
                 if (!completedUsers.includes(user.id)) {
                     completedUsers.push(user.id);
-                    
+
                     // 3. Lưu mảng mới (đã có thêm ID này) trở lại AsyncStorage
                     await AsyncStorage.setItem(COMPLETED_USERS_KEY, JSON.stringify(completedUsers));
                 }
