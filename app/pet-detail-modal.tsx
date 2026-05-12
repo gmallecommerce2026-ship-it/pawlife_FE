@@ -9,6 +9,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation
+} from 'react-native-reanimated';
 
 export default function PetDetailModal() {
   const router = useRouter();
@@ -19,6 +25,26 @@ export default function PetDetailModal() {
   const [showHistory, setShowHistory] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const { width, height } = Dimensions.get('window');
+
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+  // 1. Dùng animatedPosition để lấy chính xác tọa độ Y của Bottom Sheet
+  const animatedPosition = useSharedValue(SCREEN_HEIGHT);
+
+  // 2. Tính toán chiều cao ảnh
+  const animatedImageStyle = useAnimatedStyle(() => {
+    const overlapHeight = SCREEN_HEIGHT * 0.03;
+    const minHeight = SCREEN_HEIGHT * 0.48;
+    // animatedPosition.value chính là khoảng trống từ trên cùng màn hình đến mép Bottom Sheet.
+    // VD: BottomSheet ở 25% (đáy) -> Tọa độ Y mép trên là 75% màn hình.
+    // Chúng ta chỉ cần cho chiều cao ảnh bằng đúng tọa độ Y này!
+    // Tuy nhiên, bạn muốn DỪNG co ảnh ở mốc 55% (tức là khi mép trên ở tọa độ 45% màn hình).
+
+    return {
+      // Dùng Math.max để đảm bảo ảnh luôn co giãn theo Bottom Sheet, nhưng không bao giờ nhỏ hơn minHeight
+      height: Math.max(animatedPosition.value + overlapHeight, minHeight),
+    };
+  });
 
   // --- MOCK DATA GIỮ NGUYÊN ---
   const MOCK_IMAGES: string[] = [
@@ -84,7 +110,7 @@ export default function PetDetailModal() {
 
   // --- CẤU HÌNH BOTTOM SHEET ---
   // Thẻ bắt đầu ở 60% màn hình, và khi kéo lên tối đa sẽ chiếm 85% màn hình
-  const snapPoints = useMemo(() => ['55%', '85%'], []);
+  const snapPoints = useMemo(() => ['25%', '55%', '85%'], []);
 
   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -207,37 +233,51 @@ export default function PetDetailModal() {
 
 
       {/* --- LAYER 1: BACKGROUND TĨNH CỦA SLIDER ẢNH --- */}
-      <View style={{ height: IMAGE_HEIGHT, position: 'absolute', top: 0, width: '100%' }}>
+      <Animated.View style={[{ width: SCREEN_WIDTH }, animatedImageStyle]}>
+
+        {/* FlatList chứa các ảnh thú cưng */}
         <FlatList
-          data={petImages}
+          data={MOCK_IMAGES}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={(e) => {
-            const index = Math.round(e.nativeEvent.contentOffset.x / width);
+            const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
             setActiveIndex(index);
           }}
           renderItem={({ item }) => (
-            <Image source={{ uri: item }} style={{ width, height: IMAGE_HEIGHT }} resizeMode="cover" />
+            // Dùng height: '100%' để ảnh tự khít với chiều cao của container khi co giãn
+            <Image
+              source={{ uri: item }}
+              style={{ width: SCREEN_WIDTH, height: '100%' }}
+              resizeMode="cover"
+            />
           )}
-          keyExtractor={(_, index) => index.toString()}
         />
 
-        {/* Pagination Dots */}
-        <View className="absolute bottom-[20%] w-full flex-row justify-center gap-2">
-          {petImages.map((_: string, index: number) => (
+        {/* Lớp phủ đen mờ phía dưới ảnh (giúp dễ nhìn nút hơn) */}
+        {/* <LinearGradient
+           colors={['transparent', 'rgba(0,0,0,0.5)']}
+           style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%' }}
+        /> */}
+
+        {/* Pagination Dots (Vì dùng position absolute theo Đáy của Animated.View, nó sẽ tự động chạy lên/xuống theo) */}
+        <View className="absolute bottom-[40px] w-full flex-row justify-center items-center gap-2 z-10">
+          {MOCK_IMAGES.map((_, index) => (
             <View
               key={index}
-              className={`h-1.5 rounded-full ${index === activeIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/50'}`}
+              className={`h-2 rounded-full ${activeIndex === index ? 'w-6 bg-[#E89B5A]' : 'w-2 bg-white/60'}`}
             />
           ))}
         </View>
-      </View>
+
+      </Animated.View>
 
       {/* --- LAYER 2: BOTTOM SHEET FOREGROUND --- */}
       <BottomSheet
         index={0} // Bắt đầu ở snapPoint đầu tiên (60%)
         snapPoints={snapPoints}
+        animatedPosition={animatedPosition}
         backgroundStyle={{ backgroundColor: 'white', borderRadius: 30 }}
         handleIndicatorStyle={{ backgroundColor: '#E5E5EA', width: 48, height: 6 }}
         style={{
@@ -464,7 +504,8 @@ export default function PetDetailModal() {
         className="absolute bottom-0 w-full px-[25px] pt-4 bg-white flex-row items-center gap-4"
       >
         <TouchableOpacity className="w-[56px] h-[56px] rounded-full border border-[#E5E5EA] items-center justify-center bg-white shadow-sm shadow-gray-200">
-          <Feather name="heart" size={24} color="#F2A465" />
+          <Image className='' source={require('../assets/icon/heart-pawdoption.png') // Trái tim rỗng (mặc định)
+          } style={{ width: 27, height: 27 }} resizeMode="cover" />
         </TouchableOpacity>
 
         <TouchableOpacity

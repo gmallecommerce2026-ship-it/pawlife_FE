@@ -54,7 +54,8 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
     const actionButtonClasses = "items-center justify-center bg-black/60 backdrop-blur-md rounded-full border-[1.5px]";
 
     return (
-        <View className="absolute bottom-0 left-0 right-0 justify-end z-40 pb-8 pt-32">
+        <View className="absolute bottom-0 left-0 right-0 justify-end z-40 pb-8 pt-32"
+        >
             <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.85)', 'rgba(0, 0, 0, 0.75)']}
                 locations={[0, 0.4, 0.7, 1]}
@@ -105,7 +106,7 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
                         isFavorited
                             ? require('../../assets/icon/heart-filled-pawdoption.png') // Trái tim tô kín (khi đã double tap)
                             : require('../../assets/icon/heart-pawdoption.png') // Trái tim rỗng (mặc định)
-                    } style={{ width: 19, height: 17 }} resizeMode="cover" />
+                    } style={{ width: 27, height: 27 }} resizeMode="cover" />
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#77C852]`} onPress={() => onAction && onAction('right')}>
@@ -198,7 +199,19 @@ const SwipeableCard = ({
     return (
         <GestureDetector gesture={gesture}>
             <Animated.View style={[animatedStyle]} className="absolute top-0 left-0 right-0 bottom-0 z-10">
-                <View className="flex-1 relative justify-center items-center">
+                <View className="flex-1 relative justify-center items-center"
+                    style={{
+                        position: 'absolute',
+                        width: '100%',
+                        height: '100%',
+                        // --- LỚP NGOÀI: CHỈ ĐỔ BÓNG, KHÔNG DÙNG OVERFLOW HIDDEN ---
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 30,
+                        elevation: 10, // Quan trọng để hiện bóng trên Android
+                        backgroundColor: 'transparent',
+                    }}>
 
                     {!isTutorialCard && (
                         <View
@@ -414,7 +427,7 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
                                             onPress={() => setSelectedAge(age)}
                                             className={`p-[14px] rounded-[16px] border ${selectedAge === age ? 'border-[#E89B5A] bg-orange-50' : 'border-[#E5E5E5] bg-white'}`}
                                         >
-                                            <Text className={`font-medium text-[16px] ${selectedAge === age ? 'text-[#E89B5A]' : 'text-gray-600'}`}>{age}</Text>
+                                            <Text className={`font-medium text-[16px] ${selectedAge === age ? 'text-[#E89B5A]' : 'text-black'}`}>{age}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
@@ -425,7 +438,7 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
                         {surveyStep === 3 && (
                             <View>
                                 <Text className="text-[30px] font-semibold text-black mb-[18px]">Your Location</Text>
-                                <Text className="text-[16px] font-medium text-[#8E8E93] mb-[30px]">We'll help you find adoption shelters near you</Text>
+                                <Text className="text-[16px] font-medium text-[#8E8E93] mb-[10px]">We'll help you find adoption shelters near you</Text>
 
                                 <View
                                     className={`p-4 rounded-2xl flex-row items-center border-[1.5px] mb-4 ${locationText.trim().length > 0
