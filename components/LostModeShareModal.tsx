@@ -374,11 +374,11 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                       <Text className="text-[#8E8E93] text-[14px] font-regular">Cancel</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleConfirm} className="flex-1 bg-[#E89B5A] py-3.5 rounded-[16px] items-center" disabled={isSubmitting}>
+                    <TouchableOpacity onPress={handleConfirm} className="flex-1 bg-[#E89B5A] py-3.5 rounded-[16px] items-center justify-center" disabled={isSubmitting}>
                       {isSubmitting ? (
                         <ActivityIndicator color="white" size="small" />
                       ) : (
-                        <Text className="text-white text-[14px] font-semibold">Send</Text>
+                        <Text className="text-white text-[14px] font-semibold items-center">Send</Text>
                       )}
                     </TouchableOpacity>
                   </View>
