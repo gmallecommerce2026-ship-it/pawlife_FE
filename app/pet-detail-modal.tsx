@@ -8,6 +8,7 @@ import { ActivityIndicator, Alert, Dimensions, Image, LayoutAnimation, Linking, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function PetDetailModal() {
   const router = useRouter();
@@ -121,13 +122,89 @@ export default function PetDetailModal() {
       <StatusBar style="light" />
 
       {/* --- NÚT BACK (Luôn nằm trên cùng, z-index cao nhất) --- */}
+
       <TouchableOpacity
         onPress={() => router.back()}
-        style={{ top: insets.top + 10, zIndex: 50 }}
-        className="absolute left-5 w-10 h-10 bg-black/20 rounded-full items-center justify-center"
+        activeOpacity={0.7}
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 5,
+          elevation: 3,
+          top: insets.top + 10, zIndex: 50
+        }}
+        className="absolute left-5 w-10 h-10 rounded-full items-center justify-center"
       >
-        <Ionicons name="chevron-back" size={24} color="white" />
+        <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 28,
+            borderWidth: 0.5,
+            borderTopColor: 'white',
+            borderLeftColor: 'white',
+            borderBottomColor: 'transparent',
+            borderRightColor: 'transparent',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+          }}>
+          <LinearGradient
+            colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            locations={[0, 0.3, 1]}
+
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+          />
+          <Feather name="chevron-left" size={20} color="#00000" />
+        </View>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => router.back()}
+        activeOpacity={0.7}
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 5,
+          elevation: 3,
+          top: insets.top + 10, zIndex: 50
+        }}
+        className="absolute right-5 w-10 h-10 rounded-full items-center justify-center"
+      >
+        <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 28,
+            borderWidth: 0.5,
+            borderTopColor: 'white',
+            borderLeftColor: 'white',
+            borderBottomColor: 'transparent',
+            borderRightColor: 'transparent',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+          }}>
+          <LinearGradient
+            colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            locations={[0, 0.3, 1]}
+
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+          />
+          <Image
+            className=''
+            source={require('../assets/icon/share.png')}
+            style={{ width: 16, height: 16 }}
+            resizeMode="cover"
+          />
+        </View>
+      </TouchableOpacity>
+
+
 
       {/* --- LAYER 1: BACKGROUND TĨNH CỦA SLIDER ẢNH --- */}
       <View style={{ height: IMAGE_HEIGHT, position: 'absolute', top: 0, width: '100%' }}>
@@ -164,7 +241,6 @@ export default function PetDetailModal() {
         backgroundStyle={{ backgroundColor: 'white', borderRadius: 30 }}
         handleIndicatorStyle={{ backgroundColor: '#E5E5EA', width: 48, height: 6 }}
         style={{
-          // --- 🍎 DÀNH CHO iOS ---
           shadowColor: '#000000',
           shadowOffset: {
             width: 0,

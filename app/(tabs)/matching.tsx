@@ -90,22 +90,22 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
 
                 <TouchableOpacity
                     disabled={!canReload}
-                    className={`${actionButtonClasses} w-14 h-14 border-[2px] border-blue-500 ${!canReload ? 'opacity-40' : 'opacity-100'}`}
+                    className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#4643FF] ${!canReload ? 'opacity-50' : 'opacity-100'}`}
                     onPress={() => onAction && onAction('reload')}
                 >
                     <Image className='mr-3' source={require('../../assets/icon/reload-pawdoption.png')} style={{ width: 18, height: 18 }} resizeMode="cover" />
                 </TouchableOpacity>
 
-                <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-red-500`} onPress={() => onAction && onAction('left')}>
+                <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#FF4646]`} onPress={() => onAction && onAction('left')}>
                     <Image className='mr-3' source={require('../../assets/icon/x-pawdoption.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
                 </TouchableOpacity>
 
-                <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-orange-500`} onPress={() => onAction && onAction('heart')}>
+                <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#E89B5A]`} onPress={() => onAction && onAction('heart')}>
                     <Image className='mr-3' source={require('../../assets/icon/heart-pawdoption.png')} style={{ width: 19, height: 17 }} resizeMode="cover" />
                 </TouchableOpacity>
 
-                <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-green-500`} onPress={() => onAction && onAction('right')}>
-                    <Image className='mr-3' source={require('../../assets/icon/tick-pawdoption.png')} style={{ width: 19, height: 13 }} resizeMode="cover" />
+                <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#77C852]`} onPress={() => onAction && onAction('right')}>
+                    <Image className='mr-3' source={require('../../assets/icon/tick-pawdoption.png')} style={{ width: 19, height: 13 }} resizeMode="cover"/>
                 </TouchableOpacity>
 
             </View>
@@ -528,7 +528,7 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                     onPress={onBack}
                     className="w-10 items-end py-1.5"
                 >
-                    <Feather name="x" size={22} color="#374151" />
+                    <Feather name="x" size={18} color="#374151" />
                 </TouchableOpacity>
             </View>
 
@@ -1102,7 +1102,7 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                 <View className="flex-row items-center">
                     <Text className="text-3xl font-normal text-gray-900 tracking-tight">Pawdoption</Text>
                     <TouchableOpacity onPress={onBack} className="p-2 ml-1">
-                        <Image className='mr-3' source={require('../../assets/icon/Sliders.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
+                        <Image className='mr-3 top-1' source={require('../../assets/icon/Sliders.png')} style={{ width: 18, height: 18 }} resizeMode="cover" />
                     </TouchableOpacity>
                 </View>
 
@@ -1110,7 +1110,7 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                     <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={() => router.push('/favorite-pets')} // <-- Thêm dòng này để navigate
-                        className="flex-row items-center bg-[#ffa053] px-3 py-1.5 rounded-full shadow-sm shadow-orange-200"
+                        className="flex-row items-center bg-[#E89B5A] px-3 py-1.5 rounded-full shadow-sm shadow-orange-200"
                     >
                         <AntDesign name="heart" size={15} color="white" />
                         <Text className="text-white font-bold ml-1.5 text-base">{likeCount}</Text>
