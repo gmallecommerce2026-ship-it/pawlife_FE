@@ -3,7 +3,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { memo, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Dimensions, FlatList, Image, StatusBar, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Dimensions, FlatList, Image, StatusBar, TextInput, TouchableOpacity, View, LayoutAnimation } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { eventService } from '../services/eventService';
 import { petService } from '../services/petService';
@@ -11,8 +11,9 @@ import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
 
 import { Text } from '@/components/AppText';
+import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
-const COLUMN_WIDTH = (width - 48 - 15) / 2;
+const COLUMN_WIDTH = (width - 48 - 16) / 2;
 
 function useDebounce<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -30,6 +31,28 @@ function useDebounce<T>(value: T, delay: number): T {
 // =========================================================================
 // 1. PURE COMPONENTS
 // =========================================================================
+
+const formatBreed = (breed?: string) => {
+    if (!breed) return '';
+    
+    // Nếu dưới hoặc bằng 15 ký tự thì giữ nguyên toàn bộ
+    if (breed.length <= 15) return breed;
+
+    // Nếu trên 15 ký tự, tiến hành tách từ dựa vào khoảng trắng
+    const words = breed.split(' ');
+
+    // Nếu có từ 2 từ trở lên (VD: Golden Retriever)
+    if (words.length > 1) {
+        // Lấy chữ cái đầu tiên của từ thứ nhất, cộng thêm dấu chấm, và ghép với các từ còn lại
+        const firstLetter = words[0][0]; 
+        const restOfWords = words.slice(1).join(' '); 
+        
+        return `${firstLetter}. ${restOfWords}`;
+    }
+
+    // Fallback: Trong trường hợp hiếm hoi tên chỉ có 1 từ viết liền dính vào nhau mà dài hơn 15 ký tự
+    return `${breed.substring(0, 15)}...`;
+};
 
 const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => (
     <TouchableOpacity
@@ -55,8 +78,20 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
         </View>
         <View className="pt-[12px]">
             <Text className="text-black font-semibold text-[16px] mb-1">{item.name}</Text>
-            <View className="flex-row items-center">
-                <Text className="text-gray-400 text-[12px] font-regular">{item.age || '2 years'} · {item.breed || 'Unknown'}</Text>
+            <View className="flex-row items-start">
+                {/* Icon Giới tính với mã màu chuẩn chiết xuất từ ảnh */}
+                <Ionicons
+                    name={item.gender?.toLowerCase() === 'female' ? "female" : "male"}
+                    size={12}
+                    color={item.gender?.toLowerCase() === 'female' ? "#F471B5" : "#5BB0FF"}
+                />
+
+                <Text
+                    className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
+                    numberOfLines={1}
+                >
+                    {item.age || '1 years'} · {formatBreed(item.breed) || 'Unknown'}
+                </Text>
             </View>
         </View>
     </TouchableOpacity>
@@ -64,7 +99,7 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
 
 const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
     const { user } = useContext(AuthContext);
-    
+
     // Lấy state từ Zustand
     const isFollowed = useEngagementStore(state => state.followedShelters[item.id] ?? item.isFollowed);
     const toggleShelterFollow = useEngagementStore(state => state.toggleShelterFollow);
@@ -90,14 +125,14 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
     };
 
     return (
-        <TouchableOpacity 
+        <TouchableOpacity
             className="flex-row items-center mb-[21px] bg-white"
             activeOpacity={0.7}
             onPress={() => onPress(item)}
         >
-            <Image 
-                source={{ uri: item.avatarUrl || item.avatar || 'https://via.placeholder.com/200' }} 
-                className="w-[54px] h-[54px] rounded-full bg-gray-200" 
+            <Image
+                source={{ uri: item.avatarUrl || item.avatar || 'https://via.placeholder.com/200' }}
+                className="w-[54px] h-[54px] rounded-full bg-gray-200"
             />
             <View className="flex-1 ml-[14px] pr-2 justify-center">
                 <Text className="text-black font-semibold text-[16px] mb-[3px]" numberOfLines={1}>
@@ -107,19 +142,17 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
                     {item.address || 'Unknown location'} · {item.petCount || 0} pets
                 </Text>
             </View>
-            
+
             {/* Nút Follow */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 onPress={handleToggleFollow}
                 style={{ zIndex: 10, elevation: 10 }}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                className={`px-5 py-[3.5px] rounded-full shadow-sm ${
-                    isFollowed ? 'bg-[#F8F8F8]' : 'bg-[#E89B5A]'
-                }`}
+                className={`px-5 py-[3.5px] rounded-full shadow-sm ${isFollowed ? 'bg-[#F8F8F8]' : 'bg-[#E89B5A]'
+                    }`}
             >
-                <Text className={`text-[14px] font-semibold ${
-                    isFollowed ? 'text-[#8E8E93]' : 'text-white'
-                }`}>
+                <Text className={`text-[14px] font-semibold ${isFollowed ? 'text-[#8E8E93]' : 'text-white'
+                    }`}>
                     {isFollowed ? 'Following' : 'Follow'}
                 </Text>
             </TouchableOpacity>
@@ -129,7 +162,7 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
 
 const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
     const { user } = useContext(AuthContext);
-    
+
     // Lấy state từ Zustand
     const isInterested = useEngagementStore(state => state.interestedEvents[item.id] ?? item.isInterested);
     const toggleEventInterest = useEngagementStore(state => state.toggleEventInterest);
@@ -176,41 +209,41 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
     ];
 
     return (
-        <TouchableOpacity 
+        <TouchableOpacity
             className="bg-white rounded-[20px] flex-row shadow-sm border border-[#F3F4F6] mb-4 overflow-hidden"
             activeOpacity={0.8}
             onPress={() => onPress(item)}
         >
-            <Image 
-                source={{ uri: item.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} 
+            <Image
+                source={{ uri: item.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }}
                 className="w-[110px] min-h-[120px] bg-gray-200"
-                resizeMode="cover" 
+                resizeMode="cover"
             />
-            
+
             <View className="flex-1 p-[14px] justify-between">
-                <View className="pr-6 relative"> 
+                <View className="pr-6 relative">
                     <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1" numberOfLines={2}>
                         {item.title || 'Weekend Animal Event'}
                     </Text>
                     <Text className="text-[#8E8E93] text-[13px] font-regular" numberOfLines={1}>
                         {item.locationName || item.address || 'District, City'}
                     </Text>
-                    
+
                     {/* QUAN TRỌNG: Thêm zIndex, elevation và gọi hàm với (e) */}
-                    <TouchableOpacity 
-                        className="absolute -top-1 right-0" 
-                        style={{ zIndex: 10, elevation: 10 }} 
+                    <TouchableOpacity
+                        className="absolute -top-1 right-0"
+                        style={{ zIndex: 10, elevation: 10 }}
                         hitSlop={{ top: 20, right: 20, bottom: 20, left: 20 }}
                         onPress={handleToggle}
                     >
-                        <Feather 
-                            name="bookmark" 
-                            size={20} 
-                            color={isInterested ? "#E89B5A" : "#9CA3AF"} 
+                        <Feather
+                            name="bookmark"
+                            size={20}
+                            color={isInterested ? "#E89B5A" : "#9CA3AF"}
                         />
                     </TouchableOpacity>
                 </View>
-                
+
                 <View className="flex-row items-center justify-between mt-4">
                     <View className="flex-row items-center flex-1 pr-2">
                         <Feather name="calendar" size={13} color="#E89B5A" />
@@ -218,13 +251,13 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
                             {displayDate}
                         </Text>
                     </View>
-                    
+
                     <View className="flex-row items-center">
                         <View className="flex-row">
                             {mockAvatars.map((avatar, index) => (
-                                <Image 
+                                <Image
                                     key={index}
-                                    source={{ uri: avatar }} 
+                                    source={{ uri: avatar }}
                                     className={`w-[18px] h-[18px] rounded-full border-2 border-white ${index > 0 ? '-ml-2' : ''}`}
                                 />
                             ))}
@@ -310,9 +343,9 @@ const SheltersSection = ({ searchQuery, onProfilePress }: { searchQuery: string,
             setLoading(true);
             try {
                 // TRUYỀN USER ID VÀO ĐÂY
-                const response = await shelterService.getShelters({ 
+                const response = await shelterService.getShelters({
                     search: searchQuery,
-                    userId: user?.id 
+                    userId: user?.id
                 });
                 const responseData = response?.data?.data || response?.data || response;
                 setShelters(Array.isArray(responseData) ? responseData : []);
@@ -329,7 +362,7 @@ const SheltersSection = ({ searchQuery, onProfilePress }: { searchQuery: string,
     if (loading) return <ActivityIndicator size="large" color="#ffa053" style={{ marginTop: 40 }} />;
 
     return (
-        <FlatList 
+        <FlatList
             data={shelters}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 }}
@@ -418,6 +451,18 @@ export default function SearchScreen() {
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearchQuery = useDebounce(searchInput, 500);
 
+    const [isFocused, setIsFocused] = useState(false);
+    const handleFocus = () => {
+        // Kích hoạt animation mượt mà
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setIsFocused(true);
+    };
+
+    const handleBlur = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setIsFocused(false);
+    };
+
     useEffect(() => {
         if (type && ['Pets', 'Shelters', 'Events'].includes(type as string)) {
             setActiveTab(type as any);
@@ -480,10 +525,44 @@ export default function SearchScreen() {
     return (
         <SafeAreaView className="flex-1 bg-white" style={{ paddingTop: StatusBar.currentHeight }}>
             <View className="flex-row items-center px-6 pt-3 gap-3">
-                <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-                    <Feather name="chevron-left" size={26} color="#1F2937" />
-                </TouchableOpacity>
-                <View className="flex-1 flex-row items-center bg-[#F9FAFB] rounded-full px-4 h-12 border border-gray-100">
+                {!isFocused && (
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        activeOpacity={0.7}
+                        style={{
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 5,
+                            elevation: 3,
+                        }}
+                    >
+                        <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                            style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 28,
+                                borderWidth: 0.5,
+                                borderTopColor: 'white',
+                                borderLeftColor: 'white',
+                                borderBottomColor: 'transparent',
+                                borderRightColor: 'transparent',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                            }}>
+                            <LinearGradient
+                                colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                locations={[0, 0.3, 1]}
+
+                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                            />
+                            <Feather name="chevron-left" size={20} color="#1F2937" />
+                        </View>
+                    </TouchableOpacity>
+                )}
+                <View className="flex-1 flex-row items-center bg-[#F8F8F8] rounded-full px-4 h-12 border border-[#EBEBEB]">
                     <Feather name="search" size={18} color="#8E8E93" />
                     <TextInput
                         className="flex-1 ml-3 text-[14px] text-gray-800 font-regular"
@@ -493,17 +572,23 @@ export default function SearchScreen() {
                         style={{ fontFamily: "Urbanist" }}
                         onChangeText={setSearchInput}
                         autoFocus={false}
+                        onFocus={handleFocus}
+                        onBlur={handleBlur}
                     />
                     <TouchableOpacity onPress={() => router.push('/filter-modal')} activeOpacity={0.6} className="p-1">
-                        <Ionicons name="options-outline" size={20} color="#8E8E93" />
+                        <Image
+                            source={require('../assets/icon/sliders-gray.png')}
+                            className="w-[16px] h-[16px]"
+                        />
                     </TouchableOpacity>
                 </View>
             </View>
-
-            <View className="flex-row px-6 border-b pt-[38px] border-gray-100">
-                <TabButton title="Pet" />
-                <TabButton title="Shelter" />
-                <TabButton title="Event" />
+            <View className='px-[20px] mb-[6px]'>
+                <View className="flex-row border-b pt-[38px] border-[#545456]/35" style={{ borderBottomWidth: 0.33 }}>
+                    <TabButton title="Pet" />
+                    <TabButton title="Shelter" />
+                    <TabButton title="Event" />
+                </View>
             </View>
 
             <View className="flex-1 bg-white">

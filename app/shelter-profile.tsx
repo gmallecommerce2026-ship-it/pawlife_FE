@@ -8,6 +8,7 @@ import { shelterService } from '../services/shelterService';
 
 import { Text } from '@/components/AppText';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
 
@@ -27,6 +28,8 @@ export default function ShelterProfileScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
   const [activeTab, setActiveTab] = useState<'pets' | 'info'>('pets');
+  const COLUMN_WIDTH = (width - 48 - 16) / 2;
+
 
   const [modalConfig, setModalConfig] = useState({
     visible: false,
@@ -145,6 +148,28 @@ export default function ShelterProfileScreen() {
     }
   };
 
+  const formatBreed = (breed?: string) => {
+    if (!breed) return '';
+
+    // Nếu dưới hoặc bằng 15 ký tự thì giữ nguyên toàn bộ
+    if (breed.length <= 15) return breed;
+
+    // Nếu trên 15 ký tự, tiến hành tách từ dựa vào khoảng trắng
+    const words = breed.split(' ');
+
+    // Nếu có từ 2 từ trở lên (VD: Golden Retriever)
+    if (words.length > 1) {
+      // Lấy chữ cái đầu tiên của từ thứ nhất, cộng thêm dấu chấm, và ghép với các từ còn lại
+      const firstLetter = words[0][0];
+      const restOfWords = words.slice(1).join(' ');
+
+      return `${firstLetter}. ${restOfWords}`;
+    }
+
+    // Fallback: Trong trường hợp hiếm hoi tên chỉ có 1 từ viết liền dính vào nhau mà dài hơn 15 ký tự
+    return `${breed.substring(0, 15)}...`;
+  };
+
   const openPolicy = () => {
     setModalConfig({
       visible: true,
@@ -171,8 +196,8 @@ export default function ShelterProfileScreen() {
 
   const StatItem = ({ value, label }: { value: string | number, label: string }) => (
     <View className="flex-row items-center">
-      <Text className="text-[14px] font-bold text-black">{value}</Text>
-      <Text className="text-[14px] text-black ml-1">{label}</Text>
+      <Text className="text-[14px] font-bold text-black tracking-[0.5px]">{value}</Text>
+      <Text className="text-[14px] text-black font-regular ml-1 tracking-[0.5px]">{label}</Text>
     </View>
   );
 
@@ -280,14 +305,76 @@ export default function ShelterProfileScreen() {
       >
         <TouchableOpacity
           onPress={() => router.back()}
-          className="w-10 h-10 bg-black/20 rounded-full items-center justify-center"
+          activeOpacity={0.8}
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 5,
+            elevation: 3,
+          }}
+          className="absolute w-10 h-10 rounded-full items-center justify-center"
         >
-          <Ionicons name="chevron-back" size={24} color="white" />
+          <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 28,
+              borderWidth: 0.5,
+              borderTopColor: 'white',
+              borderLeftColor: 'white',
+              borderBottomColor: 'transparent',
+              borderRightColor: 'transparent',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+            }}>
+            <LinearGradient
+              colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              locations={[0, 0.3, 1]}
+
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+            />
+            <Feather name="chevron-left" size={20} color="#00000" />
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setIsSearching(true)} className="w-10 h-10 bg-black/20 rounded-full items-center justify-center">
-          <Ionicons name="search" size={22} color="white" />
+          onPress={() => setIsSearching(true)}
+          activeOpacity={0.8}
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 5,
+            elevation: 3,
+          }}
+          className="absolute right-0 w-10 h-10 rounded-full items-center justify-center"
+        >
+          <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 28,
+              borderWidth: 0.5,
+              borderTopColor: 'white',
+              borderLeftColor: 'white',
+              borderBottomColor: 'transparent',
+              borderRightColor: 'transparent',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            }}>
+            <LinearGradient
+              colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              locations={[0, 0.3, 1]}
+
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+            />
+            <Ionicons name="search" size={19} color="black" />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -304,7 +391,7 @@ export default function ShelterProfileScreen() {
               />
             </View>
             <View className="ml-4 flex-1 justify-center mt-4">
-              <Text className="text-[20px] font-semibold text-black mb-2" numberOfLines={1}>
+              <Text className="text-[20px] font-semibold text-black mb-2 tracking-[0.5px]" numberOfLines={1}>
                 {shelterInfo?.name}
               </Text>
               <View className="flex-row items-center">
@@ -319,11 +406,11 @@ export default function ShelterProfileScreen() {
             </View>
           </View>
           {/* Content */}
-          <View className='mx-[22px]' style={{ top: -5 }}>
-            <View className="mb-6">
-              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1 leading-4">Animal Shelter & Rescue</Text>
-              <Text className="text-[14px] text-black font-regular leading-5">
-                {shelterInfo?.description || "Providing a second chance for furry friends in need with love and professional care."}
+          <View className='mx-[20px]' style={{ top: -5 }}>
+            <View className="mb-3">
+              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1 leading-4 tracking-[0.06px]">Animal Shelter & Rescue</Text>
+              <Text className="text-[14px] text-black font-regular leading-5 tracking-[0.06px]">
+                {shelterInfo?.description || "Saving lives and finding forever home 🐾"}
               </Text>
               <View className="flex-row items-center mt-1">
                 <Image
@@ -331,19 +418,19 @@ export default function ShelterProfileScreen() {
                   style={{ width: 12, height: 12 }}
                   resizeMode="cover"
                 />
-                <Text className="ml-1 text-[14px] text-[#E89B5A] leading-4">{shelterInfo?.emailAddress || 'pawlife@example.com'}</Text>
+                <Text className="ml-1 text-[14px] text-[#E89B5A] leading-4 tracking-[0.06px]">{shelterInfo?.emailAddress || 'pawlife@example.com'}</Text>
               </View>
 
               <View className="flex-row items-center mt-1">
                 <Image
                   source={require('../assets/icon/location-gray-icon.png')}
-                  style={{ width: 6, height: 7.5 }}
+                  style={{ width: 7, height: 9 }}
                   resizeMode="cover"
                 />
-                <Text className="ml-2 text-[12px] text-[#8E8E93] flex-1 leading-4">{shelterInfo?.address}</Text>
+                <Text className="ml-2 text-[12px] text-[#8E8E93] flex-1 leading-4 tracking-[0.06px]">{shelterInfo?.address}</Text>
               </View>
 
-              <View className="flex-row items-center mt-4">
+              <View className="flex-row items-center mt-2">
 
                 {/* --- 1. HIỆU ỨNG AVATAR STACK --- */}
                 <View className="flex-row items-center">
@@ -385,10 +472,10 @@ export default function ShelterProfileScreen() {
 
               </View>
             </View>
-            <View className="flex-row gap-3 mb-6">
+            <View className="flex-row gap-4 mb-3">
               <TouchableOpacity
                 onPress={handleToggleFollow}
-                className={`flex-1 py-2 rounded-full items-center justify-center shadow-sm ${isFollowing ? 'bg-gray-200 shadow-gray-100' : 'bg-orange-400 shadow-orange-200'
+                className={`flex-1 py-2 rounded-full items-center justify-center shadow-sm ${isFollowing ? 'bg-gray-200 shadow-gray-100' : 'bg-[#E89B5A] shadow-orange-200'
                   }`}
               >
                 <Text className={`font-semibold text-[14px] ${isFollowing ? 'text-gray-700' : 'text-white'}`}>
@@ -412,7 +499,7 @@ export default function ShelterProfileScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: insets.bottom + 200 }}>
             {activeTab === 'info' ? (
-              <View className="px-[22px]">
+              <View className="px-[20px]">
                 {/* About Shelter */}
                 <Text className="text-[16px] font-medium text-black mb-2">About Shelter</Text>
                 <Text className="text-[14px] text-[#8E8E93] leading-5 mb-5">
@@ -431,7 +518,7 @@ export default function ShelterProfileScreen() {
                     <Text className="text-[14px] text-[#8E8E93]">Send message</Text>
                   </View>
                   <TouchableOpacity onPress={handleCall} className="flex-row items-center gap-x-3">
-                   <Image
+                    <Image
                       source={require('../assets/icon/phone-info.png')}
                       style={{ width: 13, height: 13 }}
                       resizeMode="cover"
@@ -468,11 +555,11 @@ export default function ShelterProfileScreen() {
                     <Text className="text-[14px] text-[#8E8E93]">Joined Jan 1, 2023</Text>
                   </View>
                   <View className="flex-row items-center gap-x-3">
-                    {/* <Image
-                      source={require('../assets/icon/real-tick.png')}
+                    <Image
+                      source={require('../assets/icon/verified.png')}
                       style={{ width: 13, height: 13 }}
                       resizeMode="cover"
-                    /> */}
+                    />
                     <Text className="text-[14px] text-[#8E8E93]">Verified Jan 1, 2023</Text>
                   </View>
                 </View>
@@ -480,7 +567,7 @@ export default function ShelterProfileScreen() {
 
             ) : (
 
-              <View className="flex-row flex-wrap gap-3 justify-between mx-[22px]">
+              <View className="flex-row flex-wrap gap-3 justify-between mx-[20px]">
                 {pets.length === 0 ? (
                   <View className="flex-1 items-center justify-center py-10">
                     <Text className="text-gray-500">No pets found matching "{searchQuery}"</Text>
@@ -490,62 +577,99 @@ export default function ShelterProfileScreen() {
                     const imageUrl = pet.images && pet.images.length > 0
                       ? pet.images[0].url
                       : 'https://via.placeholder.com/400';
-
-                    // Giả lập logic lấy giới tính (nếu API trả về 'female' hoặc 'male')
                     const isFemale = pet.gender?.toLowerCase() === 'female';
 
                     return (
                       <TouchableOpacity
-                        key={pet.id}
-                        style={{ width: COLUMN_WIDTH }}
-                        className="mb-[12px]"
-                        activeOpacity={0.8}
+                        className="bg-transparent mb-[14px]"
+                        style={{ width: 160.25 }}
+                        activeOpacity={0.9}
                         onPress={() => router.push(`/shelter-pet-detail?id=${pet.id}`)}
+                        key={pet.id}
                       >
-                        {/* 1. KHỐI ẢNH: Ép tỉ lệ 1:1, bo góc cực sâu 28px */}
-                        <View className="aspect-square mb-[10px] relative">
+                        <View className="relative">
                           <Image
                             source={{ uri: imageUrl }}
-                            className="w-full h-full rounded-[24px] bg-gray-100"
+                            // Xóa h-40, thay bằng aspect-square (hoặc dùng height: COLUMN_WIDTH ở dưới)
+                            className="w-full aspect-square rounded-[24px] bg-gray-100"
+                            // Backup nếu NativeWind bản cũ không nhận aspect-square
+                            style={{ height: 160.25 }}
                             resizeMode="cover"
                           />
-
-                          {/* Icon Heart (mô phỏng theo ảnh mẫu có trái tim màu cam phấn) */}
                           {pet.isFavorite && (
                             <View className="absolute top-3.5 right-3.5">
                               <Ionicons name="heart" size={22} color="#E89B5F" />
                             </View>
                           )}
                         </View>
-
-                        {/* 2. KHỐI TEXT: Padding = 0 để thẳng hàng hoàn toàn với lề trái của ảnh */}
-                        <View className="p-0">
-                          {/* Tên Pet: Đen tuyền, chữ to, bold, margin bottom rất nhỏ */}
-                          <Text
-                            className="text-black font-semibold text-[16px] mb-[7.6px]"
-                            numberOfLines={1}
-                          >
-                            {pet.name}
-                          </Text>
-
-                          {/* Thông tin: Giới tính + Tuổi + Giống */}
+                        <View className="pt-[12px]">
+                          <Text className="text-black font-semibold text-[16px] mb-1">{pet.name}</Text>
                           <View className="flex-row items-start">
                             {/* Icon Giới tính với mã màu chuẩn chiết xuất từ ảnh */}
-                            <Ionicons
-                              name={isFemale ? "female" : "male"}
-                              size={12}
-                              color={isFemale ? "#F471B5" : "#5BB0FF"}
-                            />
+
+                            <Image className='top-1' source={isFemale ? require('../assets/icon/female.png') : require('../assets/icon/male.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
 
                             <Text
                               className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
                               numberOfLines={1}
                             >
-                              {pet.age || '1 year'} · {pet.breed || 'Unknown'}
+                              {pet.age || '1 years'} · {formatBreed(pet.breed) || 'Unknown'}
                             </Text>
                           </View>
                         </View>
                       </TouchableOpacity>
+
+                      // <TouchableOpacity
+                      //   key={pet.id}
+                      //   style={{ width: COLUMN_WIDTH }}
+                      //   className="mb-[12px]"
+                      //   activeOpacity={0.8}
+                      //   onPress={() => router.push(`/shelter-pet-detail?id=${pet.id}`)}
+                      // >
+                      //   {/* 1. KHỐI ẢNH: Ép tỉ lệ 1:1, bo góc cực sâu 28px */}
+                      //   <View className="aspect-square mb-[10px] relative">
+                      //     <Image
+                      //       source={{ uri: imageUrl }}
+                      //       className="w-full h-full rounded-[24px] bg-gray-100"
+                      //       resizeMode="cover"
+                      //     />
+
+                      //     {/* Icon Heart (mô phỏng theo ảnh mẫu có trái tim màu cam phấn) */}
+                      //     {pet.isFavorite && (
+                      //       <View className="absolute top-3.5 right-3.5">
+                      //         <Ionicons name="heart" size={22} color="#E89B5F" />
+                      //       </View>
+                      //     )}
+                      //   </View>
+
+                      //   {/* 2. KHỐI TEXT: Padding = 0 để thẳng hàng hoàn toàn với lề trái của ảnh */}
+                      //   <View className="p-0">
+                      //     {/* Tên Pet: Đen tuyền, chữ to, bold, margin bottom rất nhỏ */}
+                      //     <Text
+                      //       className="text-black font-semibold text-[16px] mb-[7.6px]"
+                      //       numberOfLines={1}
+                      //     >
+                      //       {pet.name}
+                      //     </Text>
+
+                      //     {/* Thông tin: Giới tính + Tuổi + Giống */}
+                      //     <View className="flex-row items-start">
+                      //       {/* Icon Giới tính với mã màu chuẩn chiết xuất từ ảnh */}
+                      //       <Ionicons
+                      //         name={isFemale ? "female" : "male"}
+                      //         size={12}
+                      //         color={isFemale ? "#F471B5" : "#5BB0FF"}
+                      //       />
+
+                      //       <Text
+                      //         className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
+                      //         numberOfLines={1}
+                      //       >
+                      //         {pet.age || '1 year'} · {pet.breed || 'Unknown'}
+                      //       </Text>
+                      //     </View>
+                      //   </View>
+                      // </TouchableOpacity>
                     );
                   })
                 )}

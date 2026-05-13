@@ -136,7 +136,19 @@ const SwipeableCard = ({
     const popScale = useSharedValue(isFavorited ? 1 : 0);
 
     useEffect(() => {
-        popScale.value = withSpring(isFavorited ? 1 : 0, { damping: 30, stiffness: 250 });
+        if (isFavorited) {
+            // Khi XUẤT HIỆN: Nẩy lên tự nhiên
+            // Damping thấp (12) giúp trái tim có độ rung nhẹ khi bật ra
+            popScale.value = withSpring(1, { 
+                damping: 12, 
+                stiffness: 250,
+                mass: 1
+            });
+        } else {
+            // Khi BIẾN MẤT: Rút ngược lại nhanh, dứt khoát 
+            // Stiffness cao (350) và mass nhỏ (0.8) giúp nó co rúm lại tức thì
+            popScale.value = 0;
+        }
     }, [isFavorited]);
 
     const triggerSwipe = (direction: 'left' | 'right') => {
@@ -190,7 +202,8 @@ const SwipeableCard = ({
     const nopeOpacity = useAnimatedStyle(() => ({ opacity: interpolate(sharedTranslateX.value, [-width / 4, 0], [1, 0]) }));
 
     const heartAnimatedStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: popScale.value }]
+        transform: [{ scale: popScale.value }],
+        opacity: interpolate(popScale.value, [0, 0.2, 1], [0, 1, 1], Extrapolation.CLAMP)
     }));
     const imageSource = typeof data.image === 'string' ? { uri: data.image } : data.image;
 
@@ -1118,8 +1131,8 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
 
                 <View className="flex-row items-center">
                     <Text className="text-3xl font-normal text-gray-900 tracking-tight">Pawdoption</Text>
-                    <TouchableOpacity onPress={onBack} className="p-2 ml-1">
-                        <Image className='mr-3 top-1' source={require('../../assets/icon/Sliders.png')} style={{ width: 18, height: 18 }} resizeMode="cover" />
+                    <TouchableOpacity onPress={onBack} className="p-2">
+                        <Image className='top-[7px]' source={require('../../assets/icon/Sliders.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
                     </TouchableOpacity>
                 </View>
 

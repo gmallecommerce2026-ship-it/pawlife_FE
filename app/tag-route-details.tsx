@@ -265,7 +265,7 @@ export default function TagRouteDetailsScreen() {
                     width: 36,
                     height: 36,
                     borderRadius: 28,
-                    borderWidth: 1.5,
+                    borderWidth: 0.5,
                     borderTopColor: 'white',
                     borderLeftColor: 'white',
                     borderBottomColor: 'transparent',
