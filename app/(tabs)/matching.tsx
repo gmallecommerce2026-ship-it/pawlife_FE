@@ -7,7 +7,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Keyboard, Text as RNText, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Keyboard, Modal, Text as RNText, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
@@ -130,7 +130,8 @@ const SwipeableCard = ({
     cachePolicy = "memory-disk",
     canReload = false,
     isTutorialCard = false,
-    tutorialOverlay = null
+    tutorialOverlay = null,
+    onSingleTap
 }: any) => {
     const scale = useSharedValue(1);
     const popScale = useSharedValue(isFavorited ? 1 : 0);
@@ -191,7 +192,19 @@ const SwipeableCard = ({
             runOnJS(handleAction)('heart');
         });
 
-    const gesture = Gesture.Race(doubleTap, pan);
+    // --- THÊM SINGLE TAP CHO VIỆC XEM ẢNH ---
+    const singleTap = Gesture.Tap()
+        .numberOfTaps(1)
+        .enabled(!disableSwipe)
+        .onEnd(() => {
+            if (onSingleTap) runOnJS(onSingleTap)();
+        });
+
+    // Dùng Exclusive để hệ thống chờ xem user bấm 1 hay 2 lần
+    const taps = Gesture.Exclusive(doubleTap, singleTap);
+    
+    // Đưa tổ hợp taps và pan vào Race
+    const gesture = Gesture.Race(taps, pan);
 
     const animatedStyle = useAnimatedStyle(() => {
         const rotate = interpolate(sharedTranslateX.value, [-width / 2, 0, width / 2], [-10, 0, 10], Extrapolation.CLAMP);
@@ -933,13 +946,81 @@ const TutorialScreen = ({ onComplete }: { onComplete: () => void }) => {
         </View>
     );
 };
+const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], isVisible: boolean, onClose: () => void }) => {
+    // 1. Dùng hook lấy chính xác chiều cao của Notch/Dynamic Island
+    const insets = useSafeAreaInsets(); 
+    const [currentIndex, setCurrentIndex] = useState(0);
 
+    useEffect(() => {
+        if (isVisible) setCurrentIndex(0);
+    }, [isVisible]);
+
+    if (!isVisible || !images || images.length === 0) return null;
+
+    const handlePressLeft = () => {
+        if (currentIndex > 0) setCurrentIndex(prev => prev - 1);
+    };
+
+    const handlePressRight = () => {
+        if (currentIndex < images.length - 1) setCurrentIndex(prev => prev + 1);
+    };
+
+    return (
+        // Thêm statusBarTranslucent={true} để Modal phủ kín màn hình chuẩn xác hơn
+        <Modal visible={isVisible} transparent animationType="fade" statusBarTranslucent={true}>
+            <View className="flex-1 bg-black">
+                <Image
+                    source={{ uri: images[currentIndex] }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="contain"
+                />
+
+                {/* 2. Ép khoảng cách cứng dựa trên insets.top */}
+                <View 
+                    className="absolute top-0 left-0 right-0 z-50"
+                    style={{ paddingTop: Math.max(insets.top, 50) }} // Luôn cách đỉnh ít nhất 50px
+                >
+                    <View className="px-5">
+                        <View className="flex-row justify-end mb-4">
+                            <TouchableOpacity 
+                                onPress={onClose} 
+                                className="p-2 bg-black/40 rounded-full"
+                                // 3. Mở rộng vùng nhận diện cảm ứng để dễ bấm hơn
+                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
+                            >
+                                <Feather name="x" size={26} color="white" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View className="flex-row gap-1.5">
+                            {images.map((_, idx) => (
+                                <View 
+                                    key={idx} 
+                                    className={`flex-1 h-[3px] rounded-full ${
+                                        idx === currentIndex ? 'bg-white' : 'bg-white/30'
+                                    }`} 
+                                />
+                            ))}
+                        </View>
+                    </View>
+                </View>
+
+                {/* Vùng chạm (Tăng zIndex để chắc chắn không bị che) */}
+                <View style={{ position: 'absolute', top: '25%', bottom: 0, left: 0, right: 0, flexDirection: 'row', zIndex: 10 }}>
+                    <TouchableOpacity style={{ flex: 1 }} onPress={handlePressLeft} activeOpacity={1} />
+                    <TouchableOpacity style={{ flex: 1 }} onPress={handlePressRight} activeOpacity={1} />
+                </View>
+            </View>
+        </Modal>
+    );
+};
 // ==================================================================
 // 4. MAIN SWIPE SCREEN (PURE UI)
 // ==================================================================
 const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, onDetail: (item: any) => void, onAdopt: (item: any) => void }) => {
     const router = useRouter();
-
+    const [isViewerVisible, setIsViewerVisible] = useState(false);
+    const [viewerImages, setViewerImages] = useState<string[]>([]);
     const { user } = useContext(AuthContext);
     const { location, isLocationLoaded } = useLocation();
 
@@ -978,14 +1059,19 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                     ? `${pet.distance}`
                     : (pet.city || pet.location || 'Gần bạn');
 
+                const petImages = pet.images && pet.images.length > 0 
+                    ? pet.images.map((img: any) => img.url) 
+                    : ['https://via.placeholder.com/400x600?text=No+Image'];
+
                 return {
                     id: pet.id,
                     name: pet.name,
                     age: pet.age || 'Unknown',
                     gender: pet.gender || 'MALE',
-                    distance: displayDistance, // Đã thay 'Near you' bằng biến xử lý ở trên
+                    distance: displayDistance,
                     location: pet.shelter?.name || pet.location || 'Location',
-                    image: pet.images && pet.images.length > 0 ? pet.images[0].url : 'https://via.placeholder.com/400x600?text=No+Image'
+                    image: petImages[0], // Giữ lại image cho tương thích code cũ
+                    images: petImages    // THÊM TRƯỜNG NÀY ĐỂ CHỨA NHIỀU ẢNH
                 };
             });
 
@@ -1002,7 +1088,12 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
             setLoading(false);
         }
     };
-
+    const handleOpenViewer = (images: string[]) => {
+        if (images && images.length > 0) {
+            setViewerImages(images);
+            setIsViewerVisible(true);
+        }
+    };
     useFocusEffect(
         useCallback(() => {
             // SỬA Ở ĐÂY: Dùng isLocationLoaded thay vì location !== null
@@ -1205,6 +1296,7 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                                     sharedTranslateY={activeTranslationY}
                                     isFavorited={favorites.includes(activeCard.id)}
                                     canReload={canReload}
+                                    onSingleTap={() => handleOpenViewer(activeCard.images || [activeCard.image])} // <--- THÊM DÒNG NÀY
                                 />
                             </View>
                         ) : !loading && !activeCard ? (
@@ -1242,6 +1334,11 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                     </View>
                 )}
             </View>
+            <ImageViewerOverlay 
+                images={viewerImages} 
+                isVisible={isViewerVisible} 
+                onClose={() => setIsViewerVisible(false)} 
+            />
             <View style={{ height: TAB_BAR_HEIGHT }} />
         </SafeAreaView>
     )
