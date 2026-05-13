@@ -1014,6 +1014,7 @@ const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], 
         </Modal>
     );
 };
+
 // ==================================================================
 // 4. MAIN SWIPE SCREEN (PURE UI)
 // ==================================================================
