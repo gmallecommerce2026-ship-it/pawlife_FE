@@ -26,10 +26,10 @@ import * as LocalAuthentication from 'expo-local-authentication';
 
 // Tái sử dụng component cho dạng bật/tắt (Toggle)
 const SettingToggle = ({ label, value, onValueChange }: { label: string, value: boolean, onValueChange: (val: boolean) => void }) => (
-  <View className="flex-row items-center justify-between py-4 border-b border-gray-100">
-    <Text className="text-base font-semibold text-gray-900">{label}</Text>
+  <View className="flex-row items-center justify-between py-2">
+    <Text className="text-[16px] font-semibold text-black">{label}</Text>
     <Switch
-      trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+      trackColor={{ false: '#D1D5DB', true: '#E89B5A' }}
       thumbColor={'#FFFFFF'}
       ios_backgroundColor="#D1D5DB"
       onValueChange={onValueChange}
@@ -40,14 +40,14 @@ const SettingToggle = ({ label, value, onValueChange }: { label: string, value: 
 
 // Tái sử dụng component cho dạng chuyển hướng (Link)
 const SettingLink = ({ label, description, onPress, isLast = false }: { label: string, description?: string, onPress?: () => void, isLast?: boolean }) => (
-  <TouchableOpacity 
-    activeOpacity={0.7} 
+  <TouchableOpacity
+    activeOpacity={0.7}
     onPress={onPress}
-    className={`py-4 ${!isLast ? 'border-b border-gray-100' : ''}`}
+    className={`py-4`}
   >
     <View className="flex-row items-center justify-between">
-      <Text className="text-base font-semibold text-gray-900">{label}</Text>
-      <Feather name="chevron-right" size={20} color="#9CA3AF" />
+      <Text className="text-[16px] font-semibold text-black">{label}</Text>
+      <Feather name="chevron-right" size={20} color="#000000" />
     </View>
     {description && (
       <Text className="text-sm text-gray-500 mt-1.5 leading-5">{description}</Text>
@@ -58,11 +58,11 @@ const SettingLink = ({ label, description, onPress, isLast = false }: { label: s
 export default function AccountSecurityScreen() {
   const router = useRouter();
   const { logout, user, setAuth } = useContext(AuthContext) as any;
-  
+
   // States cho các mục Toggle
   const [useFaceId, setUseFaceId] = useState(false);
   const [useGoogleAuth, setUseGoogleAuth] = useState(false);
-  
+
   const [isDeleting, setIsDeleting] = useState(false);
 
   // States cho Modal Google Authenticator
@@ -70,10 +70,10 @@ export default function AccountSecurityScreen() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [twoFaCode, setTwoFaCode] = useState('');
   const [isProcessing2FA, setIsProcessing2FA] = useState(false);
-const { t } = useLanguage();
+  const { t } = useLanguage();
   const handleTwoFaCodeChange = (text: string) => {
     setTwoFaCode(text);
-    
+
     // Tự động ẩn bàn phím khi nhập đủ 6 số
     if (text.length === 6) {
       Keyboard.dismiss();
@@ -82,12 +82,12 @@ const { t } = useLanguage();
   // Load trạng thái Face ID & 2FA khi vào màn hình
   useEffect(() => {
     const loadSettings = async () => {
-      if (!user) return; 
+      if (!user) return;
       try {
         // ĐỔI TÊN KEY ĐỂ DÙNG CHUNG CHO MÀN LOGIN
         const faceIdSetting = await AsyncStorage.getItem('isFaceIdEnabled');
         setUseFaceId(faceIdSetting === 'true');
-        
+
         setUseGoogleAuth(!!user.isTwoFactorEnabled);
       } catch (error) {
         console.error("Error loading settings", error);
@@ -101,7 +101,7 @@ const { t } = useLanguage();
     if (newValue) {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      
+
       if (!hasHardware || !isEnrolled) {
         Alert.alert("Lỗi", "Thiết bị không hỗ trợ hoặc chưa thiết lập sinh trắc học (Face ID/Vân tay).");
         return;
@@ -153,14 +153,14 @@ const { t } = useLanguage();
         "Bạn có chắc chắn muốn tắt bảo mật 2 lớp?",
         [
           { text: "Hủy", style: "cancel" },
-          { 
-            text: "Tắt", 
-            style: "destructive", 
+          {
+            text: "Tắt",
+            style: "destructive",
             onPress: async () => {
               try {
                 await axiosClient.post('/auth/2fa/turn-off');
                 setUseGoogleAuth(false);
-                
+
                 if (setAuth && user) {
                   // FIX: Dùng SecureStore thay vì AsyncStorage
                   const currentToken = await SecureStore.getItemAsync('accessToken');
@@ -191,7 +191,7 @@ const { t } = useLanguage();
       setUseGoogleAuth(true);
       set2FAModalVisible(false);
       setTwoFaCode('');
-      
+
       if (setAuth && user) {
         // FIX: Dùng SecureStore thay vì AsyncStorage
         const currentToken = await SecureStore.getItemAsync('accessToken');
@@ -225,14 +225,14 @@ const { t } = useLanguage();
       "Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Yes, delete it", 
+        {
+          text: "Yes, delete it",
           style: "destructive",
           onPress: async () => {
             try {
               setIsDeleting(true);
               await axiosClient.delete('/auth/account');
-              if (logout) await logout(); 
+              if (logout) await logout();
               Alert.alert("Success", "Your account has been permanently deleted.");
               router.replace('/');
             } catch (error) {
@@ -248,59 +248,59 @@ const { t } = useLanguage();
   };
 
   return (
-    <View className="flex-1 bg-[#F9FAFB]">
-      <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
-        
+    <View className="flex-1 bg-[#FFFFFF]">
+      <SafeAreaView edges={['top', 'bottom']}>
+
         {/* --- HEADER --- */}
-        <View className="flex-row items-center px-4 py-2 mb-2 relative bg-white pb-4 shadow-sm z-10">
-            <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 z-10">
-                <AntDesign name="left" size={24} color="#1F2937" />
-            </TouchableOpacity>
-            <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-                <Text className="text-xl font-bold text-gray-900">Account & Security</Text>
-            </View>
+        <View className="flex-row items-center px-4 py-2 mb-2 relative bg-white pb-4">
+          <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 z-10">
+            <Feather name="chevron-left" size={20} color="#000000" />
+          </TouchableOpacity>
+          <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
+            <Text className="text-[24px] font-semibold text-black">Account & Security</Text>
+          </View>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-            
-            {/* --- BIOMETRICS & 2FA --- */}
-            <View className="bg-white px-6 mt-4 border-y border-gray-100">
-              <SettingToggle 
-                label="Face ID" 
-                value={useFaceId} 
-                onValueChange={handleToggleFaceId} 
-              />
-              
-              <View className="py-4">
-                <View className="flex-row items-center justify-between">
-                    <Text className="text-base font-semibold text-gray-900">Google Authenticator</Text>
-                    <Switch
-                        trackColor={{ false: '#D1D5DB', true: '#10B981' }}
-                        thumbColor={'#FFFFFF'}
-                        ios_backgroundColor="#D1D5DB"
-                        onValueChange={handleToggleGoogleAuth}
-                        value={useGoogleAuth}
-                    />
-                </View>
+
+          {/* --- BIOMETRICS & 2FA --- */}
+          <View className="bg-white px-6 mt-2">
+            <SettingToggle
+              label="Face ID"
+              value={useFaceId}
+              onValueChange={handleToggleFaceId}
+            />
+
+            <View className="py-4">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-[16px] font-semibold text-black">Google Authenticator</Text>
+                <Switch
+                  trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+                  thumbColor={'#FFFFFF'}
+                  ios_backgroundColor="#D1D5DB"
+                  onValueChange={handleToggleGoogleAuth}
+                  value={useGoogleAuth}
+                />
               </View>
             </View>
+          </View>
 
-            {/* --- MANAGEMENT --- */}
-            <View className="bg-white px-6 mt-6 border-y border-gray-100">
-              <SettingLink 
-                label="Change Password" 
-                onPress={() => router.push('/change-password')}
-              />
-              <SettingLink 
-                label="Device Management" 
-                description="Manage your account on the various devices you own."
-                onPress={() => router.push('/device-management')}
-                isLast={true}
-              />
-            </View>
-            
-            {/* --- DANGER ZONE --- */}
-            <View className="bg-white px-6 mt-6 border-y border-gray-100">
+          {/* --- MANAGEMENT --- */}
+          <View className="bg-white px-6 ">
+            <SettingLink
+              label="Change Password"
+              onPress={() => router.push('/change-password')}
+            />
+            <SettingLink
+              label="Device Management"
+              description="Manage your account on the various devices you own."
+              onPress={() => router.push('/device-management')}
+              isLast={true}
+            />
+          </View>
+
+          {/* --- DANGER ZONE --- */}
+          <View className="bg-white px-6 mt-6 ">
             {/* <TouchableOpacity 
                 activeOpacity={0.7} 
                 onPress={handleDeactivate}
@@ -312,23 +312,26 @@ const { t } = useLanguage();
                 </Text>
             </TouchableOpacity> */}
 
-            <TouchableOpacity 
-                activeOpacity={0.7} 
-                onPress={handleDeleteAccount}
-                disabled={isDeleting}
-                className="py-4"
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleDeleteAccount}
+              disabled={isDeleting}
+              className="py-4"
             >
+              <View className='flex-row items-center justify-between'>
                 <View className="flex-row items-center">
-                <Text className="text-base font-semibold text-red-500 mr-2">
+                  <Text className="text-[16px] font-semibold text-red-500 mr-2">
                     {isDeleting ? "Deleting Account..." : "Delete Account"}
-                </Text>
-                {isDeleting && <ActivityIndicator size="small" color="#EF4444" />}
+                  </Text>
+                  {isDeleting && <ActivityIndicator size="small" color="#EF4444" />}
                 </View>
-                <Text className="text-sm text-gray-500 mt-1.5 leading-5">
+                <Feather name="chevron-right" size={20} color="#EB4824" />
+              </View>
+              <Text className="text-sm text-gray-500 mt-1.5 leading-5">
                 Permanently remove your account and data. Proceed with caution.
-                </Text>
+              </Text>
             </TouchableOpacity>
-            </View>
+          </View>
 
         </ScrollView>
 
@@ -340,7 +343,7 @@ const { t } = useLanguage();
               <Text className="text-center text-gray-500 mb-4">
                 Sử dụng ứng dụng Google Authenticator để quét mã QR bên dưới.
               </Text>
-              
+
               {qrCodeUrl ? (
                 <Image source={{ uri: qrCodeUrl }} style={{ width: 200, height: 200 }} className="mb-6" />
               ) : (
@@ -356,7 +359,7 @@ const { t } = useLanguage();
                 className="bg-gray-50 w-full px-4 py-4 rounded-2xl border border-gray-100 text-center text-xl tracking-[5px] font-bold mb-4"
               />
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 className={`w-full py-4 rounded-full mb-3 ${isProcessing2FA ? 'bg-orange-300' : 'bg-orange-500'}`}
                 onPress={handleConfirm2FA} disabled={isProcessing2FA}
               >
@@ -367,8 +370,8 @@ const { t } = useLanguage();
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                onPress={() => { set2FAModalVisible(false); setTwoFaCode(''); }} 
+              <TouchableOpacity
+                onPress={() => { set2FAModalVisible(false); setTwoFaCode(''); }}
                 className="py-2"
                 disabled={isProcessing2FA}
               >

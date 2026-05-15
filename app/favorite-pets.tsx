@@ -2,16 +2,28 @@
 import { Text } from '@/components/AppText';
 import { AntDesign, Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, Image, TouchableOpacity, View, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+  interpolateColor
+} from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 // Đồng bộ chính xác margin/padding với màn hình Search (width - paddingX - gap) / 2
 const COLUMN_WIDTH = (width - 48 - 15) / 2;
 
 type TabType = 'All' | 'Dog' | 'Cat';
+
+const AnimatedFeather = Animated.createAnimatedComponent(Feather);
+
+
 
 // =========================================================================
 // 1. PURE COMPONENTS (Tối ưu render lại với memo)
@@ -54,7 +66,13 @@ const FavoritePetCard = memo(({ item, onPress, onUnfavorite }: { item: any; onPr
         {item.name}
       </Text>
       <View className="flex-row items-center">
-        <Text className="text-gray-400 text-[12px] font-regular" numberOfLines={1}>
+        <Image
+          className=''
+          source={item.gender === 'male' ? require('../assets/icon/female.png') : require('../assets/icon/male.png')}
+          style={{ width: 10, height: 10 }}
+          resizeMode="cover"
+        />
+        <Text className="text-gray-400 text-[12px] font-regular mt-0.5 ml-1.5" numberOfLines={1}>
           {item.age || '2 years'} · {item.breed || 'Unknown'}
         </Text>
       </View>
@@ -74,6 +92,8 @@ const FilterTab = memo(({ title, isActive, onPress }: { title: TabType; isActive
   </TouchableOpacity>
 ));
 
+
+
 // =========================================================================
 // 2. MAIN SCREEN
 // =========================================================================
@@ -83,6 +103,73 @@ export default function FavoritePetsScreen() {
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('All');
+  // 1. State cho Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+
+  const searchAnimation = useSharedValue(0);
+
+  const handleOpenSearch = () => {
+    setIsSearching(true);
+    searchAnimation.value = withTiming(1, { duration: 300 });
+    setTimeout(() => inputRef.current?.focus(), 300);
+  };
+
+  const handleCloseSearch = () => {
+    setSearchQuery('');
+    searchAnimation.value = withTiming(0, { duration: 300 });
+    setTimeout(() => setIsSearching(false), 300);
+  };
+
+  // 2. Animated Styles
+  const backButtonStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
+    transform: [{ scale: interpolate(searchAnimation.value, [0, 1], [1, 0.8]) }],
+    zIndex: isSearching ? -1 : 10, // Ẩn hoàn toàn khỏi luồng bấm khi search
+  }));
+
+  const headerTitleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
+    transform: [{ translateX: interpolate(searchAnimation.value, [0, 1], [0, -20]) }]
+  }));
+
+  // Style biến đổi khung Search
+  const searchContainerStyle = useAnimatedStyle(() => {
+    const backgroundColor = interpolateColor(
+      searchAnimation.value, [0, 1], ['rgba(255, 255, 255, 0.1)', '#F8F8F8']
+    );
+    const borderTopColor = interpolateColor(searchAnimation.value, [0, 1], ['white', '#EBEBEB']);
+    const borderLeftColor = interpolateColor(searchAnimation.value, [0, 1], ['white', '#EBEBEB']);
+    const borderBottomColor = interpolateColor(searchAnimation.value, [0, 1], ['transparent', '#EBEBEB']);
+    const borderRightColor = interpolateColor(searchAnimation.value, [0, 1], ['transparent', '#EBEBEB']);
+
+    return {
+      width: interpolate(searchAnimation.value, [0, 1], [36, width - 40]),
+      borderWidth: interpolate(searchAnimation.value, [0, 1], [0.5, 1]),
+      paddingLeft: interpolate(searchAnimation.value, [0, 1], [8.5, 12]),
+      paddingRight: interpolate(searchAnimation.value, [0, 1], [0, 12]),
+      backgroundColor,
+      borderTopColor,
+      borderLeftColor,
+      borderBottomColor,
+      borderRightColor,
+    };
+  });
+
+  // Mờ dần lớp kính Gradient khi search
+  const gradientStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
+  }));
+
+  const searchIconStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(searchAnimation.value, [0, 1], ['#000000', '#8E8E93']),
+  }));
+
+  const searchInputStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.8, 1], [0, 0, 1]),
+    marginLeft: interpolate(searchAnimation.value, [0, 1], [0, 8]),
+  }));
 
   const fetchFavorites = useCallback(async () => {
     try {
@@ -115,6 +202,14 @@ export default function FavoritePetsScreen() {
     return favorites.filter(pet => pet.type?.toUpperCase() === activeTab.toUpperCase());
   }, [favorites, activeTab]);
 
+  const filteredPets = useMemo(() => {
+    return favorites.filter(pet => {
+      const matchesTab = activeTab === 'All' ? true : pet.species === activeTab;
+      const matchesSearch = pet.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
+      return matchesTab && matchesSearch;
+    });
+  }, [favorites, activeTab, searchQuery]);
+
   // Sử dụng useCallback để tránh việc Card bị re-render không cần thiết
   const handlePetPress = useCallback((item: any) => {
     router.push({ pathname: '/shelter-pet-detail', params: { id: item.id } });
@@ -140,13 +235,91 @@ export default function FavoritePetsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       {/* Header */}
-      <View className="flex-row items-center px-6 py-4">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2" hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-          <Feather name="chevron-left" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <Text className="text-[24px] font-semibold text-black flex-1 text-center mr-6">
-          Favorite Pets
-        </Text>
+      <View style={{ height: 44, justifyContent: 'center', marginBottom: 16, marginTop: 8 }}>
+
+        {/* 1. NÚT BACK (GIỮ NGUYÊN STYLE KÍNH MỜ CỦA BẠN) */}
+        <Animated.View style={[backButtonStyle, { position: 'absolute', left: 20 }]}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 5,
+              elevation: 3,
+            }}
+            className="w-10 h-10 rounded-full items-center justify-center"
+          >
+            <View className="overflow-hidden rounded-full items-center justify-center"
+              style={{
+                width: 36, height: 36, borderRadius: 28, borderWidth: 0.5,
+                borderTopColor: 'white', borderLeftColor: 'white',
+                borderBottomColor: 'transparent', borderRightColor: 'transparent',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              }}>
+              <LinearGradient
+                colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                locations={[0, 0.3, 1]}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+              />
+              <Feather name="chevron-left" size={20} color="#000000" />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* 2. TITLE */}
+        <Animated.View style={[headerTitleStyle, { position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }]}>
+          <Text className="text-[24px] font-semibold text-black">Favorite Pets</Text>
+        </Animated.View>
+
+        {/* 3. NÚT SEARCH KÍNH MỜ -> MORPHING THÀNH THANH SEARCH */}
+        <View style={{ position: 'absolute', right: 20, height: 40, justifyContent: 'center', alignItems: 'flex-end', zIndex: 100 }}>
+          <TouchableOpacity
+            onPress={isSearching ? undefined : handleOpenSearch}
+            activeOpacity={isSearching ? 1 : 0.8}
+            style={{
+              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1, shadowRadius: 5, elevation: 3,
+            }}
+          >
+            <Animated.View
+              className="overflow-hidden flex-row items-center"
+              style={[{ height: 36, borderRadius: 28 }, searchContainerStyle]}
+            >
+              {/* Lớp kính mờ (Gradient) - Giữ nguyên logic biến mất khi search */}
+              <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, gradientStyle]}>
+                <LinearGradient
+                  colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]}
+                  style={{ flex: 1, borderRadius: 9999 }}
+                />
+              </Animated.View>
+
+              {/* Icon Search */}
+              <AnimatedFeather name="search" size={18} style={searchIconStyle} />
+
+              {/* TextInput và Nút Đóng */}
+              <Animated.View style={[searchInputStyle, { flexDirection: 'row', alignItems: 'center', flex: 1 }]}>
+                <TextInput
+                  ref={inputRef}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search favorite pets..."
+                  placeholderTextColor="#8E8E93"
+                  className="flex-1 text-[14px] text-black"
+                />
+                {isSearching && (
+                  <TouchableOpacity onPress={handleCloseSearch} className="ml-1 px-1">
+                    <Ionicons name="close-circle" size={20} color="#8E8E93" />
+                  </TouchableOpacity>
+                )}
+              </Animated.View>
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
+
       </View>
 
       {/* Tabs Filter (Giống màn hình Search) */}
@@ -163,38 +336,56 @@ export default function FavoritePetsScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredFavorites}
+          data={filteredPets}
           keyExtractor={(item, index) => item.id?.toString() || index.toString()}
           numColumns={2}
           columnWrapperStyle={{ justifyContent: 'space-between' }}
           contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={() => (
-            <View className="flex-1 items-center justify-center mt-20">
-              <Image
-                source={require('../assets/images/my-pet-empty.png')}
-                resizeMode="contain"
-                className=""
-                style={{
-                  width: 230,
-                  height: 232,
-                }}
-              />
-              <Text className="text-gray-800 text-lg font-bold mt-6">You don't have any pets yet</Text>
-              <Text className="text-gray-400 text-center mt-2 mb-6">Add your pet or adopt a new friend!</Text>
-
-              <TouchableOpacity
-                className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-2"
-                activeOpacity={0.7}
-                onPress={() => router.push('/')}
-              >
-                <View className=" rounded-full mr-2">
-                  <Ionicons name="add" size={20} color="#F59E0B" />
+          ListEmptyComponent={() => {
+            // TRẠNG THÁI 1: KHÔNG CÓ PET TRONG DANH SÁCH FAVORITE BAN ĐẦU
+            if (favorites.length === 0) {
+              return (
+                <View className="flex-1 items-center justify-center mt-20">
+                  <Image
+                    source={require('../assets/images/my-pet-empty.png')}
+                    resizeMode="contain"
+                    className=""
+                    style={{
+                      width: 230,
+                      height: 232,
+                    }}
+                  />
+                  <Text className="text-gray-800 text-lg font-bold mt-6">You don't have any pets yet</Text>
+                  <Text className="text-gray-400 text-center mt-2 mb-6">Add your pet or adopt a new friend!</Text>
+    
+                  <TouchableOpacity
+                    className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-2"
+                    activeOpacity={0.7}
+                    onPress={() => router.push('/')}
+                  >
+                    <View className=" rounded-full mr-2">
+                      <Ionicons name="add" size={20} color="#F59E0B" />
+                    </View>
+                    <Text className="text-[#F59E0B] font-thin text-base">Browse pet</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text className="text-[#F59E0B] font-thin text-base">Browse pet</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+              );
+            }
+
+            // TRẠNG THÁI 2: CÓ PET NHƯNG TÌM KIẾM KHÔNG RA KẾT QUẢ
+            return (
+              <View className="flex-1 items-center justify-center mt-[100px]">
+                <View className="w-20 h-20 bg-gray-50 rounded-full items-center justify-center mb-4">
+                  <Feather name="search" size={32} color="#9CA3AF" />
+                </View>
+                <Text className="text-black text-[18px] font-bold">No results found</Text>
+                <Text className="text-gray-400 text-[14px] text-center mt-2 px-10">
+                  We couldn't find any pets matching "{searchQuery}"
+                </Text>
+              </View>
+            );
+          }}
           renderItem={({ item }) => (
             <FavoritePetCard
               item={item}

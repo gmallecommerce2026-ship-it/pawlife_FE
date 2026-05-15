@@ -1,12 +1,19 @@
 import { Text } from '@/components/AppText';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TouchableWithoutFeedback } from '@gorhom/bottom-sheet';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  withDelay,
+  Easing
+} from 'react-native-reanimated';
 import {
   ActivityIndicator,
   Alert,
@@ -69,6 +76,7 @@ export default function TagRouteDetailsScreen() {
 
   const rawRadius = params.radius;
   const radius = (rawRadius !== null && rawRadius !== undefined && !isNaN(parseFloat(rawRadius as string))) ? parseFloat(rawRadius as string) : 0;
+  const shinePosition = useSharedValue(-0.5);
 
   // CÁC TRẠNG THÁI KIỂM SOÁT TẢI DỮ LIỆU
   const [isGpsReady, setIsGpsReady] = useState(false);
@@ -80,6 +88,37 @@ export default function TagRouteDetailsScreen() {
   const [realStats, setRealStats] = useState({ distance: '...', duration: 0 });
   const [addresses, setAddresses] = useState({ origin: 'Locating...', destination: 'Loading...' });
   const [isExpanded, setIsExpanded] = useState(true);
+
+  useEffect(() => {
+    shinePosition.value = withRepeat(
+      withSequence(
+        // Lướt vệt sáng từ trái qua phải trong 1 giây (1000ms)
+        withTiming(1.5, { duration: 1000, easing: Easing.linear }),
+        // Dừng lại ở đó (không cần thời gian)
+        withTiming(-0.5, { duration: 0 }),
+        // Nghỉ 5 giây (5000ms) rồi mới lướt tiếp
+        withDelay(5000, withTiming(-0.5, { duration: 0 }))
+      ),
+      -1, // Số -1 nghĩa là lặp lại vô hạn
+      false // Không lướt ngược lại
+    );
+  }, []);
+
+  // 3. Tạo style động cho vệt sáng
+  const shineStyle = useAnimatedStyle(() => {
+    return {
+      // Dùng phần trăm để tự động khớp với mọi chiều rộng của nút
+      left: `${shinePosition.value * 100}%`,
+    };
+  });
+
+  const innerShadowStyle = useAnimatedStyle(() => {
+    return {
+      // Chiều cao bóng sẽ thay đổi từ 20px (đóng) lên 40px (mở) để tạo độ sâu
+      height: withTiming(isExpanded ? SCREEN_HEIGHT * 1 : SCREEN_HEIGHT*0.5),
+      // opacity: withTiming(isExpanded ? 1 : 0),
+    };
+  });
 
   const toggleExpand = () => {
     // Tạo hiệu ứng mượt mà khi thay đổi layout
@@ -406,7 +445,11 @@ export default function TagRouteDetailsScreen() {
           className="absolute right-4 top-[140px] w-[50px] h-[50px] bg-white rounded-full items-center justify-center shadow-lg elevation-5 z-40"
           onPress={centerMapToUser}
         >
-          <MaterialCommunityIcons name="crosshairs-gps" size={24} color="#3B82F6" />
+          <Image
+                                source={require('../assets/icon/safari.png')}
+                                style={{ width: 22, height: 22 }}
+                                resizeMode="cover"
+                            />
         </TouchableOpacity>
 
         {/* --- FLOATING CARD THÔNG TIN THẬT --- */}
@@ -423,11 +466,11 @@ export default function TagRouteDetailsScreen() {
               <Text className="text-[16px] font-bold text-blue-500">{scannerName.charAt(0).toUpperCase()}</Text>
             </View>
             <View className="ml-3.5 flex-1 justify-center">
-              <View className="flex-row items-center">
-                <Text className="text-[16px] font-medium text-[#1E1E1E] leading-[24px]">{scannerName}</Text>
-                <Image className='ml-2' source={require('../assets/icon/real-tick.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+              <View className="flex-row items-center mb-2">
+                <Text className="text-[16px] font-medium text-[#1E1E1E] leading-[16px] ">{scannerName}</Text>
+                {/* <Image className='ml-2' source={require('../assets/icon/real-tick.png')} style={{ width: 12, height: 12 }} resizeMode="cover" /> */}
               </View>
-              <Text className="text-[12px] text-[#8E8E93] tracking-[0.06px]" numberOfLines={1}>
+              <Text className="text-[12px] text-[#8E8E93] tracking-[0.06px] leading-[13px]" numberOfLines={1}>
                 "{scannerMessage}"
               </Text>
             </View>
@@ -524,6 +567,27 @@ export default function TagRouteDetailsScreen() {
                 />
                 <Image className='' source={require('../assets/icon/phone-white.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
                 <Text className="text-[#ffffff] text-[16px] font-semibold ml-2.5 tracking-tight">Contact Now</Text>
+                <Animated.View
+                  style={[
+                    {
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      width: 60, // Bề rộng của vệt sáng
+                      transform: [{ skewX: '-20deg' }], // Làm vệt sáng nghiêng đi 20 độ trông sẽ thật hơn
+                      zIndex: 10, // Đảm bảo đè lên trên màu nền
+                    },
+                    shineStyle,
+                  ]}
+                >
+                  <LinearGradient
+                    // Gradient: Trong suốt -> Trắng mờ -> Trong suốt
+                    colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ flex: 1 }}
+                  />
+                </Animated.View>
               </TouchableOpacity>
 
             </View>
@@ -548,6 +612,28 @@ export default function TagRouteDetailsScreen() {
           </View>
 
         </View>
+
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              pointerEvents: 'none', // Để không ngăn cản thao tác bấm vào nút bên dưới
+            },
+            innerShadowStyle // Sử dụng style động đã tạo ở trên
+          ]}
+        >
+          <LinearGradient
+            // Màu từ trong suốt sang màu xám/đen nhạt để giả lập bóng đổ ngược lên
+            colors={['#FFFFFF', 'rgba(255,255,255,0)']}
+            locations={[0, 0.9]}
+            start={{ x: 0, y: 1 }}
+            end={{ x: 0, y: 0 }}
+            style={{ flex: 1, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
+          />
+        </Animated.View>
 
         <Modal
           visible={isMenuVisible}

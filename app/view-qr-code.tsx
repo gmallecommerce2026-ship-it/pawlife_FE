@@ -1,14 +1,15 @@
 import { Text } from '@/components/AppText';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowRightLeft, RefreshCcw } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 const QR_SIZE = Math.min(width * 0.45, 170);
@@ -27,6 +28,29 @@ export default function ViewQrCode() {
   const [petData, setPetData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showQrOverlay, setShowQrOverlay] = useState(false); // State quản lý hiển thị overlay
+
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const [replaceTag, setReplaceTag] = useState<string | null>(null); // 'yes' hoặc 'no'
+  const [otherDetail, setOtherDetail] = useState('');
+
+  const RadioOption = ({ label, subLabel, selected, onPress }: any) => (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      className="flex-row items-start mb-4 mx-2"
+    >
+      <View
+        className={`w-[16px] h-[16px] rounded-full border-[1px] items-center justify-center bottom-[1px] ${selected ? 'border-[#E89B5A]' : 'border-[#757575]'}`}
+      >
+        {selected && <View className="w-[10px] h-[10px] rounded-full bg-[#E89B5A]" />}
+      </View>
+      <View className="ml-2">
+        <Text className={`text-[14px] font-medium text-black`}>{label}</Text>
+        {subLabel && <Text className="text-[12px] text-gray-400 mt-0.5">{subLabel}</Text>}
+      </View>
+    </TouchableOpacity>
+  );
 
   // --- FETCH DATA ---
   useFocusEffect(
@@ -83,141 +107,212 @@ export default function ViewQrCode() {
   // --- XỬ LÝ DỮ LIỆU HIỂN THỊ ---
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId?.substring(0, 8).toUpperCase();
   const avatarUrl = petData.avatarUrl || petData.images?.[0]?.url || 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=2043&auto=format&fit=crop';
-  
-  const qrValue = (petData.tags && petData.tags.length > 0) 
-    ? petData.tags[0].id 
+
+  const qrValue = (petData.tags && petData.tags.length > 0)
+    ? petData.tags[0].id
     : `https://pawcare.app/pet/${petId}`;
 
   return (
     <View className="flex-1 bg-gray-50">
       <LinearGradient
-        colors={['#FFF9F0', '#FFFFFF']} 
-        locations={[0, 1]} 
+        colors={['#FFF9F0', '#FFFFFF']}
+        locations={[0, 1]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }} 
-        style={StyleSheet.absoluteFillObject} 
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
       />
 
       <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
         {/* HEADER */}
-        <View className="flex-row items-center px-4 py-3 relative">
-          <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 z-10">
-            <Feather name="chevron-left" size={24} color="#000000" />
+        <View className="flex-row items-center justify-between px-5 py-4">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 5,
+              elevation: 3,
+            }}
+          >
+            <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 28,
+                borderWidth: 0.5,
+                borderTopColor: 'white',
+                borderLeftColor: 'white',
+                borderBottomColor: 'transparent',
+                borderRightColor: 'transparent',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+              }}>
+              <LinearGradient
+                colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                locations={[0, 0.3, 1]}
+
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+              />
+              <Feather name="chevron-left" size={20} color="#1F2937" />
+            </View>
           </TouchableOpacity>
-          <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            <Text className="text-[24px] font-semibold text-[#000000]">View QR Code</Text>
+
+          <View className="items-center">
+            <Text className="text-[24px] font-semibold text-[#111827] tracking-tight">Scanned Tag</Text>
           </View>
+
+          <TouchableOpacity
+            // onPress={() => setIsMenuVisible(true)}
+            activeOpacity={0.7}
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 5,
+              elevation: 3,
+            }}
+
+          >
+            <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 28,
+                borderWidth: 0.5,
+                borderTopColor: 'white',
+                borderLeftColor: 'white',
+                borderBottomColor: 'transparent',
+                borderRightColor: 'transparent',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+              }}>
+              <LinearGradient
+                colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                locations={[0, 0.3, 1]}
+
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+              />
+              <Image source={require('../assets/icon/share.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
+            </View>
+          </TouchableOpacity>
         </View>
-      
-        <ScrollView 
+
+        <ScrollView
           contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}
           showsVerticalScrollIndicator={false}
         >
           <View className="w-full self-center" style={{ maxWidth: 380, alignItems: 'center' }}>
-            
-            <View 
-              className="bg-white rounded-[16px] items-center pb-[26px] border border-gray-100 mt-24 w-[294px]"
+
+            <View
+              className="bg-white rounded-[24px] items-center pb-[26px] border border-gray-100 mt-24 w-[294px]"
               style={{
                 shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 }, 
+                shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: SHADOW_OPACITY,
                 shadowRadius: SHADOW_RADIUS,
                 elevation: ELEVATION,
               }}
             >
-              
+
               <View className="absolute -top-[41px] self-center w-[82px] h-[82px] z-10">
                 {/* LAYER 1: NỬA TRÊN */}
                 <View style={{ position: 'absolute', width: 120, height: 80, bottom: 41, left: -19, overflow: 'hidden' }}>
-                  <View 
-                    style={{ 
-                      width: 82, height: 82, borderRadius: 41, 
-                      bottom: -41, left: 19, 
-                      backgroundColor: '#FFFFFF', 
+                  <View
+                    style={{
+                      width: 82, height: 82, borderRadius: 41,
+                      bottom: -41, left: 19,
+                      backgroundColor: '#FFFFFF',
                       borderWidth: 1, borderColor: '#F3F4F6',
-                      shadowColor: '#000', 
+                      shadowColor: '#000',
                       shadowOffset: { width: 0, height: -4 },
-                      shadowOpacity: SHADOW_OPACITY, 
-                      shadowRadius: SHADOW_RADIUS, 
-                      elevation: ELEVATION 
+                      shadowOpacity: SHADOW_OPACITY,
+                      shadowRadius: SHADOW_RADIUS,
+                      elevation: ELEVATION
                     }}
                   />
                 </View>
 
                 {/* LAYER 2: NỬA DƯỚI */}
                 <View style={{ position: 'absolute', width: 82, height: 41, top: 41, left: 0, overflow: 'hidden' }}>
-                  <View 
-                    style={{ 
+                  <View
+                    style={{
                       width: 82, height: 82, borderRadius: 41,
-                      top: -41, left: 0, 
-                      backgroundColor: '#FFFFFF' 
+                      top: -41, left: 0,
+                      backgroundColor: '#FFFFFF'
                     }}
                   />
                 </View>
 
                 {/* LAYER 3: ẢNH PET */}
                 <View className="absolute inset-0 items-center justify-center pointer-events-none">
-                    <Image
-                        source={{ uri: avatarUrl }}
-                        className="w-[70px] h-[70px] rounded-full bg-gray-200"
-                        resizeMode="cover"
-                    />
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    className="w-[70px] h-[70px] rounded-full bg-gray-200"
+                    resizeMode="cover"
+                  />
                 </View>
               </View>
 
-              <Text className="text-[16px] font-semibold text-black mt-[48px] mb-[4px] tracking-tight">
-                  {petData.name}
+              <Text className="text-[20px] font-semibold text-black mt-[48px] mb-[4px] tracking-tight">
+                {petData.name}
               </Text>
               <Text className="text-[12px] font-regular text-[#8E8E93] mb-[4px] tracking-wider">
-                  ID: {displayId}
+                ID: {displayId}
               </Text>
 
               {/* BỌC TOUCHABLE ĐỂ MỞ OVERLAY */}
-              <TouchableOpacity 
-                activeOpacity={0.8} 
+              <TouchableOpacity
+                activeOpacity={0.8}
                 onPress={() => setShowQrOverlay(true)}
                 className="p-5 bg-white items-center justify-center"
               >
-                  <QRCode
-                    value={qrValue}
-                    size={QR_SIZE}
-                    color="#111827"
-                    backgroundColor="transparent"
-                  />
+                <QRCode
+                  value={qrValue}
+                  size={QR_SIZE}
+                  color="#111827"
+                  backgroundColor="transparent"
+                />
               </TouchableOpacity>
 
-              <View className="flex-row items-center justify-center mt-6">
-                  <Text className="text-[16px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
-                  <Text className="text-[16px] font-semibold text-[#F97316] tracking-tighter">Life</Text>
+              <View className="flex-row items-center justify-center">
+                <Text className="text-[20px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
+                <Text className="text-[20px] font-semibold text-[#F97316] tracking-tighter">Life</Text>
               </View>
             </View>
 
-            <Text className="text-center text-[12px] text-[#8E8E93] font-regular mt-[15px] mb-16 px-4 w-[294px]">
+            <Text className="text-center text-[12px] text-[#8E8E93] font-regular mt-[15px] mb-10 px-4 w-[294px]">
               Please always attach QR tag on {petData.name}
             </Text>
 
             <View className="w-full">
-              <TouchableOpacity 
-                onPress={() => router.push({ pathname: '/transfer-ownership', params: { petId } })} 
-                activeOpacity={0.7} 
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/transfer-ownership', params: { petId } })}
+                activeOpacity={0.7}
                 className="w-full bg-white border border-[#E89B5A] py-[16px] rounded-[20px] items-center justify-center"
               >
                 <View className='flex-row items-center'>
-                  <ArrowRightLeft size={24} color="#E89B5A" strokeWidth={2} />
+                  <Image source={require('../assets/icon/transfer.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
                   <Text className="text-[16px] font-medium text-[#E89B5A] ml-2">Transfer Ownership</Text>
                 </View>
               </TouchableOpacity>
 
               <TouchableOpacity activeOpacity={0.7} className="w-full mt-[12px] bg-white border border-gray-200 py-[16px] rounded-[20px] items-center justify-center">
                 <View className='flex-row items-center'>
-                  <RefreshCcw size={24} color="#8E8E93" strokeWidth={2} />
+                  <Image source={require('../assets/icon/refresh.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
                   <Text className="text-[16px] font-medium text-[#8E8E93] ml-2">Replace QR Code</Text>
                 </View>
               </TouchableOpacity>
             </View>
 
             <View className="mt-[16px] items-center pb-4">
-              <TouchableOpacity activeOpacity={0.6}>
+              <TouchableOpacity activeOpacity={0.6}
+                onPress={() => setShowReportModal(true)}>
                 <Text className="text-[12px] font-regular text-[#8E8E93] tracking-wide">Report lost or damaged tag</Text>
               </TouchableOpacity>
             </View>
@@ -233,44 +328,277 @@ export default function ViewQrCode() {
         visible={showQrOverlay}
         onRequestClose={() => setShowQrOverlay(false)}
       >
-        <BlurView 
-          intensity={80} 
-          tint="dark" 
+        <BlurView
+          intensity={40}
+          tint="dark"
           style={StyleSheet.absoluteFill}
           className="flex-1 justify-center items-center"
         >
           {/* Nút Close góc trên bên phải */}
           <SafeAreaView className="absolute top-0 right-0 w-full flex-row justify-end px-6 py-4 pointer-events-box-none">
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setShowQrOverlay(false)}
-              className="p-2 bg-white/20 rounded-full mt-2"
+              activeOpacity={0.7}
+              style={{
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 5,
+                elevation: 3,
+              }}
             >
-              <Feather name="x" size={28} color="white" />
+              <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 28,
+                  borderWidth: 0.5,
+                  borderTopColor: 'white',
+                  borderLeftColor: 'white',
+                  borderBottomColor: 'transparent',
+                  borderRightColor: 'transparent',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                }}>
+                <LinearGradient
+                  colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  locations={[0, 0.3, 1]}
+
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                />
+                <Feather name="x" size={20} color="#1F2937" />
+              </View>
             </TouchableOpacity>
           </SafeAreaView>
 
           {/* QR Code được scale to và bo tròn */}
-          <View className="bg-white p-6 rounded-[28px] shadow-2xl items-center justify-center mb-8 overflow-hidden">
-            <QRCode
-              value={qrValue}
-              size={LARGE_QR_SIZE}
-              color="#111827"
-              backgroundColor="transparent"
-            />
+          <View
+            className="bg-white rounded-[24px] items-center pb-[26px] self-center border border-gray-100 w-[294px]"
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: SHADOW_OPACITY,
+              shadowRadius: SHADOW_RADIUS,
+              elevation: ELEVATION,
+            }}
+          >
+
+            <View className="absolute -top-[41px] self-center w-[82px] h-[82px] z-10">
+              {/* LAYER 1: NỬA TRÊN */}
+              <View style={{ position: 'absolute', width: 120, height: 80, bottom: 41, left: -19, overflow: 'hidden' }}>
+                <View
+                  style={{
+                    width: 82, height: 82, borderRadius: 41,
+                    bottom: -41, left: 19,
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1, borderColor: '#F3F4F6',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: -4 },
+                    shadowOpacity: SHADOW_OPACITY,
+                    shadowRadius: SHADOW_RADIUS,
+                    elevation: ELEVATION
+                  }}
+                />
+              </View>
+
+              {/* LAYER 2: NỬA DƯỚI */}
+              <View style={{ position: 'absolute', width: 82, height: 41, top: 41, left: 0, overflow: 'hidden' }}>
+                <View
+                  style={{
+                    width: 82, height: 82, borderRadius: 41,
+                    top: -41, left: 0,
+                    backgroundColor: '#FFFFFF'
+                  }}
+                />
+              </View>
+
+              {/* LAYER 3: ẢNH PET */}
+              <View className="absolute inset-0 items-center justify-center pointer-events-none">
+                <Image
+                  source={{ uri: avatarUrl }}
+                  className="w-[70px] h-[70px] rounded-full bg-gray-200"
+                  resizeMode="cover"
+                />
+              </View>
+            </View>
+
+            <Text className="text-[20px] font-semibold text-black mt-[48px] mb-[4px] tracking-tight">
+              {petData.name}
+            </Text>
+            <Text className="text-[12px] font-regular text-[#8E8E93] mb-[4px] tracking-wider">
+              ID: {displayId}
+            </Text>
+
+            {/* BỌC TOUCHABLE ĐỂ MỞ OVERLAY */}
+            <View className='my-[24px]'>
+              <QRCode
+                value={qrValue}
+                size={QR_SIZE}
+                color="#111827"
+                backgroundColor="transparent"
+              />
+            </View>
+
+
+            <View className="flex-row items-center justify-center">
+              <Text className="text-[20px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
+              <Text className="text-[20px] font-semibold text-[#F97316] tracking-tighter">Life</Text>
+            </View>
           </View>
 
           {/* Nút Download */}
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={handleDownloadQr}
             activeOpacity={0.8}
-            className="flex-row items-center bg-[#E89B5A] px-8 py-4 rounded-full shadow-lg"
+            className="flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] shadow-lg top-10"
           >
-            <Feather name="download" size={20} color="white" />
-            <Text className="text-white font-semibold text-[16px] ml-3">Download QR code</Text>
+            <Feather name="download" size={20} color="#8E8E93" />
+            <Text className="text-[#8E8E93] font-semibold text-[16px] ml-3">Download QR code</Text>
           </TouchableOpacity>
         </BlurView>
       </Modal>
 
+      {/* MODAL REPORT TAG ISSUE */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showReportModal}
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View className="flex-1 justify-center items-center px-6">
+          <BlurView 
+            intensity={30} // Điều chỉnh độ mờ (từ 1 đến 100)
+            tint="dark"    // Dùng 'dark' để làm tối nền, hoặc 'light' nếu muốn nền sáng
+            style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+          />
+          <View className="bg-white w-full rounded-[32px] p-8 shadow-2xl relative">
+
+            {/* Nút Close X */}
+            <TouchableOpacity
+              onPress={() => {
+                setShowReportModal(false);
+                setReplaceTag(null); // Reset khi đóng
+                setOtherDetail('');
+              }}
+
+              className="absolute top-6 right-6 p-2 z-10"
+            >
+              <Feather name="x" size={20} color="#111827" />
+            </TouchableOpacity>
+
+            <Text className="text-[20px] font-semibold text-center text-black mb-8">
+              Report Tag Issue
+            </Text>
+
+            <Text className="text-[16px] font-semibold text-black mb-6">
+              What's happening with the QR tag? <Text className="text-red-500">*</Text>
+            </Text>
+
+            {/* Danh sách lựa chọn */}
+            <View>
+              <RadioOption
+                label="Lost Tag"
+                subLabel="Tag is missing/stolen"
+                selected={selectedIssue === 'lost'}
+                onPress={() => { setSelectedIssue('lost'); setReplaceTag(null); }}
+              />
+
+              {selectedIssue === 'lost' && (
+                <View
+                  className="bg-[#E89B5A]/5 border border-[#E89B5A]/30 rounded-[20px] py-2 px-4 flex-row items-start mb-4"
+                >
+                  {/* Icon Exclamation */}
+                  <Ionicons className='bottom-1' name="alert-circle-outline" size={18} color="#E89B5A"/>
+
+                  <View className="flex-1 ml-2">
+                    <Text className="text-[14px] font-medium text-black">
+                      {petData.name}'s safety first
+                    </Text>
+                    <Text className="text-[10px] text-[#757575] mt-1 leading-[18px]">
+                      Report a lost tag will temporarily limit public QR access to protect {petData.name}'s info until a replacement is activated.
+                    </Text>
+                  </View>
+                </View>
+              )}
+              <RadioOption
+                label="Damaged Tag"
+                subLabel="QR code is damaged/unscannable"
+                selected={selectedIssue === 'damaged'}
+                onPress={() => { setSelectedIssue('damaged'); setReplaceTag(null); }}
+              />
+              <RadioOption
+                label="Other Issue"
+                selected={selectedIssue === 'other'}
+                onPress={() => setSelectedIssue('other')}
+              />
+
+              {(selectedIssue === 'lost' || selectedIssue === 'damaged') && (
+                <Animated.View entering={FadeInDown} className="mt-2 pt-2 ">
+                  <Text className="text-[16px] font-semibold text-black mb-4">
+                    Would you like to replace with new QR tag? <Text className="text-red-500">*</Text>
+                  </Text>
+                  <View className="flex-row justify-between">
+                    <RadioOption
+                      label="Yes, replace now"
+                      subLabel=''
+                      selected={replaceTag === 'yes'}
+                      onPress={() => setReplaceTag('yes')}
+
+                    />
+                    <RadioOption
+                      label="No, I’ll do it later"
+                      subLabel=''
+                      selected={replaceTag === 'no'}
+                      onPress={() => setReplaceTag('no')}
+
+                    />
+                  </View>
+                </Animated.View>
+              )}
+
+              {selectedIssue === 'other' && (
+                <Animated.View entering={FadeInDown} className="mt-2">
+                  <TextInput
+                    multiline
+                    numberOfLines={4}
+                    placeholder="Please describe your issue here..."
+                    placeholderTextColor="#757575"
+                    value={otherDetail}
+                    onChangeText={setOtherDetail}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl text-[14px] p-2 text-black"
+                    style={{ textAlignVertical: 'top', minHeight: 50, fontFamily: 'Urbanist' }}
+                  />
+                </Animated.View>
+              )}
+            </View>
+
+            {/* Nút Submit (Tùy chọn thêm để hoàn thiện UX) */}
+            <TouchableOpacity
+              onPress={() => {
+                console.log("Submit:", { selectedIssue, replaceTag, otherDetail });
+                setShowReportModal(false);
+              }}
+              className={`w-full py-4 rounded-full mt-6 ${((selectedIssue === 'lost' || selectedIssue === 'damaged') && replaceTag) ||
+                (selectedIssue === 'other' && otherDetail.trim().length > 0)
+                ? 'bg-[#E89B5A]' : 'bg-gray-200'
+                }`}
+              disabled={!(
+                ((selectedIssue === 'lost' || selectedIssue === 'damaged') && replaceTag) ||
+                (selectedIssue === 'other' && otherDetail.trim().length > 0)
+              )}
+            >
+              <Text className={`text-center font-semibold text-[14px] ${((selectedIssue === 'lost' || selectedIssue === 'damaged') && replaceTag) ||
+                (selectedIssue === 'other' && otherDetail.trim().length > 0)
+                ? 'text-white' : 'text-gray-400'
+                }`}>
+                Submit Report
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

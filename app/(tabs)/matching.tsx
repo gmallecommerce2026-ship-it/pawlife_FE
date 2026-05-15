@@ -7,7 +7,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Keyboard, Modal, Text as RNText, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Keyboard, Linking, Modal, Platform, Text as RNText, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
@@ -140,8 +140,8 @@ const SwipeableCard = ({
         if (isFavorited) {
             // Khi XUẤT HIỆN: Nẩy lên tự nhiên
             // Damping thấp (12) giúp trái tim có độ rung nhẹ khi bật ra
-            popScale.value = withSpring(1, { 
-                damping: 12, 
+            popScale.value = withSpring(1, {
+                damping: 12,
                 stiffness: 250,
                 mass: 1
             });
@@ -202,7 +202,7 @@ const SwipeableCard = ({
 
     // Dùng Exclusive để hệ thống chờ xem user bấm 1 hay 2 lần
     const taps = Gesture.Exclusive(doubleTap, singleTap);
-    
+
     // Đưa tổ hợp taps và pan vào Race
     const gesture = Gesture.Race(taps, pan);
 
@@ -948,7 +948,7 @@ const TutorialScreen = ({ onComplete }: { onComplete: () => void }) => {
 };
 const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], isVisible: boolean, onClose: () => void }) => {
     // 1. Dùng hook lấy chính xác chiều cao của Notch/Dynamic Island
-    const insets = useSafeAreaInsets(); 
+    const insets = useSafeAreaInsets();
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
@@ -976,17 +976,17 @@ const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], 
                 />
 
                 {/* 2. Ép khoảng cách cứng dựa trên insets.top */}
-                <View 
+                <View
                     className="absolute top-0 left-0 right-0 z-50"
                     style={{ paddingTop: Math.max(insets.top, 50) }} // Luôn cách đỉnh ít nhất 50px
                 >
                     <View className="px-5">
                         <View className="flex-row justify-end mb-4">
-                            <TouchableOpacity 
-                                onPress={onClose} 
+                            <TouchableOpacity
+                                onPress={onClose}
                                 className="p-2 bg-black/40 rounded-full"
                                 // 3. Mở rộng vùng nhận diện cảm ứng để dễ bấm hơn
-                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
+                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                             >
                                 <Feather name="x" size={26} color="white" />
                             </TouchableOpacity>
@@ -994,11 +994,10 @@ const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], 
 
                         <View className="flex-row gap-1.5">
                             {images.map((_, idx) => (
-                                <View 
-                                    key={idx} 
-                                    className={`flex-1 h-[3px] rounded-full ${
-                                        idx === currentIndex ? 'bg-white' : 'bg-white/30'
-                                    }`} 
+                                <View
+                                    key={idx}
+                                    className={`flex-1 h-[3px] rounded-full ${idx === currentIndex ? 'bg-white' : 'bg-white/30'
+                                        }`}
                                 />
                             ))}
                         </View>
@@ -1060,8 +1059,8 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                     ? `${pet.distance}`
                     : (pet.city || pet.location || 'Gần bạn');
 
-                const petImages = pet.images && pet.images.length > 0 
-                    ? pet.images.map((img: any) => img.url) 
+                const petImages = pet.images && pet.images.length > 0
+                    ? pet.images.map((img: any) => img.url)
                     : ['https://via.placeholder.com/400x600?text=No+Image'];
 
                 return {
@@ -1335,10 +1334,10 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                     </View>
                 )}
             </View>
-            <ImageViewerOverlay 
-                images={viewerImages} 
-                isVisible={isViewerVisible} 
-                onClose={() => setIsViewerVisible(false)} 
+            <ImageViewerOverlay
+                images={viewerImages}
+                isVisible={isViewerVisible}
+                onClose={() => setIsViewerVisible(false)}
             />
             <View style={{ height: TAB_BAR_HEIGHT }} />
         </SafeAreaView>
@@ -1429,11 +1428,11 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                     </View>
 
                     {/* Nút X Góc phải */}
-                    <View className="absolute top-6 right-4 z-20">
+                    {/* <View className="absolute top-6 right-4 z-20">
                         <TouchableOpacity onPress={onClose} className="p-2">
                             <Feather name="x" size={22} color="#374151" />
                         </TouchableOpacity>
-                    </View>
+                    </View> */}
 
                     <ScrollView className="flex-1 px-6 pt-2 bg-white" showsVerticalScrollIndicator={false} bounces={true}>
                         {/* Tiêu đề & Sub-info */}
@@ -1454,8 +1453,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                         </View>
 
                         <View className="flex-row justify-between mb-6 gap-[10px]">
-                            <View className={`flex-1 ${pet.gender === 'Male' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'
-                                } py-[12px] rounded-[16px] items-center`}>
+                            <View className={`flex-1 ${pet.gender.toLowerCase() === 'male' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'} py-[12px] rounded-[16px] items-center`}>
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
                                 <Text className="text-black text-[14px] font-semibold">{pet.gender}</Text>
                             </View>
@@ -1486,7 +1484,28 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                 </Text>
                             </View>
                             <View className="flex-row items-center gap-2">
-                                <TouchableOpacity activeOpacity={0.7} className="w-[41px] h-[41px] rounded-full bg-[#FFF4EC] items-center justify-center">
+                                <TouchableOpacity activeOpacity={0.7} className="w-[41px] h-[41px] rounded-full bg-[#FFF4EC] items-center justify-center"
+                                    onPress={async () => {
+                                        const phoneNumber = pet?.shelter?.phone;
+                                        if (phoneNumber) {
+                                            const webUrl = `https://zalo.me/${phoneNumber}`;
+                                            const appUrl = Platform.OS === 'ios'
+                                                ? `zalo://`
+                                                : `intent://zalo.me/${phoneNumber}#Intent;package=com.zing.zalo;scheme=https;end`;
+                                            try {
+                                                const canOpenApp = await Linking.canOpenURL(Platform.OS === 'ios' ? 'zalo://' : appUrl);
+                                                if (canOpenApp) {
+                                                    await Linking.openURL(Platform.OS === 'ios' ? webUrl : appUrl);
+                                                } else {
+                                                    await Linking.openURL(webUrl);
+                                                }
+                                            } catch (error) {
+                                                await Linking.openURL(webUrl);
+                                            }
+                                        } else {
+                                            Alert.alert("Thông báo", "Trạm cứu hộ này chưa cung cấp số điện thoại Zalo.");
+                                        }
+                                    }}>
                                     <Image
                                         source={require('../../assets/icon/message.png')}
                                         style={{ width: 24, height: 24 }}
@@ -1512,55 +1531,28 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                             <Text className="text-[#8E8E93] text-[14px] leading-6 mb-2">{description}</Text>
 
                             {/* Trình bày Tags theo ảnh (Vàng nhạt cho tag đầu tiên) */}
-                            <View className="flex-row flex-wrap gap-2.5">
-                                {displayTags.map((tagItem: any, index: number) => {
-                                    const isFirst = index === 0;
-
-                                    // Xử lý an toàn: Nếu là mảng string thì dùng luôn, nếu là mảng object thì trích xuất text
-                                    const tagText = typeof tagItem === 'string'
-                                        ? tagItem
-                                        : (tagItem?.tag?.name || tagItem?.name || tagItem?.tagName || 'Pet Tag');
-
-                                    return (
-                                        <View
-                                            key={index}
-                                            className={`px-4 py-1.5 rounded-full ${isFirst ? 'bg-yellow-100/70' : 'bg-gray-50 border border-gray-100'}`}
-                                        >
-                                            <Text className={`text-[12px] ${isFirst ? 'text-yellow-700 font-medium' : 'text-gray-600'}`}>
-                                                {tagText}
-                                            </Text>
-                                        </View>
-                                    )
-                                })}
+                            <View className="flex-row gap-2 mt-[6px]">
+                                <View className="bg-[#FFF4E8] px-3.5 py-0.5 rounded-full border border-[#E8A53C]/25"><Text className="text-[#E8A53C] text-[12px] font-medium">Playful</Text></View>
+                                <View className="bg-[#EBF4FE] px-3.5 py-0.5 rounded-full border border-[#5A90DA]/25"><Text className="text-[#5A90DA] text-[12px] font-medium">Clingy</Text></View>
+                                <View className="bg-[#EAF8EF] px-3.5 py-0.5 rounded-full border border-[#83DA5A]/25"><Text className="text-[#77C852] text-[12px] font-medium">Friendly</Text></View>
                             </View>
                         </View>
 
                         <View className="mb-4">
                             <Text className="font-medium text-black text-[16px] mb-2">{currentPet.name}'s Behavior</Text>
                             <View className="flex-row items-start mb-1">
-                                <View className="flex-row items-center mr-2 mt-[2px]">
-                                    <FontAwesome5 name="check" size={14} color="#77C852" />
-                                    <Text className="ml-1.5 text-[14px] text-[#77C852]">
-                                        Good with:
-                                    </Text>
+                                <View className="flex-row items-center mr-1 mt-[2px]">
+                                    <Image source={require('../../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                                    <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">Good with:</Text>
                                 </View>
-
-                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                                    Children, Seniors, Dogs, Cats.
-                                </Text>
+                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
                             </View>
-
                             <View className="flex-row items-start">
-                                <View className="flex-row items-center mr-2 mt-[2px]">
-                                    <FontAwesome5 name="times" size={14} color="#FE7D66" />
-                                    <Text className="ml-2.5 text-[14px] text-[#FE7D66]">
-                                        Not suitable:
-                                    </Text>
+                                <View className="flex-row items-center mr-1 mt-[2px]">
+                                    <Image source={require('../../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                                    <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">Not suitable:</Text>
                                 </View>
-
-                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                                    Children, Seniors, Dogs, Cats.
-                                </Text>
+                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
                             </View>
                         </View>
 
@@ -1577,14 +1569,14 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                     {/* Sticky Footer: Chứa 2 nút bấm */}
                     <View className="px-6 pt-4 pb-6 bg-white items-center">
                         <TouchableOpacity
-                            className="px-10 bg-[#F59E0B] py-4 rounded-full items-center mb-4"
+                            className="px-10 bg-[#E89B5A] py-4 rounded-full items-center mb-4"
                             activeOpacity={0.8}
                             onPress={() => { onClose(); onAdopt(currentPet); }}
                         >
-                            <Text className="text-white font-medium text-lg">I'm Interested</Text>
+                            <Text className="text-white font-medium text-lg">Apply To Adopt</Text>
                         </TouchableOpacity>
                         <TouchableOpacity activeOpacity={0.6} onPress={onClose} className="py-2 px-6">
-                            <Text className="text-gray-500 text-[15px]" style={{ textDecorationLine: 'underline' }}>Back</Text>
+                            <Text className="text-gray-500 text-[15px]" style={{ textDecorationLine: 'underline' }}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

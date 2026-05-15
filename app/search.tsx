@@ -34,7 +34,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const formatBreed = (breed?: string) => {
     if (!breed) return '';
-    
+
     // Nếu dưới hoặc bằng 15 ký tự thì giữ nguyên toàn bộ
     if (breed.length <= 15) return breed;
 
@@ -44,9 +44,9 @@ const formatBreed = (breed?: string) => {
     // Nếu có từ 2 từ trở lên (VD: Golden Retriever)
     if (words.length > 1) {
         // Lấy chữ cái đầu tiên của từ thứ nhất, cộng thêm dấu chấm, và ghép với các từ còn lại
-        const firstLetter = words[0][0]; 
-        const restOfWords = words.slice(1).join(' '); 
-        
+        const firstLetter = words[0][0];
+        const restOfWords = words.slice(1).join(' ');
+
         return `${firstLetter}. ${restOfWords}`;
     }
 
@@ -79,11 +79,11 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
         <View className="pt-[12px]">
             <Text className="text-black font-semibold text-[16px] mb-1">{item.name}</Text>
             <View className="flex-row items-start">
-                {/* Icon Giới tính với mã màu chuẩn chiết xuất từ ảnh */}
-                <Ionicons
-                    name={item.gender?.toLowerCase() === 'female' ? "female" : "male"}
-                    size={12}
-                    color={item.gender?.toLowerCase() === 'female' ? "#F471B5" : "#5BB0FF"}
+                <Image
+                    className='top-1'
+                    source={item.gender?.toLowerCase() === 'female' ? require('../assets/icon/female.png') : require('../assets/icon/male.png')}
+                    style={{ width: 10, height: 10 }}
+                    resizeMode="cover"
                 />
 
                 <Text
@@ -236,11 +236,11 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
                         hitSlop={{ top: 20, right: 20, bottom: 20, left: 20 }}
                         onPress={handleToggle}
                     >
-                        <Feather
-                            name="bookmark"
-                            size={20}
-                            color={isInterested ? "#E89B5A" : "#9CA3AF"}
-                        />
+                        <Image
+                                source={isInterested ? require('../assets/icon/book-mark.png') : require('../assets/icon/book-mark-solid.png')}
+                                style={{ width: 10, height: 14 }}
+                                resizeMode="cover"
+                            />
                     </TouchableOpacity>
                 </View>
 
@@ -509,17 +509,33 @@ export default function SearchScreen() {
         });
     };
 
+
     const TabButton = ({ title }: { title: 'Pet' | 'Shelter' | 'Event' }) => {
         const isActive = activeTab === title;
+
         return (
             <TouchableOpacity
                 onPress={() => setActiveTab(title)}
-                className={`flex-1 items-center pb-3 border-b-2 ${isActive ? 'border-[#E89B5A]' : 'border-transparent'}`}
-                activeOpacity={0.8}
+                // Thêm class 'relative' để làm mốc tọa độ cho thanh màu cam
+                className="flex-1 items-center justify-center pb-3 relative"
             >
-                <Text className={`text-[16px] ${isActive ? 'text-[#E89B5A] font-semibold' : 'text-gray-400 font-regular'}`}>{title}</Text>
+                <Text
+                    className={`text-[16px] font-semibold ${isActive ? 'text-[#E89B5A]' : 'text-[#8E8E93]'
+                        }`}
+                >
+                    {title}
+                </Text>
+
+                {/* --- THANH CAM BO TRÒN 2 ĐẦU --- */}
+                {isActive && (
+                    <View
+                        // rounded-full chính là "phép thuật" để bo tròn 2 đầu
+                        // absolute bottom-[-1px] để thanh này nằm đè chính xác lên đường viền xám mờ của khung chứa
+                        className="absolute bottom-[-1px] w-full h-[3px] bg-[#E89B5A] rounded-full"
+                    />
+                )}
             </TouchableOpacity>
-        )
+        );
     };
 
     return (

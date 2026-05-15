@@ -11,28 +11,24 @@ import { Text } from '@/components/AppText';
 export default function TermsOfServiceScreen() {
   const router = useRouter();
 
-  // Component render từng điều khoản giống hệt PolicyItem của trang Matching
   const TermItem = ({ number, title, content }: { number: string, title: string, content: string }) => (
-    <View className="flex-row items-start mt-[38px]">
-        <Text className="font-medium text-[16px] text-gray-900 w-5 mt-0.5">{number}.</Text>
+    <View className="flex-row items-start mt-[24px]">
+        <Text className="font-semibold text-[16px] text-gray-900 w-5 ">{number}.</Text>
         <View className="flex-1">
-            <Text className="text-gray-800 font-medium text-[16px] mb-1">{title}</Text>
-            <Text className="text-gray-500 font-regular text-[14px] leading-5">{content}</Text>
+            <Text className="text-black font-semibold text-[16px] mb-1">{title}</Text>
+            <Text className="text-[#8E8E93] font-regular text-[14px] leading-5">{content}</Text>
         </View>
     </View>
   );
 
   return (
     <View className="flex-1 bg-white">
-      {/* Background toàn bộ màn hình là màu trắng */}
       <SafeAreaView className="flex-1 bg-white" edges={['top', 'bottom']}>
         
-        {/* --- HEADER --- */}
         <View className="flex-row items-center justify-between px-4 pt-3 z-10 bg-white">
-            <View className="w-10" /> {/* Spacer để cân bằng layout */}
+            <View className="w-10" /> 
             
             
-            {/* Nút Close ở góc phải */}
             <TouchableOpacity 
                 onPress={() => router.back()} 
                 className="w-10 items-end py-1.5"
@@ -42,11 +38,10 @@ export default function TermsOfServiceScreen() {
             </TouchableOpacity>
         </View>
         
-        {/* --- NỘI DUNG CUỘN --- */}
         <View className="flex-1 relative">
             <ScrollView 
                 showsVerticalScrollIndicator={false} 
-                contentContainerStyle={{ paddingHorizontal: 35, paddingTop: 24, paddingBottom: 100 }} // paddingBottom lớn để kéo text vượt qua vùng mờ
+                contentContainerStyle={{ paddingHorizontal: 35, paddingTop: 24, paddingBottom: 100 }}
             >
                 <Text className="flex-1 font-semibold text-[24px] text-black tracking-wide">
                     Terms of Service
@@ -92,8 +87,6 @@ export default function TermsOfServiceScreen() {
                 />
             </ScrollView>
 
-            {/* --- HIỆU ỨNG MỜ DẦN (FADE-OUT OVERLAY) --- */}
-            {/* Đặt ở vị trí tuyệt đối (absolute) dưới cùng để đè lên ScrollView */}
             <LinearGradient
                 colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.7)', 'rgba(255,255,255,1)']}
                 locations={[0, 0.45, 1]}
@@ -102,8 +95,8 @@ export default function TermsOfServiceScreen() {
                     left: 0, 
                     right: 0, 
                     bottom: 0, 
-                    height: 120, // Độ cao của vùng mờ
-                    pointerEvents: 'none' // Không block thao tác vuốt của user
+                    height: 120,
+                    pointerEvents: 'none'
                 }}
             />
         </View>

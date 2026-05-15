@@ -19,9 +19,9 @@ import { petService } from '../../services/petService';
 interface Pet {
   id: string;
   name: string;
-  species: string; 
+  species: string;
   breed?: string | null;
-  dob?: string | null; 
+  dob?: string | null;
   avatarUrl?: string | null;
   status: string;
   isLost?: boolean; // THÊM DÒNG NÀY
@@ -122,12 +122,12 @@ export default function MyPetsScreen() {
         resizeMode="cover"
       />
 
-      <View className="flex-1 ml-6 mb-6 justify-between h-20">
+      <View className="flex-1 ml-6 mb-6 justify-between">
 
         <View className="flex-row justify-between items-start">
           <Text
             numberOfLines={1}
-            className="font-semibold text-gray-900 text-lg flex-1 mr-2"
+            className="font-semibold text-gray-900 text-lg flex-1 mr-2 mb-2"
           >
             {pet.name}
           </Text>
@@ -143,10 +143,10 @@ export default function MyPetsScreen() {
 
         <View>
           <View className="flex-row items-center mb-1">
-            <MaterialCommunityIcons
-              name={pet.species?.toLowerCase() === 'cat' ? "cat" : "dog-side"}
-              size={14}
-              color="#9CA3AF"
+            <Image
+              source={pet.species?.toLowerCase() === 'cat' ? require('../../assets/icon/cat-side.png') : require('../../assets/icon/dog-side.png')}
+              style={{ width: 11, height: 9 }}
+              resizeMode="contain"
             />
             <Text className="text-gray-500 text-sm ml-1.5">
               {pet.breed || 'Unknown breed'}
@@ -154,7 +154,12 @@ export default function MyPetsScreen() {
           </View>
 
           <View className="flex-row items-center">
-            <MaterialCommunityIcons name="cake-variant-outline" size={14} color="#9CA3AF" />
+            <Image
+              source={require('../../assets/icon/brith-cake.png')}
+              style={{ width: 11, height: 9 }}
+              resizeMode="contain"
+              className='bottom-[2px]'
+            />
             <Text className="text-gray-500 text-sm ml-1.5">
               {calculateAge(pet.dob)}
             </Text>
@@ -178,7 +183,7 @@ export default function MyPetsScreen() {
       {/* --- HEADER --- */}
       <View className="flex-row justify-between items-center px-6 pt-[28px] pb-[21px] z-10 bg-transparent">
         <View className="flex-row items-center">
-          <Text className="text-3xl font-normal text-gray-900 tracking-tight">My Pet</Text>
+          <Text className="text-[28px] font-normal text-black tracking-[0.06px]">My Pet</Text>
         </View>
         {/* <TouchableOpacity onPress={() => router.push('/profile-settings')} className="p-2 ">
           <Feather name="align-justify" size={25} color="#374151" />
@@ -196,16 +201,16 @@ export default function MyPetsScreen() {
         }}
       >
         {/* --- STATE HANDLING LẠI LOGIC RENDER --- */}
-        
+
         {/* 1. Đang tải dữ liệu */}
         {isLoading ? (
           <View className="flex-1 justify-center items-center mt-10">
-             <ActivityIndicator size="large" color="#F59E0B" />
+            <ActivityIndicator size="large" color="#F59E0B" />
           </View>
         ) : error ? (
           /* 2. Bị lỗi khi fetch data */
           <View className="flex-1 justify-center items-center mt-10">
-             <Text className="text-red-500">{error}</Text>
+            <Text className="text-red-500">{error}</Text>
           </View>
         ) : pets.length > 0 ? (
           /* 3. NẾU CÓ PET: Gọi Sub-component PetCard ra để hiển thị */

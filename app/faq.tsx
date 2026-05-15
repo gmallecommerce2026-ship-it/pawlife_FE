@@ -1,24 +1,24 @@
 import { Text } from '@/components/AppText';
-import { Ionicons } from '@expo/vector-icons';
-import { Stack, router } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   LayoutAnimation,
   Platform,
   ScrollView,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
   UIManager,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Dữ liệu FAQ theo yêu cầu
+// Dữ liệu FAQ 
 const FAQ_DATA = {
   General: [
     {
@@ -88,225 +88,134 @@ const FAQ_DATA = {
 const CATEGORIES = ['General', 'Account', 'Services', 'Adoption'];
 
 export default function FAQScreen() {
-  const [activeCategory, setActiveCategory] = useState('General');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState(Object.keys(FAQ_DATA)[0]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const categories = Object.keys(FAQ_DATA);
+
+  // Xử lý hiệu ứng mở rộng mượt mà
   const toggleExpand = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const filteredData = useMemo(() => {
-    const currentData = FAQ_DATA[activeCategory as keyof typeof FAQ_DATA];
-    if (!searchQuery.trim()) return currentData;
+  // Lọc dữ liệu FAQ theo Tab và từ khóa tìm kiếm
+  const filteredFaqs = useMemo(() => {
+    let currentFaqs = FAQ_DATA[activeCategory as keyof typeof FAQ_DATA] || [];
     
-    return currentData.filter(item => 
-      item.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.answer.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase();
+      return currentFaqs.filter(
+        (faq) => faq.question.toLowerCase().includes(lowerQuery) || faq.answer.toLowerCase().includes(lowerQuery)
+      );
+    }
+    return currentFaqs;
   }, [activeCategory, searchQuery]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Stack.Screen options={{ headerShown: false }} />
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-white">
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={24} color="#000" />
+      {/* --- HEADER --- */}
+      <View className="flex-row items-center px-4 py-3 bg-white z-10 relative">
+        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 z-10">
+          <Feather name="chevron-left" size={24} color="#000000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>FAQ</Text>
+        <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
+          <Text className="text-[24px] font-semibold text-black">FAQ</Text>
+        </View>
       </View>
 
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="#9E9E9E" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search FAQ..."
-            placeholderTextColor="#9E9E9E"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+      {/* --- SEARCH BAR --- */}
+      <View className="flex-row items-center bg-[#F8F8F8] mx-5 mt-2.5 mb-5 rounded-full px-4 h-12">
+        <Feather name="search" size={20} color="#8E8E93" className="mr-2.5" />
+        <TextInput
+          className="flex-1 text-[15px] text-[#333333] h-full"
+          placeholder="Search for answers..."
+          placeholderTextColor="#8E8E93"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
 
-        {/* Filter Chips */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          style={styles.chipsContainer}
-          contentContainerStyle={styles.chipsContent}
+      {/* --- CATEGORY CHIPS --- */}
+      <View className="mb-5">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="px-5 gap-2.5" // Dùng contentContainerClassName thay vì truyền vào style
         >
-          {CATEGORIES.map((category) => {
+          {categories.map((category) => {
             const isActive = activeCategory === category;
             return (
               <TouchableOpacity
                 key={category}
-                style={[styles.chip, isActive && styles.chipActive]}
+                activeOpacity={0.7}
                 onPress={() => {
                   setActiveCategory(category);
-                  setExpandedId(null); // Reset accordion when changing tabs
+                  setExpandedId(null); // Reset mục đang mở khi chuyển tab
                 }}
-                activeOpacity={0.7}
+                className={`px-5 py-2.5 rounded-[20px] justify-center items-center ${
+                  isActive ? 'bg-[#E89B5A]' : 'bg-[#F5F5F5]'
+                }`}
               >
-                <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                <Text
+                  className={`text-[14px] font-medium ${
+                    isActive ? 'text-white' : 'text-[#666666]'
+                  }`}
+                >
                   {category}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
+      </View>
 
-        {/* FAQ List */}
-        <View style={styles.faqListContainer}>
-          {filteredData.length > 0 ? (
-            filteredData.map((item) => {
-              const isExpanded = expandedId === item.id;
-              return (
-                <View key={item.id} style={styles.faqItemContainer}>
-                  <TouchableOpacity 
-                    style={styles.faqQuestionRow} 
-                    onPress={() => toggleExpand(item.id)}
-                    activeOpacity={0.6}
-                  >
-                    <Text style={styles.faqQuestionText}>{item.question}</Text>
-                    <Ionicons 
-                      name={isExpanded ? "chevron-up" : "chevron-down"} 
-                      size={20} 
-                      color="#4A4A4A" 
-                    />
-                  </TouchableOpacity>
-                  
-                  {isExpanded && (
-                    <View style={styles.faqAnswerContainer}>
-                      <Text style={styles.faqAnswerText}>{item.answer}</Text>
-                    </View>
-                  )}
+      {/* --- FAQ LIST --- */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerClassName="px-5 pb-10"
+      >
+        {filteredFaqs.map((faq) => {
+          const isExpanded = expandedId === faq.id;
+          return (
+            <TouchableOpacity
+              key={faq.id}
+              activeOpacity={0.7}
+              onPress={() => toggleExpand(faq.id)}
+              className="border-b border-[#F0F0F0] py-4"
+            >
+              <View className="flex-row justify-between items-center">
+                <Text className="flex-1 text-[16px] font-medium text-[#333333] pr-4">
+                  {faq.question}
+                </Text>
+                <Feather
+                  name={isExpanded ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color="#666666"
+                />
+              </View>
+              
+              {/* Nội dung câu trả lời sẽ mở ra khi tap vào */}
+              {isExpanded && (
+                <View className="mt-3 pr-6">
+                  <Text className="text-[14px] leading-[22px] text-[#666666]">
+                    {faq.answer}
+                  </Text>
                 </View>
-              );
-            })
-          ) : (
-            <Text style={styles.noResultsText}>No results found for "{searchQuery}"</Text>
-          )}
-        </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+
+        {filteredFaqs.length === 0 && (
+          <View className="items-center justify-center py-10">
+            <Text className="text-gray-400 text-[14px]">No answers found matching your search.</Text>
+          </View>
+        )}
       </ScrollView>
+
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    position: 'relative',
-  },
-  backButton: {
-    position: 'absolute',
-    left: 20,
-    zIndex: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 20,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 48,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#333333',
-    height: '100%',
-  },
-  chipsContainer: {
-    marginBottom: 20,
-  },
-  chipsContent: {
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  chip: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chipActive: {
-    backgroundColor: '#4A4A4A',
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#666666',
-  },
-  chipTextActive: {
-    color: '#FFFFFF',
-  },
-  faqListContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  faqItemContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  faqQuestionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 18,
-  },
-  faqQuestionText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#000000',
-    paddingRight: 16,
-    lineHeight: 22,
-  },
-  faqAnswerContainer: {
-    paddingBottom: 18,
-    paddingRight: 20,
-  },
-  faqAnswerText: {
-    fontSize: 14,
-    color: '#666666',
-    lineHeight: 22,
-  },
-  noResultsText: {
-    textAlign: 'center',
-    color: '#9E9E9E',
-    marginTop: 40,
-    fontSize: 15,
-  }
-});

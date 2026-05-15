@@ -52,16 +52,16 @@ export default function DeviceManagementScreen() {
       `Bạn có chắc chắn muốn đăng xuất tài khoản khỏi ${deviceName}?`,
       [
         { text: "Hủy", style: "cancel" },
-        { 
-          text: "Đăng xuất", 
+        {
+          text: "Đăng xuất",
           style: "destructive",
           onPress: async () => {
             try {
               setIsProcessing(deviceId); // Hiển thị loading cho riêng nút này
-              
+
               // Gọi API xóa Session
               await axiosClient.delete(`/auth/logout-device/${deviceId}`);
-              
+
               // Cập nhật UI ngay lập tức bằng cách lọc thiết bị đã xóa ra khỏi mảng
               setDevices(prev => prev.filter(device => device.id !== deviceId));
               Alert.alert("Thành công", `Đã đăng xuất khỏi ${deviceName}`);
@@ -80,12 +80,12 @@ export default function DeviceManagementScreen() {
   // --- 3. HÀM CHỌN ICON DỰA TRÊN LOẠI THIẾT BỊ ---
   const getDeviceIcon = (type: string) => {
     switch (type) {
-      case 'laptop': 
+      case 'laptop':
         return <MaterialCommunityIcons name="laptop" size={28} color="#4B5563" />;
-      case 'tablet': 
+      case 'tablet':
         return <MaterialCommunityIcons name="tablet" size={28} color="#4B5563" />;
-      case 'smartphone': 
-      default: 
+      case 'smartphone':
+      default:
         return <MaterialCommunityIcons name="cellphone" size={28} color="#4B5563" />;
     }
   };
@@ -94,44 +94,45 @@ export default function DeviceManagementScreen() {
   const formatTime = (isoString: string) => {
     if (!isoString) return 'Không rõ thời gian';
     try {
-        const date = new Date(isoString);
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        const day = date.getDate().toString().padStart(2, '0');
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const year = date.getFullYear();
-        
-        return `${hours}:${minutes} • ${day}/${month}/${year}`;
+      const date = new Date(isoString);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+
+      return `${hours}:${minutes} • ${day}/${month}/${year}`;
     } catch {
-        return 'Thời gian không hợp lệ';
+      return 'Thời gian không hợp lệ';
     }
-    };
+  };
 
   return (
-    <View className="flex-1 bg-[#F9FAFB]">
+    <View className="flex-1 bg-[#FFFFFF]">
       <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
-        
+
         {/* --- HEADER --- */}
-        <View className="flex-row items-center px-4 py-2 mb-2 relative bg-white pb-4 shadow-sm z-10">
+        <View className="flex-row items-center px-4 py-2 mb-2 relative bg-white pb-4">
           <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 z-10">
-            <AntDesign name="left" size={24} color="#1F2937" />
+            <Feather name="chevron-left" size={20} color="#000000" />
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            <Text className="text-xl font-bold text-gray-900">Quản lý thiết bị</Text>
+            {/* Thay text cứng bằng hàm t */}
+            <Text className="text-[24px] font-semibold text-black">Device Management</Text>
           </View>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}>
-          
+
           <View className="px-6 mb-6">
             <Text className="text-gray-500 text-sm leading-5">
-              Đây là danh sách các thiết bị đã đăng nhập vào tài khoản. Đăng xuất khỏi bất kỳ thiết bị nào có dấu hiệu bất thường.
+              This is a list of devices that have logged into the account. Log out of any device that shows unusual behavior.
             </Text>
           </View>
 
           {/* --- KHU VỰC DANH SÁCH THIẾT BỊ --- */}
-          <View className="bg-white border-y border-gray-100 min-h-[100px] justify-center">
-            
+          <View className="bg-white border-y border-gray-100 justify-center">
+
             {/* TRẠNG THÁI LOADING */}
             {isLoading ? (
               <View className="py-8 items-center justify-center">
@@ -139,17 +140,17 @@ export default function DeviceManagementScreen() {
                 <Text className="text-gray-400 mt-4 text-sm">Đang tải danh sách thiết bị...</Text>
               </View>
             ) : devices.length === 0 ? (
-              
+
               /* TRẠNG THÁI TRỐNG (Phòng hờ) */
               <View className="py-8 items-center justify-center">
                 <Text className="text-gray-400 text-sm">Không tìm thấy dữ liệu thiết bị.</Text>
               </View>
             ) : (
-              
+
               /* HIỂN THỊ DỮ LIỆU THẬT */
               devices.map((device, index) => (
-                <View 
-                  key={device.id} 
+                <View
+                  key={device.id}
                   className={`flex-row items-center p-6 ${index !== devices.length - 1 ? 'border-b border-gray-100' : ''}`}
                 >
                   {/* Icon Thiết bị */}
@@ -160,10 +161,10 @@ export default function DeviceManagementScreen() {
                   {/* Thông tin */}
                   <View className="flex-1">
                     <View className="flex-row items-center mb-1">
-                      <Text className="text-base font-bold text-gray-900">{device.name}</Text>
+                      <Text className="text-base font-semibold text-gray-900">{device.name}</Text>
                       {device.isCurrentDevice && (
                         <View className="bg-emerald-50 px-2 py-0.5 rounded ml-2 border border-emerald-100">
-                          <Text className="text-emerald-600 text-[10px] font-bold uppercase">Thiết bị này</Text>
+                          <Text className="text-emerald-600 text-[10px] font-semibold uppercase">Thiết bị này</Text>
                         </View>
                       )}
                     </View>
@@ -175,7 +176,7 @@ export default function DeviceManagementScreen() {
 
                   {/* Nút Đăng xuất */}
                   {!device.isCurrentDevice && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       onPress={() => handleLogoutDevice(device.id, device.name)}
                       disabled={isProcessing === device.id}
                       className="p-2 ml-2"
