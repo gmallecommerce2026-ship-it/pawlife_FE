@@ -3,7 +3,7 @@ import { Text } from '@/components/AppText';
 import { Feather } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { CheckCircle, ChevronLeft } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
@@ -11,12 +11,15 @@ import { ActivityIndicator, Animated, Dimensions, Easing, StyleSheet, TouchableO
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, Mask, Rect } from 'react-native-svg';
 
+import { petService } from '@/services/petService';
+// 1. IMPORT CỦA BẠN VÀO ĐÂY
+import { useModalStore } from '@/store/useModalStore';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BOX_SIZE = 288;
-const CUTOUT_RADIUS = 24; // Độ bo tròn góc (khớp với rounded-tl-[24px] của viền cam)
+const CUTOUT_RADIUS = 24; 
 const OVERLAY_COLOR = 'rgba(0, 0, 0, 0.6)';
 
-// Tính toán toạ độ tĩnh chính xác tuyệt đối ở giữa màn hình
 const boxX = (SCREEN_WIDTH - BOX_SIZE) / 2;
 const boxY = (SCREEN_HEIGHT - BOX_SIZE) / 2;
 
@@ -25,9 +28,14 @@ export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
-  
   const isFocused = useIsFocused(); 
 
+  // 2. KHAI BÁO STATE GỌI MODAL
+  const showModal = useModalStore((state) => state.showModal);
+
+  const params = useLocalSearchParams();
+  const linkPetId = params.linkPetId as string;
+  const isAddingPet = params.isAddingPet === 'true';
   // Animations
   const laserAnim = useRef(new Animated.Value(0)).current;
   const successScaleAnim = useRef(new Animated.Value(0)).current;
@@ -83,42 +91,87 @@ export default function ScanScreen() {
   };
 
   const processValidScan = (data: string) => {
+    alert(`MÃ GỐC CAMERA ĐỌC ĐƯỢC LÀ:\n"${data}"`);
       setScanned(true);
       setScanSuccess(true);
 
+      // Trích xuất ID để xử lý logic Backend
       let finalTagId = data;
-      if (data.includes('pawlife://tag/')) {
-        finalTagId = data.replace('pawlife://tag/', '');
-      } else if (data.includes('/tag/')) {
-        finalTagId = data.split('/tag/')[1];
+      const tagMatch = data.match(/\/tag\/([a-zA-Z0-9-]+)/) || data.match(/pawlife:\/\/tag\/([a-zA-Z0-9-]+)/);
+      if (tagMatch && tagMatch[1]) {
+        finalTagId = tagMatch[1];
       }
-
+      finalTagId = finalTagId.trim().replace(/\/$/, "");
+      alert(`ID SẼ GỬI XUỐNG BACKEND LÀ:\n"${finalTagId}"`);
       Animated.parallel([
-        Animated.spring(successScaleAnim, {
-          toValue: 1,
-          friction: 4,
-          tension: 50,
-          useNativeDriver: true,
-        }),
-        Animated.timing(successOpacityAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        })
-      ]).start(() => {
-        setTimeout(() => {
-          router.push({
-            pathname: '/scanned-pet',
-            params: { tagId: finalTagId } 
-          });
+        Animated.spring(successScaleAnim, { toValue: 1, friction: 4, tension: 50, useNativeDriver: true }),
+        Animated.timing(successOpacityAnim, { toValue: 1, duration: 200, useNativeDriver: true })
+      ]).start(async () => {
 
+        if (isAddingPet) {
           setTimeout(() => {
-            setScanned(false);
-            setScanSuccess(false);
-            successScaleAnim.setValue(0);
-            successOpacityAnim.setValue(0);
-          }, 500);
-        }, 800);
+            router.push({
+              pathname: '/add-pet',
+              // THÊM rawQrData VÀO PARAMS ĐỂ MANG ĐI
+              params: { tagId: finalTagId, rawQrData: data } 
+            });
+
+            // Reset camera âm thầm
+            setTimeout(() => {
+              setScanned(false);
+              setScanSuccess(false);
+              successScaleAnim.setValue(0);
+              successOpacityAnim.setValue(0);
+            }, 500);
+          }, 800);
+        }
+
+        // LUỒNG 2: GÁN VÒNG CỔ CHO PET ĐÃ TỒN TẠI (Đã làm ở bước trước)
+        else if (linkPetId) {
+          try {
+            await petService.linkQrCode(linkPetId, finalTagId);
+            showModal({
+              title: 'Success',
+              message: 'Pet profile updated successfully! Vòng cổ đã được gán.',
+              buttonText: 'View QR',
+              onConfirm: () => {
+                setScanned(false); setScanSuccess(false);
+                successScaleAnim.setValue(0); successOpacityAnim.setValue(0);
+                router.replace(`/view-qr-code?id=${linkPetId}`); 
+              }
+            });
+          } catch (error: any) {
+            // SỬ DỤNG CUSTOM MODAL CHO ERROR LUÔN CHO ĐỒNG BỘ
+            showModal({
+              title: 'Error',
+              message: error.response?.data?.message || error.message || "Mã QR không hợp lệ!",
+              buttonText: 'Try Again',
+              onConfirm: () => {
+                setScanned(false);
+                setScanSuccess(false);
+                successScaleAnim.setValue(0);
+                successOpacityAnim.setValue(0);
+              }
+            });
+          }
+        } 
+        
+        // LUỒNG 2: CHẾ ĐỘ QUÉT PET LẠC BÌNH THƯỜNG
+        else {
+          setTimeout(() => {
+            router.push({
+              pathname: '/scanned-pet',
+              params: { tagId: finalTagId } 
+            });
+
+            setTimeout(() => {
+              setScanned(false);
+              setScanSuccess(false);
+              successScaleAnim.setValue(0);
+              successOpacityAnim.setValue(0);
+            }, 500);
+          }, 800);
+        }
       });
   };
 
@@ -256,7 +309,7 @@ export default function ScanScreen() {
           
           {/* Nút Back - Nằm bên trái */}
           <TouchableOpacity 
-            onPress={() => router.push(`/`)}
+            onPress={() => router.back()}
             className="w-12 h-12 bg-[#2A2A2A]/80 rounded-full items-center justify-center z-20"
           >
             <ChevronLeft size={24} color="white" />

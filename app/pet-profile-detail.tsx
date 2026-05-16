@@ -369,7 +369,12 @@ export default function PetProfileDetailScreen() {
               </View>
             </View>
           ) : (
-            <View className="mx-7 mb-8 flex-row bg-[#FDFCE8] border border-[#FDF094] rounded-[20px] p-[17px]">
+            // --- ĐÃ UPDATE ĐOẠN NÀY ĐỂ TRUYỀN linkPetId ---
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onPress={() => router.push({ pathname: '/(tabs)/scan', params: { linkPetId: petId } })}
+              className="mx-7 mb-8 flex-row bg-[#FDFCE8] border border-[#FDF094] rounded-[20px] p-[17px]"
+            >
               <View className="mr-2">
                 <Image
                   source={require('../assets/icon/scan-icon.png')}
@@ -383,7 +388,7 @@ export default function PetProfileDetailScreen() {
                   Scan QR tag to enable <Text className="font-medium">PawHistory</Text> & <Text className="font-medium">Lost Pet</Text> functions.
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
 
           {/* --- PET INFORMATION CARD --- */}
@@ -515,7 +520,8 @@ export default function PetProfileDetailScreen() {
                 if (hasValidQRCode) {
                   router.push(`/view-qr-code?id=${petId}`);
                 } else {
-                  router.push('/(tabs)/scan');
+                  // --- ĐÃ UPDATE ĐOẠN NÀY ĐỂ TRUYỀN linkPetId ---
+                  router.push({ pathname: '/(tabs)/scan', params: { linkPetId: petId } });
                 }
               }}
               activeOpacity={0.7}

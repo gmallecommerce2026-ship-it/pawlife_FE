@@ -1,9 +1,10 @@
 // app/add-pet.tsx
 import { Text } from '@/components/AppText';
 import { petService } from '@/services/petService';
+import { useModalStore } from '@/store/useModalStore';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -60,7 +61,11 @@ interface AddPetFormData {
 
 export default function AddPetScreen() {
   const router = useRouter();
-  
+  const params = useLocalSearchParams();
+  const tagId = params.tagId as string;
+  const rawQrData = params.rawQrData as string;
+
+  const showModal = useModalStore((state) => state.showModal);
   // Tách biệt hook upload cho Avatar và Vaccination Record
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
   const { pickAndUploadImage: pickVaccine, isUploading: isUploadingVaccine } = useImageUpload();
@@ -154,7 +159,12 @@ export default function AddPetScreen() {
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      Alert.alert('Missing Information', "Please enter the pet's name.");
+      showModal({
+        title: 'Missing Information',
+        message: "Please enter the pet's name.",
+        buttonText: 'OK',
+        onConfirm: () => {}
+      });
       return;
     }
 
@@ -167,7 +177,6 @@ export default function AddPetScreen() {
         breed: formData.breed || undefined,
         gender: formData.gender !== 'UNKNOWN' ? formData.gender : undefined,
         color: formData.color || undefined,
-        // ÉP KIỂU SANG NUMBER CHUẨN DTO:
         weight: formData.weight ? parseFloat(formData.weight) : undefined,
         size: formData.size,
         description: formData.description || undefined,
@@ -176,31 +185,40 @@ export default function AddPetScreen() {
         contactAddress: formData.contactAddress || undefined,
         images: formData.imageUrl ? [formData.imageUrl] : [],
         vaccinationRecordUrl: formData.vaccinationRecordUrl || undefined,
-        // Nếu có ngày sinh
         ...(formData.dob && { dob: formData.dob }),
+        // QUAN TRỌNG: Đẩy thẳng tagId xuống Backend trong cùng 1 cục payload
+        ...(tagId && { tagId: (tagId as string).trim() }),
+        ...(rawQrData && { qrCodeUrl: rawQrData }),
       };
 
-      if (formData.dob) {
-        payload.dob = formData.dob;
-      }
+      // 1. Chỉ gọi duy nhất 1 API (Backend sẽ tự xử lý việc gán QR bằng Transaction)
+      const newPet = await petService.addPet(payload); 
+      const realPetId = newPet?.id || newPet?.data?.id;
 
-      await petService.addPet(payload);
-      Alert.alert('Success', 'Pet profile added successfully!', [
-        { 
-          text: 'OK', 
-          onPress: () => {
-            // Quay lại màn hình trước đó
-            router.back(); 
-          } 
-        }
-      ]);
+      // 2. Chuyển trang thẳng
+      router.replace(`/pet-profile-detail?id=${realPetId}`);
+
+      // 3. Hiển thị thông báo
+      showModal({
+        title: 'Success',
+        message: tagId 
+          ? 'Pet profile created successfully! Vòng cổ đã được kích hoạt.' 
+          : 'Pet profile created successfully!',
+        buttonText: 'OK',
+        onConfirm: () => {}
+      });
+
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to add pet. Please try again.');
+      showModal({
+        title: 'Error',
+        message: error.response?.data?.message || error.message || 'Failed to add pet. Please try again.',
+        buttonText: 'Try Again',
+        onConfirm: () => {}
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
-
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView 

@@ -17,7 +17,10 @@ export const petService = {
     return response.data;
   },
 
-  
+  linkQrCode: async(petId: string, tagId: string) => {
+    const response = await axiosClient.post(`/pets/${petId}/link-qr`, { tagId });
+    return response.data;
+  },
 
   swipePet: async (petId: string, data: SwipePayload) => {
     try {

@@ -3,7 +3,8 @@ import { Text } from '@/components/AppText';
 import { AntDesign } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -33,32 +34,44 @@ export default function ScannedPetScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReportVisible, setIsReportVisible] = useState(false);
 
-  useEffect(() => {
-    const fetchPetData = async () => {
-      try {
-        setLoading(true);
-        const response = await axiosClient.get(`/tags/${tagId}/scan`);
-        const petData = response.data;
-        setPet(petData);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true; // Cleanup function để tránh memory leak
 
-        const isPetLost = petData.isLost || petData.status?.toUpperCase() === 'LOST';
+      const fetchPetData = async () => {
+        try {
+          setLoading(true);
+          setHasReported(false); // Reset lại trạng thái report nếu user scan lại
+          
+          // Thêm timestamp ?t=... để bypass hoàn toàn HTTP Cache của iOS/Android
+          const response = await axiosClient.get(`/tags/${tagId}/scan?t=${Date.now()}`);
+          
+          if (!isActive) return;
+          
+          const petData = response.data;
+          setPet(petData);
 
-        // Tự động bật Modal nếu thú cưng đi lạc
-        if (isPetLost && !hasReported) {
-          setTimeout(() => {
-            setIsModalVisible(true);
-          }, 500);
+          const isPetLost = petData.isLost || petData.status?.toUpperCase() === 'LOST';
+
+          if (isPetLost) {
+            setTimeout(() => {
+              if (isActive) setIsModalVisible(true);
+            }, 500);
+          }
+        } catch (error: any) {
+          if (isActive) setPet(null);
+        } finally {
+          if (isActive) setLoading(false);
         }
-      } catch (error: any) {
-        setPet(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
 
-    if (tagId) fetchPetData();
-    else setLoading(false);
-  }, [tagId]);
+      if (tagId) fetchPetData();
+
+      return () => {
+        isActive = false; // Cleanup khi user rời khỏi màn hình
+      };
+    }, [tagId])
+  );
 
   // HÀM XỬ LÝ GỌI API DUY NHẤT
   const handleShareLocation = async (location: any, formData: FormData, isSkipped: boolean) => {
