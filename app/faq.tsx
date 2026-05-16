@@ -122,7 +122,7 @@ export default function FAQScreen() {
           <Feather name="chevron-left" size={24} color="#000000" />
         </TouchableOpacity>
         <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-          <Text className="text-[24px] font-semibold text-black">FAQ</Text>
+          <Text className="text-[20px] font-semibold text-black">FAQ</Text>
         </View>
       </View>
 

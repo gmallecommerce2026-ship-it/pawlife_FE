@@ -118,7 +118,7 @@ export default function DeviceManagementScreen() {
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
             {/* Thay text cứng bằng hàm t */}
-            <Text className="text-[24px] font-semibold text-black">Device Management</Text>
+            <Text className="text-[20px] font-semibold text-black">Device Management</Text>
           </View>
         </View>
 

@@ -34,6 +34,7 @@ const SettingToggle = ({ label, value, onValueChange }: { label: string, value: 
       ios_backgroundColor="#D1D5DB"
       onValueChange={onValueChange}
       value={value}
+      style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
     />
   </View>
 );
@@ -257,7 +258,7 @@ export default function AccountSecurityScreen() {
             <Feather name="chevron-left" size={20} color="#000000" />
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            <Text className="text-[24px] font-semibold text-black">Account & Security</Text>
+            <Text className="text-[20px] font-semibold text-black">Account & Security</Text>
           </View>
         </View>
 
@@ -275,11 +276,12 @@ export default function AccountSecurityScreen() {
               <View className="flex-row items-center justify-between">
                 <Text className="text-[16px] font-semibold text-black">Google Authenticator</Text>
                 <Switch
-                  trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+                  trackColor={{ false: '#D1D5DB', true: '#E89B5A' }}
                   thumbColor={'#FFFFFF'}
                   ios_backgroundColor="#D1D5DB"
                   onValueChange={handleToggleGoogleAuth}
                   value={useGoogleAuth}
+                  style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                 />
               </View>
             </View>

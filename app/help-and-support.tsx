@@ -31,7 +31,7 @@ const HelpItem = ({
           className='-ml-1'
         />
       </View>
-      <Text className="text-[16px] font-medium text-gray-900">{label}</Text>
+      <Text className="text-[14px] font-medium text-gray-900">{label}</Text>
     </View>
     <Feather name="chevron-right" size={20} color="#9CA3AF" />
   </TouchableOpacity>
@@ -50,7 +50,7 @@ export default function HelpCenterScreen() {
             <Feather name="chevron-left" size={20} color="#000000" />
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            <Text className="text-[24px] font-semibold text-gray-900">Help & Support</Text>
+            <Text className="text-[20px] font-semibold text-gray-900">Help & Support</Text>
           </View>
         </View>
 

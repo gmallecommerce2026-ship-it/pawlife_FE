@@ -6,14 +6,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AlertCircle } from 'lucide-react-native';
-import React, { useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, ImageBackground, ScrollView, Share, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Image, ImageBackground, Modal, ScrollView, Share, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { eventService } from '../services/eventService';
 import { useEngagementStore } from '../store/useEngagementStore';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 const { width } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function EventDetailScreen() {
     const router = useRouter();
@@ -24,12 +26,24 @@ export default function EventDetailScreen() {
     const isInterested = useEngagementStore(state => state.interestedEvents[eventId] ?? eventData?.isInterested);
     const toggleEventInterest = useEngagementStore(state => state.toggleEventInterest);
 
+    const bottomSheetRef = useRef<BottomSheet>(null);
+    const snapPoints = useMemo(() => ['60%', '95%'], []);
+
 
     const [eventData, setEventData] = useState<any>(null);
     const [similarEvents, setSimilarEvents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isNotFound, setIsNotFound] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
+
+    const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+    // Hàm mở xem ảnh
+    const handleOpenImageViewer = (index: number) => {
+        setSelectedImageIndex(index);
+        setIsImageViewerVisible(true);
+    };
 
     const onShare = async () => {
         if (!eventData) return;
@@ -64,7 +78,11 @@ export default function EventDetailScreen() {
                         avatarUrl: 'https://images.unsplash.com/photo-1517260739337-6799d239ce83?q=80&w=500&auto=format&fit=crop'
                     };
                     // ==========================================
-
+                    res.data.images = Array.from({ length: 15 }).map((_, index) => ({
+                        id: `mock_img_${index}`,
+                        // Dùng picsum.photos với seed khác nhau để sinh ra 15 ảnh ngẫu nhiên có kích thước 300x300
+                        url: `https://picsum.photos/seed/pawlife${index}/300/300`
+                    }));
                     setEventData(res.data);
                     if (res.data.isInterested !== undefined) {
                         useEngagementStore.getState().setInitialEventInterest(eventId, res.data.isInterested);
@@ -177,248 +195,462 @@ export default function EventDetailScreen() {
     `;
 
     return (
-        <View className="flex-1 bg-white">
+        <View className='flex-1 '>
             <StatusBar style="light" />
-            <ScrollView className="flex-1" showsVerticalScrollIndicator={false} bounces={false}>
-                {/* 1. HERO HEADER */}
-                <View className="w-full h-[350px] relative">
-                    <ImageBackground source={{ uri: bannerImage }} className="w-full h-full" resizeMode="cover">
-                        <LinearGradient colors={['rgba(0,0,0,0.6)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140 }} />
-                        <View className="flex-row justify-between items-center px-6" style={{ marginTop: insets.top + 10 }}>
-                            <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full items-center justify-center border border-white/20">
-                                <Feather name="chevron-left" size={24} color="white" />
-                            </TouchableOpacity>
+            <View style={{ height: SCREEN_HEIGHT * 0.45, width: '100%' }}>
+                <Image
+                    source={{ uri: bannerImage }}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                />
 
-                            {/* Nút Share & Cờ */}
-                            <View className="flex-row items-center space-x-3 gap-3">
+                {/* OVERLAY HEADER: 3 nút bấm nổi trên nền ảnh (Như yêu cầu trước của bạn) */}
+                <SafeAreaView edges={['top']} className="absolute top-0 left-0 right-0 z-10">
+                    <View className="flex-row items-center justify-between px-5 mt-2 h-[44px]">
 
-                                <TouchableOpacity
-                                    onPress={handleInterest}
-                                    disabled={actionLoading}
-                                    className={`w-10 h-10 backdrop-blur-md rounded-full items-center justify-center border ${isInterested ? 'bg-orange-500 border-orange-500' : 'bg-black/20 border-white/20'}`}
-                                >
-                                    {actionLoading ? (
-                                        <ActivityIndicator size="small" color="white" />
-                                    ) : (
-                                        <Ionicons name={isInterested ? "bookmark" : "bookmark-outline"} size={20} color="white" />
-                                    )}
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={onShare} className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full items-center justify-center border border-white/20">
-                                    <Feather name="share-2" size={20} color="white" />
-                                </TouchableOpacity>
+                        {/* BÊN TRÁI: Nút Back */}
+                        <TouchableOpacity
+                            onPress={() => router.back()}
+                            activeOpacity={0.7}
+                            style={{
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.1,
+                                shadowRadius: 5,
+                                elevation: 3,
+                            }}
+                            className="w-10 h-10 rounded-full items-center justify-center"
+                        >
+                            <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                                style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 28,
+                                    borderWidth: 0.5,
+                                    borderTopColor: 'white',
+                                    borderLeftColor: 'white',
+                                    borderBottomColor: 'transparent',
+                                    borderRightColor: 'transparent',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                                }}>
+                                <LinearGradient
+                                    colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                    locations={[0, 0.3, 1]}
+
+                                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                                />
+                                <Feather name="chevron-left" size={20} color="#00000" />
                             </View>
-                        </View>
-                    </ImageBackground>
-                </View>
+                        </TouchableOpacity>
 
-                {/* 2. MAIN CONTENT BODY */}
-                <View className="-mt-10 bg-white rounded-t-[24px] px-[21px] pt-[37px] pb-12 shadow-2xl shadow-black/10">
+                        {/* BÊN PHẢI: Nút Share & Mark */}
+                        <View className="flex-row items-center">
 
-                    {/* CATEGORY - Căn lề trái, ôm khít nội dung */}
-                    {eventData.category && (
-                        <View className="flex-row mb-[20px]">
-                            <View className="bg-orange-50 px-3 py-1.5 rounded-full">
-                                <Text className="text-[14px] font-medium text-orange-600 tracking-wider">
-                                    {eventData.category}
-                                </Text>
-                            </View>
-                        </View>
-                    )}
-
-                    {/* TITLE */}
-                    <Text className="text-[24px] font-semibold text-black leading-8 mb-[20px]">
-                        {eventData.title}
-                    </Text>
-
-                    {/* THỜI GIAN VÀ ĐỊA ĐIỂM (Layout ngang, icon nhỏ gọn, không border) */}
-                    <View className="flex-row items-center justify-between mb-6">
-
-                        {/* Cột Địa Điểm */}
-                        <View className="flex-row items-center flex-1 ml-2">
-                            <View className="w-10 h-10 items-center justify-center mr-3">
-                                <Ionicons name="location-sharp" size={18} color="#ffa053" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-[#8E8E93] font-regular text-[16px]" numberOfLines={1}>
-                                    {eventData.locationName}
-                                </Text>
-                                <Text className="text-[#8E8E93] font-regular text-[16px]" numberOfLines={1}>
-                                    {eventData.address}
-                                </Text>
-                            </View>
-                        </View>
-                        {/* Cột Thời Gian */}
-                        <View className="flex-row items-center flex-1 mr-2">
-                            <View className="w-10 h-10 items-center justify-center mr-3">
-                                <Feather name="calendar" size={18} color="#ffa053" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-[#E89B5A] font-medium text-[16px]">
-                                    {day} {monthName}, {year} at {timeString}
-                                </Text>
-                            </View>
-                        </View>
-
-                    </View>
-
-                    {/* NGƯỜI QUAN TÂM (Overlapping Avatars) */}
-                    <View className="flex-row items-center mb-[43px]">
-                        <View className="flex-row items-center mr-3">
-                            {/* Chú ý: Ở đây dùng ảnh placeholder, bạn có thể map dữ liệu thực tế từ API nếu có mảng users */}
-                            <Image
-                                source={{ uri: 'https://i.pravatar.cc/100?img=1' }}
-                                className="w-[40px] h-[40px] rounded-full border-2 border-white z-30 bg-gray-200"
-                            />
-                            <Image
-                                source={{ uri: 'https://i.pravatar.cc/100?img=2' }}
-                                className="w-[40px] h-[40px] rounded-full border-2 border-white -ml-3 z-20 bg-gray-200"
-                            />
-                            <Image
-                                source={{ uri: 'https://i.pravatar.cc/100?img=3' }}
-                                className="w-[40px] h-[40px] rounded-full border-2 border-white -ml-3 z-10 bg-gray-200"
-                            />
-                        </View>
-                        <Text className="text-[#8E8E93] text-[16px] font-regular">
-                            <Text className="text-[#8E8E93] font-regular">+ {eventData.interestedCount || 0} </Text>
-                            Interested
-                        </Text>
-                    </View>
-
-
-
-                    {/* ABOUT EVENT */}
-                    <View className="mb-[32px]">
-                        <Text className="text-[16px] font-medium text-black mb-[12px]">About Event</Text>
-                        <Text className="text-[#8E8E93] font-regular leading-relaxed text-[14px] text-justify">
-                            {eventData.description || "Chưa có mô tả cho sự kiện này."}
-                        </Text>
-                    </View>
-
-
-
-                    {/* ORGANIZER PROFILE */}
-                    {eventData.organizer && (
-                        <View className="mb-[32px]">
-                            <Text className="text-[16px] font-medium text-black mb-[20px]">Organizer</Text>
+                            {/* Nút Share */}
                             <TouchableOpacity
-                                className="flex-row items-center justify-between"
+                                onPress={handleInterest}
                                 activeOpacity={0.7}
-                                onPress={() => router.push({
-                                    pathname: '/organizer-profile',
-                                    params: { id: eventData.organizer.id }
-                                })}
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.1,
+                                    shadowRadius: 5,
+                                    elevation: 3,
+                                }}
+                                className="w-10 h-10 rounded-full items-center justify-center mr-3"
                             >
-                                <View className="flex-row items-center">
-                                    <Image
-                                        source={{ uri: eventData.organizer.avatarUrl || 'https://via.placeholder.com/150.png?text=No+Avatar' }}
-                                        className="w-12 h-12 rounded-full mr-3 border border-gray-200"
+                                <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 28,
+                                        borderWidth: 0.5,
+                                        borderTopColor: 'white',
+                                        borderLeftColor: 'white',
+                                        borderBottomColor: 'transparent',
+                                        borderRightColor: 'transparent',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                                    }}>
+                                    <LinearGradient
+                                        colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
+                                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                        locations={[0, 0.3, 1]}
+
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                                     />
-                                    <View>
-                                        <Text className="text-black font-medium text-[14px]">{eventData.organizer.name}</Text>
-                                        <Text className="text-[#8E8E93] font-regular text-[12px] mt-0.5">Event Organizer</Text>
-                                    </View>
+                                    <Image
+                                        className=''
+                                        source={ isInterested ? require('../assets/icon/book-mark.png') : require('../assets/icon/bookmark-black.png')}
+                                        style={{ width: 10, height: 13 }}
+                                        resizeMode="cover"
+                                    />
                                 </View>
-                                <View className="w-8 h-8 items-center justify-center">
-                                    <Feather name="chevron-right" size={18} color="#000000" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={onShare}
+                                activeOpacity={0.7}
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.1,
+                                    shadowRadius: 5,
+                                    elevation: 3,
+                                }}
+                                className="w-10 h-10 rounded-full items-center justify-center"
+                            >
+                                <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 28,
+                                        borderWidth: 0.5,
+                                        borderTopColor: 'white',
+                                        borderLeftColor: 'white',
+                                        borderBottomColor: 'transparent',
+                                        borderRightColor: 'transparent',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                                    }}>
+                                    <LinearGradient
+                                        colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
+                                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                        locations={[0, 0.3, 1]}
+
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                                    />
+                                    <Image
+                                        className=''
+                                        source={require('../assets/icon/share.png')}
+                                        style={{ width: 16, height: 16 }}
+                                        resizeMode="cover"
+                                    />
                                 </View>
                             </TouchableOpacity>
                         </View>
-                    )}
+                    </View>
+                </SafeAreaView>
+            </View>
+            <BottomSheet
+                ref={bottomSheetRef}
+                index={0}
+                snapPoints={snapPoints}
+                backgroundStyle={{ borderRadius: 32, backgroundColor: '#FFFFFF' }}
+                handleIndicatorStyle={{ backgroundColor: '#999999', width: 40, height: 5 }}
+            >
+                <BottomSheetScrollView
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View className="-mt-10 bg-white rounded-t-[24px] px-[20px] pt-[37px] pb-12 shadow-2xl">
 
-                    {/* LOCATION MAP */}
-                    <View className="mb-[32px]">
-                        <Text className="text-[16px] font-medium text-black mb-[12px]">Location</Text>
-                        <View className="flex-row items-center mb-[12px]">
-                            <Ionicons name="location-sharp" size={18} color="#ffa053" />
-                            <Text className="text-gray-600 text-sm ml-2 font-medium flex-1" numberOfLines={2}>
-                                {eventData.address || eventData.locationName}
+                        {/* CATEGORY */}
+                        {eventData.category && (
+                            <View className="flex-row mb-[20px]">
+                                <View className="bg-[#E89B5A]/10 border border-[#E89B5A]/50 px-3 py-1.5 rounded-[12px]">
+                                    <Text className="text-[14px] font-medium text-[#E89B5A] tracking-wider">
+                                        {eventData.category}
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* TITLE */}
+                        <Text className="text-[24px] font-semibold text-black leading-8 mb-[15px]">
+                            {eventData.title}
+                        </Text>
+
+                        {/* THỜI GIAN VÀ ĐỊA ĐIỂM */}
+                        <View className='mb-[30px]'>
+                            <View className="flex-row items-center mb-[15px]">
+                                <View className="items-center justify-center mr-2">
+                                    <Image
+                                        className=''
+                                        source={require('../assets/icon/location-gray-icon.png')}
+                                        style={{ width: 10, height: 12 }}
+                                        resizeMode="cover"
+                                    />
+                                </View>
+                                <View>
+                                    <Text className="text-[#8E8E93] font-regular text-[16px]" numberOfLines={1}>
+                                        {eventData.locationName} Mall, {eventData.address}
+                                    </Text>
+                                </View>
+                            </View>
+                            {/* Cột Thời Gian */}
+                            <View className="flex-row items-center flex-1 mr-2">
+                                <View className="items-center justify-center mr-2">
+                                    <Image
+                                        className=''
+                                        source={require('../assets/icon/calendar-orange.png')}
+                                        style={{ width: 12.3, height: 12.3 }}
+                                        resizeMode="cover"
+                                    />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-[#E89B5A] font-regular text-[14px]">
+                                        {day} {monthName}, {year} at {timeString}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* ABOUT EVENT */}
+                        <View className="mb-[30px]">
+                            <Text className="text-[16px] font-medium text-black mb-[12px]">About Event</Text>
+                            <Text className="text-[#8E8E93] font-regular leading-relaxed text-[14px] text-justify">
+                                {eventData.description || "Chưa có mô tả cho sự kiện này."}
                             </Text>
                         </View>
 
-                        {/* MapView Container dùng WebView */}
-                        <View className="w-full h-[145px] rounded-[12px] overflow-hidden border border-gray-200 bg-gray-100 relative pointer-events-none">
-                            <WebView
-                                originWhitelist={['*']}
-                                source={{ html: mapHtml }}
-                                style={{ flex: 1 }}
-                                scrollEnabled={false}
-                                showsHorizontalScrollIndicator={false}
-                                showsVerticalScrollIndicator={false}
-                                bounces={false}
-                            />
-                            {/* Lớp phủ trong suốt để chặn thao tác vuốt trượt làm lỗi cuộn trang */}
-                            <View className="absolute inset-0 z-10" />
-                        </View>
-                    </View>
-                    {/* GALLERY */}
-                    {eventData.images && eventData.images.length > 0 && (
-                        <View className="mb-8">
-                            <Text className="text-[16px] font-medium text-black mb-[20px]">Photo Gallery</Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                                {eventData.images.map((img: any) => (
-                                    <TouchableOpacity key={img.id} className='pb-4'
-                                        style={{
-                                            shadowColor: '#E89B5A', // Màu cam nhạt của bạn
-                                            shadowOffset: { width: 2, height: 3 }, // Quan trọng nhất: Cả 2 chiều bằng 0 để bóng tỏa đều 4 hướng
-                                            shadowOpacity: 0.25, // Độ đậm của bóng (từ 0 đến 1)
-                                            shadowRadius: 3, // Độ lan rộng của bóng
-                                            elevation: 4, // Đổ bóng cho Android (Android tự động tỏa khá đều)
-                                        }} activeOpacity={0.9}>
-                                        <Image source={{ uri: img.url }} className="w-[81px] h-[81px] rounded-[16px] bg-gray-100" resizeMode="cover" />
+                        {/* ORGANIZER PROFILE */}
+                        {eventData.organizer && (
+                            <View className="mb-[30px]">
+                                <Text className="text-[16px] font-medium text-black mb-[20px]">Organizer</Text>
+
+                                <View className="flex-row items-center">
+                                    <Image
+                                        source={{ uri: eventData.organizer.avatarUrl || 'https://via.placeholder.com/150.png?text=No+Avatar' }}
+                                        className="w-[53px] h-[53px] rounded-full border border-gray-200 overflow-hidden items-center justify-center bg-white shadow-sm shadow-gray-100"
+                                    />
+                                    <View className="flex-1 mr-2 ml-3">
+                                        <Text className="text-[14px] font-medium text-black mb-[6px]" numberOfLines={1}>
+                                            {eventData.organizer.name || 'Pawlife Organizer'}
+                                        </Text>
+                                        <Text className="text-[12px] text-[#8E8E93]" numberOfLines={1}>
+                                            Event Organize
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        className="w-[41px] h-[41px] rounded-full bg-[#FDF5EF] items-center justify-center"
+                                    // onPress={async () => {
+                                    //     const phoneNumber = pet?.shelter?.phone;
+                                    //     if (phoneNumber) {
+                                    //         const webUrl = `https://zalo.me/${phoneNumber}`;
+                                    //         const appUrl = Platform.OS === 'ios'
+                                    //             ? `zalo://`
+                                    //             : `intent://zalo.me/${phoneNumber}#Intent;package=com.zing.zalo;scheme=https;end`;
+                                    //         try {
+                                    //             const canOpenApp = await Linking.canOpenURL(Platform.OS === 'ios' ? 'zalo://' : appUrl);
+                                    //             if (canOpenApp) {
+                                    //                 await Linking.openURL(Platform.OS === 'ios' ? webUrl : appUrl);
+                                    //             } else {
+                                    //                 await Linking.openURL(webUrl);
+                                    //             }
+                                    //         } catch (error) {
+                                    //             await Linking.openURL(webUrl);
+                                    //         }
+                                    //     } else {
+                                    //         Alert.alert("Thông báo", "Trạm cứu hộ này chưa cung cấp số điện thoại Zalo.");
+                                    //     }
+                                    // }}
+                                    >
+                                        <Image source={require('../assets/icon/message.png')} style={{ width: 24, height: 24 }} resizeMode="cover" />
                                     </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        className="w-[36px] h-[36px] items-center justify-center ml-2"
+                                        onPress={() => router.push({
+                                            pathname: '/organizer-profile',
+                                            params: { id: eventData.organizer.id }
+                                        })}
+                                    >
+                                        <Feather name="chevron-right" size={18} color="black" />
+                                    </TouchableOpacity>
+                                </View>
+                                <View className="flex-row items-center gap-2">
 
+                                </View>
 
+                            </View>
+                        )}
 
-                    {/* MORE EVENTS */}
-                    {similarEvents.length > 0 && (
-                        <View className="mb-4">
-                            <View className="flex-row justify-between items-center mb-4">
-                                <Text className="text-lg font-bold text-gray-900">More Events</Text>
-                                <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-                                    <Text className="text-orange-500 text-sm font-bold">See All</Text>
-                                </TouchableOpacity>
+                        {/* LOCATION MAP */}
+                        <View className="mb-[32px]">
+                            <View className='flex-row justify-between'>
+
+                                <Text className="text-[16px] font-medium text-black mb-[12px]">Location</Text>
+                                <Text className="text-[14px] font-regular text-[#E89B5A] mb-[12px]">View on Map</Text>
                             </View>
 
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingVertical: 8, paddingHorizontal: 4 }}>
-                                {similarEvents.map(ev => {
-                                    const evDate = new Date(ev.startDate);
-                                    return (
-                                        <TouchableOpacity
-                                            key={ev.id}
-                                            activeOpacity={0.8}
-                                            onPress={() => router.push({ pathname: '/event-detail', params: { id: ev.id } })}
-                                            className="w-64 bg-white border border-gray-100 rounded-2xl p-3 shadow-sm shadow-gray-100 flex-row items-center"
-                                        >
-                                            <Image
-                                                source={{ uri: ev.bannerUrl || ev.images?.[0]?.url || 'https://via.placeholder.com/100.png' }}
-                                                className="w-16 h-16 rounded-xl bg-gray-200"
-                                            />
-                                            <View className="ml-3 flex-1">
-                                                <Text className="font-bold text-gray-900 text-sm mb-1" numberOfLines={1}>{ev.title}</Text>
-                                                <View className="flex-row items-center mb-2">
-                                                    <Ionicons name="location-outline" size={12} color="#9CA3AF" />
-                                                    <Text className="text-gray-400 text-[11px] ml-1 flex-1" numberOfLines={1}>{ev.locationName}</Text>
-                                                </View>
-                                                <View className="flex-row justify-between items-center">
-                                                    <Text className="text-xs font-medium text-orange-500">{ev.interestedCount} Interested</Text>
-                                                    <View className="items-center bg-gray-50 px-2 py-1 rounded-lg">
-                                                        <Text className="text-xs font-bold text-gray-800">{evDate.getDate()}</Text>
-                                                        <Text className="text-[8px] font-bold text-gray-500 uppercase">{evDate.toLocaleDateString('en-US', { month: 'short' })}</Text>
+                            <View className="mb-[12px]">
+                                <Text className="text-[#8E8E93] text-[12px] font-medium flex-1" numberOfLines={2}>
+                                    {eventData.locationName} Mall, {eventData.address}
+                                </Text>
+                            </View>
+
+                            {/* MapView Container dùng WebView */}
+                            <View className="w-full h-[145px] rounded-[16px] overflow-hidden border border-gray-200 bg-gray-100 relative pointer-events-none">
+                                <WebView
+                                    originWhitelist={['*']}
+                                    source={{ html: mapHtml }}
+                                    style={{ flex: 1 }}
+                                    scrollEnabled={false}
+                                    showsHorizontalScrollIndicator={false}
+                                    showsVerticalScrollIndicator={false}
+                                    bounces={false}
+                                />
+                                {/* Lớp phủ trong suốt để chặn thao tác vuốt trượt làm lỗi cuộn trang */}
+                                <View className="absolute inset-0 z-10" />
+                            </View>
+                        </View>
+                        {/* GALLERY */}
+                        {eventData.images && eventData.images.length > 0 && (
+                            <View className="mb-8">
+                                <Text className="text-[16px] font-medium text-black mb-[20px]">Photo Gallery</Text>
+                                <View className="flex-row justify-between">
+                                    {eventData.images.slice(0, 4).map((img: any, index: number) => {
+                                        const isLastImage = index === 3; // Ảnh thứ 4
+                                        const remainingCount = eventData.images.length - 4;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={img.id || index}
+                                                activeOpacity={0.8}
+                                                onPress={() => handleOpenImageViewer(index)}
+                                                // w-[23%] và aspect-square giúp 4 ảnh chia đều chiều ngang và luôn là hình vuông
+                                                className="w-[22%] aspect-square rounded-[16px] overflow-hidden relative bg-gray-200"
+                                            >
+                                                <Image source={{ uri: img.url }} className="w-[81px] h-[81px] rounded-[16px] bg-gray-100" resizeMode="cover" />
+
+                                                {/* Overlay đen mờ và số lượng ảnh còn lại */}
+                                                {isLastImage && remainingCount > 0 && (
+                                                    <View className="absolute inset-0 bg-black/50 items-center justify-center">
+                                                        <Text className="text-white text-[20px] font-bold tracking-wider">
+                                                            +{remainingCount}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                                {/* <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                                    {eventData.images.map((img: any) => (
+                                        <TouchableOpacity key={img.id} className='pb-4'
+                                            style={{
+                                                shadowColor: '#E89B5A', // Màu cam nhạt của bạn
+                                                shadowOffset: { width: 2, height: 3 }, // Quan trọng nhất: Cả 2 chiều bằng 0 để bóng tỏa đều 4 hướng
+                                                shadowOpacity: 0.25, // Độ đậm của bóng (từ 0 đến 1)
+                                                shadowRadius: 3, // Độ lan rộng của bóng
+                                                elevation: 4, // Đổ bóng cho Android (Android tự động tỏa khá đều)
+                                            }} activeOpacity={0.9}>
+                                            <Image source={{ uri: img.url }} className="w-[81px] h-[81px] rounded-[16px] bg-gray-100" resizeMode="cover" />
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView> */}
+                            </View>
+                        )}
+
+
+
+                        {/* MORE EVENTS */}
+                        {similarEvents.length > 0 && (
+                            <View className="mb-4">
+                                <View className="flex-row justify-between items-center mb-4">
+                                    <Text className="text-[16px] font-medium text-black">More Events</Text>
+                                </View>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingVertical: 8, paddingHorizontal: 4 }}>
+                                    {similarEvents.map(ev => {
+                                        const evDate = new Date(ev.startDate);
+                                        return (
+                                            <TouchableOpacity
+                                                key={ev.id}
+                                                className="w-[300px] h-[79px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98]"
+                                                style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 6 }}
+                                                activeOpacity={0.85}
+                                                onPress={() => router.push(`/event-detail?id=${ev.id}`)}
+                                            >
+                                                <View className="flex-1 flex-row rounded-[20px] overflow-hidden">
+                                                    <Image source={{ uri: ev.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} className="w-[98px] h-full bg-gray-100" resizeMode="cover" />
+                                                    <View className="flex-1 flex-row items-center pl-6 pr-4 py-3">
+                                                        <View className="flex-1 justify-between h-full pr-2">
+                                                            <View>
+                                                                <Text className="font-semibold text-gray-800 text-sm leading-tight mb-0.5" numberOfLines={1}>{ev.title}</Text>
+                                                                <View className="flex-row items-center mt-1.5">
+                                                                    <Ionicons name="location" size={12} color="#9CA3AF" />
+                                                                    <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>{ev.locationName || ev.address}</Text>
+                                                                </View>
+                                                            </View>
+                                                            <View className="flex-row mt-2 items-center">
+                                                                <View className="flex-row">
+                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=1' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 z-30" />
+                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=5' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-20" />
+                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=8' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-10" />
+                                                                </View>
+                                                            </View>
+                                                        </View>
+                                                        <View className="items-center justify-center shrink-0 min-w-[32px]">
+                                                            <Text className="text-[18px] font-black text-gray-800 leading-tight">{evDate.getDate().toString().padStart(2, '0')}</Text>
+                                                            <Text className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">{evDate.toLocaleString('en-US', { month: 'short' }).toUpperCase()}</Text>
+                                                        </View>
                                                     </View>
                                                 </View>
-                                            </View>
-                                        </TouchableOpacity>
-                                    )
-                                })}
-                            </ScrollView>
+                                            </TouchableOpacity>
+                                        )
+                                    })}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+                    <Modal
+                        visible={isImageViewerVisible}
+                        transparent={true}
+                        animationType="fade"
+                        onRequestClose={() => setIsImageViewerVisible(false)}
+                    >
+                        <View className="flex-1 bg-black">
+                            <SafeAreaView className="flex-1">
+                                {/* Header của Modal (Nút X và Số thứ tự ảnh) */}
+                                <View className="flex-row items-center justify-between px-4 py-2 z-10 absolute top-12 left-0 right-0">
+                                    <TouchableOpacity
+                                        onPress={() => setIsImageViewerVisible(false)}
+                                        className="p-2 bg-black/40 rounded-full"
+                                    >
+                                        <Feather name="x" size={24} color="white" />
+                                    </TouchableOpacity>
+                                    <View className="bg-black/40 px-3 py-1 rounded-full">
+                                        <Text className="text-white text-[14px] font-medium">
+                                            {selectedImageIndex + 1} / {eventData.images?.length || 0}
+                                        </Text>
+                                    </View>
+                                    <View className="w-10" />
+                                </View>
+
+                                <ScrollView
+                                    horizontal
+                                    pagingEnabled
+                                    showsHorizontalScrollIndicator={false}
+                                    contentOffset={{ x: selectedImageIndex * width, y: 0 }}
+                                    onMomentumScrollEnd={(event) => {
+                                        const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+                                        setSelectedImageIndex(newIndex);
+                                    }}
+                                >
+                                    {eventData.images?.map((img: any, index: number) => (
+                                        <View key={index} style={{ width: width, flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                                            <Image
+                                                source={{ uri: img.url }}
+                                                style={{ width: width, height: SCREEN_HEIGHT * 0.7 }}
+                                                resizeMode="contain"
+                                            />
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            </SafeAreaView>
                         </View>
-                    )}
-                </View>
-            </ScrollView>
+                    </Modal>
+
+                </BottomSheetScrollView>
+            </BottomSheet>
+
+
         </View>
     );
 }

@@ -128,14 +128,12 @@ export default function FollowedSheltersScreen() {
       <Text className="text-gray-400 text-center mt-2 mb-8">Look like we missing a paw...</Text>
 
       <TouchableOpacity
-        className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-4"
+        className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-4"
         activeOpacity={0.7}
         onPress={() => router.push('/')}
       >
-        <View className=" rounded-full mr-2">
-          <Ionicons name="add" size={20} color="#F59E0B" />
-        </View>
-        <Text className="text-[#F59E0B] font-thin text-base">Browse shelters</Text>
+        
+        <Text className="text-[#8E8E93] font-medium">Browse shelters</Text>
       </TouchableOpacity>
     </View>
   );
@@ -151,7 +149,7 @@ export default function FollowedSheltersScreen() {
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
             <Text className="text-[24px] font-semibold text-black">
-              Followed Shelters
+              Following Shelters
             </Text>
           </View>
         </View>

@@ -52,7 +52,7 @@ export default function LanguageScreen() {
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
             {/* Thay text cứng bằng hàm t */}
-            <Text className="text-[24px] font-semibold text-black">{t('Language')}</Text>
+            <Text className="text-[20px] font-semibold text-black">{t('Language')}</Text>
           </View>
         </View>
 

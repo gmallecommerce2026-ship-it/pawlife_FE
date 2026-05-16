@@ -36,7 +36,7 @@ const MenuItem = ({ icon, label, value, isDestructive = false, onPress, hideBord
             <View className="w-8 items-start justify-center">
                 {icon}
             </View>
-            <Text className={`text-[16px] px-2 font-regular ${isDestructive ? 'text-red-500' : 'text-[#000000]'}`}>
+            <Text className={`text-[14px] px-2 font-regular ${isDestructive ? 'text-red-500' : 'text-[#000000]'}`}>
                 {label}
             </Text>
         </View>
@@ -136,12 +136,11 @@ export default function ProfileSettingsScreen() {
                                     style={{ width: 17, height: 17 }}
                                     resizeMode="cover"
                                 />
-                                <Text className="text-[16px] font-regular text-[#000000] ml-3">{t('My Pet')}</Text>
+                                <Text className="text-[14px] font-regular text-[#000000] ml-3">{t('My Pet')}</Text>
                             </View>
                             <Feather name="chevron-right" size={20} color="#D9D9D9" />
                         </TouchableOpacity>
 
-                        {/* THAY ĐỔI: Xóa contentContainerStyle padding vì khung ScrollView giờ đã nằm chuẩn đúng vị trí gióng dọc từ icon xuống */}
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}

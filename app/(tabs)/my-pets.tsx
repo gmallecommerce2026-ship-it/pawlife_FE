@@ -118,7 +118,7 @@ export default function MyPetsScreen() {
     >
       <Image
         source={{ uri: pet.avatarUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=500&auto=format&fit=crop' }}
-        className="w-[92px] h-[108px] rounded-[13px] bg-gray-100"
+        className="w-[92px] h-[108px] rounded-[16px] bg-gray-100"
         resizeMode="cover"
       />
 

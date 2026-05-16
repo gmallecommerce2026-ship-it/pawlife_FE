@@ -70,7 +70,7 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
                     {/* --- ĐÃ CẬP NHẬT GIAO DIỆN GIỚI TÍNH + TUỔI TẠI ĐÂY --- */}
                     <View className="flex-row items-center bg-white/25 px-2 py-0.5 rounded-full border-[1px] border-white/90 overflow-hidden backdrop-blur-xl shadow-sm">
                         <Ionicons
-                            name={data.gender?.toUpperCase() === 'FEMALE' ? "female" : "male"}
+                            name={data.gender?.toLowerCase() === 'female' ? "female" : "male"}
                             size={12}
                             color="#ffffff"
                         />
@@ -1453,9 +1453,9 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                         </View>
 
                         <View className="flex-row justify-between mb-6 gap-[10px]">
-                            <View className={`flex-1 ${pet.gender.toLowerCase() === 'male' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'} py-[12px] rounded-[16px] items-center`}>
+                            <View className={`flex-1 ${pet?.gender.toLowerCase() === 'male' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'} py-[12px] rounded-[16px] items-center`}>
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
-                                <Text className="text-black text-[14px] font-semibold">{pet.gender}</Text>
+                                <Text className="text-black text-[14px] font-semibold">{pet?.gender || 'Unknow'}</Text>
                             </View>
                             <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
@@ -1567,13 +1567,13 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                     </ScrollView>
 
                     {/* Sticky Footer: Chứa 2 nút bấm */}
-                    <View className="px-6 pt-4 pb-6 bg-white items-center">
+                    <View className="w-full px-6 pt-4 pb-6 bg-white items-center ">
                         <TouchableOpacity
-                            className="px-10 bg-[#E89B5A] py-4 rounded-full items-center mb-4"
+                            className="px-10 bg-[#E89B5A] py-4 rounded-full items-center mb-4 shadow-sm"
                             activeOpacity={0.8}
                             onPress={() => { onClose(); onAdopt(currentPet); }}
                         >
-                            <Text className="text-white font-medium text-lg">Apply To Adopt</Text>
+                            <Text className="text-white font-semibold text-lg mx-6">Apply To Adopt</Text>
                         </TouchableOpacity>
                         <TouchableOpacity activeOpacity={0.6} onPress={onClose} className="py-2 px-6">
                             <Text className="text-gray-500 text-[15px]" style={{ textDecorationLine: 'underline' }}>Cancel</Text>

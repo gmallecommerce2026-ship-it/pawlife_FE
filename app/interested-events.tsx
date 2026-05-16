@@ -27,64 +27,6 @@ export default function InterestedEventsScreen() {
 
     // --- LOGIC SEARCH & ANIMATION ---
     const [searchQuery, setSearchQuery] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-    const inputRef = useRef<TextInput>(null);
-    const searchAnimation = useSharedValue(0);
-
-    const handleOpenSearch = () => {
-        setIsSearching(true);
-        searchAnimation.value = withTiming(1, { duration: 300 });
-        setTimeout(() => inputRef.current?.focus(), 300);
-    };
-
-    const handleCloseSearch = () => {
-        setSearchQuery('');
-        searchAnimation.value = withTiming(0, { duration: 300 });
-        setTimeout(() => setIsSearching(false), 300);
-    };
-
-    // --- ANIMATED STYLES ---
-    const backButtonStyle = useAnimatedStyle(() => ({
-        opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
-        transform: [{ scale: interpolate(searchAnimation.value, [0, 1], [1, 0.8]) }],
-        zIndex: isSearching ? -1 : 10,
-    }));
-
-    const headerTitleStyle = useAnimatedStyle(() => ({
-        opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
-        transform: [{ translateX: interpolate(searchAnimation.value, [0, 1], [0, -20]) }]
-    }));
-
-    const searchContainerStyle = useAnimatedStyle(() => {
-        const backgroundColor = interpolateColor(
-            searchAnimation.value, [0, 1], ['rgba(255, 255, 255, 0.1)', '#F8F8F8']
-        );
-        const borderTopColor = interpolateColor(searchAnimation.value, [0, 1], ['white', '#EBEBEB']);
-        const borderLeftColor = interpolateColor(searchAnimation.value, [0, 1], ['white', '#EBEBEB']);
-        const borderBottomColor = interpolateColor(searchAnimation.value, [0, 1], ['transparent', '#EBEBEB']);
-        const borderRightColor = interpolateColor(searchAnimation.value, [0, 1], ['transparent', '#EBEBEB']);
-
-        return {
-            width: interpolate(searchAnimation.value, [0, 1], [36, width - 40]),
-            borderWidth: interpolate(searchAnimation.value, [0, 1], [0.5, 1]),
-            paddingLeft: interpolate(searchAnimation.value, [0, 1], [8.5, 12]),
-            paddingRight: interpolate(searchAnimation.value, [0, 1], [0, 12]),
-            backgroundColor, borderTopColor, borderLeftColor, borderBottomColor, borderRightColor,
-        };
-    });
-
-    const gradientStyle = useAnimatedStyle(() => ({
-        opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
-    }));
-
-    const searchIconStyle = useAnimatedStyle(() => ({
-        color: interpolateColor(searchAnimation.value, [0, 1], ['#000000', '#8E8E93']),
-    }));
-
-    const searchInputStyle = useAnimatedStyle(() => ({
-        opacity: interpolate(searchAnimation.value, [0, 0.8, 1], [0, 0, 1]),
-        marginLeft: interpolate(searchAnimation.value, [0, 1], [0, 8]),
-    }));
 
     // --- FETCH DATA ---
     useEffect(() => {
@@ -163,15 +105,15 @@ export default function InterestedEventsScreen() {
 
                 <View className="flex-1 p-[14px] justify-between">
                     <View className="pr-6 relative">
-                        <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1" numberOfLines={2}>
+                        <Text className="text-gray-900 font-bold text-[16px]  -top-1 leading-[22px] mb-1" numberOfLines={2}>
                             {item.title || 'Weekend Animal Event'}
                         </Text>
-                        <Text className="text-[#8E8E93] text-[13px] font-regular" numberOfLines={1}>
+                        <Text className="text-[#8E8E93] text-[12px] font-regular" numberOfLines={1}>
                             {item.locationName || item.address || 'District, City'}
                         </Text>
 
                         <TouchableOpacity
-                            className="absolute -top-1 right-0"
+                            className="absolute right-0"
                             hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                             onPress={() => handleRemoveInterest(item.id)}
                         >
@@ -186,25 +128,12 @@ export default function InterestedEventsScreen() {
                     <View className="flex-row items-center justify-between mt-4">
                         <View className="flex-row items-center flex-1 pr-2">
                             <Feather name="calendar" size={13} color="#E89B5A" />
-                            <Text className="text-[#E89B5A] text-[9px] font-medium ml-1.5" numberOfLines={1}>
+                            <Text className="text-[#E89B5A] text-[12px] font-medium ml-1.5" numberOfLines={1}>
                                 {displayDate}
                             </Text>
                         </View>
 
-                        <View className="flex-row items-center">
-                            <View className="flex-row">
-                                {mockAvatars.map((avatar, index) => (
-                                    <Image
-                                        key={index}
-                                        source={{ uri: avatar }}
-                                        className={`w-[18px] h-[18px] rounded-full border-2 border-white ${index > 0 ? '-ml-2' : ''}`}
-                                    />
-                                ))}
-                            </View>
-                            <Text className="text-[#8E8E93] text-[9px] font-regular ml-1">
-                                + {item.interestedCount || 123} interested
-                            </Text>
-                        </View>
+
                     </View>
                 </View>
             </TouchableOpacity>
@@ -214,87 +143,36 @@ export default function InterestedEventsScreen() {
     return (
         <View className="flex-1 bg-white">
             <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
-
-                {/* --- HEADER --- */}
                 <View style={{ height: 44, justifyContent: 'center', marginBottom: 16, marginTop: 8 }}>
-                    {/* NÚT BACK */}
-                    <Animated.View style={[backButtonStyle, { position: 'absolute', left: 20 }]}>
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            activeOpacity={0.8}
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        activeOpacity={0.8}
+                        style={{
+                            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.1, shadowRadius: 5, elevation: 3,
+                        }}
+                        className="absolute left-5 w-10 h-10 rounded-full items-center justify-center"
+                    >
+                        <View className="overflow-hidden rounded-full items-center justify-center"
                             style={{
-                                shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.1, shadowRadius: 5, elevation: 3,
-                            }}
-                            className="w-10 h-10 rounded-full items-center justify-center"
-                        >
-                            <View className="overflow-hidden rounded-full items-center justify-center"
-                                style={{
-                                    width: 36, height: 36, borderRadius: 28, borderWidth: 0.5,
-                                    borderTopColor: 'white', borderLeftColor: 'white',
-                                    borderBottomColor: 'transparent', borderRightColor: 'transparent',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                }}>
-                                <LinearGradient
-                                    colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
-                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]}
-                                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
-                                />
-                                <Feather name="chevron-left" size={20} color="#000000" />
-                            </View>
-                        </TouchableOpacity>
-                    </Animated.View>
-
-                    {/* TITLE */}
-                    <Animated.View style={[headerTitleStyle, { position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }]}>
-                        <Text className="text-[20px] font-semibold text-black">Interested Events</Text>
-                    </Animated.View>
-
-                    {/* NÚT SEARCH KÍNH MỜ -> THANH SEARCH */}
-                    <View style={{ position: 'absolute', right: 20, height: 40, justifyContent: 'center', alignItems: 'flex-end', zIndex: 100 }}>
-                        <TouchableOpacity
-                            onPress={isSearching ? undefined : handleOpenSearch}
-                            activeOpacity={isSearching ? 1 : 0.8}
-                            style={{
-                                shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.1, shadowRadius: 5, elevation: 3,
-                            }}
-                        >
-                            <Animated.View
-                                className="overflow-hidden flex-row items-center"
-                                style={[{ height: 36, borderRadius: 28 }, searchContainerStyle]}
-                            >
-                                <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, gradientStyle]}>
-                                    <LinearGradient
-                                        colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
-                                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]}
-                                        style={{ flex: 1, borderRadius: 9999 }}
-                                    />
-                                </Animated.View>
-
-                                <AnimatedFeather name="search" size={18} style={searchIconStyle} />
-
-                                <Animated.View style={[searchInputStyle, { flexDirection: 'row', alignItems: 'center', flex: 1 }]}>
-                                    <TextInput
-                                        ref={inputRef}
-                                        value={searchQuery}
-                                        onChangeText={setSearchQuery}
-                                        placeholder="Search events..."
-                                        placeholderTextColor="#8E8E93"
-                                        className="flex-1 text-[14px] text-black"
-                                    />
-                                    {isSearching && (
-                                        <TouchableOpacity onPress={handleCloseSearch} className="ml-1 px-1">
-                                            <Ionicons name="close-circle" size={20} color="#8E8E93" />
-                                        </TouchableOpacity>
-                                    )}
-                                </Animated.View>
-                            </Animated.View>
-                        </TouchableOpacity>
+                                width: 36, height: 36, borderRadius: 28, borderWidth: 0.5,
+                                borderTopColor: 'white', borderLeftColor: 'white',
+                                borderBottomColor: 'transparent', borderRightColor: 'transparent',
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            }}>
+                            <LinearGradient
+                                colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]}
+                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                            />
+                            <Feather name="chevron-left" size={20} color="#000000" />
+                        </View>
+                    </TouchableOpacity>
+                    <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
+                        <Text className="text-[24px] font-semibold text-black">Interested Events</Text>
                     </View>
                 </View>
 
-                {/* --- BODY (LOADING / EMPTY / LIST) --- */}
                 {loading ? (
                     <View className="flex-1 justify-center items-center">
                         <ActivityIndicator size="large" color="#ffa053" />
@@ -307,7 +185,6 @@ export default function InterestedEventsScreen() {
                         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 13, paddingBottom: 20 }}
                         showsVerticalScrollIndicator={false}
                         ListEmptyComponent={() => {
-                            // TRẠNG THÁI 1: CHƯA QUAN TÂM EVENT NÀO
                             if (events.length === 0) {
                                 return (
                                     <View className="flex items-center justify-center px-6 pb-20 mt-20">
@@ -320,28 +197,15 @@ export default function InterestedEventsScreen() {
                                         <Text className="text-gray-800 text-lg font-bold mt-4">A little empty here</Text>
                                         <Text className="text-gray-400 text-center mt-2 mb-4">Look like we missing a paw...</Text>
                                         <TouchableOpacity
-                                            className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-2"
+                                            className=" px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-2"
                                             activeOpacity={0.7}
                                             onPress={() => router.push('/')}
                                         >
-                                            <Text className="text-[#F59E0B] font-thin text-base">Upcoming events</Text>
+                                            <Text className="text-[#8E8E93] font-medium">Upcoming events</Text>
                                         </TouchableOpacity>
                                     </View>
                                 );
                             }
-
-                            // TRẠNG THÁI 2: SEARCH KHÔNG RA KẾT QUẢ
-                            return (
-                                <View className="flex-1 items-center justify-center mt-[100px]">
-                                    <View className="w-20 h-20 bg-gray-50 rounded-full items-center justify-center mb-4">
-                                        <Feather name="search" size={32} color="#9CA3AF" />
-                                    </View>
-                                    <Text className="text-black text-[18px] font-bold">No results found</Text>
-                                    <Text className="text-gray-400 text-[14px] text-center mt-2 px-10">
-                                        We couldn't find any events matching "{searchQuery}"
-                                    </Text>
-                                </View>
-                            );
                         }}
                     />
                 )}

@@ -34,23 +34,15 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const formatBreed = (breed?: string) => {
     if (!breed) return '';
-
-    // Nếu dưới hoặc bằng 15 ký tự thì giữ nguyên toàn bộ
     if (breed.length <= 15) return breed;
-
-    // Nếu trên 15 ký tự, tiến hành tách từ dựa vào khoảng trắng
     const words = breed.split(' ');
-
-    // Nếu có từ 2 từ trở lên (VD: Golden Retriever)
     if (words.length > 1) {
-        // Lấy chữ cái đầu tiên của từ thứ nhất, cộng thêm dấu chấm, và ghép với các từ còn lại
         const firstLetter = words[0][0];
         const restOfWords = words.slice(1).join(' ');
 
         return `${firstLetter}. ${restOfWords}`;
     }
 
-    // Fallback: Trong trường hợp hiếm hoi tên chỉ có 1 từ viết liền dính vào nhau mà dài hơn 15 ký tự
     return `${breed.substring(0, 15)}...`;
 };
 
@@ -111,16 +103,15 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
     }, [item.id, item.isFollowed]);
 
     const handleToggleFollow = async (e: any) => {
-        // CỰC KỲ QUAN TRỌNG: Chặn click lan lên thẻ cha
         if (e && e.stopPropagation) e.stopPropagation();
 
-        toggleShelterFollow(item.id); // Optimistic UI
+        toggleShelterFollow(item.id);
 
         try {
             await shelterService.toggleFollow(item.id);
         } catch (error) {
             console.error("Lỗi khi toggle follow:", error);
-            toggleShelterFollow(item.id); // Rollback nếu lỗi
+            toggleShelterFollow(item.id);
         }
     };
 
@@ -143,7 +134,6 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
                 </Text>
             </View>
 
-            {/* Nút Follow */}
             <TouchableOpacity
                 onPress={handleToggleFollow}
                 style={{ zIndex: 10, elevation: 10 }}
@@ -173,23 +163,18 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
         }
     }, [item.id, item.isInterested]);
 
-    // Thêm event "e" vào đây
     const handleToggle = async (e: any) => {
-        // 1. NGĂN CHẶN thẻ cha nhận click (tránh việc vừa lưu vừa bị đẩy sang trang detail)
         if (e && e.stopPropagation) {
             e.stopPropagation();
         }
 
-        // 2. Optimistic Update (Đổi màu ngay lập tức)
         toggleEventInterest(item.id);
 
         try {
-            // 3. Sửa lại logic user y hệt trang event detail
             const res = await eventService.toggleInterest(item.id, user?.id || 'guest');
             if (!res.success) throw new Error("API failed");
         } catch (error) {
             console.error("Lỗi khi bookmark:", error);
-            // Rollback nếu API báo lỗi
             toggleEventInterest(item.id);
         }
     };
@@ -222,48 +207,32 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
 
             <View className="flex-1 p-[14px] justify-between">
                 <View className="pr-6 relative">
-                    <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1" numberOfLines={2}>
+                    <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1 -top-1" numberOfLines={2}>
                         {item.title || 'Weekend Animal Event'}
                     </Text>
                     <Text className="text-[#8E8E93] text-[13px] font-regular" numberOfLines={1}>
                         {item.locationName || item.address || 'District, City'}
                     </Text>
 
-                    {/* QUAN TRỌNG: Thêm zIndex, elevation và gọi hàm với (e) */}
                     <TouchableOpacity
-                        className="absolute -top-1 right-0"
+                        className="absolute right-0"
                         style={{ zIndex: 10, elevation: 10 }}
                         hitSlop={{ top: 20, right: 20, bottom: 20, left: 20 }}
                         onPress={handleToggle}
                     >
                         <Image
-                                source={isInterested ? require('../assets/icon/book-mark.png') : require('../assets/icon/book-mark-solid.png')}
-                                style={{ width: 10, height: 14 }}
-                                resizeMode="cover"
-                            />
+                            source={isInterested ? require('../assets/icon/book-mark.png') : require('../assets/icon/book-mark-solid.png')}
+                            style={{ width: 10, height: 14 }}
+                            resizeMode="cover"
+                        />
                     </TouchableOpacity>
                 </View>
 
                 <View className="flex-row items-center justify-between mt-4">
                     <View className="flex-row items-center flex-1 pr-2">
                         <Feather name="calendar" size={13} color="#E89B5A" />
-                        <Text className="text-[#E89B5A] text-[9px] font-medium ml-1.5" numberOfLines={1}>
+                        <Text className="text-[#E89B5A] text-[12px] font-medium ml-1.5" numberOfLines={1}>
                             {displayDate}
-                        </Text>
-                    </View>
-
-                    <View className="flex-row items-center">
-                        <View className="flex-row">
-                            {mockAvatars.map((avatar, index) => (
-                                <Image
-                                    key={index}
-                                    source={{ uri: avatar }}
-                                    className={`w-[18px] h-[18px] rounded-full border-2 border-white ${index > 0 ? '-ml-2' : ''}`}
-                                />
-                            ))}
-                        </View>
-                        <Text className="text-[#8E8E93] text-[9px] font-regular ml-1">
-                            + {item.interestedCount || 123} interested
                         </Text>
                     </View>
                 </View>
@@ -280,17 +249,14 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
 const PetsSection = ({ searchQuery, onDetailPress }: { searchQuery: string, onDetailPress: (item: any) => void }) => {
     const [pets, setPets] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    // Thêm state để quản lý filter chip đang được chọn
     const [activeType, setActiveType] = useState<'All' | 'Dog' | 'Cat'>('All');
 
     useEffect(() => {
         const fetchPets = async () => {
             setLoading(true);
             try {
-                // Chuẩn bị params gửi lên API
                 const params: any = { search: searchQuery };
 
-                // Nếu không phải 'All', thêm param 'type' (DOG hoặc CAT)
                 if (activeType !== 'All') {
                     params.type = activeType.toUpperCase();
                 }
@@ -342,7 +308,6 @@ const SheltersSection = ({ searchQuery, onProfilePress }: { searchQuery: string,
         const fetchShelters = async () => {
             setLoading(true);
             try {
-                // TRUYỀN USER ID VÀO ĐÂY
                 const response = await shelterService.getShelters({
                     search: searchQuery,
                     userId: user?.id
@@ -453,7 +418,6 @@ export default function SearchScreen() {
 
     const [isFocused, setIsFocused] = useState(false);
     const handleFocus = () => {
-        // Kích hoạt animation mượt mà
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setIsFocused(true);
     };
@@ -489,7 +453,6 @@ export default function SearchScreen() {
                 id: item.id,
                 name: item.name,
                 address: item.address || item.loc,
-                // Cập nhật field
                 image: item.avatarUrl || item.avatar || item.img
             }
         });
@@ -501,7 +464,6 @@ export default function SearchScreen() {
             params: {
                 id: item.id,
                 title: item.title,
-                // Cập nhật mapping dữ liệu chuẩn từ API
                 location: item.locationName || item.address,
                 date: item.startDate,
                 image: item.bannerUrl
@@ -516,21 +478,17 @@ export default function SearchScreen() {
         return (
             <TouchableOpacity
                 onPress={() => setActiveTab(title)}
-                // Thêm class 'relative' để làm mốc tọa độ cho thanh màu cam
                 className="flex-1 items-center justify-center pb-3 relative"
             >
                 <Text
-                    className={`text-[16px] font-semibold ${isActive ? 'text-[#E89B5A]' : 'text-[#8E8E93]'
+                    className={`text-[16px]  ${isActive ? 'text-[#E89B5A] font-semibold' : 'text-[#8E8E93] font-regular'
                         }`}
                 >
                     {title}
                 </Text>
 
-                {/* --- THANH CAM BO TRÒN 2 ĐẦU --- */}
                 {isActive && (
                     <View
-                        // rounded-full chính là "phép thuật" để bo tròn 2 đầu
-                        // absolute bottom-[-1px] để thanh này nằm đè chính xác lên đường viền xám mờ của khung chứa
                         className="absolute bottom-[-1px] w-full h-[3px] bg-[#E89B5A] rounded-full"
                     />
                 )}
@@ -565,7 +523,7 @@ export default function SearchScreen() {
                                 borderRightColor: 'transparent',
                                 justifyContent: 'center',
                                 alignItems: 'center',
-                                backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
                             }}>
                             <LinearGradient
                                 colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}

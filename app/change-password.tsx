@@ -70,7 +70,7 @@ export default function ChangePasswordScreen() {
             <Feather name="chevron-left" size={20} color="#000000" />
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            <Text className="text-[24px] font-semibold text-black">Change Password</Text>
+            <Text className="text-[20px] font-semibold text-black">Change Password</Text>
           </View>
         </View>
 

@@ -274,51 +274,7 @@ export default function FavoritePetsScreen() {
           <Text className="text-[24px] font-semibold text-black">Favorite Pets</Text>
         </Animated.View>
 
-        {/* 3. NÚT SEARCH KÍNH MỜ -> MORPHING THÀNH THANH SEARCH */}
-        <View style={{ position: 'absolute', right: 20, height: 40, justifyContent: 'center', alignItems: 'flex-end', zIndex: 100 }}>
-          <TouchableOpacity
-            onPress={isSearching ? undefined : handleOpenSearch}
-            activeOpacity={isSearching ? 1 : 0.8}
-            style={{
-              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1, shadowRadius: 5, elevation: 3,
-            }}
-          >
-            <Animated.View
-              className="overflow-hidden flex-row items-center"
-              style={[{ height: 36, borderRadius: 28 }, searchContainerStyle]}
-            >
-              {/* Lớp kính mờ (Gradient) - Giữ nguyên logic biến mất khi search */}
-              <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, gradientStyle]}>
-                <LinearGradient
-                  colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]}
-                  style={{ flex: 1, borderRadius: 9999 }}
-                />
-              </Animated.View>
-
-              {/* Icon Search */}
-              <AnimatedFeather name="search" size={18} style={searchIconStyle} />
-
-              {/* TextInput và Nút Đóng */}
-              <Animated.View style={[searchInputStyle, { flexDirection: 'row', alignItems: 'center', flex: 1 }]}>
-                <TextInput
-                  ref={inputRef}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder="Search favorite pets..."
-                  placeholderTextColor="#8E8E93"
-                  className="flex-1 text-[14px] text-black"
-                />
-                {isSearching && (
-                  <TouchableOpacity onPress={handleCloseSearch} className="ml-1 px-1">
-                    <Ionicons name="close-circle" size={20} color="#8E8E93" />
-                  </TouchableOpacity>
-                )}
-              </Animated.View>
-            </Animated.View>
-          </TouchableOpacity>
-        </View>
+        
 
       </View>
 
@@ -343,7 +299,6 @@ export default function FavoritePetsScreen() {
           contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={() => {
-            // TRẠNG THÁI 1: KHÔNG CÓ PET TRONG DANH SÁCH FAVORITE BAN ĐẦU
             if (favorites.length === 0) {
               return (
                 <View className="flex-1 items-center justify-center mt-20">
@@ -360,31 +315,16 @@ export default function FavoritePetsScreen() {
                   <Text className="text-gray-400 text-center mt-2 mb-6">Add your pet or adopt a new friend!</Text>
     
                   <TouchableOpacity
-                    className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-2"
+                    className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-4"
                     activeOpacity={0.7}
                     onPress={() => router.push('/')}
                   >
-                    <View className=" rounded-full mr-2">
-                      <Ionicons name="add" size={20} color="#F59E0B" />
-                    </View>
-                    <Text className="text-[#F59E0B] font-thin text-base">Browse pet</Text>
+                    <Text className="text-[#8E8E93] font-medium">Browse pets</Text>
                   </TouchableOpacity>
                 </View>
               );
             }
 
-            // TRẠNG THÁI 2: CÓ PET NHƯNG TÌM KIẾM KHÔNG RA KẾT QUẢ
-            return (
-              <View className="flex-1 items-center justify-center mt-[100px]">
-                <View className="w-20 h-20 bg-gray-50 rounded-full items-center justify-center mb-4">
-                  <Feather name="search" size={32} color="#9CA3AF" />
-                </View>
-                <Text className="text-black text-[18px] font-bold">No results found</Text>
-                <Text className="text-gray-400 text-[14px] text-center mt-2 px-10">
-                  We couldn't find any pets matching "{searchQuery}"
-                </Text>
-              </View>
-            );
           }}
           renderItem={({ item }) => (
             <FavoritePetCard
