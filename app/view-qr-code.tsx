@@ -535,6 +535,8 @@ export default function ViewQrCode() {
   );
 }
 
+
+
 const styles = StyleSheet.create({
   qrContainer: {
     alignItems: 'center',
