@@ -198,12 +198,12 @@ export default function AddPetScreen() {
       // 2. Chuyển trang thẳng
       router.replace(`/pet-profile-detail?id=${realPetId}`);
 
-      // 3. Hiển thị thông báo
+      // 3. Hiển thị thông báo (SỬA LẠI ĐOẠN NÀY)
       showModal({
         title: 'Success',
         message: tagId 
-          ? 'Pet profile created successfully! Vòng cổ đã được kích hoạt.' 
-          : 'Pet profile created successfully!',
+          ? 'Tạo hồ sơ thú cưng thành công! Vòng cổ đã được kích hoạt.' 
+          : 'Tạo hồ sơ thành công!\n(Profile hiện chưa có QR code, bạn có thể cập nhật và gán vòng cổ sau).', // Nhắc nhở người dùng
         buttonText: 'OK',
         onConfirm: () => {}
       });

@@ -108,9 +108,20 @@ export const petService = {
     }
   },
 
-  toggleLostMode: async (petId: string, isLost: boolean) => {
+  toggleLostMode: async (petId: string, data: {
+    isLost: boolean;
+    location?: string;
+    dateTime?: string;
+    details?: string;
+    ownerName?: string;
+    ownerPhone?: string;
+    ownerAddress?: string;
+    note?: string;
+    photos?: string[];
+  }) => {
     try {
-      const response = await axiosClient.patch(`/pets/${petId}/lost-mode`, { isLost });
+      // Truyền toàn bộ object data vào body của patch request
+      const response = await axiosClient.patch(`/pets/${petId}/lost-mode`, data);
       return response.data;
     } catch (error: any) {
       throw error.response?.data || { message: error.message };

@@ -1,10 +1,9 @@
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AntDesign } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -163,7 +162,13 @@ export default function ScannedPetScreen() {
   }
 
   const isLost = pet.isLost || pet.status?.toUpperCase() === 'LOST';
-  // const isLost = false;
+
+  // Thêm đoạn này: Xử lý fallback dữ liệu an toàn để tránh bị crash và bắt đúng field từ Backend trả về
+  const displayOwnerName = pet?.lostInfo?.ownerName || pet?.ownerName || pet?.owner?.name || 'Unknown Owner';
+  const displayOwnerPhone = pet?.lostInfo?.ownerPhone || pet?.ownerPhone || pet?.owner?.phone || null;
+  const displayOwnerAddress = pet?.lostInfo?.ownerAddress || pet?.ownerAddress || pet?.owner?.address || 'No address provided';
+  // Lấy trường `note` được gửi từ form Report, ưu tiên lostInfo.note hoặc pet.note
+  const displayNote = pet?.lostInfo?.note || pet?.note || "Please contact me ASAP";
 
   return (
     <View className="flex-1 bg-white">
@@ -190,10 +195,10 @@ export default function ScannedPetScreen() {
           <View className="px-5 pt-4">
             <View className="bg-white rounded-[32px] z-10"
               style={{
-                shadowColor: '#E89B5A',                  // Color: 000000
-                shadowOffset: { width: 4, height: 4 },   // Position: X 4, Y 4
-                shadowOpacity: 0.4,                     // Opacity: 25%
-                shadowRadius: 4,                        // Blur: 10
+                shadowColor: '#E89B5A',
+                shadowOffset: { width: 4, height: 4 },
+                shadowOpacity: 0.4,
+                shadowRadius: 4,
                 elevation: 3,
               }}>
 
@@ -205,7 +210,6 @@ export default function ScannedPetScreen() {
                   source={{ uri: pet.image || pet.images?.[0]?.url }}
                   style={{ width: width - 20, height: 300 }}
                   resizeMode="cover"
-
                 />
                 <View className="bottom-0 left-0 right-0 h-[105px] w-full absolute rounded-2xl overflow-hidden items-center justify-center">
                   <LinearGradient
@@ -225,27 +229,24 @@ export default function ScannedPetScreen() {
                   <Text
                     className="text-white text-[24px] font-bold text-center capitalize mb-2"
                   >
-                    {pet?.name.toLowerCase()}
+                    {pet?.name?.toLowerCase() || 'pet'}
                   </Text>
                   <Text
                     className="text-white text-[14px] font-regular text-center tracking-[0.5px]"
                   >
-                    {pet?.age || 'Unknown'} years old • {pet?.breed}
+                    {pet?.age || 'Unknown'} years old • {pet?.breed || 'Unknown'}
                   </Text>
                 </View>
               </View>
             </View>
           </View>
-
-
         ) : (
           <View className="pt-4 px-6">
             <View className="bg-white rounded-[32px]" style={{
-              shadowColor: '#000000',                  // Color: 000000
-              shadowOffset: { width: 4, height: 4 },   // Position: X 4, Y 4
-              shadowOpacity: 0.25,                     // Opacity: 25%
-              shadowRadius: 5,                        // Blur: 10
-
+              shadowColor: '#000000',
+              shadowOffset: { width: 4, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 5,
               elevation: 3,
             }}>
 
@@ -258,7 +259,7 @@ export default function ScannedPetScreen() {
               </View>
             </View>
             <View className='items-center'>
-              <Text className="text-[24px] font-medium text-gray-800 py-5">Meet {pet.name}!</Text>
+              <Text className="text-[24px] font-medium text-gray-800 py-5">Meet {pet?.name}!</Text>
             </View>
           </View>
         )}
@@ -266,7 +267,8 @@ export default function ScannedPetScreen() {
         {/* --- 2. INFORMATION BODY --- */}
         <View className="px-5">
 
-          {isLost && pet.owner ? (
+          {/* Thay đổi điều kiện từ: isLost && pet.owner sang chỉ isLost để tránh lỗi mất UI */}
+          {isLost ? (
             <View className="bg-white">
               <Text className="text-[18px] font-semibold text-[#AB5C1A] my-[21px]">Owner Information</Text>
               <View className="flex justify-center items-center mb-4">
@@ -282,11 +284,11 @@ export default function ScannedPetScreen() {
                       </View>
                       <View className="flex-1 justify-center">
                         <Text className="text-[#AB5C1A] text-[16px] font-semibold leading-[16px] mb-[7px]">Owner Name</Text>
-                        <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{pet.owner.name}</Text>
+                        <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{displayOwnerName}</Text>
                       </View>
                     </View>
 
-                    {pet.owner.phone && (
+                    {displayOwnerPhone && (
                       <View className="flex-row gap-4 pb-[12.15px]">
                         <View className="justify-center mb-5 bottom-1">
                           <Image
@@ -297,7 +299,7 @@ export default function ScannedPetScreen() {
                         </View>
                         <View className="flex-1 justify-center">
                           <Text className="text-[#AB5C1A] text-[16px] font-semibold  leading-[16px] mb-[7px]">Phone Number</Text>
-                          <Text className="text-[#8E8E93] text-[14px] font-regular mt leading-[16px]">{pet.owner.phone}</Text>
+                          <Text className="text-[#8E8E93] text-[14px] font-regular mt leading-[16px]">{displayOwnerPhone}</Text>
                         </View>
                       </View>
                     )}
@@ -313,15 +315,16 @@ export default function ScannedPetScreen() {
                       <View className="flex-1 justify-center -mx-1">
                         <Text className="text-[#AB5C1A] text-[16px] font-semibold leading-[16px] mb-[7px]">Address</Text>
                         <Text className="text-[#8E8E93] text-[14px] ffont-regular leading-[16px]">
-                          {pet.owner.address}
+                          {displayOwnerAddress}
                         </Text>
                       </View>
                     </View>
                   </View>
                 </View>
                 <View className="flex items-center w-4/5 bg-[#FFF8F5] px-2.5 rounded-full border border-[#E89B5A] bottom-5">
-                  <Text className="text-[#AB5C1A] text-[14px] font-regular leading-[20px] py-[6px]">
-                    "Please contact me ASAP"
+                  <Text className="text-[#AB5C1A] text-[14px] text-center font-regular leading-[20px] py-[6px]">
+                    {/* BƯỚC ĐỔI QUAN TRỌNG: Gọi ra biến displayNote đã xử lý ở trên */}
+                    {displayNote}
                   </Text>
                 </View>
               </View>

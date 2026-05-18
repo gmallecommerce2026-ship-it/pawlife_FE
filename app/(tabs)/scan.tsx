@@ -315,15 +315,20 @@ export default function ScanScreen() {
             <ChevronLeft size={24} color="white" />
           </TouchableOpacity>
 
-          {/* Nút Continue without scanning - Căn giữa tuyệt đối */}
-          <View pointerEvents="box-none" className="absolute left-0 right-0 items-center justify-center z-10">
-            <TouchableOpacity 
-              onPress={() => router.back()}
-              className="bg-black/40 px-5 py-3 rounded-full border border-white/10 shadow-sm"
-            >
-              <Text className="text-white font-lighter text-[12px]">Continue without scanning</Text>
-            </TouchableOpacity>
-          </View>
+          {/* CHỈ HIỂN THỊ NÚT SKIP KHI ĐANG Ở LUỒNG THÊM PET MỚI */}
+          {isAddingPet && (
+            <View pointerEvents="box-none" className="absolute left-0 right-0 items-center justify-center z-10">
+              <TouchableOpacity 
+                onPress={() => {
+                  // Chuyển thẳng tới form nhập liệu
+                  router.replace('/add-pet'); 
+                }}
+                className="bg-black/40 px-5 py-3 rounded-full border border-white/10 shadow-sm"
+              >
+                <Text className="text-white font-lighter text-[12px]">Continue without scanning</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           
           {/* View trống để giữ bố cục flex layout */}
           <View className="w-12" />

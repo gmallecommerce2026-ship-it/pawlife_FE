@@ -106,8 +106,21 @@ export default function PetProfileDetailScreen() {
 
   // --- LOGIC HANDLERS ---
   const handleLostModeToggle = (value: boolean) => {
-    setPendingLostMode(value);
-    setShowLostModeModal(true);
+    if (value === true) {
+      // Ép kiểu 'as any' để bypass lỗi strict typing của Expo Router
+      router.push({
+        pathname: '/report-lost-pet' as any,
+        params: { 
+          petId: petId,
+          petName: petData?.name, // Thêm dấu ? để an toàn
+          petAvatar: petData?.avatarUrl || petData?.images?.[0]?.url 
+        }
+      });
+    } else {
+      // Khi tắt chế độ mất tích
+      setPendingLostMode(false);
+      setShowLostModeModal(true);
+    }
   };
 
   const handleViewQRCode = () => {

@@ -49,6 +49,7 @@ function RootLayoutNavGuard() {
   const [isAppLocked, setIsAppLocked] = useState(false);
   const appState = useRef(AppState.currentState);
   const [hasSeenIntro, setHasSeenIntro] = useState<boolean | null>(null);
+  
   useEffect(() => {
     const initSocket = async () => {
       if (isAuthenticated && !socket.connected) {
@@ -60,6 +61,7 @@ function RootLayoutNavGuard() {
     };
     initSocket();
   }, [isAuthenticated]);
+
   // BỔ SUNG 3: Global Socket Listener cho luồng Transfer Ownership
   useEffect(() => {
     // Chỉ kích hoạt socket listener nếu user đã đăng nhập hoàn tất
@@ -297,7 +299,9 @@ function RootLayoutNav() {
       <Stack.Screen name="transfer-ownership" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pawcare/[category]" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="intro" options={{ headerShown: false, animation: 'fade' }} />
-
+      
+      {/* THÊM KHAI BÁO MÀN HÌNH REPORT LOST PET Ở ĐÂY */}
+      <Stack.Screen name="report-lost-pet" options={{ headerShown: false, animation: 'slide_from_right' }} />
     </Stack>
   );
 }

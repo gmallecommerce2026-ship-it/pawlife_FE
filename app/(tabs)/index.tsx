@@ -3,12 +3,12 @@ import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 // Đã tạm tắt hook useInfiniteSlider để khắc phục lỗi liệt cảm ứng do re-render loop
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
-import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { BlurView } from 'expo-blur';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 
 // Sử dụng components chuẩn của React Native để NativeWind (Tailwind) nhận diện được className
 import { ActivityIndicator, FlatList, Image, ScrollView, TouchableOpacity, View } from 'react-native';
@@ -217,7 +217,20 @@ export default function HomeScreen() {
             const addressParts = fullAddress.split(',');
             displayCity = addressParts[addressParts.length - 1].trim();
         }
-        const isFemale = pet.gender?.toUpperCase() === 'FEMALE';
+        
+        // Chuẩn hóa kiểm tra giới tính (Hỗ trợ cả chữ hoa, chữ thường từ NestJS API)
+        const isFemale = pet.gender?.toUpperCase() === 'FEMALE' || pet.gender?.toUpperCase() === 'CÁ';
+        
+        // Xử lý hiển thị Tuổi động (Bỏ hardcode số '1')
+        const displayAge = (() => {
+            if (!pet.age) return 'N/A';
+            // Nếu API trả về dạng số (ví dụ: 2) -> hiển thị '2 tuổi' hoặc '2 yrs' tùy ngôn ngữ app
+            if (typeof pet.age === 'number' || !isNaN(Number(pet.age))) {
+                return `${pet.age}`;
+            }
+            // Nếu API đã format sẵn chuỗi (ví dụ: "3 tháng", "1 year") -> giữ nguyên
+            return pet.age;
+        })();
 
         return (
             <TouchableOpacity
@@ -227,9 +240,13 @@ export default function HomeScreen() {
                 onPress={() => router.push({
                     pathname: '/pet-detail-modal',
                     params: {
-                        id: pet.id, name: pet.name, gender: pet.gender || 'male',
-                        distance: displayCity, image: petImageUrl,
-                        age: pet.age || 'Unknown', breed: pet.breed || 'Unknown Breed'
+                        id: pet.id, 
+                        name: pet.name, 
+                        gender: pet.gender || 'male', // Truyền nguyên bản hoặc format chuẩn về detail modal
+                        distance: displayCity, 
+                        image: petImageUrl,
+                        age: displayAge, // Truyền tuổi đã xử lý động
+                        breed: pet.breed || 'Unknown Breed'
                     }
                 })}
             >
@@ -242,9 +259,11 @@ export default function HomeScreen() {
                     >
                         <View className="flex-row items-center mb-1">
                             <Text className="text-white text-[17px] font-semibold tracking-tight shrink mb-0.5" numberOfLines={1}>{pet.name}</Text>
+                            
+                            {/* KHẮC PHỤC LỖI HARDCODE TẠI ĐÂY */}
                             <View className="flex-row items-center ml-2 px-2 py-0.5 rounded-full shrink-0 border border-white/40 overflow-hidden bg-white/20 backdrop-blur-md">
                                 <Ionicons name={isFemale ? 'female' : 'male'} size={12} color="#ffffff" />
-                                <Text className="text-white text-[11px] font-bold ml-1">{pet.age || '1'}</Text>
+                                <Text className="text-white text-[11px] font-bold ml-1">{displayAge}</Text>
                             </View>
                         </View>
                         <View className="flex-row items-center">
