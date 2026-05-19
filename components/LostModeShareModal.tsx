@@ -331,7 +331,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                       <TouchableOpacity
                         onPress={() => { }}
                         activeOpacity={0.7}
-                        // Xóa các class border cũ đi, thêm relative để chứa SVG
                         className="bg-white rounded-[12px] items-center justify-center mt-1 relative overflow-hidden"
                       >
                         {/* --- BẮT ĐẦU: KHỐI SVG VẼ VIỀN NÉT ĐỨT --- */}
@@ -341,10 +340,9 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                               width="100%"
                               height="100%"
                               fill="none"
-                              stroke="#D1D5DB" // Màu viền
-                              strokeWidth={2}  // Độ dày của viền (tùy chỉnh)
-                              rx={16}          // Độ bo góc (phải khớp với rounded-[12px])
-                              // THẦN CHÚ NẰM Ở ĐÂY: [Chiều dài nét đứt, Khoảng cách gap]
+                              stroke="#D1D5DB"
+                              strokeWidth={2} 
+                              rx={16}
                               strokeDasharray="5, 5"
                             />
                           </Svg>

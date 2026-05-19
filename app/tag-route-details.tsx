@@ -92,36 +92,28 @@ export default function TagRouteDetailsScreen() {
   useEffect(() => {
     shinePosition.value = withRepeat(
       withSequence(
-        // Lướt vệt sáng từ trái qua phải trong 1 giây (1000ms)
         withTiming(1.5, { duration: 1000, easing: Easing.linear }),
-        // Dừng lại ở đó (không cần thời gian)
         withTiming(-0.5, { duration: 0 }),
-        // Nghỉ 5 giây (5000ms) rồi mới lướt tiếp
         withDelay(5000, withTiming(-0.5, { duration: 0 }))
       ),
-      -1, // Số -1 nghĩa là lặp lại vô hạn
-      false // Không lướt ngược lại
+      -1,
+      false
     );
   }, []);
 
-  // 3. Tạo style động cho vệt sáng
   const shineStyle = useAnimatedStyle(() => {
     return {
-      // Dùng phần trăm để tự động khớp với mọi chiều rộng của nút
       left: `${shinePosition.value * 100}%`,
     };
   });
 
   const innerShadowStyle = useAnimatedStyle(() => {
     return {
-      // Chiều cao bóng sẽ thay đổi từ 20px (đóng) lên 40px (mở) để tạo độ sâu
       height: withTiming(isExpanded ? SCREEN_HEIGHT * 1 : SCREEN_HEIGHT*0.5),
-      // opacity: withTiming(isExpanded ? 1 : 0),
     };
   });
 
   const toggleExpand = () => {
-    // Tạo hiệu ứng mượt mà khi thay đổi layout
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsExpanded(!isExpanded);
   };
@@ -178,7 +170,6 @@ export default function TagRouteDetailsScreen() {
             destRes ? destRes.json() : null
           ]);
 
-          // --- XỬ LÝ ĐƯỜNG ĐI & THÔNG SỐ ---
           if (dirData?.status === 'OK' && dirData.routes?.[0]) {
             const route = dirData.routes[0];
             const leg = route.legs[0];
@@ -196,7 +187,6 @@ export default function TagRouteDetailsScreen() {
             });
 
             if (mapRef.current) {
-              // Delay nhỏ giúp map render xong mới fit tọa độ
               setTimeout(() => {
                 mapRef.current?.fitToCoordinates(
                   [{ latitude: curLat, longitude: curLng }, { latitude: targetLat, longitude: targetLng }],
@@ -208,7 +198,6 @@ export default function TagRouteDetailsScreen() {
             console.warn("Google Directions API Error:", dirData?.status, dirData?.error_message);
           }
 
-          // --- XỬ LÝ ĐỊA CHỈ TỐI ƯU HƠN ---
           setAddresses({
             origin: getShortAddress(oriData) || 'Your Location',
             destination: getShortAddress(destData) || 'Scanned Point'
