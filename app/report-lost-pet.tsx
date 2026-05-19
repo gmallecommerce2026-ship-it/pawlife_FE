@@ -4,16 +4,13 @@ import { petService } from '@/services/petService';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Camera, ChevronRight, Map, MapPin, Plus, X } from 'lucide-react-native';
-import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
+import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -21,6 +18,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -144,8 +142,11 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
   };
 
   const handleClose = () => {
-    if (router.canGoBack()) {
-      router.back();
+    if (petId) {
+      // Sử dụng router.replace thay vì router.back() để điều hướng thẳng về Profile
+      // Việc dùng 'replace' cũng giúp xóa form này khỏi lịch sử điều hướng, 
+      // tránh lỗi người dùng ấn nút Back trên Android bị quay lại trang form.
+      router.replace(`/pet-profile-detail?id=${petId}`);
     } else {
       router.replace('/(tabs)/my-pets');
     }
@@ -171,7 +172,7 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
       Alert.alert(
         'Báo lạc thành công',
         `Đã kích hoạt chế độ báo lạc cho ${petName || 'thú cưng'}.`,
-        [{ text: 'OK', onPress: () => handleClose() }]
+        [{ text: 'OK', onPress: () => handleClose() }] // Gọi hàm handleClose ở trên
       );
     } catch (error: any) {
       // Đọc message lỗi trả về từ Axios hoặc Server một cách chính xác

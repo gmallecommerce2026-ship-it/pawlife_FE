@@ -135,7 +135,11 @@ export default function PetProfileDetailScreen() {
     try {
       setShowLostModeModal(false);
       setIsTogglingLostMode(true);
-      await petService.toggleLostMode(petId, isLost);
+      
+      // SỬA DÒNG NÀY: Truyền vào một object
+      await petService.toggleLostMode(petId, { isLost: isLost }); 
+      // Hoặc viết tắt: await petService.toggleLostMode(petId, { isLost });
+      
       setIsLostMode(isLost);
     } catch (error: any) {
       Alert.alert(t('error.title'), error.message || t('error.toggleModeFailed'));
