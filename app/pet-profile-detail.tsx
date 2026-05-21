@@ -1,6 +1,6 @@
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Feather, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { Feather, FontAwesome5, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,6 +14,54 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const MOCK_PAW_HISTORY = [
+  {
+    id: '1',
+    title: 'Current Owner',
+    date: '01/01/2026',
+    description: 'Ownership transferred to Jane Doe',
+    icon: 'user',
+    color: '#F2A465', // Cam
+    bgColor: '#FFF4EC'
+  },
+  {
+    id: '2',
+    title: 'Annual Checkup',
+    date: '01/01/2026',
+    description: 'Health examination completed',
+    icon: 'check',
+    color: '#77C582', // Xanh lá
+    bgColor: '#EBFFE2'
+  },
+  {
+    id: '3',
+    title: 'DHPP Vaccination',
+    date: '01/01/2026',
+    description: 'Vaccinated: hepatitis, rabies, parvo, and parainfluenza',
+    icon: 'user', // Bạn có thể đổi thành 'syringe' cho hợp ngữ cảnh y tế
+    color: '#5A90DA', // Xanh dương
+    bgColor: '#E8F1FF'
+  },
+  {
+    id: '4',
+    title: 'QR Code Registered',
+    date: '01/01/2026',
+    description: 'PawLife QR tag activated and linked to Luna',
+    icon: 'expand',
+    color: '#885BF2', // Tím
+    bgColor: '#EAE7FB'
+  },
+  {
+    id: '5',
+    title: 'Date of Birth',
+    date: '01/01/2026',
+    description: 'Luna was born',
+    icon: 'user',
+    color: '#F2A465', // Vàng cam
+    bgColor: '#FFF4EC'
+  }
+];
+
 export default function PetProfileDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -24,6 +72,7 @@ export default function PetProfileDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLostMode, setIsLostMode] = useState(false);
   const [isAddressVisible, setIsAddressVisible] = useState(true);
+  const [showHistory, setShowHistory] = useState(true);
   const [expandHistory, setExpandHistory] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingLostMode, setIsTogglingLostMode] = useState(false);
@@ -32,6 +81,8 @@ export default function PetProfileDetailScreen() {
   const [showVaccineMenu, setShowVaccineMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 28 });
   const { t } = useLanguage();
+
+
 
   const handleRemovePet = () => {
     Alert.alert(
@@ -110,10 +161,13 @@ export default function PetProfileDetailScreen() {
       // Ép kiểu 'as any' để bypass lỗi strict typing của Expo Router
       router.push({
         pathname: '/report-lost-pet' as any,
-        params: { 
+        params: {
           petId: petId,
           petName: petData?.name, // Thêm dấu ? để an toàn
-          petAvatar: petData?.avatarUrl || petData?.images?.[0]?.url 
+          petAvatar: petData?.avatarUrl || petData?.images?.[0]?.url,
+          petShelterName: petData.contactName || ownerInfo.name || 'Chưa cập nhật',
+          petShelterPhone: petData.contactPhone || ownerInfo.phone || 'Chưa cập nhật',
+          petShelterAddress: petData.contactAddress || ownerInfo.address || 'Chưa cập nhật'
         }
       });
     } else {
@@ -135,11 +189,11 @@ export default function PetProfileDetailScreen() {
     try {
       setShowLostModeModal(false);
       setIsTogglingLostMode(true);
-      
+
       // SỬA DÒNG NÀY: Truyền vào một object
-      await petService.toggleLostMode(petId, { isLost: isLost }); 
+      await petService.toggleLostMode(petId, { isLost: isLost });
       // Hoặc viết tắt: await petService.toggleLostMode(petId, { isLost });
-      
+
       setIsLostMode(isLost);
     } catch (error: any) {
       Alert.alert(t('error.title'), error.message || t('error.toggleModeFailed'));
@@ -151,8 +205,9 @@ export default function PetProfileDetailScreen() {
 
   const toggleHistory = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandHistory(!expandHistory);
+    setShowHistory(!showHistory);
   };
+
 
   // --- SUB-COMPONENTS ---
   const InfoRow = ({ label1, value1, label2, value2 }: any) => (
@@ -270,15 +325,47 @@ export default function PetProfileDetailScreen() {
 
         {/* --- HEADER --- */}
         <View className="flex-row items-center justify-between px-4 py-2 bg-[#FFFFFF]">
-          <TouchableOpacity onPress={() => router.back()} className="p-2">
-            <Feather name="chevron-left" size={24} color="#374151" />
+          <TouchableOpacity
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 5,
+              elevation: 3,
+            }}
+          >
+            <View className="overflow-hidden left-0 rounded-full w-[36px] h-[36px] items-center justify-center"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 28,
+                borderWidth: 0.5,
+                borderTopColor: 'white',
+                borderLeftColor: 'white',
+                borderBottomColor: 'transparent',
+                borderRightColor: 'transparent',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              }}>
+              <LinearGradient
+                colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                locations={[0, 0.3, 1]}
+
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+              />
+              <Feather name="chevron-left" size={20} color="#1F2937" />
+            </View>
           </TouchableOpacity>
           <Text className="text-[18px] font-semibold text-[#000000]">{petData.name} Profile</Text>
           <View className="w-10" />
         </View>
 
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
 
           {/* --- AVATAR & ID SECTION --- */}
           <View className="items-center mt-6 mb-[12px]">
@@ -302,95 +389,120 @@ export default function PetProfileDetailScreen() {
 
           {/* --- LOST MODE / QR REQUIRED SECTION --- */}
           {hasValidQRCode ? (
-            <View
-              className="mx-7 mb-8 rounded-[20px]"
-              style={isLostMode
-                ? {
-                  shadowColor: '#8B546B1A',
-                  shadowOffset: { width: 5, height: 5 },
-                  shadowOpacity: 1,
-                  shadowRadius: 2,
-                  elevation: 3,
-                  backgroundColor: isLostMode ? '#FEF2F2' : '#FFFFFF'
-                } : {}}
-            >
-              {/* 2. INNER VIEW: Cắt góc overflow và xử lý màu nền */}
-              <View
-                className={`rounded-[20px] p-[18px] py-[21px] flex-row items-center justify-between overflow-hidden ${isLostMode
-                  ? 'bg-[#FEF2F2] border border-[#FFE5E5]'
-                  : 'bg-white border border-gray-200'
-                  }`}
 
-              >
-
-                {/* Nền Gradient khi bật Lost Mode */}
-                {isLostMode && (
-                  <>
-                    <LinearGradient
-                      colors={['#FFF8F1', '#FFF8F1', '#FFEEF0']}
-                      // Ép bóng mờ đi rất nhanh ở đoạn 15% và biến mất hoàn toàn ở 35% của 24px
-                      // => Bóng thực tế chỉ mỏng khoảng 8px nhưng mượt mà ôm sát góc
-                      locations={[0, 0.15, 0.35]}
-                      start={{ x: 1, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{
-                        position: 'absolute',
-                        top: 0, left: 0, right: 0,
-                        // BẮT BUỘC lớn hơn borderRadius (20) để đường cong được vẽ trọn vẹn
-                        height: 3,
-                        zIndex: 1,
-                      }}
-                    />
-                    <LinearGradient
-                      colors={['#FFF8F1', '#FFEEF0']}
-                      locations={[0.3, 1]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                    />
-                  </>
-                )}
-
-                {/* KHỐI BÊN TRÁI: Icon và Text */}
-                <View className="flex-row items-start flex-1 mr-4 z-10">
-                  <View className="mt-[1px] mr-3">
-
-                    <Feather
-                      name="alert-circle"
-                      size={20}
-                      color={isLostMode ? "#8B3A3A" : "#9ca3af00"}
+            <View>
+              <View>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => router.push({ pathname: '/(tabs)/scan', params: { linkPetId: petId } })}
+                  className="mx-[20px] mb-8 flex-row bg-[#FDF5E8] border border-[#FFAA33] rounded-[20px] p-[17px]"
+                >
+                  <View className="mr-2">
+                    <Image
+                      source={require('../assets/icon/alert.png')}
+                      style={{ width: 15, height: 15 }}
+                      resizeMode="cover"
                     />
                   </View>
                   <View className="flex-1">
-                    <Text className={`font-medium text-[16px] leading-6 ${isLostMode ? 'text-[#8B3A3A]' : 'text-[#000000]'}`}>
-                      Lost Pet Mode
-                    </Text>
-                    <Text className={`text-[14px] mt-0.5 font-light ${isLostMode ? 'text-[#8B3A3ACC]' : 'text-gray-400'}`}>
-                      {isLostMode ? "Active - See Pet's Activity" : "Inactive - Pet is safe"}
+                    <Text className="text-[16px] font-semibold text-[#CF7900] mb-1">This Tag Needs Replacement ASAP!</Text>
+                    <Text className="text-[14px] text-[#CF7900]">
+                      A damaged tag may make it harder for other to access important info when needed.
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
+              </View>
+              <View
+                className="mx-[20px] mb-8 rounded-[20px]"
+                style={isLostMode
+                  ? {
+                    shadowColor: '#8B546B1A',
+                    shadowOffset: { width: 5, height: 5 },
+                    shadowOpacity: 1,
+                    shadowRadius: 2,
+                    elevation: 3,
+                    backgroundColor: isLostMode ? '#FEF2F2' : '#FFFFFF'
+                  } : {}}
+              >
+                {/* 2. INNER VIEW: Cắt góc overflow và xử lý màu nền */}
+                <View
+                  className={`rounded-[20px] p-[18px] py-[21px] flex-row items-center justify-between overflow-hidden ${isLostMode
+                    ? 'bg-[#FEF2F2] border border-[#FFE5E5]'
+                    : 'bg-white border border-gray-200'
+                    }`}
 
-                {/* KHỐI BÊN PHẢI: Switch */}
-                <View className="justify-center z-10">
-                  <Switch
-                    disabled={isTogglingLostMode}
-                    trackColor={{ false: '#E5E7EB', true: '#8B3A3A' }}
-                    thumbColor={'#FFFFFF'}
-                    ios_backgroundColor="#E5E7EB"
-                    onValueChange={handleLostModeToggle}
-                    value={isLostMode}
-                    style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }}
-                  />
+                >
+
+                  {/* Nền Gradient khi bật Lost Mode */}
+                  {isLostMode && (
+                    <>
+                      <LinearGradient
+                        colors={['#FFF8F1', '#FFF8F1', '#FFEEF0']}
+                        // Ép bóng mờ đi rất nhanh ở đoạn 15% và biến mất hoàn toàn ở 35% của 24px
+                        // => Bóng thực tế chỉ mỏng khoảng 8px nhưng mượt mà ôm sát góc
+                        locations={[0, 0.15, 0.35]}
+                        start={{ x: 1, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={{
+                          position: 'absolute',
+                          top: 0, left: 0, right: 0,
+                          // BẮT BUỘC lớn hơn borderRadius (20) để đường cong được vẽ trọn vẹn
+                          height: 3,
+                          zIndex: 1,
+                        }}
+                      />
+                      <LinearGradient
+                        colors={['#FFF8F1', '#FFEEF0']}
+                        locations={[0.3, 1]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                      />
+                    </>
+                  )}
+
+                  {/* KHỐI BÊN TRÁI: Icon và Text */}
+                  <View className="flex-row items-start flex-1 mr-4 z-10">
+                    {isLostMode && (
+                      <View className="mt-[1px] mr-3">
+                        <Feather
+                          name="alert-circle"
+                          size={20}
+                          color="#8B3A3A"
+                        />
+                      </View>
+                    )}
+                    <View className="flex-1">
+                      <Text className={`font-medium text-[16px] leading-6 ${isLostMode ? 'text-[#8B3A3A]' : 'text-[#000000]'}`}>
+                        Lost Pet Mode
+                      </Text>
+                      <Text className={`text-[14px] mt-0.5 font-light ${isLostMode ? 'text-[#8B3A3ACC]' : 'text-gray-400'}`}>
+                        {isLostMode ? "Active - See Pet's Activity" : "Inactive - Pet is safe"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* KHỐI BÊN PHẢI: Switch */}
+                  <View className="justify-center z-10">
+                    <Switch
+                      disabled={isTogglingLostMode}
+                      trackColor={{ false: '#E5E7EB', true: '#8B3A3A' }}
+                      thumbColor={'#FFFFFF'}
+                      ios_backgroundColor="#E5E7EB"
+                      onValueChange={handleLostModeToggle}
+                      value={isLostMode}
+                      style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }}
+                    />
+                  </View>
                 </View>
               </View>
             </View>
           ) : (
             // --- ĐÃ UPDATE ĐOẠN NÀY ĐỂ TRUYỀN linkPetId ---
-            <TouchableOpacity 
+            <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => router.push({ pathname: '/(tabs)/scan', params: { linkPetId: petId } })}
-              className="mx-7 mb-8 flex-row bg-[#FDFCE8] border border-[#FDF094] rounded-[20px] p-[17px]"
+              className="mx-[20px] mb-8 flex-row bg-[#FDFCE8] border border-[#FDF094] rounded-[20px] p-[17px]"
             >
               <View className="mr-2">
                 <Image
@@ -409,7 +521,7 @@ export default function PetProfileDetailScreen() {
           )}
 
           {/* --- PET INFORMATION CARD --- */}
-          <View className="mx-7 mb-8 ">
+          <View className="mx-[20px] mb-8 ">
             <View className=''>
               <Text className="font-semibold text-[16px] text-black mb-3">Pet Information</Text>
             </View>
@@ -417,12 +529,12 @@ export default function PetProfileDetailScreen() {
 
               <InfoRow
                 label1="Gender" value1={petData.gender || 'Chưa cập nhật'}
-                label2="Breed" value2={petData.breed || 'Chưa cập nhật'}
+                label2="Sterilized" value2={petData.sterilized || 'Chưa cập nhật'}
               />
               <InfoRow
-                label1="Color"
-                value1={petData.color || 'Chưa cập nhật'}
-                label2="Weight (kg)" value2={'Chưa cập nhật'}
+                label1="Breed"
+                value1={petData.breed || 'Chưa cập nhật'}
+                label2="Color" value2={petData.color || 'Chưa cập nhật'}
               />
               <InfoRow2
                 label1="Birthday"
@@ -431,19 +543,19 @@ export default function PetProfileDetailScreen() {
                     ? new Date(petData.dob).toLocaleDateString('en-GB')
                     : (petData.age ? `${petData.age} tuổi` : 'Chưa cập nhật')
                 }
-                label2="Microchip" value2={'Chưa cập nhật'}
+                label2="Weight" value2={petData.weight + ' kg' || 'Chưa cập nhật'}
               />
               <View className="h-[1px] bg-gray-200 w-full mb-5" />
               <Text className="text-black text-[16px] font-medium mb-2">Notes</Text>
               <Text className="text-[#8E8E93] text-[14px] leading-5">
-                {petData.description || 'Chưa có ghi chú nào cho bé thú cưng này.'}
+                {petData.description || 'Loves Belly rubs and playing fetch. Very friendly with children'}
               </Text>
 
             </View>
           </View>
 
           {/* --- OWNER / SHELTER INFORMATION CARD --- */}
-          <View className="mx-7 mb-8">
+          <View className="mx-[20px] mb-8">
             {/* Tiêu đề Section */}
             <Text className="font-semibold text-[16px] text-black mb-3">
               {isShelter ? 'Shelter Information' : 'Owner Information'}
@@ -453,78 +565,135 @@ export default function PetProfileDetailScreen() {
             <View className="bg-white rounded-[20px] border border-gray-200 px-5">
               <OwnerRow
                 label="Name"
-                value={displayContactName} // Output thực tế nên là: "Sarah Johnson"
+                value={displayContactName}
               />
               <OwnerRow
                 label="Phone"
-                value={displayContactPhone} // Output thực tế nên là: "012345678900"
+                value={displayContactPhone}
               />
               <OwnerRow
                 label="Address"
-                value={displayContactAddress} // Output thực tế nên là: "123 Oak St, Hanoi, Vietnam"
+                value={displayContactAddress}
                 isLast={true}
               />
             </View>
           </View>
 
+          <View className="mx-[20px] mb-8">
+            <View className="flex-row justify-between items-center mb-5">
+              <Text className="text-[16px] font-medium text-black">Paw History</Text>
+              <TouchableOpacity
+                onPress={toggleHistory}
+                activeOpacity={0.6}
+                className="flex-row items-center px-3 py-1.5 rounded-full"
+              >
+                <Text className="text-[13px] text-[#F2A465] font-medium mr-1">{showHistory ? 'Hide' : 'View'}</Text>
+                <Feather name={showHistory ? "chevron-up" : "chevron-down"} size={16} color="#F2A465" />
+              </TouchableOpacity>
+            </View>
+
+            {showHistory && (
+              <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
+                {MOCK_PAW_HISTORY.map((item, index) => {
+                  const isLastItem = index === MOCK_PAW_HISTORY.length - 1;
+
+                  return (
+                    <View key={item.id} className="flex-row">
+                      {/* Cột trái: Chứa Icon và Line nối */}
+                      <View className="items-center mr-4 w-[32px]">
+                        {/* Icon Container */}
+                        <View
+                          className="w-[32px] h-[32px] rounded-full items-center justify-center z-10"
+                          style={{ backgroundColor: item.bgColor }}
+                        >
+                          <FontAwesome5 name={item.icon} size={13} color={item.color} />
+                        </View>
+
+                        {/* Vertical Line nối xuống node tiếp theo */}
+                        {!isLastItem && (
+                          <View
+                            className="w-[2px] flex-1 my-1"
+                            style={{ backgroundColor: item.color }}
+                          />
+                        )}
+                      </View>
+
+                      {/* Cột phải: Chứa Text content */}
+                      {/* Thêm padding-bottom để tạo khoảng cách giữa các khối, trừ item cuối cùng */}
+                      <View className={`flex-1 pt-1 ${!isLastItem ? 'pb-6' : ''}`}>
+                        <View className="flex-row justify-between items-start">
+                          <Text className="text-[16px] font-medium text-black">
+                            {item.title}
+                          </Text>
+                          <Text className="text-[13px] text-[#8E8E93] font-regular">
+                            {item.date}
+                          </Text>
+                        </View>
+                        <Text className="text-[13px] text-[#8E8E93] mt-1 leading-[18px]">
+                          {item.description}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+
+                <View className='flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px]'>
+                  <Image
+                    source={require('../assets/icon/lock.png')}
+                    style={{ width: 12, height: 12 }}
+                    resizeMode="cover"
+                  />
+                  <Text className='font-regular text-[12px] text-[#8E8E93]'>This timeline is permanent and append-only.</Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+
           {/* ========================================================= */}
           {/* --- VACCINATION RECORD SECTION (MỚI THÊM VÀO ĐÂY) --- */}
           {/* ========================================================= */}
-          <View className="mx-7 mb-8">
-            <Text className="font-semibold text-[16px] text-[#111827] mb-3">Vaccination Record</Text>
-
+          <View className="mx-[20px] mb-8">
+            <Text className="font-semibold text-[16px] text-black mb-3">Vaccination Record</Text>
             {petData?.vaccinationRecordUrl ? (
-              /* Trạng thái đã có giấy tờ */
-              <View className="border border-[#E5E5E5] rounded-[12px] p-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
-                <Image
-                  source={{ uri: petData.vaccinationRecordUrl }}
-                  className="w-10 h-10 rounded-lg bg-[#F3F4F6]"
-                  resizeMode="cover"
-                />
+              <View className="border border-[#E5E5E5] rounded-[16px] pl-3 pt-3 pb-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
+                <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
                 <View className="flex-1 mx-3">
-                  <View className="flex-row justify-between items-center mb-0.5">
-                    <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>vaccination_record.jpg</Text>
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        const { pageY } = e.nativeEvent;
+                        setMenuPosition({ top: pageY + 10, right: 32 });
+                        setShowVaccineMenu(true);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                    </TouchableOpacity>
                   </View>
-                  <View className="flex-row items-center">
-                    <Text className="text-[12px] text-[#6B7280] mr-2">1.2 MB</Text>
+                  <View className="flex-row items-center mt-1">
+                    <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">1.2 MB • </Text>
                     <View className="flex-row items-center">
-                      <Feather name="check-circle" size={12} color="#EFA062" />
-                      <Text className="text-[12px] text-[#EFA062] ml-1 font-medium">Completed</Text>
+                      <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">Submitted on 01/01/2026</Text>
                     </View>
                   </View>
                 </View>
-                {/* Thay icon thùng rác bằng icon Xem chi tiết (Eye) */}
-                <TouchableOpacity
-                  className="p-2"
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  onPress={(e) => {
-                    // Ngăn chặn sự kiện lan truyền
-                    e.stopPropagation();
-
-                    // Lấy toạ độ Y của phần tử vừa click trên màn hình
-                    const { pageY } = e.nativeEvent;
-
-                    // Set toạ độ cho menu (cộng thêm một chút offset để menu nằm dưới nút)
-                    setMenuPosition({ top: pageY + 10, right: 32 });
-                    setShowVaccineMenu(true);
-                  }}
-                >
-                  <Feather name="more-vertical" size={20} color="#6B7280" />
-                </TouchableOpacity>
               </View>
             ) : (
-              /* Trạng thái chưa có giấy tờ (Empty state) */
-              <View className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-5 items-center justify-center">
-                <View className="w-10 h-10 bg-[#F3F4F6] rounded-full items-center justify-center mb-2">
-                  <Feather name="file-minus" size={20} color="#9CA3AF" />
+              <View className="bg-white border border-dashed border-[#E5E5E5] rounded-[12px] py-5 items-center justify-center">
+                <View className="rounded-full items-center justify-center mb-2">
+                  <Image source={require('../assets/icon/file.png')} style={{ width: 17, height: 17 }} resizeMode="cover" />
                 </View>
-                <Text className="text-[13px] text-[#6B7280] font-medium">No record uploaded yet</Text>
+                <Text className="text-[16px] text-black font-medium mb-2">No vaccine records yet</Text>
+                <Text className="text-[14px] text-[#A9ACB4] font-regular">Records added to PawLife will be shown here.</Text>
               </View>
             )}
           </View>
           {/* ========================================================= */}
           {/* --- ACTION BUTTONS --- */}
-          <View className="mx-7 gap-3">
+          <View className="mx-[20px] gap-3">
             <TouchableOpacity
               className="w-full bg-[#E89B5A] py-5 rounded-[16px] shadow-md shadow-orange-200 items-center overflow-hidden"
               onPress={() => router.push(`/edit-pet?id=${petId}`)}
@@ -635,7 +804,7 @@ export default function PetProfileDetailScreen() {
         >
           {/* Menu Dropdown sử dụng toạ độ động */}
           <View
-            className="absolute bg-white rounded-xl border border-gray-100 w-48 overflow-hidden"
+            className="absolute bg-white rounded-xl border border-gray-100 w-36"
             style={{
               top: menuPosition.top,
               right: menuPosition.right,
@@ -648,33 +817,31 @@ export default function PetProfileDetailScreen() {
           >
             {/* Option 1: Upload */}
             <TouchableOpacity
-              className="flex-row items-center px-4 py-3.5 border-b border-gray-50"
+              className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
                 console.log("Trigger Upload File");
               }}
             >
-              <Feather name="upload" size={16} color="#3B82F6" />
-              <Text className="text-[14px] text-gray-700 ml-3 font-medium">Upload new file</Text>
+              <Text className="text-[14px] text-gray-700 ml-3 font-regular">Upload new file</Text>
             </TouchableOpacity>
 
             {/* Option 2: Report */}
             <TouchableOpacity
-              className="flex-row items-center px-4 py-3.5 border-b border-gray-50"
+              className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
                 console.log("Trigger Report");
               }}
             >
-              <Feather name="flag" size={16} color="#EAB308" />
-              <Text className="text-[14px] text-gray-700 ml-3 font-medium">Report issue</Text>
+              <Text className="text-[14px] text-gray-700 ml-3 font-regular">Download</Text>
             </TouchableOpacity>
 
             {/* Option 3: Delete */}
             <TouchableOpacity
-              className="flex-row items-center px-4 py-3.5"
+              className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
@@ -691,8 +858,7 @@ export default function PetProfileDetailScreen() {
                 }, 150);
               }}
             >
-              <Feather name="trash-2" size={16} color="#EF4444" />
-              <Text className="text-[14px] text-[#EF4444] ml-3 font-medium">Delete record</Text>
+              <Text className="text-[14px] text-[#FF3B30] ml-3 font-regular">Report</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

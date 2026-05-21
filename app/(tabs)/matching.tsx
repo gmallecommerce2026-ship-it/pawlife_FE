@@ -24,6 +24,7 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocation } from '../../hooks/useLocation';
 import { petService } from '../../services/petService';
+import Toast from 'react-native-toast-message';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.3;
@@ -1142,8 +1143,25 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
             // Gọi API ngầm ở background
             if (isCurrentlyFavorited) {
                 petService.unfavoritePet(activeCard.id).catch(err => console.error("Lỗi bỏ tim:", err));
+                Toast.show({
+                type: 'custom_badge',
+                props: {
+                    petName: activeCard.name || 'This pet',
+                    actionText: ' has been removed from Saved Pet'
+                },
+                visibilityTime: 2500,
+                autoHide: true,
+            });
             } else {
-                petService.favoritePet(activeCard.id).catch(err => console.error("Lỗi thả tim:", err));
+                Toast.show({
+                type: 'custom_badge',
+                props: {
+                    petName: activeCard.name || 'This pet',
+                    actionText: ' has been added to Saved Pet'
+                },
+                visibilityTime: 2500,
+                autoHide: true,
+            });
             }
             return;
         }

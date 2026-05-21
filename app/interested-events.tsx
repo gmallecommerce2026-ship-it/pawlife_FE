@@ -121,6 +121,7 @@ export default function InterestedEventsScreen() {
                                 source={require('../assets/icon/book-mark.png')}
                                 style={{ width: 10, height: 14 }}
                                 resizeMode="cover"
+                                className='top-[2px]'
                             />
                         </TouchableOpacity>
                     </View>

@@ -19,6 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { SuccessModal } from '../components/SuccessModal';
+import Toast from 'react-native-toast-message';
+import { toastConfig } from '@/components/toastConfig';
 // BỔ SUNG 2: Import socket
 export { ErrorBoundary } from 'expo-router';
 
@@ -49,7 +51,7 @@ function RootLayoutNavGuard() {
   const [isAppLocked, setIsAppLocked] = useState(false);
   const appState = useRef(AppState.currentState);
   const [hasSeenIntro, setHasSeenIntro] = useState<boolean | null>(null);
-  
+
   useEffect(() => {
     const initSocket = async () => {
       if (isAuthenticated && !socket.connected) {
@@ -73,8 +75,8 @@ function RootLayoutNavGuard() {
         `Bạn vừa nhận được yêu cầu chuyển nhượng thú cưng. Bạn có muốn kiểm tra và xác nhận ngay bây giờ không?`,
         [
           { text: "Để sau", style: "cancel" },
-          { 
-            text: "Xem ngay", 
+          {
+            text: "Xem ngay",
             onPress: () => {
               // Nhảy thẳng vào trang transfer-ownership của bé pet đó
               router.push({
@@ -170,15 +172,15 @@ function RootLayoutNavGuard() {
       // Đã đăng nhập nhưng đang kẹt ở màn hình Auth
       if (inSignInScreen) {
         // if (!hasSeenIntro) {
-          router.replace('/intro'); // Nếu chưa xem intro -> vào intro
+        router.replace('/intro'); // Nếu chưa xem intro -> vào intro
         // } else {
-          // router.replace('/(tabs)'); // Nếu xem rồi -> vào tabs
+        // router.replace('/(tabs)'); // Nếu xem rồi -> vào tabs
         // }
       }
     }
   }, [isAuthenticated, isLoading, segments, hasSeenIntro]);
 
-  
+
   // Render Màn Hình Khóa nếu hết hạn 1 tiếng
   if (isAppLocked) {
     return (
@@ -190,7 +192,7 @@ function RootLayoutNavGuard() {
         <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 30, textAlign: 'center', paddingHorizontal: 20 }}>
           Đã hơn 1 tiếng kể từ lần đăng nhập cuối. Vui lòng xác thực lại để đảm bảo an toàn.
         </Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={promptBiometrics}
           style={{ backgroundColor: '#10B981', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8 }}
         >
@@ -234,13 +236,14 @@ export default function RootLayout() {
   if (!loaded) {
     return <View />;
   }
-  
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>
         <AuthProvider>
           <LanguageProvider>
             <RootLayoutNavGuard />
+            <Toast config={toastConfig} position="top" topOffset={50} />
             <SuccessModal />
           </LanguageProvider>
         </AuthProvider>
@@ -258,13 +261,13 @@ function RootLayoutNav() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="sign-in" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="fill-profile" options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }} />
-      
+
       {/* SỬA LỖI 1: Thêm chữ 's' vào my-applications để khớp với tên file */}
       <Stack.Screen name="my-applications" options={{ headerShown: false, animation: 'slide_from_right' }} />
-      
+
       <Stack.Screen name="adoption-status" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      
+
       {/* SỬA LỖI 2: ĐÃ XÓA `scan`, `scanned-pet`, và `matching` VÌ CHÚNG THUỘC VỀ (tabs) */}
       <Stack.Screen name="select-last-seen-location" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="tag-route-details" options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -300,7 +303,7 @@ function RootLayoutNav() {
       <Stack.Screen name="transfer-ownership" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pawcare/[category]" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="intro" options={{ headerShown: false, animation: 'fade' }} />
-      
+
       {/* THÊM KHAI BÁO MÀN HÌNH REPORT LOST PET Ở ĐÂY */}
       <Stack.Screen name="report-lost-pet" options={{ headerShown: false, animation: 'slide_from_right' }} />
     </Stack>

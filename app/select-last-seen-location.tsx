@@ -200,7 +200,7 @@ export default function SelectLocationMapScreen() {
               borderRightColor: 'transparent',
               justifyContent: 'center',
               alignItems: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+              backgroundColor: 'rgba(255, 255, 255, 0.2)', 
             }}>
             <LinearGradient
               colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
@@ -215,7 +215,7 @@ export default function SelectLocationMapScreen() {
       </View>
 
       <View
-        style={{ paddingBottom: insets.bottom + 20 }}
+        style={{ paddingBottom: insets.bottom + 10 }}
         className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[24px] p-6 shadow-2xl"
       >
         <Text className="text-black font-semibold text-[20px] tracking-[0.06px] mb-2">

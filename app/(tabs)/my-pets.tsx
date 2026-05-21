@@ -145,7 +145,7 @@ export default function MyPetsScreen() {
           <View className="flex-row items-center mb-1">
             <Image
               source={pet.species?.toLowerCase() === 'cat' ? require('../../assets/icon/cat-side.png') : require('../../assets/icon/dog-side.png')}
-              style={{ width: 11, height: 9 }}
+              style={{ width: 14, height: 11 }}
               resizeMode="contain"
             />
             <Text className="text-gray-500 text-sm ml-1.5">
@@ -156,9 +156,9 @@ export default function MyPetsScreen() {
           <View className="flex-row items-center">
             <Image
               source={require('../../assets/icon/brith-cake.png')}
-              style={{ width: 11, height: 9 }}
+              style={{ width: 14, height: 11 }}
               resizeMode="contain"
-              className='bottom-[2px]'
+              className='bottom-[1px]'
             />
             <Text className="text-gray-500 text-sm ml-1.5">
               {calculateAge(pet.dob)}
