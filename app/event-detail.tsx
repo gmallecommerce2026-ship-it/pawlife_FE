@@ -2,17 +2,17 @@
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AlertCircle } from 'lucide-react-native';
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, ImageBackground, Modal, ScrollView, Share, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, Share, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { eventService } from '../services/eventService';
 import { useEngagementStore } from '../store/useEngagementStore';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 const { width } = Dimensions.get('window');
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -28,7 +28,6 @@ export default function EventDetailScreen() {
 
     const bottomSheetRef = useRef<BottomSheet>(null);
     const snapPoints = useMemo(() => ['60%', '95%'], []);
-
 
     const [eventData, setEventData] = useState<any>(null);
     const [similarEvents, setSimilarEvents] = useState<any[]>([]);
@@ -68,21 +67,17 @@ export default function EventDetailScreen() {
 
                 const res = await eventService.getEventDetail(eventId, user?.id);
                 if (res && res.data) {
+                    // ==========================================
+                    // Map chuẩn dữ liệu Shelter từ Backend (KHÔNG DÙNG FALLBACK IMAGE RÁC)
+                    // ==========================================
+                    if (res.data.shelter) {
+                        res.data.organizer = {
+                            id: res.data.shelter.id,
+                            name: res.data.shelter.name,
+                            avatarUrl: res.data.shelter.avatarUrl // Map thủ công ở đây
+                        };
+                    }
 
-                    // ==========================================
-                    // 🚨 HARD MOCK DATA ORGANIZER ĐỂ TEST UI
-                    // ==========================================
-                    res.data.organizer = {
-                        id: 'org_1', // Khớp với ID bên trang Organizer Profile
-                        name: 'Pet Art Collective',
-                        avatarUrl: 'https://images.unsplash.com/photo-1517260739337-6799d239ce83?q=80&w=500&auto=format&fit=crop'
-                    };
-                    // ==========================================
-                    res.data.images = Array.from({ length: 15 }).map((_, index) => ({
-                        id: `mock_img_${index}`,
-                        // Dùng picsum.photos với seed khác nhau để sinh ra 15 ảnh ngẫu nhiên có kích thước 300x300
-                        url: `https://picsum.photos/seed/pawlife${index}/300/300`
-                    }));
                     setEventData(res.data);
                     if (res.data.isInterested !== undefined) {
                         useEngagementStore.getState().setInitialEventInterest(eventId, res.data.isInterested);
@@ -169,7 +164,8 @@ export default function EventDetailScreen() {
     const year = startDate.getFullYear();
     const timeString = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-    const bannerImage = eventData.bannerUrl || eventData.images?.[0]?.url || 'https://via.placeholder.com/800x400.png?text=No+Image';
+    // Chỉ dùng URL thực, nếu không có sẽ render UI thay thế bên dưới
+    const bannerImage = eventData.bannerUrl || eventData.images?.[0]?.url;
 
     // Tọa độ mặc định (Hà Nội) nếu API không trả về
     const mapLatitude = eventData.latitude || 21.028511;
@@ -197,14 +193,21 @@ export default function EventDetailScreen() {
     return (
         <View className='flex-1 '>
             <StatusBar style="light" />
-            <View style={{ height: SCREEN_HEIGHT * 0.45, width: '100%' }}>
-                <Image
-                    source={{ uri: bannerImage }}
-                    className="w-full h-full"
-                    resizeMode="cover"
-                />
+            <View style={{ height: SCREEN_HEIGHT * 0.45, width: '100%', backgroundColor: '#F3F4F6' }}>
+                {bannerImage ? (
+                    <Image
+                        source={{ uri: bannerImage }}
+                        className="w-full h-full"
+                        resizeMode="cover"
+                    />
+                ) : (
+                    // UI Xử lý khi không có banner
+                    <View className="w-full h-full items-center justify-center bg-[#FDF5EF]">
+                        <Feather name="image" size={48} color="#E89B5A" style={{ opacity: 0.5 }} />
+                    </View>
+                )}
 
-                {/* OVERLAY HEADER: 3 nút bấm nổi trên nền ảnh (Như yêu cầu trước của bạn) */}
+                {/* OVERLAY HEADER: 3 nút bấm nổi trên nền ảnh */}
                 <SafeAreaView edges={['top']} className="absolute top-0 left-0 right-0 z-10">
                     <View className="flex-row items-center justify-between px-5 mt-2 h-[44px]">
 
@@ -233,23 +236,21 @@ export default function EventDetailScreen() {
                                     borderRightColor: 'transparent',
                                     justifyContent: 'center',
                                     alignItems: 'center',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
                                 }}>
                                 <LinearGradient
                                     colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
                                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                                     locations={[0, 0.3, 1]}
-
                                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                                 />
-                                <Feather name="chevron-left" size={20} color="#00000" />
+                                <Feather name="chevron-left" size={20} color="#000000" />
                             </View>
                         </TouchableOpacity>
 
                         {/* BÊN PHẢI: Nút Share & Mark */}
                         <View className="flex-row items-center">
-
-                            {/* Nút Share */}
+                            {/* Nút Mark */}
                             <TouchableOpacity
                                 onPress={handleInterest}
                                 activeOpacity={0.7}
@@ -274,17 +275,15 @@ export default function EventDetailScreen() {
                                         borderRightColor: 'transparent',
                                         justifyContent: 'center',
                                         alignItems: 'center',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
                                     }}>
                                     <LinearGradient
                                         colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
                                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                                         locations={[0, 0.3, 1]}
-
                                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                                     />
                                     <Image
-                                        className=''
                                         source={ isInterested ? require('../assets/icon/book-mark.png') : require('../assets/icon/bookmark-black.png')}
                                         style={{ width: 10, height: 13 }}
                                         resizeMode="cover"
@@ -292,6 +291,7 @@ export default function EventDetailScreen() {
                                 </View>
                             </TouchableOpacity>
 
+                            {/* Nút Share */}
                             <TouchableOpacity
                                 onPress={onShare}
                                 activeOpacity={0.7}
@@ -316,17 +316,15 @@ export default function EventDetailScreen() {
                                         borderRightColor: 'transparent',
                                         justifyContent: 'center',
                                         alignItems: 'center',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)', 
                                     }}>
                                     <LinearGradient
                                         colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
                                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                                         locations={[0, 0.3, 1]}
-
                                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                                     />
                                     <Image
-                                        className=''
                                         source={require('../assets/icon/share.png')}
                                         style={{ width: 16, height: 16 }}
                                         resizeMode="cover"
@@ -337,6 +335,7 @@ export default function EventDetailScreen() {
                     </View>
                 </SafeAreaView>
             </View>
+            
             <BottomSheet
                 ref={bottomSheetRef}
                 index={0}
@@ -344,9 +343,7 @@ export default function EventDetailScreen() {
                 backgroundStyle={{ borderRadius: 32, backgroundColor: '#FFFFFF' }}
                 handleIndicatorStyle={{ backgroundColor: '#999999', width: 40, height: 5 }}
             >
-                <BottomSheetScrollView
-                    showsVerticalScrollIndicator={false}
-                >
+                <BottomSheetScrollView showsVerticalScrollIndicator={false}>
                     <View className="-mt-10 bg-white rounded-t-[24px] px-[20px] pt-[37px] pb-12 shadow-2xl">
 
                         {/* CATEGORY */}
@@ -370,7 +367,6 @@ export default function EventDetailScreen() {
                             <View className="flex-row items-center mb-[15px]">
                                 <View className="items-center justify-center mr-2">
                                     <Image
-                                        className=''
                                         source={require('../assets/icon/location-gray-icon.png')}
                                         style={{ width: 10, height: 12 }}
                                         resizeMode="cover"
@@ -386,7 +382,6 @@ export default function EventDetailScreen() {
                             <View className="flex-row items-center flex-1 mr-2">
                                 <View className="items-center justify-center mr-2">
                                     <Image
-                                        className=''
                                         source={require('../assets/icon/calendar-orange.png')}
                                         style={{ width: 12.3, height: 12.3 }}
                                         resizeMode="cover"
@@ -414,10 +409,20 @@ export default function EventDetailScreen() {
                                 <Text className="text-[16px] font-medium text-black mb-[20px]">Organizer</Text>
 
                                 <View className="flex-row items-center">
-                                    <Image
-                                        source={{ uri: eventData.organizer.avatarUrl || 'https://via.placeholder.com/150.png?text=No+Avatar' }}
-                                        className="w-[53px] h-[53px] rounded-full border border-gray-200 overflow-hidden items-center justify-center bg-white shadow-sm shadow-gray-100"
-                                    />
+                                    {eventData.organizer.avatarUrl ? (
+                                        <Image
+                                            source={{ uri: eventData.organizer.avatarUrl }}
+                                            className="w-[53px] h-[53px] rounded-full border border-gray-200 overflow-hidden items-center justify-center bg-white shadow-sm shadow-gray-100"
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View className="w-[53px] h-[53px] rounded-full border border-gray-200 bg-[#FDF5EF] items-center justify-center shadow-sm shadow-gray-100">
+                                            <Text className="text-[#E89B5A] text-[20px] font-bold">
+                                                {eventData.organizer.name?.charAt(0).toUpperCase() || 'P'}
+                                            </Text>
+                                        </View>
+                                    )}
+
                                     <View className="flex-1 mr-2 ml-3">
                                         <Text className="text-[14px] font-medium text-black mb-[6px]" numberOfLines={1}>
                                             {eventData.organizer.name || 'Pawlife Organizer'}
@@ -429,27 +434,6 @@ export default function EventDetailScreen() {
                                     <TouchableOpacity
                                         activeOpacity={0.7}
                                         className="w-[41px] h-[41px] rounded-full bg-[#FDF5EF] items-center justify-center"
-                                    // onPress={async () => {
-                                    //     const phoneNumber = pet?.shelter?.phone;
-                                    //     if (phoneNumber) {
-                                    //         const webUrl = `https://zalo.me/${phoneNumber}`;
-                                    //         const appUrl = Platform.OS === 'ios'
-                                    //             ? `zalo://`
-                                    //             : `intent://zalo.me/${phoneNumber}#Intent;package=com.zing.zalo;scheme=https;end`;
-                                    //         try {
-                                    //             const canOpenApp = await Linking.canOpenURL(Platform.OS === 'ios' ? 'zalo://' : appUrl);
-                                    //             if (canOpenApp) {
-                                    //                 await Linking.openURL(Platform.OS === 'ios' ? webUrl : appUrl);
-                                    //             } else {
-                                    //                 await Linking.openURL(webUrl);
-                                    //             }
-                                    //         } catch (error) {
-                                    //             await Linking.openURL(webUrl);
-                                    //         }
-                                    //     } else {
-                                    //         Alert.alert("Thông báo", "Trạm cứu hộ này chưa cung cấp số điện thoại Zalo.");
-                                    //     }
-                                    // }}
                                     >
                                         <Image source={require('../assets/icon/message.png')} style={{ width: 24, height: 24 }} resizeMode="cover" />
                                     </TouchableOpacity>
@@ -464,17 +448,12 @@ export default function EventDetailScreen() {
                                         <Feather name="chevron-right" size={18} color="black" />
                                     </TouchableOpacity>
                                 </View>
-                                <View className="flex-row items-center gap-2">
-
-                                </View>
-
                             </View>
                         )}
 
                         {/* LOCATION MAP */}
                         <View className="mb-[32px]">
                             <View className='flex-row justify-between'>
-
                                 <Text className="text-[16px] font-medium text-black mb-[12px]">Location</Text>
                                 <Text className="text-[14px] font-regular text-[#E89B5A] mb-[12px]">View on Map</Text>
                             </View>
@@ -500,13 +479,14 @@ export default function EventDetailScreen() {
                                 <View className="absolute inset-0 z-10" />
                             </View>
                         </View>
+
                         {/* GALLERY */}
                         {eventData.images && eventData.images.length > 0 && (
                             <View className="mb-8">
                                 <Text className="text-[16px] font-medium text-black mb-[20px]">Photo Gallery</Text>
                                 <View className="flex-row justify-between">
                                     {eventData.images.slice(0, 4).map((img: any, index: number) => {
-                                        const isLastImage = index === 3; // Ảnh thứ 4
+                                        const isLastImage = index === 3; 
                                         const remainingCount = eventData.images.length - 4;
 
                                         return (
@@ -514,7 +494,6 @@ export default function EventDetailScreen() {
                                                 key={img.id || index}
                                                 activeOpacity={0.8}
                                                 onPress={() => handleOpenImageViewer(index)}
-                                                // w-[23%] và aspect-square giúp 4 ảnh chia đều chiều ngang và luôn là hình vuông
                                                 className="w-[22%] aspect-square rounded-[16px] overflow-hidden relative bg-gray-200"
                                             >
                                                 <Image source={{ uri: img.url }} className="w-[81px] h-[81px] rounded-[16px] bg-gray-100" resizeMode="cover" />
@@ -531,24 +510,8 @@ export default function EventDetailScreen() {
                                         );
                                     })}
                                 </View>
-                                {/* <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                                    {eventData.images.map((img: any) => (
-                                        <TouchableOpacity key={img.id} className='pb-4'
-                                            style={{
-                                                shadowColor: '#E89B5A', // Màu cam nhạt của bạn
-                                                shadowOffset: { width: 2, height: 3 }, // Quan trọng nhất: Cả 2 chiều bằng 0 để bóng tỏa đều 4 hướng
-                                                shadowOpacity: 0.25, // Độ đậm của bóng (từ 0 đến 1)
-                                                shadowRadius: 3, // Độ lan rộng của bóng
-                                                elevation: 4, // Đổ bóng cho Android (Android tự động tỏa khá đều)
-                                            }} activeOpacity={0.9}>
-                                            <Image source={{ uri: img.url }} className="w-[81px] h-[81px] rounded-[16px] bg-gray-100" resizeMode="cover" />
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView> */}
                             </View>
                         )}
-
-
 
                         {/* MORE EVENTS */}
                         {similarEvents.length > 0 && (
@@ -568,7 +531,15 @@ export default function EventDetailScreen() {
                                                 onPress={() => router.push(`/event-detail?id=${ev.id}`)}
                                             >
                                                 <View className="flex-1 flex-row rounded-[20px] overflow-hidden">
-                                                    <Image source={{ uri: ev.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} className="w-[98px] h-full bg-gray-100" resizeMode="cover" />
+                                                    {/* Bỏ ảnh rác ở Event Card */}
+                                                    {ev.bannerUrl ? (
+                                                        <Image source={{ uri: ev.bannerUrl }} className="w-[98px] h-full bg-gray-100" resizeMode="cover" />
+                                                    ) : (
+                                                        <View className="w-[98px] h-full bg-[#FDF5EF] items-center justify-center">
+                                                            <Feather name="image" size={24} color="#E89B5A" opacity={0.5} />
+                                                        </View>
+                                                    )}
+                                                    
                                                     <View className="flex-1 flex-row items-center pl-6 pr-4 py-3">
                                                         <View className="flex-1 justify-between h-full pr-2">
                                                             <View>
@@ -579,10 +550,30 @@ export default function EventDetailScreen() {
                                                                 </View>
                                                             </View>
                                                             <View className="flex-row mt-2 items-center">
+                                                                {/* Tích hợp Dữ liệu Avatar Thật ở đây */}
                                                                 <View className="flex-row">
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=1' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 z-30" />
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=5' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-20" />
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=8' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-10" />
+                                                                    {ev.interestedUsers && ev.interestedUsers.length > 0 ? (
+                                                                        ev.interestedUsers.slice(0, 3).map((u: any, index: number) => (
+                                                                            u.avatarUrl ? (
+                                                                                <Image 
+                                                                                    key={u.id || index}
+                                                                                    source={{ uri: u.avatarUrl }} 
+                                                                                    className={`w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 ${index > 0 ? '-ml-1.5' : ''}`}
+                                                                                    style={{ zIndex: 30 - index * 10 }}
+                                                                                />
+                                                                            ) : (
+                                                                                <View 
+                                                                                    key={u.id || index}
+                                                                                    className={`w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 items-center justify-center ${index > 0 ? '-ml-1.5' : ''}`}
+                                                                                    style={{ zIndex: 30 - index * 10 }}
+                                                                                >
+                                                                                    <Feather name="user" size={8} color="#9CA3AF" />
+                                                                                </View>
+                                                                            )
+                                                                        ))
+                                                                    ) : (
+                                                                        <Text className="text-[10px] text-gray-400">Be the first to join</Text>
+                                                                    )}
                                                                 </View>
                                                             </View>
                                                         </View>
@@ -607,7 +598,6 @@ export default function EventDetailScreen() {
                     >
                         <View className="flex-1 bg-black">
                             <SafeAreaView className="flex-1">
-                                {/* Header của Modal (Nút X và Số thứ tự ảnh) */}
                                 <View className="flex-row items-center justify-between px-4 py-2 z-10 absolute top-12 left-0 right-0">
                                     <TouchableOpacity
                                         onPress={() => setIsImageViewerVisible(false)}
@@ -649,7 +639,6 @@ export default function EventDetailScreen() {
 
                 </BottomSheetScrollView>
             </BottomSheet>
-
 
         </View>
     );

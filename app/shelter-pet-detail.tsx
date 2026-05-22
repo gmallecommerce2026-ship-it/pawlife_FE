@@ -6,7 +6,22 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
-
+const getAge = (dobString?: string) => {
+  if (!dobString) return 'Unknown';
+  const dob = new Date(dobString);
+  const diff_ms = Date.now() - dob.getTime();
+  const age_dt = new Date(diff_ms);
+  const years = Math.abs(age_dt.getUTCFullYear() - 1970);
+  const months = age_dt.getUTCMonth();
+  
+  if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
+  if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
+  return 'Newborn';
+};
+const formatCapitalize = (str?: string) => {
+  if (!str) return 'Unknown';
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
 export default function PetProfileDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -15,7 +30,6 @@ export default function PetProfileDetailScreen() {
   const [petData, setPetData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- FETCH DATA TỪ API ---
   useFocusEffect(
     useCallback(() => {
       const fetchPetDetail = async () => {
@@ -43,10 +57,17 @@ export default function PetProfileDetailScreen() {
     );
   }
 
-  // Fallback data hardcode y hệt thiết kế 
-  const displayImage = petData?.avatarUrl || 'https://images.unsplash.com/photo-1600804340584-c7db2eacf0bf?q=80&w=800&auto=format&fit=crop';
+  const displayImage = petData?.avatarUrl || petData?.images?.[0]?.url || 'https://images.unsplash.com/photo-1600804340584-c7db2eacf0bf?q=80&w=800&auto=format&fit=crop';
   const displayName = petData?.name || 'Max';
-  const displayBreed = petData?.breed || 'Labrador Retriever';
+  const displayBreed = petData?.breed || 'Unknown Breed';
+  const displayAge = getAge(petData?.dob);
+  const displayGender = formatCapitalize(petData?.gender);
+  const displaySize = formatCapitalize(petData?.size);
+
+  // Cấu hình Background Động theo Gender
+  const isFemale = petData?.gender?.toUpperCase() === 'FEMALE';
+  const genderBgClass = isFemale ? 'bg-[#FAE8ED]' : 'bg-[#EAF4FB]'; // Hồng hoặc Xanh
+
   const handleAdopt = () => {
     router.push({
       pathname: '/adoption-form',
@@ -55,10 +76,11 @@ export default function PetProfileDetailScreen() {
         name: displayName,
         breed: displayBreed,
         image: displayImage,
-        age: petData?.age || 'Young', // Lấy tuổi nếu có, không thì để default
+        age: displayAge, 
       }
     });
   };
+
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
@@ -101,17 +123,24 @@ export default function PetProfileDetailScreen() {
 
             {/* --- STATS BADGES --- */}
             <View className="px-[25px] flex-row justify-between mt-6 gap-[10px]">
-                <View className="flex-1 bg-[#EAF4FB] py-[12px] rounded-[16px] items-center">
+                {/* Gender */}
+                <View className={`flex-1 py-[12px] rounded-[16px] items-center ${genderBgClass}`}>
                     <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
-                    <Text className="text-[#1C1C1E] text-[14px] font-semibold">Male</Text>
+                    <Text className="text-[#1C1C1E] text-[14px] font-semibold">{displayGender}</Text>
                 </View>
+                
+                {/* Age */}
                 <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
                     <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
-                    <Text className="text-[#1C1C1E] text-[14px] font-semibold">Young</Text>
+                    <Text className="text-[#1C1C1E] text-[14px] font-semibold">{displayAge}</Text>
                 </View>
-                <View className="flex-1 bg-[#FAE8ED] py-[12px] rounded-[16px] items-center">
-                    <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Size</Text>
-                    <Text className="text-[#1C1C1E] text-[14px] font-semibold">Large</Text>
+                
+                {/* Weight (Thay cho Size) */}
+                <View className="flex-1 bg-[#EAF4FB] py-[12px] rounded-[16px] items-center">
+                    <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">{petData?.weight ? 'Weight' : 'Size'}</Text>
+                    <Text className="text-[#1C1C1E] text-[14px] font-semibold">
+                        {petData?.weight ? `${petData.weight} kg` : (petData?.size ? formatCapitalize(petData.size) : 'N/A')}
+                    </Text>
                 </View>
             </View>
 

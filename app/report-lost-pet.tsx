@@ -6,7 +6,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { useWindowDimensions } from 'react-native';
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +22,11 @@ import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+interface LocItem {
+  code: number;
+  name: string;
+}
+
 export default function ReportLostPetScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -32,19 +36,25 @@ export default function ReportLostPetScreen() {
   const { pickAndUploadImage, isUploading } = useImageUpload();
 
   // --- Form States ---
-  const [location, setLocation] = useState('');
-  const [details, setDetails] = useState('');
-  const [lostDate, setLostDate] = useState<Date>(new Date());
+  const [location, setLocation] = useState(''); // Lưu chuỗi địa chỉ cuối cùng đã gộp
   const [dateTime, setDateTime] = useState('');
+  const [details, setDetails] = useState('');
 
-  const { width } = useWindowDimensions();
-  // 40 là padding 2 bên (px-5 = 20*2)
-  // 32 là tổng 4 khoảng gap (gap-2 = 8px * 4)
-  const imageSize = (width - 40 - 48) / 5;
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [ownerAddress, setOwnerAddress] = useState('');
+  const [note, setNote] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+
+  // --- Date Picker States ---
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+
+
+
 
   const {
-    petId, petName, petAvatar, petBreed, petAge, petShelterName, petShelterPhone, petShelterAddress,
-    selectedMapAddress,
+    petId, petName, petAvatar, petBreed, petAge,
+    selectedMapAddress, // Địa chỉ chữ chữ map trả về
     selectedLatitude,
     selectedLongitude,
     selectedRadius
@@ -54,9 +64,6 @@ export default function ReportLostPetScreen() {
     petAvatar: string;
     petBreed?: string;
     petAge?: string;
-    petShelterName?: string;
-    petShelterPhone?: string;
-    petShelterAddress?: string;
     selectedMapAddress?: string;
     selectedLatitude?: string;
     selectedLongitude?: string;
@@ -64,31 +71,8 @@ export default function ReportLostPetScreen() {
   }>();
 
   useEffect(() => {
-    const formatDateTime = (date: Date) => {
-      const hh = String(date.getHours()).padStart(2, '0');
-      const mm = String(date.getMinutes()).padStart(2, '0');
-      const dd = String(date.getDate()).padStart(2, '0');
-      const MM = String(date.getMonth() + 1).padStart(2, '0');
-      const yyyy = date.getFullYear();
-
-      return `${hh}:${mm} - ${dd}/${MM}/${yyyy}`;
-    };
-
-    setDateTime(formatDateTime(lostDate));
-  }, [lostDate]);
-
-  const [ownerName, setOwnerName] = useState(petShelterName || '');
-  const [ownerPhone, setOwnerPhone] = useState(petShelterPhone || '');
-  const [ownerAddress, setOwnerAddress] = useState(petShelterAddress || '');
-  const [note, setNote] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
-
-  // --- Date Picker States ---
-  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
-
-
-  useEffect(() => {
     if (selectedMapAddress) {
+      // Gán chuỗi địa chỉ kèm theo bán kính (nếu muốn) vào state location của bạn
       setLocation(selectedMapAddress);
     }
   }, [selectedMapAddress]);
@@ -98,6 +82,8 @@ export default function ReportLostPetScreen() {
   const mapRadius = selectedRadius ? parseFloat(selectedRadius) : 500;
   const mapAddress = selectedMapAddress as string;
 
+  // Khởi tạo mặc định là thời gian hiện tại
+  const [lostDate, setLostDate] = useState<Date>(new Date());
 
   const showDateTimePicker = () => {
     setDatePickerVisibility(true);
@@ -115,9 +101,27 @@ export default function ReportLostPetScreen() {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     setDateTime(`${hours}:${minutes} - ${day}/${month}/${year}`);
-
+    
     hideDateTimePicker();
   };
+
+const [formattedLostDate, setFormattedLostDate] = useState<string>('');
+
+  useEffect(() => {
+    const formatDateTime = (date: Date) => {
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mm = String(date.getMinutes()).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const MM = String(date.getMonth() + 1).padStart(2, '0');
+      const yyyy = date.getFullYear();
+      
+      return `${hh}:${mm} - ${dd}/${MM}/${yyyy}`;
+    };
+
+    setDateTime(formatDateTime(lostDate));
+    console.log(dateTime);
+    
+  }, [lostDate]);
 
   const isFormValid = location && dateTime && details && ownerName && ownerPhone && ownerAddress;
 
@@ -139,6 +143,9 @@ export default function ReportLostPetScreen() {
 
   const handleClose = () => {
     if (petId) {
+      // Sử dụng router.replace thay vì router.back() để điều hướng thẳng về Profile
+      // Việc dùng 'replace' cũng giúp xóa form này khỏi lịch sử điều hướng, 
+      // tránh lỗi người dùng ấn nút Back trên Android bị quay lại trang form.
       router.replace(`/pet-profile-detail?id=${petId}`);
     } else {
       router.replace('/(tabs)/my-pets');
@@ -165,7 +172,7 @@ export default function ReportLostPetScreen() {
       Alert.alert(
         'Báo lạc thành công',
         `Đã kích hoạt chế độ báo lạc cho ${petName || 'thú cưng'}.`,
-        [{ text: 'OK', onPress: () => handleClose() }]
+        [{ text: 'OK', onPress: () => handleClose() }] // Gọi hàm handleClose ở trên
       );
     } catch (error: any) {
       // Đọc message lỗi trả về từ Axios hoặc Server một cách chính xác
@@ -190,7 +197,7 @@ export default function ReportLostPetScreen() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 20,
-            paddingBottom: insets.bottom - 10
+            paddingBottom: insets.bottom + 40
           }}
           keyboardShouldPersistTaps="handled"
         >
@@ -198,7 +205,7 @@ export default function ReportLostPetScreen() {
           <View className="w-full flex-row items-center justify-center relative py-4 px-5 mb-5 bg-white">
 
             <View className="items-center justify-center pr-6 pl-6">
-              <Text className="text-[20px] font-semibold text-black text-center">
+              <Text className="text-[20px] font-bold text-black text-center">
                 Report Lost Pet
               </Text>
 
@@ -247,7 +254,7 @@ export default function ReportLostPetScreen() {
           </View>
 
           {/* PET INFO */}
-          <View className="items-center mb-[30px]">
+          <View className="items-center mb-[21px]">
             <Image
               source={{
                 uri: petAvatar && petAvatar !== 'undefined'
@@ -257,7 +264,7 @@ export default function ReportLostPetScreen() {
               className="w-[128px] h-[128px] rounded-full border-[4px] border-[#F9FAFB]"
               resizeMode="cover"
             />
-            <Text className="text-[20px] font-semibold text-[#111827] mt-[30px] tracking-[0.06px]">
+            <Text className="text-[20px] font-bold text-[#111827] mt-[30px] tracking-[0.06px]">
               {petName || 'Thú cưng'}
             </Text>
             <Text className="text-[14px] text-[#B8B8B8] mt-[8px] font-regular tracking-[0.5px]">
@@ -280,6 +287,7 @@ export default function ReportLostPetScreen() {
               /* --- TRẠNG THÁI 1: ĐÃ CHỌN VỊ TRÍ (Hiện Card + Mini Map) --- */
               <View className="bg-white">
 
+                {/* 1. Phần Text Địa chỉ & Bán kính (Bấm vào để sửa) */}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => {
@@ -409,7 +417,7 @@ export default function ReportLostPetScreen() {
               cancelTextIOS="Cancel"
 
             />
-            <View className='mb-[30px]'>
+            <View className='mb-2'>
               <Text className="text-[#8E8E93] font-medium text-[14px]">
                 Description
               </Text>
@@ -420,14 +428,13 @@ export default function ReportLostPetScreen() {
                 placeholder="Describe what Luna looks like when gone missing..."
                 placeholderTextColor="#9CA3AF"
                 multiline
-                className={`w-full border-b border-[#E5E5E5] py-2 text-[14px] text-[#111827] bottom-1 ${details ? 'font-semibold' : 'font-regular'
-                  }`}
+                className="w-full border-b border-[#E5E5E5] py-2 text-[14px] text-[#111827] font-semibold bottom-1"
                 textAlignVertical="top"
                 cursorColor="#EF4444"
               />
             </View>
             {/* PHOTOS */}
-            <View className="mb-[30px]">
+            <View className="mb-4">
               <View className="flex-row justify-between items-center mb-3">
                 <Text className="text-[14px] font-semibold text-black tracking-[0.06px]">
                   Photos <Text className="text-[#8E8E93] text-[12px] font-medium">(Optional)</Text>
@@ -435,7 +442,7 @@ export default function ReportLostPetScreen() {
                 <Text className="text-[13px] font-semibold text-[#9CA3AF]">{photos.length}/5</Text>
               </View>
 
-              <View className="flex-row flex-wrap gap-3">
+              <View className="flex-row flex-wrap gap-2">
                 {photos.length === 0 ? (
                   <TouchableOpacity
                     onPress={handleAddPhoto}
@@ -458,7 +465,7 @@ export default function ReportLostPetScreen() {
                 ) : (
                   <>
                     {photos.map((uri, index) => (
-                      <View key={index} className="relative" style={{ width: imageSize, height: imageSize }}>
+                      <View key={index} className="relative w-[60px] h-[60px]">
                         <Image
                           source={{ uri }}
                           className="w-full h-full rounded-[14px] bg-[#F3F4F6]"
@@ -486,8 +493,7 @@ export default function ReportLostPetScreen() {
                         onPress={handleAddPhoto}
                         activeOpacity={0.7}
                         disabled={isUploading}
-                        className="bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center"
-                        style={{ width: imageSize, height: imageSize }}
+                        className="w-[60px] h-[60px] bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center"
                       >
                         {isUploading ? (
                           <ActivityIndicator size="small" color="#9CA3AF" />
@@ -545,16 +551,13 @@ export default function ReportLostPetScreen() {
                 onPress={handleActivateLostMode}
                 className={`w-full h-[48px] rounded-[16px] items-center justify-center flex-row ${isFormValid && !isSubmitting && !isUploading ? 'bg-[#E85A5A]' : 'bg-[#FFB4B4]'
                   }`}
-                style={isFormValid && !isSubmitting && !isUploading
-                  ? {
-                    shadowColor: '#FF0000',
-                    shadowOffset: { width: 0, height: 3 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 10,
-                    elevation: 5,
-                  }
-                  : {
-                  }}
+                style={{
+                  shadowColor: '#FF0000',
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 10,
+                  elevation: 5,
+                }}
               >
                 <Image source={require('../assets/icon/bell.png')} style={{ width: 14, height: 17 }} resizeMode="cover" className='mr-2' />
                 {isSubmitting && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />}

@@ -1,7 +1,7 @@
 // app/(tabs)/matching.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-import { AntDesign, Feather, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,9 +22,9 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { useLocation } from '../../hooks/useLocation';
 import { petService } from '../../services/petService';
-import Toast from 'react-native-toast-message';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.3;
@@ -1064,15 +1064,36 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                     ? pet.images.map((img: any) => img.url)
                     : ['https://via.placeholder.com/400x600?text=No+Image'];
 
+                let calculatedAge = pet.age;
+                if (!calculatedAge && pet.dob) {
+                    const birthDate = new Date(pet.dob);
+                    const today = new Date();
+                    let years = today.getFullYear() - birthDate.getFullYear();
+                    let months = today.getMonth() - birthDate.getMonth();
+                    
+                    if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+                        years--;
+                        months += 12;
+                    }
+                    
+                    if (years > 0) {
+                        calculatedAge = `${years}`;
+                    } else if (months > 0) {
+                        calculatedAge = `${months} tháng`;
+                    } else {
+                        calculatedAge = '< 1 tháng';
+                    }
+                }
+
                 return {
                     id: pet.id,
                     name: pet.name,
-                    age: pet.age || 'Unknown',
+                    age: calculatedAge || 'Unknown', // Đã fix! Sẽ ăn theo calculatedAge
                     gender: pet.gender || 'MALE',
                     distance: displayDistance,
                     location: pet.shelter?.name || pet.location || 'Location',
-                    image: petImages[0], // Giữ lại image cho tương thích code cũ
-                    images: petImages    // THÊM TRƯỜNG NÀY ĐỂ CHỨA NHIỀU ẢNH
+                    image: petImages[0], 
+                    images: petImages    
                 };
             });
 

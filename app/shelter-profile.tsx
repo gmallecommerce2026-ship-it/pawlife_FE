@@ -1,26 +1,39 @@
 // app/shelter-profile.tsx
-import { AntDesign, Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Linking, Modal, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Linking, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  interpolateColor,
+  runOnJS,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming
+} from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shelterService } from '../services/shelterService';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  useAnimatedScrollHandler,
-  interpolate,
-  Extrapolation,
-  withTiming,
-  runOnJS,
-  interpolateColor
-} from 'react-native-reanimated';
 
 import { Text } from '@/components/AppText';
-import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
+
+const getAge = (dobString?: string) => {
+  if (!dobString) return 'Unknown';
+  const dob = new Date(dobString);
+  const diff_ms = Date.now() - dob.getTime();
+  const age_dt = new Date(diff_ms);
+  const years = Math.abs(age_dt.getUTCFullYear() - 1970);
+  const months = age_dt.getUTCMonth();
+  
+  if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
+  if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
+  return 'Newborn';
+};
 
 const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) => string }) => {
   const router = useRouter();
@@ -29,7 +42,7 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
   const imageUrl = pet.images && pet.images.length > 0
     ? pet.images[0].url
     : 'https://via.placeholder.com/400';
-  const isFemale = pet.gender?.toLowerCase() === 'female';
+  const isFemale = pet.gender?.toUpperCase() === 'FEMALE';
 
   return (
     <TouchableOpacity
@@ -67,7 +80,8 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
             className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
             numberOfLines={1}
           >
-            {pet.age || '1 years'} · {formatBreed ? formatBreed(pet.breed) : (pet.breed || 'Unknown')}
+            {/* Sử dụng hàm getAge thay cho '1 years' */}
+            {getAge(pet.dob)} · {formatBreed ? formatBreed(pet.breed) : (pet.breed || 'Unknown')}
           </Text>
         </View>
       </View>
@@ -400,6 +414,11 @@ export default function ShelterProfileScreen() {
     );
   }
 
+  const formatDate = (dateString?: string | Date) => {
+    if (!dateString) return 'Pending';
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   if (isNotFound) {
     return (
       <SafeAreaView className="flex-1 bg-[#FAFAFA] justify-center items-center">
@@ -544,7 +563,9 @@ export default function ShelterProfileScreen() {
       >
         {/* 1. Ảnh Cover (Kéo được) */}
         <Image
-          source={{ uri: shelterInfo?.avatarUrl || 'https://via.placeholder.com/400x300' }}
+          source={{ 
+            uri: shelterInfo?.coverUrl || shelterInfo?.avatarUrl || 'https://via.placeholder.com/400x300' 
+          }}
           style={{ width: width, height: SCREEN_HEIGHT * 0.22 }}
           resizeMode="cover"
         />
@@ -704,29 +725,23 @@ export default function ShelterProfileScreen() {
               <Text className="text-[16px] font-medium text-black mb-2">More Info</Text>
               <View className="gap-y-3">
                 <View className="flex-row items-center gap-x-3">
-                  <Image
-                    source={require('../assets/icon/earth.png')}
-                    style={{ width: 13, height: 13 }}
-                    resizeMode="cover"
-                  />
+                  <Image source={require('../assets/icon/earth.png')} style={{ width: 13, height: 13 }} resizeMode="cover"/>
+                  {/* Sử dụng dữ liệu thật */}
                   <Text className="text-[14px] text-[#8E8E93]">Based in {shelterInfo?.address || "Vietnam"}</Text>
                 </View>
                 <View className="flex-row items-center gap-x-3">
-                  <Image
-                    source={require('../assets/icon/info.png')}
-                    style={{ width: 13, height: 13 }}
-                    resizeMode="cover"
-                  />
-                  <Text className="text-[14px] text-[#8E8E93]">Joined Jan 1, 2023</Text>
+                  <Image source={require('../assets/icon/info.png')} style={{ width: 13, height: 13 }} resizeMode="cover"/>
+                  {/* Sử dụng ngày tạo thật từ DB */}
+                  <Text className="text-[14px] text-[#8E8E93]">Joined {formatDate(shelterInfo?.createdAt)}</Text>
                 </View>
-                <View className="flex-row items-center gap-x-3">
-                  <Image
-                    source={require('../assets/icon/verified.png')}
-                    style={{ width: 13, height: 13 }}
-                    resizeMode="cover"
-                  />
-                  <Text className="text-[14px] text-[#8E8E93]">Verified Jan 1, 2023</Text>
-                </View>
+                
+                {/* Render theo trạng thái verified */}
+                {shelterInfo?.isVerified && (
+                  <View className="flex-row items-center gap-x-3">
+                      <Image source={require('../assets/icon/real-tick.png')} style={{ width: 13, height: 13 }} resizeMode="cover"/>
+                      <Text className="text-[14px] text-[#8E8E93]">Verified {formatDate(shelterInfo?.verifiedAt)}</Text>
+                  </View>
+                )}
               </View>
             </View>
 

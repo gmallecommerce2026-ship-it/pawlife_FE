@@ -1,21 +1,35 @@
 // app/pet-detail-modal.tsx
 import { Text } from '@/components/AppText';
-import { Feather, FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState, useMemo } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, LayoutAnimation, Linking, Platform, TouchableOpacity, UIManager, View, FlatList } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { petService } from '../services/petService';
+import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, LayoutAnimation, Linking, Platform, TouchableOpacity, UIManager, View } from 'react-native';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
-  interpolate,
-  Extrapolation
+  useSharedValue
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { petService } from '../services/petService';
+const getAge = (dobString?: string) => {
+  if (!dobString) return 'Unknown';
+  const dob = new Date(dobString);
+  const diff_ms = Date.now() - dob.getTime();
+  const age_dt = new Date(diff_ms);
+  const years = Math.abs(age_dt.getUTCFullYear() - 1970);
+  const months = age_dt.getUTCMonth();
+  
+  if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
+  if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
+  return 'Newborn';
+};
 
+const formatCapitalize = (str?: string) => {
+  if (!str) return 'Unknown';
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
 export default function PetDetailModal() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -316,19 +330,26 @@ export default function PetDetailModal() {
 
             {/* Thuộc tính Pet */}
             <View className="flex-row justify-between mt-6 gap-[10px]">
-              <View className={`flex-1 ${pet.gender === 'Male' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'} py-[12px] rounded-[16px] items-center`}>
-                <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
-                <Text className="text-black text-[14px] font-semibold">{pet.gender}</Text>
+              {/* Gender */}
+              <View className={`flex-1 ${pet?.gender?.toUpperCase() === 'FEMALE' ? 'bg-[#FAE8ED]' : 'bg-[#EAF4FB]'} py-[12px] rounded-[16px] items-center`}>
+                  <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
+                  <Text className="text-black text-[14px] font-semibold">{formatCapitalize(pet?.gender)}</Text>
               </View>
+
+              {/* Age */}
               <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
-                <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
-                <Text className="text-black text-[14px] font-semibold">Young</Text>
+                  <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
+                  <Text className="text-black text-[14px] font-semibold">{getAge(pet?.dob)}</Text>
               </View>
+              
+              {/* Weight / Size */}
               <View className="flex-1 bg-[#E8F9E6] py-[12px] rounded-[16px] items-center">
-                <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Size</Text>
-                <Text className="text-black text-[14px] font-semibold">Large</Text>
+                  <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Weight</Text>
+                  <Text className="text-black text-[14px] font-semibold">
+                      {pet?.weight ? `${pet.weight} kg` : (pet?.size ? formatCapitalize(pet.size) : 'N/A')}
+                  </Text>
               </View>
-            </View>
+          </View>
 
             {/* Shelter Info */}
             <View className="flex-row items-center my-6">

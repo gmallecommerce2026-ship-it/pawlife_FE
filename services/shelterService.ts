@@ -10,6 +10,17 @@ export const shelterService = {
     }
   },
 
+  getOrganizerProfile: async (shelterId: string, userId?: string) => {
+    try {
+      const response = await axiosClient.get(`shelters/${shelterId}/organizer-profile`, {
+        params: { userId }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: error.message };
+    }
+  },
+  
   // 2. Thêm userId vào hàm Detail
   getShelterDetail: async (shelterId: string, userId?: string, petSearch?: string) => {
     try {

@@ -223,14 +223,31 @@ export default function HomeScreen() {
         
         // Xử lý hiển thị Tuổi động (Bỏ hardcode số '1')
         const displayAge = (() => {
-            if (!pet.age) return 'N/A';
-            // Nếu API trả về dạng số (ví dụ: 2) -> hiển thị '2 tuổi' hoặc '2 yrs' tùy ngôn ngữ app
-            if (typeof pet.age === 'number' || !isNaN(Number(pet.age))) {
-                return `${pet.age}`;
-            }
-            // Nếu API đã format sẵn chuỗi (ví dụ: "3 tháng", "1 year") -> giữ nguyên
+        // Fallback phòng trường hợp backend sau này có trả về trường age
+        if (pet.age) {
+            if (typeof pet.age === 'number' || !isNaN(Number(pet.age))) return `${pet.age}`;
             return pet.age;
-        })();
+        }
+        
+        // Logic tính tuổi từ trường dob
+        if (pet.dob) {
+            const birthDate = new Date(pet.dob);
+            const today = new Date();
+            let years = today.getFullYear() - birthDate.getFullYear();
+            let months = today.getMonth() - birthDate.getMonth();
+            
+            if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+                years--;
+                months += 12;
+            }
+            
+            if (years > 0) return `${years}`; // Ví dụ: '2'
+            if (months > 0) return `${months}T`; // Ví dụ: '3T' (3 tháng) để fit với UI nhỏ
+            return '1T'; // Bé xíu (< 1 tháng)
+        }
+        
+        return 'N/A';
+    })();
 
         return (
             <TouchableOpacity
