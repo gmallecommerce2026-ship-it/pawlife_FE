@@ -833,7 +833,7 @@ export default function PetProfileDetailScreen() {
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
-                console.log("Trigger Report");
+                console.log("Trigger downlpad");
               }}
             >
               <Text className="text-[14px] text-gray-700 ml-3 font-regular">Download</Text>

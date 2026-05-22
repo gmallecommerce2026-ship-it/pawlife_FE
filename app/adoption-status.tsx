@@ -1,13 +1,16 @@
 // app/adoption-status.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import { useImageUpload } from '@/hooks/useImageUpload';
+import { X } from 'lucide-react-native';
+
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -23,7 +26,30 @@ interface TimelineStep {
   actionRequired?: string;
 }
 
-
+const mockTimelineSteps: TimelineStep[] = [
+  {
+    id: '1',
+    title: 'Application Submitted',
+    state: 'completed',
+    date: 'May 20, 2026', // Bạn có thể tùy chỉnh ngày
+    description: 'Đơn đăng ký nhận nuôi của bạn đã được gửi thành công đến Shelter.'
+  },
+  {
+    id: '2',
+    title: 'Pending Review',
+    state: 'completed',
+    date: 'May 21, 2026',
+    description: 'Shelter đang xem xét hồ sơ và thông tin của bạn.'
+  },
+  {
+    id: '3',
+    title: 'Need More Information',
+    state: 'alert', // Trạng thái 'alert' sẽ hiện icon dấu chấm than (!) theo hàm renderNodeIcon của bạn
+    date: 'May 22, 2026',
+    description: 'Shelter needs a bit more information to verify.',
+    actionRequired: 'Photos of your living space' // Bạn có thể dùng trường này để render nút bấm bổ sung (nếu có)
+  }
+];
 
 
 export default function AdoptionStatusScreen() {
@@ -37,6 +63,15 @@ export default function AdoptionStatusScreen() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+
+  const { width } = useWindowDimensions();
+  const imageSize = (width - 40 - 48) / 5;
+  const { pickAndUploadImage, isUploading } = useImageUpload();
+  const handleRemovePhoto = (index: number) => {
+    setPhotos(photos.filter((_, i) => i !== index));
+  };
+
+  const [photos, setPhotos] = useState<string[]>([]);
   useEffect(() => {
     if (id) {
       fetchApplicationDetails();
@@ -88,12 +123,24 @@ export default function AdoptionStatusScreen() {
     return steps;
   };
 
+  const handleAddPhoto = async () => {
+    if (photos.length >= 5) return;
+    const imageUrl = await pickAndUploadImage({
+      folder: 'lost-pets',
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (imageUrl) {
+      setPhotos((prev) => [...prev, imageUrl]);
+    }
+  };
+
   const renderNodeIcon = (state: string) => {
     switch (state) {
-      case 'completed': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20"><Feather name="check" size={14} color="white" /></View>;
-      case 'success': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20"><MaterialCommunityIcons name="heart" size={14} color="white" /></View>;
-      case 'alert': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20"><Text className="text-white font-bold text-sm">!</Text></View>;
-      case 'error': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20"><Feather name="x" size={14} color="white" /></View>;
+      case 'completed': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20"><Feather name="check" size={16} color="white" /></View>;
+      case 'success': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20"><MaterialCommunityIcons name="heart" size={16} color="white" /></View>;
+      case 'alert': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20"><Ionicons name="alert" size={16} color="white" /></View>;
+      case 'error': return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] items-center justify-center z-20"><Feather name="x" size={16} color="white" /></View>;
       case 'active':
       default: return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] border-[3px] border-[#D38544] items-center justify-center z-20 shadow-sm shadow-[#D38544]"><View className="w-2.5 h-2.5 rounded-full bg-[#D38544]" /></View>;
     }
@@ -137,7 +184,8 @@ export default function AdoptionStatusScreen() {
 
   const pet = applicationData.pet;
   const isClosed = applicationData.status === 'CLOSED';
-  const timelineSteps = generateTimelineSteps(applicationData.status, applicationData.createdAt);
+  // const timelineSteps = generateTimelineSteps(applicationData.status, applicationData.createdAt);
+  const timelineSteps = mockTimelineSteps;
   const commitments = applicationData.commitments || {};
 
   const submittedDate = new Date(applicationData.createdAt).toLocaleDateString('en-US', {
@@ -227,11 +275,11 @@ export default function AdoptionStatusScreen() {
               style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
             />
             <Image
-                        className=''
-                        source={require('../assets/icon/share.png')}
-                        style={{ width: 16, height: 16 }}
-                        resizeMode="cover"
-                      />
+              className=''
+              source={require('../assets/icon/share.png')}
+              style={{ width: 16, height: 16 }}
+              resizeMode="cover"
+            />
           </View>
         </TouchableOpacity>
 
@@ -343,12 +391,66 @@ export default function AdoptionStatusScreen() {
                 <View className={`flex-1 ml-4 ${!isLast ? 'pb-8' : 'pb-4'}`}>
                   <Text className={`text-[14px] font-medium mt-1 ${step.state === 'alert' ? 'text-[#F59E0B]' : step.state === 'error' ? 'text-[#EF4444]' : step.state === 'success' ? 'text-[#10B981]' : 'text-gray-900'}`}>{step.title}</Text>
                   {step.date && <Text className="text-[12px] font-regular text-[#8E8E93] mt-1">{step.date}</Text>}
-                  {step.description && <Text className="text-[12px] font-regular text-[#8E8E93] mt-2 leading-5">{step.description}</Text>}
+                  {isLast && step.description && <Text className="text-[12px] font-regular text-[#8E8E93] mt-2 leading-5">{step.description}</Text>}
                   {step.actionRequired && (
-                    <TouchableOpacity className="mt-3.5 flex-row items-center justify-between bg-[#F9FAFB] border border-gray-100 rounded-xl p-3.5" activeOpacity={0.7}>
-                      <Text className="text-[14px] font-medium text-gray-800">{step.actionRequired}</Text>
-                      <Feather name="chevron-right" size={18} color="#9CA3AF" />
-                    </TouchableOpacity>
+                    <View className="flex-row flex-wrap gap-3 mt-2">
+                      {photos.length === 0 ? (
+                        <TouchableOpacity className="self-start mt-3.5 flex-row items-center bg-[#FFFFFF] border border-gray-100 rounded-xl p-3.5" activeOpacity={0.7} onPress={handleAddPhoto}>
+                          <Image
+                            className='mr-2'
+                            source={require('../assets/icon/upload-gray.png')}
+                            style={{ width: 9, height: 9 }}
+                            resizeMode="cover"
+                          />
+                          <Text className="text-[14px] font-medium text-gray-800">{step.actionRequired}</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <>
+                          {photos.map((uri, index) => (
+                            <View key={index} className="relative" style={{ width: imageSize, height: imageSize }}>
+                              <Image
+                                source={{ uri }}
+                                className="w-full h-full rounded-[14px] bg-[#F3F4F6]"
+                              />
+                              <TouchableOpacity
+                                onPress={() => handleRemovePhoto(index)}
+                                activeOpacity={0.7}
+                                className="absolute -top-2 -right-2 w-6 h-6 rounded-full items-center justify-center"
+                                style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 }}
+                              >
+                                <LinearGradient
+                                  colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                  locations={[0, 0.3, 1]}
+
+                                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                                />
+                                <X size={10} color="#000000" strokeWidth={3} />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+
+                          {photos.length < 4 && (
+                            <TouchableOpacity
+                              onPress={handleAddPhoto}
+                              activeOpacity={0.7}
+                              disabled={isUploading}
+                              className="bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center"
+                              style={{ width: imageSize, height: imageSize }}
+                            >
+                              {isUploading ? (
+                                <ActivityIndicator size="small" color="#9CA3AF" />
+                              ) : (
+                                <Image
+                                  source={require('../assets/icon/upload-gray.png')}
+                                  className="w-[18px] h-[18px]"
+                                />
+                              )}
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      )}
+                    </View>
                   )}
                 </View>
               </View>
@@ -441,7 +543,7 @@ export default function AdoptionStatusScreen() {
       </Modal>
       <Modal
         visible={isDetailsVisible}
-        animationType="fade" // Hiệu ứng trượt từ dưới lên
+        animationType="fade"
         transparent={true}
         onRequestClose={() => setIsDetailsVisible(false)}
       >

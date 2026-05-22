@@ -2,7 +2,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Linking, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Linking, TextInput, TouchableOpacity, View, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -20,7 +20,7 @@ import { Text } from '@/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 const { width } = Dimensions.get('window');
-const COLUMN_WIDTH = (width - 48 - 16) / 2;
+const COLUMN_WIDTH = (width - 40 - 13) / 2;
 
 const getAge = (dobString?: string) => {
   if (!dobString) return 'Unknown';
@@ -29,7 +29,7 @@ const getAge = (dobString?: string) => {
   const age_dt = new Date(diff_ms);
   const years = Math.abs(age_dt.getUTCFullYear() - 1970);
   const months = age_dt.getUTCMonth();
-  
+
   if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
   if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
   return 'Newborn';
@@ -47,7 +47,7 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
   return (
     <TouchableOpacity
       className="bg-transparent mb-[14px]"
-      style={{ width: 160.25 }}
+      style={{ width: '100%' }}
       activeOpacity={0.9}
       onPress={() => router.push(`/shelter-pet-detail?id=${pet.id}`)}
     >
@@ -55,7 +55,7 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
         <Image
           source={{ uri: imageUrl }}
           className="w-full aspect-square rounded-[24px] bg-gray-100"
-          style={{ height: 160.25 }}
+          style={{ width: '100%' }}
           resizeMode="cover"
         />
         {pet.isFavorite && (
@@ -89,6 +89,44 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
   );
 };
 
+const SectionLabel = ({ title, optional }: { title: string, optional?: boolean }) => (
+  <View className="flex-row items-baseline">
+    <Text className="text-black font-semibold text-[14px] tracking-[0.06px]">
+      {title}
+    </Text>
+    {/* Nếu optional = true thì mới hiển thị chữ (Optional) */}
+    {optional && (
+      <Text className="text-[#8E8E93] font-regular text-[14px] ml-1 tracking-[0.06px]">
+        (Optional)
+      </Text>
+    )}
+  </View>
+);
+
+const FilterChip = ({ label, selected, onPress, iconSource }: any) => {
+  const containerStyle = selected
+    ? "border-[#E89B5A]"
+    : "border border-[#E5E5E5]";
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      // Thêm flex-row để ảnh và chữ nằm ngang, justify-center để luôn căn giữa thẻ
+      className={`flex-1 py-2.5 border rounded-full flex-row items-center justify-center ${containerStyle}`}
+    >
+      {iconSource && (
+        <Image
+          source={iconSource}
+          className="w-[16px] h-[16px] mr-2" // mr-2 tạo khoảng cách với chữ
+          resizeMode="contain"
+        />
+      )}
+
+      <Text className={`text-[14px] text-black font-regular`}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
+
 // Sử dụng React.memo để tối ưu hóa, tránh render lại thẻ pet không cần thiết khi gõ phím tìm kiếm
 
 export default function ShelterProfileScreen() {
@@ -101,18 +139,26 @@ export default function ShelterProfileScreen() {
   const [pets, setPets] = useState<any[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   // === THÊM STATE CHO SEARCH TẠI ĐÂY ===
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
   const [activeTab, setActiveTab] = useState<'pets' | 'info'>('pets');
-  const COLUMN_WIDTH = (width - 48 - 16) / 2;
+  const COLUMN_WIDTH = (width - 40 - 13) / 2;
 
   const scrollY = useSharedValue(0);
   const HEADER_HEIGHT = insets.top + 50; // Chiều cao header
   const SCROLL_THRESHOLD = 200; // Khoảng cách để header hiện ra hoàn toàn
   const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
+
+  const [selectedGender, setSelectedGender] = useState<string | null>(null);
+  const [selectedAge, setSelectedAge] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedSterilized, setSelectedSterilized] = useState<boolean | null>(null);
+  const [isfilterVisible, setIsFilterVisible] = useState(false);
 
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
@@ -149,10 +195,19 @@ export default function ShelterProfileScreen() {
 
   const handleOpenSearch = () => {
     setIsSearching(true);
+    setIsSearchActive(true);
     // Animation giãn nở thanh search mượt mà
     searchAnimation.value = withTiming(1, { duration: 300 });
     // Focus sau khi animation chạy được một chút hoặc hoàn tất
     setTimeout(() => inputRef.current?.focus(), 300);
+  };
+
+  const handleOutsidePress = () => {
+    Keyboard.dismiss();
+    setIsSearchActive(false);
+    searchAnimation.value = withTiming(0, { duration: 250 }, () => {
+      runOnJS(setIsSearching)(false);
+    });
   };
 
   // Hàm đóng search
@@ -437,7 +492,13 @@ export default function ShelterProfileScreen() {
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
-
+      {isSearchActive && (
+        <TouchableWithoutFeedback onPress={handleOutsidePress}>
+          <View
+            className="absolute inset-0 z-40 bg-transparent"
+          />
+        </TouchableWithoutFeedback>
+      )}
       {/* --- STICKY HEADER (Luôn nằm trên cùng) --- */}
       <Animated.View
         style={[headerBarStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 10, paddingHorizontal: 20 }]}
@@ -541,7 +602,7 @@ export default function ShelterProfileScreen() {
                     style={{ fontFamily: 'Urbanist' }}
                   />
                   {isSearching && (
-                    <TouchableOpacity onPress={handleCloseSearch} className="ml-1 px-1">
+                    <TouchableOpacity onPress={() => setIsFilterVisible(true)} className="ml-1 px-1">
                       <Image className='ml-2' source={require('../assets/icon/sliders-gray.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                     </TouchableOpacity>
                   )}
@@ -563,8 +624,8 @@ export default function ShelterProfileScreen() {
       >
         {/* 1. Ảnh Cover (Kéo được) */}
         <Image
-          source={{ 
-            uri: shelterInfo?.coverUrl || shelterInfo?.avatarUrl || 'https://via.placeholder.com/400x300' 
+          source={{
+            uri: shelterInfo?.coverUrl || shelterInfo?.avatarUrl || 'https://via.placeholder.com/400x300'
           }}
           style={{ width: width, height: SCREEN_HEIGHT * 0.22 }}
           resizeMode="cover"
@@ -673,10 +734,10 @@ export default function ShelterProfileScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setActiveTab(prev => prev === 'pets' ? 'info' : 'pets')}
-                className={`flex-1 py-2 rounded-full items-center justify-center ${activeTab === 'info' ? 'bg-orange-100' : 'bg-[#F6F6F6]'
+                className={`flex-1 py-2 rounded-full items-center justify-center ${activeTab === 'info' ? 'bg-[#E89B5A]' : 'bg-[#F6F6F6]'
                   }`}
               >
-                <Text className={`font-semibold text-[14px] ${activeTab === 'info' ? 'text-orange-500' : 'text-gray-600'
+                <Text className={`font-semibold text-[14px] ${activeTab === 'info' ? 'text-white' : 'text-gray-600'
                   }`}>
                   {activeTab === 'pets' ? 'Contact' : 'View Pets'}
                 </Text>
@@ -725,21 +786,21 @@ export default function ShelterProfileScreen() {
               <Text className="text-[16px] font-medium text-black mb-2">More Info</Text>
               <View className="gap-y-3">
                 <View className="flex-row items-center gap-x-3">
-                  <Image source={require('../assets/icon/earth.png')} style={{ width: 13, height: 13 }} resizeMode="cover"/>
+                  <Image source={require('../assets/icon/earth.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
                   {/* Sử dụng dữ liệu thật */}
                   <Text className="text-[14px] text-[#8E8E93]">Based in {shelterInfo?.address || "Vietnam"}</Text>
                 </View>
                 <View className="flex-row items-center gap-x-3">
-                  <Image source={require('../assets/icon/info.png')} style={{ width: 13, height: 13 }} resizeMode="cover"/>
+                  <Image source={require('../assets/icon/info.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
                   {/* Sử dụng ngày tạo thật từ DB */}
                   <Text className="text-[14px] text-[#8E8E93]">Joined {formatDate(shelterInfo?.createdAt)}</Text>
                 </View>
-                
+
                 {/* Render theo trạng thái verified */}
                 {shelterInfo?.isVerified && (
                   <View className="flex-row items-center gap-x-3">
-                      <Image source={require('../assets/icon/real-tick.png')} style={{ width: 13, height: 13 }} resizeMode="cover"/>
-                      <Text className="text-[14px] text-[#8E8E93]">Verified {formatDate(shelterInfo?.verifiedAt)}</Text>
+                    <Image source={require('../assets/icon/real-tick.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
+                    <Text className="text-[14px] text-[#8E8E93]">Verified {formatDate(shelterInfo?.verifiedAt)}</Text>
                   </View>
                 )}
               </View>
@@ -747,20 +808,175 @@ export default function ShelterProfileScreen() {
 
           ) : (
 
-            <View className="flex-row flex-wrap gap-3 justify-between mx-[20px]">
+            <View
+              className="flex-row flex-wrap w-full"
+              style={{
+                paddingHorizontal: 20,
+                columnGap: 13,
+                rowGap: 16
+              }}
+            >
               {filteredPets.length > 0 ? (
                 filteredPets.map((pet) => (
-                  <PetCard key={pet.id} pet={pet} formatBreed={formatBreed} />
+                  /* Bọc PetCard vào 1 thẻ View có độ rộng COLUMN_WIDTH đã tính toán */
+                  <View key={pet.id} style={{ width: COLUMN_WIDTH }}>
+                    <PetCard pet={pet} formatBreed={formatBreed} />
+                  </View>
                 ))
               ) : (
                 <View className="flex-1 items-center justify-center py-10">
-                  <Text className="text-gray-500">No pets found matching "{searchQuery}"</Text>
+                  <Text className="text-gray-500">No pets found</Text>
                 </View>
               )}
             </View>
           )}
         </View>
       </Animated.ScrollView>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible = {isfilterVisible}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setIsFilterVisible(false)}
+          className="flex-1 bg-black/50 justify-center items-center px-5"
+        >
+          <TouchableWithoutFeedback>
+            <View className="bg-white w-full rounded-[32px] overflow-hidden max-h-[80%] shadow-2xl pt-8">
+
+              <View className='mx-[20px]'>
+
+                <View className="flex-row items-center justify-between">
+                  <SectionLabel title="Location" />
+
+                  {/* Nút X đóng modal */}
+                  <TouchableOpacity onPress={() => setIsFilterVisible(false)} className="p-2.5 -mt-1 -mr-1">
+                    <Feather name="x" size={16} color="#111827" />
+                  </TouchableOpacity>
+                </View>
+                {/* Ô hiển thị vị trí tự động cập nhật */}
+                <View className="mt-5">
+                  <SectionLabel title="Pet Type" />
+                  <View className="flex-row justify-between gap-3 mt-3">
+                    <FilterChip
+                      label="All"
+                      selected={selectedType === 'all'}
+                      onPress={() => setSelectedType('all')}
+                      iconSource={require('../assets/icon/all-filter.png')}
+                    />
+                    <FilterChip
+                      label="Cat"
+                      selected={selectedType === 'cat'}
+                      onPress={() => setSelectedType('cat')}
+                      iconSource={require('../assets/icon/cat-filter.png')}
+                    />
+                    <FilterChip
+                      label="Dog"
+                      selected={selectedType === 'dog'}
+                      onPress={() => setSelectedType('dog')}
+                      iconSource={require('../assets/icon/dog-filter.png')}
+                    />
+                  </View>
+                </View>
+
+                <View className="mt-5">
+                  <SectionLabel title="Gender" optional />
+                  <View className="flex-row flex-wrap justify-between gap-3 mt-3">
+                    <FilterChip
+                      label="Female"
+                      selected={selectedGender === 'female'}
+                      onPress={() => setSelectedGender('female')}
+                      iconSource={require('../assets/icon/female-filter.png')}
+                    />
+                    <FilterChip
+                      label="Male"
+                      selected={selectedGender === 'male'}
+                      onPress={() => setSelectedGender('male')}
+                      iconSource={require('../assets/icon/male-filter.png')}
+                    />
+                  </View>
+                </View>
+
+                <View className="mt-5">
+                  <SectionLabel title="Sterilized" optional />
+                  <View className="flex-row flex-wrap justify-between gap-3 mt-3">
+                    <FilterChip
+                      label="Yes"
+                      selected={selectedSterilized === true}
+                      onPress={() => setSelectedSterilized(true)}
+                    />
+                    <FilterChip
+                      label="No"
+                      selected={selectedSterilized === false}
+                      onPress={() => setSelectedSterilized(false)}
+                    />
+                  </View>
+                </View>
+
+                <View className="mt-5">
+                  <SectionLabel title="Age" optional />
+                  <View className="flex-row flex-wrap justify-between gap-3 mt-3">
+                    <FilterChip
+                      label="Baby"
+                      selected={selectedAge === 'baby'}
+                      onPress={() => setSelectedAge('baby')}
+                    />
+                    <FilterChip
+                      label="Young"
+                      selected={selectedAge === 'young'}
+                      onPress={() => setSelectedAge('young')}
+                    />
+                    <FilterChip
+                      label="Adult"
+                      selected={selectedAge === 'adult'}
+                      onPress={() => setSelectedAge('adult')}
+                    />
+                    <FilterChip
+                      label="Senior"
+                      selected={selectedAge === 'senior'}
+                      onPress={() => setSelectedAge('senior')}
+                    />
+                  </View>
+                </View>
+                <View className="mt-5">
+                  <SectionLabel title="Size" optional />
+                  <View className="flex-row flex-wrap justify-between gap-3 mt-3">
+                    <FilterChip
+                      label="Small"
+                      selected={selectedSize === 'small'}
+                      onPress={() => setSelectedSize('small')}
+                    />
+                    <FilterChip
+                      label="Medium"
+                      selected={selectedSize === 'medium'}
+                      onPress={() => setSelectedSize('medium')}
+                    />
+                    <FilterChip
+                      label="Large"
+                      selected={selectedSize === 'large'}
+                      onPress={() => setSelectedSize('large')}
+                    />
+                  </View>
+                </View>
+
+
+                {/* --- BOTTOM BUTTONS (Reset & Apply) --- */}
+                <View className="flex-row items-center justify-between py-6">
+                  <TouchableOpacity
+                    onPress={()=> {}}
+                    className="w-full bg-[#E89B5A] py-4 rounded-full items-center active:bg-[#D68A4A]"
+                  >
+                    <Text className="text-white font-semibold text-[16px]">Apply</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+            </View>
+          </TouchableWithoutFeedback>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

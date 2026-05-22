@@ -30,6 +30,12 @@ export const toastConfig: ToastConfig = {
                     <Text className="font-semibold text-[#1A1A1A]" style={{fontFamily:'Urbanist'}}>
                         {props.petName}
                     </Text>
+                    <Text className="font-semibold text-[#1A1A1A]" style={{fontFamily:'Urbanist'}}>
+                        {props.eventName}
+                    </Text>
+                    <Text className="font-semibold text-[#1A1A1A]" style={{fontFamily:'Urbanist'}}>
+                        {props.shelterName}
+                    </Text>
 
                     {/* Hành động: Chữ thường, màu xám #757575 */}
                     <Text className="font-regular text-[#757575]" style={{fontFamily:'Urbanist'}}>

@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 import { eventService } from '../services/eventService';
+import Toast from 'react-native-toast-message';
 
 const { width } = Dimensions.get('window');
 const AnimatedFeather = Animated.createAnimatedComponent(Feather);
@@ -60,8 +61,21 @@ export default function InterestedEventsScreen() {
 
     const handleRemoveInterest = async (eventId: string | number) => {
         setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+        const targetEvent = events.find(e => e.id === eventId);
+        const eventTitle = targetEvent?.title || 'This event';
         try {
             // await eventService.removeInterestedEvent(eventId); 
+            Toast.show({
+                type: 'custom_badge',
+                position: 'bottom',
+                bottomOffset: 50,
+                props: {
+                    eventName: eventTitle,
+                    actionText: ' removed from Interested Event'
+                },
+                visibilityTime: 3000, // Ẩn sau 3 giây
+                autoHide: true,
+            });
         } catch (error) {
             console.error("Lỗi khi hủy quan tâm event:", error);
         }

@@ -54,6 +54,10 @@ export default function EditPetScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 28 });
+  const [showVaccineMenu, setShowVaccineMenu] = useState(false);
+
+
 
   const [formData, setFormData] = useState<EditPetFormData>({
     name: '',
@@ -422,147 +426,100 @@ export default function EditPetScreen() {
               <TouchableOpacity
                 onPress={handlePickVaccine}
                 activeOpacity={0.7}
-                className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center mb-4"
+                className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center"
               >
-                <View className="w-10 h-10 bg-[#F3F4F6] rounded-full items-center justify-center mb-2">
-                  <Feather name="upload-cloud" size={20} color="#6B7280" />
+                <View className="items-center justify-center mb-2">
+                  <Image source={require('../assets/icon/upload-black.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
                 </View>
-                <Text className="text-[14px] text-[#374151] font-medium mb-1">
-                  <Text className="text-[#EFA062]">Click to upload</Text> or drag and drop
+                <Text className="text-[16px] text-[#292D32] font-medium mb-[10px]">
+                  Choose a file to upload
                 </Text>
-                {/* Cập nhật thêm PDF vào text hướng dẫn */}
-                <Text className="text-[12px] text-[#9CA3AF]">JPEG, PNG, PDF, and MP4 formats, up to 50MB</Text>
+                <Text className="text-[14px] text-[#A9ACB4]">JPEG, PNG, PDG, and MP4 formats, up to 50MB</Text>
               </TouchableOpacity>
 
               {/* 2. Trạng thái Đang tải lên */}
               {isUploadingVaccine && (
-                <View className="border border-[#E5E7EB] rounded-[12px] p-3 flex-row items-center mb-3 bg-white shadow-sm shadow-gray-100">
-                  <View className="w-10 h-10 rounded-lg bg-[#F3F4F6] items-center justify-center">
-                    <Feather name="file" size={20} color="#9CA3AF" />
-                  </View>
-                  <View className="flex-1 mx-3">
-                    <View className="flex-row justify-between items-center mb-1.5">
-                      <Text className="text-[14px] text-[#111827] font-medium" numberOfLines={1}>Uploading_document...</Text>
-                      <Text className="text-[12px] text-[#6B7280]">45%</Text>
+                <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mt-2">
+                  <View className='flex-row items-center mb-3'>
+                    <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                    <View className="flex-1 ml-3">
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
+                        <TouchableOpacity
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Feather name="x" size={10} color="#9CA3AF" />
+                        </TouchableOpacity>
+                      </View>
+                      <View className="flex-row items-center mt-1">
+                        <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">60KB of 120 KB • </Text>
+                        <View className="flex-row items-center">
+                          <ActivityIndicator color="#E89B5A" style={{ transform: [{ scaleX: 0.6 }, { scaleY: 0.6 }] }} />
+                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">Uploading...</Text>
+                        </View>
+                      </View>
                     </View>
-                    <View className="h-1.5 w-full bg-[#F3F4F6] rounded-full overflow-hidden">
-                      <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '45%' }} />
-                    </View>
                   </View>
-                  <TouchableOpacity className="p-1">
-                    <Feather name="x" size={16} color="#9CA3AF" />
-                  </TouchableOpacity>
+                  <View className="h-1.5 bg-[#E3E3E4] rounded-full ">
+                    <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '45%' }} />
+                  </View>
                 </View>
               )}
 
               {/* 3. Trạng thái Đã tải lên xong */}
               {formData.vaccinationRecordUrl ? (
-                <View className="border border-[#E5E5E5] rounded-[12px] p-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
-                  <Image
-                    source={{ uri: formData.vaccinationRecordUrl }}
-                    className="w-10 h-10 rounded-lg bg-[#F3F4F6]"
-                    resizeMode="cover"
-                  />
-                  <View className="flex-1 mx-3">
-                    <View className="flex-row justify-between items-center mb-0.5">
-                      <Text className="text-[13px] text-[#111827] font-medium" numberOfLines={1}>vaccination_record.jpg</Text>
-                    </View>
-                    <View className="flex-row items-center">
-                      <Text className="text-[12px] text-[#6B7280] mr-2">1.2 MB</Text>
-                      <View className="flex-row items-center">
-                        <Feather name="check-circle" size={12} color="#EFA062" />
-                        <Text className="text-[12px] text-[#EFA062] ml-1 font-medium">Completed</Text>
+                <View>
+                  <View className="h-[57px] rounded-[16px] p-3 flex-row items-center bg-[#F8F8F8] mt-2">
+                    <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                    <View className="flex-1 ml-3">
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
+                        <TouchableOpacity
+                          onPress={() => handleChange('vaccinationRecordUrl', '')}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                        </TouchableOpacity>
                       </View>
-                    </View>
-                  </View>
-                  {/* Thay icon thùng rác bằng icon Xem chi tiết (Eye) */}
-                  <TouchableOpacity
-                    className="p-2"
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    onPress={(e) => {
-                      // Ngăn chặn sự kiện lan truyền
-                      e.stopPropagation();
-
-                      // Lấy toạ độ Y của phần tử vừa click trên màn hình
-                      const { pageY } = e.nativeEvent;
-
-                      // Set toạ độ cho menu (cộng thêm một chút offset để menu nằm dưới nút)
-                      // setMenuPosition({ top: pageY + 10, right: 32 });
-                      // setShowVaccineMenu(true);
-                    }}
-                  >
-                    <Feather name="more-vertical" size={20} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </View>
-
-
-            {/* QR Code Section (Áp dụng style Dropzone giống hệt) */}
-            {/* <View className="mb-8">
-                <Text className="text-[15px] font-semibold text-[#111827] mb-3">Smart Tag / QR Code</Text>
-                
-                {!formData.qrCodeUrl && !isUploadingQR && (
-                  <TouchableOpacity
-                    onPress={handlePickQR}
-                    activeOpacity={0.7}
-                    className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center mb-4"
-                  >
-                    <View className="w-10 h-10 bg-[#F3F4F6] rounded-full items-center justify-center mb-2">
-                      <Feather name="maximize" size={20} color="#6B7280" />
-                    </View>
-                    <Text className="text-[14px] text-[#374151] font-medium mb-1">
-                      <Text className="text-[#3B82F6]">Click to upload QR</Text> or drag and drop
-                    </Text>
-                    <Text className="text-[12px] text-[#9CA3AF]">SVG, PNG, JPG (max. 800x400px)</Text>
-                  </TouchableOpacity>
-                )}
-
-                {isUploadingQR && (
-                  <View className="border border-[#E5E7EB] rounded-[12px] p-3 flex-row items-center mb-3 bg-white shadow-sm shadow-gray-100">
-                    <View className="w-10 h-10 rounded-lg bg-[#F3F4F6] items-center justify-center">
-                      <Feather name="file" size={20} color="#9CA3AF" />
-                    </View>
-                    <View className="flex-1 mx-3">
-                      <View className="flex-row justify-between items-center mb-1.5">
-                        <Text className="text-[14px] text-[#111827] font-medium" numberOfLines={1}>Uploading_QR...</Text>
-                        <Text className="text-[12px] text-[#6B7280]">Uploading...</Text>
-                      </View>
-                      <View className="h-1.5 w-full bg-[#F3F4F6] rounded-full overflow-hidden">
-                        <View className="h-full bg-[#3B82F6] rounded-full w-1/2" />
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {formData.qrCodeUrl ? (
-                  <View className="border border-[#3B82F6] rounded-[12px] p-3 flex-row items-center bg-[#EFF6FF] shadow-sm shadow-blue-100/50">
-                    <Image 
-                      source={{ uri: formData.qrCodeUrl }} 
-                      className="w-10 h-10 rounded-lg bg-[#F3F4F6]" 
-                      resizeMode="cover"
-                    />
-                    <View className="flex-1 mx-3">
-                      <View className="flex-row justify-between items-center mb-0.5">
-                        <Text className="text-[14px] text-[#111827] font-medium" numberOfLines={1}>qr_code.jpg</Text>
-                      </View>
-                      <View className="flex-row items-center">
+                      <View className="flex-row items-center mt-1">
+                        <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">1.2 MB • </Text>
                         <View className="flex-row items-center">
-                           <Feather name="check-circle" size={12} color="#3B82F6" />
-                           <Text className="text-[12px] text-[#3B82F6] ml-1 font-medium">Completed</Text>
+                          <Feather name="check" size={12} color="#EFA062" />
+                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">Completed</Text>
                         </View>
                       </View>
                     </View>
-                    <TouchableOpacity 
-                      onPress={() => handleChange('qrCodeUrl', '')}
-                      className="p-1"
+                  </View>
+                </View>
+              ) : null}
+
+              {/* 3. Trạng thái cho các bản ghi có sẵn*/}
+              <View className="border border-[#E5E5E5] rounded-[16px] pl-3 pt-3 pb-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50 mt-3">
+                <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                <View className="flex-1 mx-3">
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        const { pageY } = e.nativeEvent;
+                        setMenuPosition({ top: pageY + 10, right: 32 });
+                        setShowVaccineMenu(true);
+                      }}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                      <Feather name="trash-2" size={18} color="#EF4444" />
+                      <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
                     </TouchableOpacity>
                   </View>
-                ) : null}
-              </View> */}
+                  <View className="flex-row items-center mt-1">
+                    <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">1.2 MB • </Text>
+                    <View className="flex-row items-center">
+                      <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">Submitted on 01/01/2026</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
 
             {/* Action Buttons */}
             <View className="space-y-3 mb-10">
@@ -627,6 +584,80 @@ export default function EditPetScreen() {
           />
         )
       )}
+
+      <Modal
+        visible={showVaccineMenu}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowVaccineMenu(false)}
+      >
+        {/* Lớp phủ tàng hình, click vào đây sẽ đóng menu */}
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={() => setShowVaccineMenu(false)}
+        >
+          {/* Menu Dropdown sử dụng toạ độ động */}
+          <View
+            className="absolute bg-white rounded-xl border border-gray-100 w-36"
+            style={{
+              top: menuPosition.top,
+              right: menuPosition.right,
+              elevation: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 10
+            }}
+          >
+            {/* Option 1: Upload */}
+            <TouchableOpacity
+              className="flex-row items-center px-2 py-3"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowVaccineMenu(false);
+                console.log("Trigger Upload File");
+              }}
+            >
+              <Text className="text-[14px] text-gray-700 ml-3 font-regular">Upload new file</Text>
+            </TouchableOpacity>
+
+            {/* Option 2: Report */}
+            <TouchableOpacity
+              className="flex-row items-center px-2 py-3"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowVaccineMenu(false);
+                console.log("Trigger downlpad");
+              }}
+            >
+              <Text className="text-[14px] text-gray-700 ml-3 font-regular">Download</Text>
+            </TouchableOpacity>
+
+            {/* Option 3: Delete */}
+            <TouchableOpacity
+              className="flex-row items-center px-2 py-3"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowVaccineMenu(false);
+                // Delay một chút để Modal đóng mượt mà trước khi hiện Alert
+                setTimeout(() => {
+                  Alert.alert(
+                    "Delete Record",
+                    "Are you sure you want to delete this vaccination record?",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Delete", style: "destructive", onPress: () => console.log("Deleted") }
+                    ]
+                  );
+                }, 150);
+              }}
+            >
+              <Text className="text-[14px] text-[#FF3B30] ml-3 font-regular">Report</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

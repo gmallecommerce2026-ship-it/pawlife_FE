@@ -455,7 +455,7 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
                     ) : (
                       <Image
                         source={require('../assets/icon/upload-gray.png')}
-                        className="w-[18px] h-[18px] mr-1"
+                        className="w-[18px] h-[18px]"
                       />
                     )}
                     <Text className="text-[14px] font-regular text-black">

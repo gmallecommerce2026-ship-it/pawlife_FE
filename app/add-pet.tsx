@@ -28,18 +28,60 @@ type SpeciesType = 'Dog' | 'Cat';
 type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
 const BREED_OPTIONS = {
   Dog: [
+    { label: 'Unknown Breed', value: 'Unknown Breed' },
+    { label: 'Mixed Breed', value: 'Mixed Breed' },
+    { label: 'VN Local Dog', value: 'VN Local Dog' },
     { label: 'Poodle', value: 'Poodle' },
-    { label: 'Phú Quốc', value: 'Phu Quoc' },
-    { label: 'Golden Retriever', value: 'Golden' },
-    { label: 'Husky', value: 'Husky' },
-    { label: 'Other', value: 'Other' },
+    { label: 'Pomeranian', value: 'Pomeranian' },
+    { label: 'Corgi', value: 'Corgi' },
+    { label: 'Golden Retriever', value: 'Golden Retriever' },
+    { label: 'Labrador Retriever', value: 'Labrador Retriever' },
+    { label: 'Chihuahua', value: 'Chihuahua' },
+    { label: 'French Bulldog', value: 'French Bulldog' },
+    { label: 'aHusky', value: 'Husky' },
+    { label: 'Shiba Inu', value: 'Shiba Inu' },
+    { label: 'Samoyed', value: 'Samoyed' },
+    { label: 'Dachshund', value: 'Dachshund' },
+    { label: 'Beagle', value: 'Beagle' },
+    { label: 'Pug', value: 'Pug' },
+    { label: 'Border Collie', value: 'Border Collie' },
+    { label: 'Maltese', value: 'Maltese' },
+    { label: 'Yorkshire Terrier', value: 'Yorkshire Terrier' },
+    { label: 'Schnauzer', value: 'Schnauzer' },
+    { label: 'Chow Chow', value: 'Chow Chow' },
+    { label: 'Alaskan Malamute', value: 'Alaskan Malamute' },
+    { label: 'Akita', value: 'Akita' },
+    { label: 'Doberman', value: 'Doberman' },
+    { label: 'Rottweiler', value: 'Rottweiler' },
+    { label: 'German Shepherd', value: 'German Shepherd' },
+    { label: 'Phu Quoc Ridgeback', value: 'Phu Quoc Ridgeback' },
+    { label: 'Bac Ha Dog', value: 'Bac Ha Dog' },
+    { label: 'H’Mong Bobtail', value: 'H’Mong Bobtail' },
   ],
   Cat: [
+    { label: 'Unknown Breed', value: 'Unknown Breed' },
+    { label: 'Mixed Breed', value: 'Mixed Breed' },
+    { label: 'Domestic Cat', value: 'Domestic Cat' },
     { label: 'British Shorthair', value: 'British Shorthair' },
     { label: 'Scottish Fold', value: 'Scottish Fold' },
+    { label: 'Munchkin', value: 'Munchkin' },
     { label: 'Persian', value: 'Persian' },
+    { label: 'Ragdoll', value: 'Ragdoll' },
+    { label: 'Maine Coon', value: 'Maine Coon' },
+    { label: 'Bengal', value: 'Bengal' },
     { label: 'Sphynx', value: 'Sphynx' },
-    { label: 'Other', value: 'Other' },
+    { label: 'Russian Blue', value: 'Russian Blue' },
+    { label: 'Siamese', value: 'Siamese' },
+    { label: 'Exotic Shorthair', value: 'Exotic Shorthair' },
+    { label: 'Tabby Cat', value: 'Tabby Cat' },
+    { label: 'Orange Cat', value: 'Orange Cat' },
+    { label: 'Black Cat', value: 'Black Cat' },
+    { label: 'White Cat', value: 'White Cat' },
+    { label: 'Calico Cat', value: 'Calico Cat' },
+    { label: 'Tuxedo Cat', value: 'Tuxedo Cat' },
+    { label: 'Siamese Mix', value: 'Siamese Mix' },
+    { label: 'Long Hair', value: 'Long Hair' },
+    { label: 'Short Hair', value: 'Short Hair' },
   ]
 };
 
@@ -649,28 +691,56 @@ export default function AddPetScreen() {
 
               {/* 3. Trạng thái Đã tải lên xong (Uploaded File Item) */}
               {formData.vaccinationRecordUrl ? (
-                <View className="h-[57px] rounded-[16px] p-3 flex-row items-center bg-[#F8F8F8] mt-2">
-                  {/* <Image
+                <View>
+
+                  <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mt-2">
+                    <View className='flex-row items-center mb-3'>
+                      <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                      <View className="flex-1 ml-3">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
+                          <TouchableOpacity
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Feather name="x" size={10} color="#9CA3AF" />
+                          </TouchableOpacity>
+                        </View>
+                        <View className="flex-row items-center mt-1">
+                          <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">60KB of 120 KB • </Text>
+                          <View className="flex-row items-center">
+                            <ActivityIndicator color="#E89B5A" style={{ transform: [{ scaleX: 0.6 }, { scaleY: 0.6 }] }} />
+                            <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">Uploading...</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                    <View className="h-1.5 bg-[#E3E3E4] rounded-full ">
+                      <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '45%' }} />
+                    </View>
+                  </View>
+                  <View className="h-[57px] rounded-[16px] p-3 flex-row items-center bg-[#F8F8F8] mt-2">
+                    {/* <Image
                     source={{ uri: formData.vaccinationRecordUrl }}
                     className="w-10 h-10 rounded-lg bg-[#F3F4F6]"
                     resizeMode="cover"
                   /> */}
-                  <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
-                  <View className="flex-1 ml-3">
-                    <View className="flex-row justify-between items-center">
-                      <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
-                      <TouchableOpacity
-                        onPress={() => handleChange('vaccinationRecordUrl', '')}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                      </TouchableOpacity>
-                    </View>
-                    <View className="flex-row items-center mt-1">
-                      <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">1.2 MB • </Text>
-                      <View className="flex-row items-center">
-                        <Feather name="check" size={12} color="#EFA062" />
-                        <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">Completed</Text>
+                    <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                    <View className="flex-1 ml-3">
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
+                        <TouchableOpacity
+                          onPress={() => handleChange('vaccinationRecordUrl', '')}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                        </TouchableOpacity>
+                      </View>
+                      <View className="flex-row items-center mt-1">
+                        <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">1.2 MB • </Text>
+                        <View className="flex-row items-center">
+                          <Feather name="check" size={12} color="#EFA062" />
+                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">Completed</Text>
+                        </View>
                       </View>
                     </View>
                   </View>

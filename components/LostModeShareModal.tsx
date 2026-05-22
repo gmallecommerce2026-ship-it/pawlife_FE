@@ -20,8 +20,11 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   View
 } from 'react-native';
+import { useImageUpload } from '@/hooks/useImageUpload';
+import { X } from 'lucide-react-native';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const MODAL_MAP_WIDTH = Math.round(SCREEN_WIDTH * 0.9 - 48);
@@ -60,11 +63,30 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
   const [loadingMap, setLoadingMap] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false); // Tránh double-click
 
+  const { width } = useWindowDimensions();
+  const imageSize = (width - 40 - 48) / 5;
+  const { pickAndUploadImage, isUploading } = useImageUpload();
+  const handleRemovePhoto = (index: number) => {
+    setPhotos(photos.filter((_, i) => i !== index));
+  };
+  const [photos, setPhotos] = useState<string[]>([]);
   const [formData, setFormData] = useState<FormData>({
     scannedBy: '',
     phoneNumber: '',
     message: '',
   });
+
+  const handleAddPhoto = async () => {
+    if (photos.length >= 5) return;
+    const imageUrl = await pickAndUploadImage({
+      folder: 'lost-pets',
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (imageUrl) {
+      setPhotos((prev) => [...prev, imageUrl]);
+    }
+  };
 
   const fetchLocation = async (isMounted: boolean = true) => {
     setLoadingMap(true);
@@ -327,21 +349,22 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                     </View>
 
 
-                    <View className='mt-1'>
+                    <View className='mt-1 flex-row flex-wrap gap-3 mt-2"'>
+                      {photos.length === 0 ? (
                       <TouchableOpacity
-                        onPress={() => { }}
+                        onPress={handleAddPhoto}
                         activeOpacity={0.7}
-                        className="bg-white rounded-[12px] items-center justify-center mt-1 relative overflow-hidden"
+                        className="bg-white w-full rounded-[12px] items-center justify-center mt-1 relative overflow-hidden"
                       >
                         {/* --- BẮT ĐẦU: KHỐI SVG VẼ VIỀN NÉT ĐỨT --- */}
-                        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                        <View className="w-full" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
                           <Svg width="100%" height="100%">
                             <Rect
                               width="100%"
                               height="100%"
                               fill="none"
                               stroke="#D1D5DB"
-                              strokeWidth={2} 
+                              strokeWidth={2}
                               rx={16}
                               strokeDasharray="5, 5"
                             />
@@ -363,6 +386,53 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                         </View>
 
                       </TouchableOpacity>
+                      ) : (
+                        <>
+                          {photos.map((uri, index) => (
+                            <View key={index} className="relative" style={{ width: imageSize, height: imageSize }}>
+                              <Image
+                                source={{ uri }}
+                                className="w-full h-full rounded-[14px] bg-[#F3F4F6]"
+                              />
+                              <TouchableOpacity
+                                onPress={() => handleRemovePhoto(index)}
+                                activeOpacity={0.7}
+                                className="absolute -top-2 -right-2 w-6 h-6 rounded-full items-center justify-center"
+                                style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 }}
+                              >
+                                <LinearGradient
+                                  colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                  locations={[0, 0.3, 1]}
+
+                                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                                />
+                                <X size={10} color="#000000" strokeWidth={3} />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+
+                          {photos.length < 4 && (
+                            <TouchableOpacity
+                              onPress={handleAddPhoto}
+                              activeOpacity={0.7}
+                              disabled={isUploading}
+                              className="bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center"
+                              style={{ width: imageSize, height: imageSize }}
+                            >
+                              {isUploading ? (
+                                <ActivityIndicator size="small" color="#9CA3AF" />
+                              ) : (
+                                <Image
+                                  source={require('../assets/icon/upload-gray.png')}
+                                  className="w-[18px] h-[18px]"
+                                />
+                              )}
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      )}
+
                     </View>
                   </View>
 

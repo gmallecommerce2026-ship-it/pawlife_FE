@@ -146,7 +146,7 @@ export default function ViewQrCode() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
+      <SafeAreaView className="flex-1" edges={['top']}>
         {/* HEADER */}
         <View className="flex-row items-center justify-between px-5 py-4">
           <TouchableOpacity
@@ -203,7 +203,7 @@ export default function ViewQrCode() {
         >
           <View className="w-full self-center" style={{ maxWidth: 380, alignItems: 'center' }}>
             <View
-              className="bg-white rounded-[24px] items-center pb-[26px] border border-gray-100 mt-24 w-[294px]"
+              className="bg-white rounded-[24px] items-center pb-[26px] border border-gray-100 mt-[60px] w-[294px]"
               style={{
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
@@ -448,14 +448,13 @@ export default function ViewQrCode() {
               />
 
               {selectedIssue === 'lost' && (
-                <View className="bg-[#E89B5A]/5 border border-[#E89B5A]/30 rounded-[20px] py-2 px-4 flex-row items-start mb-4">
-                  <Ionicons className='bottom-1' name="alert-circle-outline" size={18} color="#E89B5A" />
-                  <View className="flex-1 ml-2">
-                    <Text className="text-[14px] font-medium text-black">
-                      {petData?.name}'s safety first
+                <View className="mx-8 bg-[#E89B5A]/5 border -mt-2 border-[#E89B5A]/30 rounded-[12px] py-2 px-3 flex-row items-start mb-8">
+                  <View className="flex-1">
+                    <Text className="text-[10px] font-medium text-black">
+                      This QR tag will be removed from {petData?.name}’s profile.
                     </Text>
-                    <Text className="text-[10px] text-[#757575] mt-1 leading-[18px]">
-                      Report a lost tag will temporarily limit public QR access to protect {petData?.name}'s info until a replacement is activated.
+                    <Text className="text-[10px] text-[#757575] mt-1">
+                      A replacement tag can be activated anytime.
                     </Text>
                   </View>
                 </View>

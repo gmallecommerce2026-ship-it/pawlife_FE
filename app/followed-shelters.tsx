@@ -1,6 +1,7 @@
 import { Text } from '@/components/AppText';
 import { shelterService } from '@/services/shelterService';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, FlatList, Image, RefreshControl, TouchableOpacity, View } from 'react-native';
@@ -114,15 +115,15 @@ export default function FollowedSheltersScreen() {
 
   const renderEmptyState = () => (
     <View className="flex items-center justify-center px-6 pb-20 mt-20">
-     <Image
-          source={require('../assets/images/cat-in-house.png')}
-          resizeMode="contain"
-          className=""
-          style={{
-            width: 362,
-            height: 242,
-          }}
-        />
+      <Image
+        source={require('../assets/images/cat-in-house.png')}
+        resizeMode="contain"
+        className=""
+        style={{
+          width: 362,
+          height: 242,
+        }}
+      />
 
       <Text className="text-gray-800 text-lg font-bold mt-8">A little empty here</Text>
       <Text className="text-gray-400 text-center mt-2 mb-8">Look like we missing a paw...</Text>
@@ -132,7 +133,7 @@ export default function FollowedSheltersScreen() {
         activeOpacity={0.7}
         onPress={() => router.push('/')}
       >
-        
+
         <Text className="text-[#8E8E93] font-medium">Browse shelters</Text>
       </TouchableOpacity>
     </View>
@@ -143,14 +144,33 @@ export default function FollowedSheltersScreen() {
       <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
 
         {/* HEADER */}
-        <View className="flex-row items-center px-4 py-3 relative bg-white z-10">
-          <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 z-10">
-            <Feather name="chevron-left" size={24} color="#000000" />
+        <View style={{ height: 44, justifyContent: 'center', marginBottom: 16, marginTop: 8 }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+            style={{
+              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1, shadowRadius: 5, elevation: 3,
+            }}
+            className="absolute left-5 w-10 h-10 rounded-full items-center justify-center"
+          >
+            <View className="overflow-hidden rounded-full items-center justify-center"
+              style={{
+                width: 36, height: 36, borderRadius: 28, borderWidth: 0.5,
+                borderTopColor: 'white', borderLeftColor: 'white',
+                borderBottomColor: 'transparent', borderRightColor: 'transparent',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              }}>
+              <LinearGradient
+                colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+              />
+              <Feather name="chevron-left" size={20} color="#000000" />
+            </View>
           </TouchableOpacity>
-          <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            <Text className="text-[24px] font-semibold text-black">
-              Following Shelters
-            </Text>
+          <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
+            <Text className="text-[24px] font-semibold text-black">Following Shelter</Text>
           </View>
         </View>
 

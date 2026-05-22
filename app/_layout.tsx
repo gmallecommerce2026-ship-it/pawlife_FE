@@ -262,13 +262,11 @@ function RootLayoutNav() {
       <Stack.Screen name="sign-in" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="fill-profile" options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }} />
 
-      {/* SỬA LỖI 1: Thêm chữ 's' vào my-applications để khớp với tên file */}
       <Stack.Screen name="my-applications" options={{ headerShown: false, animation: 'slide_from_right' }} />
 
       <Stack.Screen name="adoption-status" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
-      {/* SỬA LỖI 2: ĐÃ XÓA `scan`, `scanned-pet`, và `matching` VÌ CHÚNG THUỘC VỀ (tabs) */}
       <Stack.Screen name="select-last-seen-location" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="tag-route-details" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="shelter-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -303,8 +301,6 @@ function RootLayoutNav() {
       <Stack.Screen name="transfer-ownership" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pawcare/[category]" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="intro" options={{ headerShown: false, animation: 'fade' }} />
-
-      {/* THÊM KHAI BÁO MÀN HÌNH REPORT LOST PET Ở ĐÂY */}
       <Stack.Screen name="report-lost-pet" options={{ headerShown: false, animation: 'slide_from_right' }} />
     </Stack>
   );
