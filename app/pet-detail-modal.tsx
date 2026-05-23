@@ -1,7 +1,7 @@
 // app/pet-detail-modal.tsx
 import { Text } from '@/components/AppText';
-import { Feather, FontAwesome5 } from '@expo/vector-icons';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { Feather, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,6 +13,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
+import Toast from 'react-native-toast-message';
+
 const getAge = (dobString?: string) => {
   if (!dobString) return 'Unknown';
   const dob = new Date(dobString);
@@ -20,7 +22,7 @@ const getAge = (dobString?: string) => {
   const age_dt = new Date(diff_ms);
   const years = Math.abs(age_dt.getUTCFullYear() - 1970);
   const months = age_dt.getUTCMonth();
-  
+
   if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
   if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
   return 'Newborn';
@@ -39,6 +41,9 @@ export default function PetDetailModal() {
   const [showHistory, setShowHistory] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const { width, height } = Dimensions.get('window');
+  const [headerHeight, setHeaderHeight] = useState(100);
+  const BOTTOM_BAR_HEIGHT = 125;
+  const [isFavourite, setIsFavourite] = useState(false);
 
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -121,11 +126,16 @@ export default function PetDetailModal() {
 
   // Cấu hình chiều cao ảnh nền (để đủ cover khoảng trống phía sau thẻ)
   const IMAGE_HEIGHT = height * 0.55;
-
+  const REQUIRED_TOP_INSET = insets.top + 44 + 21;
   // --- CẤU HÌNH BOTTOM SHEET ---
-  // Thẻ bắt đầu ở 60% màn hình, và khi kéo lên tối đa sẽ chiếm 85% màn hình
-  const snapPoints = useMemo(() => ['25%', '55%', '85%'], []);
+  const snapPoints = useMemo(() => {
+    // Mốc cao nhất: Dưới nút back 21px
+    const highestSnapPoint = SCREEN_HEIGHT - REQUIRED_TOP_INSET;
 
+    const lowestSnapPoint = headerHeight + BOTTOM_BAR_HEIGHT;
+    const middleSnapPoint = 369;
+    return [lowestSnapPoint, middleSnapPoint, highestSnapPoint];
+  }, [headerHeight, SCREEN_HEIGHT, insets.top]);
   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
@@ -134,6 +144,42 @@ export default function PetDetailModal() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowHistory(!showHistory);
   };
+
+  const handleFavourite = () => {
+    setIsFavourite(true);
+    try {
+      if (isFavourite) {
+        // petService.unfavoritePet(pet.id).catch(err => console.error("Lỗi bỏ tim:", err));
+        setIsFavourite(false);
+        Toast.show({
+          type: 'custom_badge',
+          props: {
+            petName: pet.name || 'This pet',
+            actionText: ' has been removed from Favourite Pet'
+          },
+          visibilityTime: 2500,
+          autoHide: true,
+        })
+      } else{
+        setIsFavourite(true);
+        Toast.show({
+          type: 'custom_badge',
+          props: {
+            petName: pet.name || 'This pet',
+            actionText: ' has been added from Favourite Pet'
+          },
+          visibilityTime: 2500,
+          autoHide: true,
+        })
+      }
+    }
+    catch {
+
+    }
+    finally {
+
+    }
+  }
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -289,67 +335,78 @@ export default function PetDetailModal() {
 
       {/* --- LAYER 2: BOTTOM SHEET FOREGROUND --- */}
       <BottomSheet
-        index={0} // Bắt đầu ở snapPoint đầu tiên (60%)
+        index={1} // Bắt đầu ở snapPoint đầu tiên (60%)
         snapPoints={snapPoints}
+        enableOverDrag={false}
         animatedPosition={animatedPosition}
+        topInset={REQUIRED_TOP_INSET}
         backgroundStyle={{ backgroundColor: 'white', borderRadius: 30 }}
         handleIndicatorStyle={{ backgroundColor: '#E5E5EA', width: 48, height: 6 }}
         style={{
           shadowColor: '#000000',
           shadowOffset: {
             width: 0,
-            height: -10 // Y: -10 (Bóng đổ lên trên)
+            height: -10
           },
-          shadowOpacity: 0.25, // 25% Color opacity
-          shadowRadius: 10,    // Blur: 10
+          shadowOpacity: 0.25,
+          shadowRadius: 10,
           elevation: 10,
         }}
       >
+        <BottomSheetView className="px-[25px] pt-[12px] pb-[16px] bg-white z-10"
+          onLayout={(event) => {
+            const { height } = event.nativeEvent.layout;
+            if (height > 0) {
+              setHeaderHeight(height); // Cập nhật chiều cao thực tế vào state
+            }
+          }}>
+          <View className="flex-1 justify-between items-start">
+            <View className="flex-row items-baseline">
+              <Text className="text-[24px] font-semibold text-black">{pet.name}</Text>
+              <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({pet.breed})</Text>
+            </View>
+            <View className="flex-row items-center mt-1.5">
+              <Image
+                source={require('../assets/icon/location_solid.png')}
+                style={{ width: 16, height: 16 }}
+                resizeMode="cover"
+              />
+              <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">1.2 km away</Text>
+            </View>
+          </View>
+        </BottomSheetView>
         <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} // Chừa chỗ cho Footer
+          contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 55 }} // Chừa chỗ cho Footer
         >
           {/* --- NỘI DUNG THẺ TRẮNG --- */}
           <View className="bg-white px-[25px] pt-2">
 
             {/* Header Info */}
-            <View className="flex-1 justify-between items-start">
-              <View className="flex-row items-baseline">
-                <Text className="text-[24px] font-semibold text-black">{pet.name}</Text>
-                <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({pet.breed})</Text>
-              </View>
-              <View className="flex-row items-center mt-1.5">
-                <Image
-                  source={require('../assets/icon/location_solid.png')}
-                  style={{ width: 16, height: 16 }}
-                  resizeMode="cover"
-                />
-                <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">1.2 km away</Text>
-              </View>
-            </View>
+
 
             {/* Thuộc tính Pet */}
             <View className="flex-row justify-between mt-6 gap-[10px]">
               {/* Gender */}
               <View className={`flex-1 ${pet?.gender?.toUpperCase() === 'FEMALE' ? 'bg-[#FAE8ED]' : 'bg-[#EAF4FB]'} py-[12px] rounded-[16px] items-center`}>
-                  <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
-                  <Text className="text-black text-[14px] font-semibold">{formatCapitalize(pet?.gender)}</Text>
+                <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
+                <Text className="text-black text-[14px] font-semibold">{formatCapitalize(pet?.gender)}</Text>
               </View>
 
               {/* Age */}
               <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
-                  <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
-                  <Text className="text-black text-[14px] font-semibold">{getAge(pet?.dob)}</Text>
+                <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
+                <Text className="text-black text-[14px] font-semibold">{getAge(pet?.dob)}</Text>
               </View>
-              
+
               {/* Weight / Size */}
               <View className="flex-1 bg-[#E8F9E6] py-[12px] rounded-[16px] items-center">
-                  <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Weight</Text>
-                  <Text className="text-black text-[14px] font-semibold">
-                      {pet?.weight ? `${pet.weight} kg` : (pet?.size ? formatCapitalize(pet.size) : 'N/A')}
-                  </Text>
+                <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Weight</Text>
+                <Text className="text-black text-[14px] font-semibold">
+                  {pet?.weight ? `${pet.weight} kg` : (pet?.size ? formatCapitalize(pet.size) : 'N/A')}
+                </Text>
               </View>
-          </View>
+            </View>
 
             {/* Shelter Info */}
             <View className="flex-row items-center my-6">
@@ -407,7 +464,7 @@ export default function PetDetailModal() {
             {/* Description */}
             <View>
               <Text className="text-[16px] font-medium text-black mb-2">About {pet.name}</Text>
-              <Text className="text-[14px] text-[#8E8E93] leading-[22px] font-regular tracking-[0.06px]">
+              <Text className="text-[14px] text-[#8E8E93] leading-[20px] font-regular tracking-[0.06px]">
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam
               </Text>
               <View className="flex-row gap-2 mt-[6px]">
@@ -420,7 +477,7 @@ export default function PetDetailModal() {
             {/* Behavior */}
             <View className="mt-6">
               <Text className="text-[16px] font-medium text-black mb-2">{pet.name}'s Behavior</Text>
-              <View className="flex-row items-start mb-1">
+              <View className="flex-row items-start">
                 <View className="flex-row items-center mr-1 mt-[2px]">
                   <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                   <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">Good with:</Text>
@@ -440,7 +497,7 @@ export default function PetDetailModal() {
             <View className="mt-6 mb-6">
               <Text className="text-[16px] font-medium text-black mb-2">Ideal Home</Text>
               <Text className="text-[14px] text-[#8E8E93] leading-[22px]">
-                {pet.idealHome || "This pet needs a loving home with space to run and play."}
+                {pet.idealHome || "TLorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. "}
               </Text>
             </View>
 
@@ -521,12 +578,23 @@ export default function PetDetailModal() {
 
       {/* --- FOOTER CTA NẰM NGOÀI CÙNG (Fixed ở dưới) --- */}
       <View
-        style={{ paddingBottom: insets.bottom + 10 }}
+        style={{ paddingBottom: insets.bottom }}
         className="absolute bottom-0 w-full px-[25px] pt-4 bg-white flex-row items-center gap-4"
       >
-        <TouchableOpacity className="w-[56px] h-[56px] rounded-full border border-[#E5E5EA] items-center justify-center bg-white shadow-sm shadow-gray-200">
-          <Image className='' source={require('../assets/icon/heart-pawdoption.png') // Trái tim rỗng (mặc định)
-          } style={{ width: 27, height: 27 }} resizeMode="cover" />
+        <TouchableOpacity className={`w-[56px] h-[56px] rounded-full border-2 items-center justify-center bg-white ${isFavourite ? "border-[#E89B5A]/50" : "border-[#E5E5EA]"}`}
+        onPress={handleFavourite}
+          style={
+            isFavourite ? {
+              shadowColor: '#E89B5A',
+              shadowOpacity: 0.25,
+              shadowOffset: { width: 0, height: 3 },
+              shadowRadius: 6,
+              elevation: 3
+            } : {
+
+            }}>
+          <Image className='' source={isFavourite ? require('../assets/icon/heart-filled-pawdoption.png') : require('../assets/icon/heart-pawdoption.png')}
+            style={{ width: 27, height: 27 }} resizeMode="cover" />
         </TouchableOpacity>
 
         <TouchableOpacity

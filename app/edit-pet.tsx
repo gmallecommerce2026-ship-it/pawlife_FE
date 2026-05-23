@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import { Dropdown } from 'react-native-element-dropdown';
 import {
   ActivityIndicator,
@@ -83,7 +84,7 @@ interface EditPetFormData {
   breed: string;
   color: string;
   weight: string;
-  size: SizeType | string; 
+  size: SizeType | string;
   dob: string;
   microchip: string;
   description: string;
@@ -92,7 +93,7 @@ interface EditPetFormData {
   contactName: string;
   contactPhone: string;
   contactAddress: string;
-  vaccinationRecordUrl: string;
+  vaccinationRecordUrls: string[];
   qrCodeUrl: string;
   sterilized: boolean | null;
 }
@@ -121,7 +122,7 @@ export default function EditPetScreen() {
     breed: '',
     color: '',
     weight: '',
-    size: 'MEDIUM', 
+    size: 'MEDIUM',
     dob: '',
     microchip: '',
     description: '',
@@ -130,9 +131,9 @@ export default function EditPetScreen() {
     contactName: '',
     contactPhone: '',
     contactAddress: '',
-    vaccinationRecordUrl: '',
+    vaccinationRecordUrls: [],
     qrCodeUrl: '',
-    sterilized: null, 
+    sterilized: null,
   });
 
   const inputFontStyle = { fontFamily: 'Urbanist-Regular' };
@@ -157,7 +158,9 @@ export default function EditPetScreen() {
           contactName: data.contactName || '',
           contactPhone: data.contactPhone || '',
           contactAddress: data.contactAddress || '',
-          vaccinationRecordUrl: data.vaccinationRecordUrl || '',
+          vaccinationRecordUrls: data.vaccinationRecordUrls
+            ? data.vaccinationRecordUrls
+            : (data.vaccinationRecordUrl ? [data.vaccinationRecordUrl] : []),
           qrCodeUrl: data.qrCodeUrl || '',
           sterilized: data.sterilized || null,
         });
@@ -166,7 +169,7 @@ export default function EditPetScreen() {
         router.back();
       } finally {
         setIsLoading(false);
-        
+
       }
     };
     if (id) fetchPet();
@@ -180,10 +183,25 @@ export default function EditPetScreen() {
 
   // Xử lý upload Vaccination Record
   const handlePickVaccine = async () => {
-    const uploadedUrl = await pickVaccine({ folder: 'vaccines', aspect: [4, 3], quality: 0.8 });
-    if (uploadedUrl) handleChange('vaccinationRecordUrl', uploadedUrl);
-  };
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true, // Cho phép chọn nhiều
+        quality: 0.8,
+      });
 
+      if (!result.canceled && result.assets) {
+        const newLocalUrls = result.assets.map(asset => asset.uri);
+        handleChange('vaccinationRecordUrls', [
+          ...formData.vaccinationRecordUrls,
+          ...newLocalUrls
+        ]);
+      }
+    } catch (error) {
+      console.error("Lỗi khi chọn ảnh test:", error);
+      Alert.alert("Lỗi", "Không thể mở thư viện ảnh.");
+    }
+  };
   // Xử lý upload QR Code
   const handlePickQR = async () => {
     const uploadedUrl = await pickQR({ folder: 'qr-codes', aspect: [1, 1], quality: 0.8 });
@@ -226,7 +244,7 @@ export default function EditPetScreen() {
         contactPhone: formData.contactPhone || null,
         contactAddress: formData.contactAddress || null,
         images: formData.imageUrl ? [formData.imageUrl] : [],
-        vaccinationRecordUrl: formData.vaccinationRecordUrl || null,
+        vaccinationRecordUrls: formData.vaccinationRecordUrls.length > 0 ? formData.vaccinationRecordUrls : [],
         qrCodeUrl: formData.qrCodeUrl || null,
       };
 
@@ -309,7 +327,7 @@ export default function EditPetScreen() {
               <Text className="text-[16px] font-semibold text-black mb-3">Pet Information</Text>
 
               <View className="bg-white p-6 rounded-[20px] border border-gray-200">
-                
+
                 {/* 1. Name & Type Row */}
                 <View className="flex-row gap-3 mb-5">
                   <View className="flex-1">
@@ -554,15 +572,18 @@ export default function EditPetScreen() {
               )}
 
               {/* 3. Trạng thái Đã tải lên xong */}
-              {formData.vaccinationRecordUrl ? (
-                <View>
+              {formData.vaccinationRecordUrls.map((url, index) => (
+                <View key={index}>
                   <View className="h-[57px] rounded-[16px] p-3 flex-row items-center bg-[#F8F8F8] mt-2">
                     <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
                     <View className="flex-1 ml-3">
                       <View className="flex-row justify-between items-center">
                         <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
                         <TouchableOpacity
-                          onPress={() => handleChange('vaccinationRecordUrl', '')}
+                          onPress={() => {
+                            const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== index);
+                            handleChange('vaccinationRecordUrls', newUrls);
+                          }}
                           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
                           <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
@@ -578,7 +599,7 @@ export default function EditPetScreen() {
                     </View>
                   </View>
                 </View>
-              ) : null}
+              ))}
 
               {/* 3. Trạng thái cho các bản ghi có sẵn*/}
               <View className="border border-[#E5E5E5] rounded-[16px] pl-3 pt-3 pb-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50 mt-3">

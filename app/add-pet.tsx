@@ -5,6 +5,7 @@ import { useModalStore } from '@/store/useModalStore';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import { Dropdown } from 'react-native-element-dropdown';
 import {
@@ -111,7 +112,7 @@ interface AddPetFormData {
   contactName: string;
   contactPhone: string;
   contactAddress: string;
-  vaccinationRecordUrl: string;
+  vaccinationRecordUrls: string[];
   qrCodeUrl: string;
   sterilized: boolean | null;
 }
@@ -145,7 +146,7 @@ export default function AddPetScreen() {
     contactName: '',
     contactPhone: '',
     contactAddress: '',
-    vaccinationRecordUrl: '',
+    vaccinationRecordUrls: [],
     qrCodeUrl: '',
     sterilized: null,
   });
@@ -190,14 +191,29 @@ export default function AddPetScreen() {
 
   // Xử lý upload Vaccination Record
   const handlePickVaccine = async () => {
-    const uploadedUrl = await pickVaccine({
-      folder: 'vaccines',
-      aspect: [4, 3], // Tỉ lệ ngang phù hợp cho giấy tờ
-      quality: 0.8,
-    });
+    try {
+      // 1. Mở thư viện ảnh và cho phép chọn nhiều ảnh cùng lúc
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true, // 🔴 Bật tính năng chọn nhiều
+        quality: 0.8,
+      });
 
-    if (uploadedUrl) {
-      handleChange('vaccinationRecordUrl', uploadedUrl);
+      if (!result.canceled && result.assets) {
+        // 2. Trích xuất mảng các đường dẫn local (URI) từ các ảnh đã chọn
+        const newLocalUrls = result.assets.map(asset => asset.uri);
+
+        // 3. Nối các đường dẫn mới vào mảng cũ đang có trong state
+        handleChange('vaccinationRecordUrls', [
+          ...formData.vaccinationRecordUrls,
+          ...newLocalUrls
+        ]);
+
+        // (Không cần gọi API upload lên server ở bước này)
+      }
+    } catch (error) {
+      console.error("Lỗi khi chọn ảnh test:", error);
+      Alert.alert("Lỗi", "Không thể mở thư viện ảnh.");
     }
   };
 
@@ -242,7 +258,7 @@ export default function AddPetScreen() {
         contactPhone: formData.contactPhone || undefined,
         contactAddress: formData.contactAddress || undefined,
         images: formData.imageUrl ? [formData.imageUrl] : [],
-        vaccinationRecordUrl: formData.vaccinationRecordUrl || undefined,
+        vaccinationRecordUrls: formData.vaccinationRecordUrls.length > 0 ? formData.vaccinationRecordUrls : undefined,
         ...(formData.dob && { dob: formData.dob }),
         // QUAN TRỌNG: Đẩy thẳng tagId xuống Backend trong cùng 1 cục payload
         ...(tagId && { tagId: (tagId as string).trim() }),
@@ -691,46 +707,19 @@ export default function AddPetScreen() {
               )}
 
               {/* 3. Trạng thái Đã tải lên xong (Uploaded File Item) */}
-              {formData.vaccinationRecordUrl ? (
-                <View>
-
-                  <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mt-2">
-                    <View className='flex-row items-center mb-3'>
-                      <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
-                      <View className="flex-1 ml-3">
-                        <View className="flex-row justify-between items-center">
-                          <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
-                          <TouchableOpacity
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          >
-                            <Feather name="x" size={10} color="#9CA3AF" />
-                          </TouchableOpacity>
-                        </View>
-                        <View className="flex-row items-center mt-1">
-                          <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">60KB of 120 KB • </Text>
-                          <View className="flex-row items-center">
-                            <ActivityIndicator color="#E89B5A" style={{ transform: [{ scaleX: 0.6 }, { scaleY: 0.6 }] }} />
-                            <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">Uploading...</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                    <View className="h-1.5 bg-[#E3E3E4] rounded-full ">
-                      <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '45%' }} />
-                    </View>
-                  </View>
+              {formData.vaccinationRecordUrls.map((url, index) => (
+                <View key={index}>
+                  
                   <View className="h-[57px] rounded-[16px] p-3 flex-row items-center bg-[#F8F8F8] mt-2">
-                    {/* <Image
-                    source={{ uri: formData.vaccinationRecordUrl }}
-                    className="w-10 h-10 rounded-lg bg-[#F3F4F6]"
-                    resizeMode="cover"
-                  /> */}
                     <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
                     <View className="flex-1 ml-3">
                       <View className="flex-row justify-between items-center">
                         <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
                         <TouchableOpacity
-                          onPress={() => handleChange('vaccinationRecordUrl', '')}
+                          onPress={() => {
+                            const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== index);
+                            handleChange('vaccinationRecordUrls', newUrls);
+                          }}
                           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
                           <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
@@ -746,7 +735,7 @@ export default function AddPetScreen() {
                     </View>
                   </View>
                 </View>
-              ) : null}
+              ))}
             </View>
 
             {/* Action Buttons */}

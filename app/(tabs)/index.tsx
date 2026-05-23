@@ -365,8 +365,8 @@ export default function HomeScreen() {
                                             onPress={() => router.push({ pathname: '/pawcare/[category]', params: { category: cat.label } })}
                                         >
                                             <View
-                                                className="w-20 h-20 bg-white rounded-full items-center justify-center mb-3 border border-gray-50"
-                                                style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 2, elevation: 4 }}
+                                                className="w-20 h-20 bg-white rounded-full items-center justify-center mb-3"
+                                                style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 }}
                                             >
                                                 <Image source={cat.icon} className="w-11 h-11" />
                                             </View>
