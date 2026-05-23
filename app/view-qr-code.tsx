@@ -127,12 +127,12 @@ export default function ViewQrCode() {
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId?.substring(0, 8).toUpperCase();
   const avatarUrl = petData.avatarUrl || petData.images?.[0]?.url || 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=2043&auto=format&fit=crop';
 
-  const activeTag = petData?.tags?.find((tag: any) => tag.status === 'ACTIVE') || petData?.tags?.[0]; 
-  
+  const activeTag = petData?.tags?.find((tag: any) => tag.status === 'ACTIVE') || petData?.tags?.[0];
+
   const tagId = activeTag?.id;
   const publicDomain = "https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev";
   const qrUri = tagId ? `${publicDomain}/qr-codes/${tagId}.svg` : null;
-  
+
   // FIX 1: Khai báo qrValue fallback để truyền vào thẻ QRCode không bị văng app
   const qrValue = qrUri || `https://pawlife.com/pet/${displayId}`;
 
@@ -198,13 +198,15 @@ export default function ViewQrCode() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 30 : 24 }}
           showsVerticalScrollIndicator={false}
         >
           <View className="w-full self-center" style={{ maxWidth: 380, alignItems: 'center' }}>
             <View
-              className="bg-white rounded-[24px] items-center pb-[26px] border border-gray-100 mt-[60px] w-[294px]"
+              className="bg-white rounded-[24px] items-center mt-24 w-full"
               style={{
+                maxWidth: 294,
+                // maxHeight: 339,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: SHADOW_OPACITY,
@@ -262,26 +264,37 @@ export default function ViewQrCode() {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setShowQrOverlay(true)}
-                className="p-5 bg-white items-center justify-center"
+                // 1. Lớp ngoài cùng: w-full và tự động căn giữa mọi thứ bên trong
+                className="py-5 bg-white items-center justify-center w-full"
               >
-                <View style={styles.qrContainer}>
+                {/* 2. Ép cứng khung chứa bằng đúng kích thước thật của SVG (189x189) */}
+                <View
+                  style={{
+                    width: 189,
+                    height: 189,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                >
                   {qrUri ? (
-                      <SvgUri
-                        width="200"
-                        height="200"
-                        uri={qrUri}
-                        onError={() => console.log("Lỗi tải ảnh QR từ R2")}
-                      />
-                    ) : (
-                      <View>
-                        <Text>Không tìm thấy mã QR cho thú cưng này.</Text>
-                        <Text style={{fontSize: 12}}>Vui lòng kiểm tra lại trạng thái thẻ.</Text>
-                      </View>
-                    )}
+                    <SvgUri
+                      // 3. Khai báo thẳng 189 ở đây, lỗi nhảy góc sẽ BẾN MẤT HOÀN TOÀN!
+                      width="189"
+                      height="189"
+                      uri={qrUri}
+                      onError={() => console.log("Lỗi tải ảnh QR từ R2")}
+                    />
+                  ) : (
+                    <View className="items-center justify-center flex-1">
+                      <Text className="text-center text-[13px] text-gray-500">
+                        Không tìm thấy mã QR
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
 
-              <View className="flex-row items-center justify-center">
+              <View className="flex-row items-center justify-center pb-10">
                 <Text className="text-[20px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
                 <Text className="text-[20px] font-semibold text-[#E89B5A] tracking-tighter">Life</Text>
               </View>
@@ -311,7 +324,7 @@ export default function ViewQrCode() {
               </TouchableOpacity>
             </View>
 
-            <View className="mt-[16px] items-center pb-4">
+            <View className="mt-10 items-center pb-4">
               <TouchableOpacity activeOpacity={0.6} onPress={() => setShowReportModal(true)}>
                 <Text className="text-[12px] font-regular text-[#8E8E93] tracking-wide">Report lost or damaged tag</Text>
               </TouchableOpacity>
@@ -339,8 +352,9 @@ export default function ViewQrCode() {
             className="flex-1 justify-center items-center"
           >
             <View
-              className="bg-white rounded-[24px] items-center pb-[26px] self-center border border-gray-100 w-[294px]"
+              className="bg-white rounded-[24px] items-center pb-[26px] self-center border border-gray-100 w-full"
               style={{
+                maxWidth:338,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: SHADOW_OPACITY,
@@ -375,16 +389,16 @@ export default function ViewQrCode() {
 
               <View className='my-[24px]'>
                 <QRCode
-                  value={qrValue} // Đã fix biến undefined ở đây
-                  size={QR_SIZE}
+                  value={qrValue}
+                  size={196}
                   color="#111827"
                   backgroundColor="transparent"
                 />
               </View>
 
               <View className="flex-row items-center justify-center">
-                <Text className="text-[20px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
-                <Text className="text-[20px] font-semibold text-[#E89B5A] tracking-tighter">Life</Text>
+                <Text className="text-[22px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
+                <Text className="text-[22px] font-semibold text-[#E89B5A] tracking-tighter">Life</Text>
               </View>
             </View>
 
@@ -392,10 +406,10 @@ export default function ViewQrCode() {
             <TouchableOpacity
               onPress={handleDownloadQr}
               activeOpacity={0.8}
-              className="flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] top-10"
+              className="absolute flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] bottom-12"
             >
               <Feather name="download" size={20} color="#8E8E93" />
-              <Text className="text-[#8E8E93] font-semibold text-[16px] ml-3">Download QR code</Text>
+              <Text className="text-[#8E8E93] font-medium text-[16px] ml-3">Download QR code</Text>
             </TouchableOpacity>
           </BlurView>
         </TouchableOpacity>
@@ -540,13 +554,7 @@ const styles = StyleSheet.create({
   qrContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
 });

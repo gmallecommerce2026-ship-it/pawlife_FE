@@ -41,7 +41,7 @@ const CATEGORIES = [
 
 const SectionHeader = ({ title, onLinkPress }: { title: string, onLinkPress?: () => void }) => (
     <View className="flex-row justify-between items-center mb-4 px-6">
-        <Text className="text-[18px] font-semibold text-gray-900 ">{title}</Text>
+        <Text className="text-[16px] font-semibold text-black ">{title}</Text>
         <TouchableOpacity onPress={onLinkPress} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text className="text-[#E89B5A] text-sm font-extralight text-[14px]">View all</Text>
         </TouchableOpacity>
@@ -303,14 +303,13 @@ export default function HomeScreen() {
     }
 
     return (
-        <View className="flex-1 bg-[#ffffff]  ">
-            {/* SỬA LỖI: Đổi keyboardShouldPersistTaps thành "handled" */}
+        <View className="flex-1 bg-white ">
             <Animated.ScrollView
                 showsVerticalScrollIndicator={false}
                 style={{
                     flex: 1, zIndex: 1
                 }}
-                contentContainerStyle={{ paddingBottom: 120 }}
+                contentContainerStyle={{ paddingBottom: 60 }}
                 onScroll={scrollHandler}
                 scrollEventThrottle={16}
                 keyboardShouldPersistTaps="handled"
@@ -320,8 +319,8 @@ export default function HomeScreen() {
 
                 <View className="bg-white pb-6">
                     <LinearGradient
-                        colors={['#FFFFFF', '#FCF8ED', '#FCF8ED']}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        colors={['#FFFFFF', '#FCF8ED']}
+                        start={{x: 0.5, y: 0}} end={{x: 0.5, y: 1}}
                         className="pb-6"
                     >
                         <View className="px-6 mt-2">
@@ -344,7 +343,7 @@ export default function HomeScreen() {
                                             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                                             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                                         />
-                                        <MaterialCommunityIcons name="line-scan" size={32} color="#F59E0B" />
+                                        <Image source={require('../../assets/icon/scan-index.png')} style={{ width: 21, height: 21 }} resizeMode="cover" />
                                     </View>
                                     <View className="flex-1">
                                         <Text className="font-semibold text-gray-900 text-lg">Found A Lost Pet?</Text>
@@ -426,14 +425,14 @@ export default function HomeScreen() {
                                             style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 6 }}
                                             onPress={() => router.push({ pathname: '/shelter-profile', params: { id: shelter.id, name: shelter.name, address: shelter.address || 'Đang cập nhật', image: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' } })}
                                         >
-                                            <Image source={{ uri: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' }} className="w-14 h-14 rounded-2xl bg-gray-200 mr-3" resizeMode="cover" />
+                                            <Image source={{ uri: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' }} className="w-14 h-14 rounded-full bg-gray-200 mr-3" resizeMode="cover" />
                                             <View className="flex-1">
-                                                <Text className="font-semibold text-gray-800 text-sm" numberOfLines={1}>
+                                                <Text className="font-medium text-black text-[14px]" numberOfLines={1}>
                                                     {shelter.name}
                                                 </Text>
                                                 <View className="flex-row items-center mt-2">
                                                     <Ionicons name="location-outline" size={12} color="#9CA3AF" />
-                                                    <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>{shelter.address || 'Đang cập nhật'}</Text>
+                                                    <Text className="text-[#8E8E93] font-regular text-[12px] ml-1 flex-1" numberOfLines={1}>{shelter.address || 'Đang cập nhật'}</Text>
                                                 </View>
                                             </View>
                                         </TouchableOpacity>
@@ -459,7 +458,7 @@ export default function HomeScreen() {
                                         return (
                                             <TouchableOpacity
                                                 key={event.id}
-                                                className="w-[340px] h-[79px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98]"
+                                                className="w-[300px] h-[56px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98]"
                                                 style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 6 }}
                                                 activeOpacity={0.85}
                                                 onPress={() => router.push(`/event-detail?id=${event.id}`)}
@@ -469,23 +468,17 @@ export default function HomeScreen() {
                                                     <View className="flex-1 flex-row items-center pl-6 pr-4 py-3">
                                                         <View className="flex-1 justify-between h-full pr-2">
                                                             <View>
-                                                                <Text className="font-semibold text-gray-800 text-sm leading-tight mb-0.5" numberOfLines={1}>{event.title}</Text>
+                                                                <Text className="font-medium text-gray-800 text-[14px] leading-tight mb-0.5 tracking-[0.06px]" numberOfLines={1}>{event.title}</Text>
                                                                 <View className="flex-row items-center mt-1.5">
-                                                                    <Ionicons name="location" size={12} color="#9CA3AF" />
-                                                                    <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>{event.locationName || event.address}</Text>
+                                                                    <Image source={require('../../assets/icon/location-solid-gray.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                                                                    <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>{event.locationName || event.address}</Text>
                                                                 </View>
                                                             </View>
-                                                            <View className="flex-row mt-2 items-center">
-                                                                <View className="flex-row">
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=1' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 z-30" />
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=5' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-20" />
-                                                                    <Image source={{ uri: 'https://i.pravatar.cc/100?img=8' }} className="w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 -ml-1.5 z-10" />
-                                                                </View>
-                                                            </View>
+                                                            
                                                         </View>
                                                         <View className="items-center justify-center shrink-0 min-w-[32px]">
-                                                            <Text className="text-[18px] font-black text-gray-800 leading-tight">{d.getDate().toString().padStart(2, '0')}</Text>
-                                                            <Text className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">{d.toLocaleString('en-US', { month: 'short' }).toUpperCase()}</Text>
+                                                            <Text className="text-[20px] font-semibold text-black leading-tight">{d.getDate().toString().padStart(2, '0')}</Text>
+                                                            <Text className="text-[12px] font-regular text-[#8E8E93] tracking-[0.06px] mt-0.5">{d.toLocaleString('en-US', { month: 'short' }).toUpperCase()}</Text>
                                                         </View>
                                                     </View>
                                                 </View>
@@ -622,7 +615,7 @@ export default function HomeScreen() {
                         <Text className="text-white font-semibold text-[20px] shadow-black/10" style={{ transformOrigin: 'left center' }}>
                             Hello, {user?.name || 'Người dùng'}!
                         </Text>
-                        <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium shadow-sm tracking-tight overflow-hidden">
+                        <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium tracking-tight overflow-hidden">
                             <Text>
                                 Let’s dive into your account
                             </Text>
@@ -631,7 +624,7 @@ export default function HomeScreen() {
                 </View>
 
                 <View
-                    className="absolute bottom-0 w-full bg-[#FEFBF5] rounded-t-[60px]"
+                    className="absolute bottom-0 w-full bg-[#FFFFFF] rounded-t-[60px]"
                     style={{ height: CURVE_HEIGHT - 5, zIndex: 0 }}
                     pointerEvents="none"
                 />

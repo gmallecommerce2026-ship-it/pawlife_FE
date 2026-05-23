@@ -54,7 +54,7 @@ const FavoritePetCard = memo(({ item, onPress, onUnfavorite }: { item: any; onPr
       {/* Nút Unfavorite (Trái tim) được thiết kế lại gọn gàng góc phải */}
       <TouchableOpacity
         onPress={() => onUnfavorite(item.id)}
-        className="absolute top-3 right-3 bg-white/80 p-2 rounded-full z-10 shadow-sm shadow-gray-200"
+        className="absolute top-3 right-3 p-2 rounded-full z-10 shadow-sm"
         hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
       >
         <AntDesign name="heart" size={16} color="#E89B5A" />
@@ -271,7 +271,7 @@ export default function FavoritePetsScreen() {
 
         {/* 2. TITLE */}
         <Animated.View style={[headerTitleStyle, { position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }]}>
-          <Text className="text-[24px] font-semibold text-black">Favorite Pets</Text>
+          <Text className="text-[20px] font-semibold text-black">Favorite Pets</Text>
         </Animated.View>
 
         
@@ -311,11 +311,11 @@ export default function FavoritePetsScreen() {
                       height: 232,
                     }}
                   />
-                  <Text className="text-gray-800 text-lg font-bold mt-6">You don't have any pets yet</Text>
-                  <Text className="text-gray-400 text-center mt-2 mb-6">Add your pet or adopt a new friend!</Text>
+                  <Text className="text-black text-[16px] font-medium mt-6">You don't have any pets yet</Text>
+                  <Text className="text-[#8E8E93] text-[14px] text-center mt-2 mb-8">Add your pet or adopt a new friend!</Text>
     
                   <TouchableOpacity
-                    className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-4"
+                    className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50"
                     activeOpacity={0.7}
                     onPress={() => router.push('/')}
                   >

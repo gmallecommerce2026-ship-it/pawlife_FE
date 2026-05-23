@@ -238,7 +238,7 @@ export default function MyPetsScreen() {
 
         {/* --- NÚT ADD PET: Luôn nằm ở dưới cùng --- */}
         <TouchableOpacity
-          className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-2"
+          className="w-full bg-white py-5 rounded-[24px] border border-dashed border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-2"
           activeOpacity={0.7}
           onPress={() => router.push({ 
             pathname: '/(tabs)/scan', 
@@ -246,9 +246,9 @@ export default function MyPetsScreen() {
           })}
         >
           <View className=" rounded-full mr-2">
-            <Ionicons name="add" size={20} color="#F59E0B" />
+            <Ionicons name="add" size={20} color="#8E8E93" />
           </View>
-          <Text className="text-[#F59E0B] font-thin text-base">Add New Pet</Text>
+          <Text className="text-[#8E8E93] font-thin text-base">Add New Pet</Text>
         </TouchableOpacity>
 
       </ScrollView>

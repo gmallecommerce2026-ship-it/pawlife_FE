@@ -303,7 +303,7 @@ export default function MyApplicationsScreen() {
               <Feather name="chevron-left" size={20} color="#1F2937" />
             </View>
           </TouchableOpacity>
-          <Text className="text-[24px] font-semibold text-[#111827] flex-1 text-center mr-6">
+          <Text className="text-[20px] font-semibold text-black flex-1 text-center mr-6">
             My Applications
           </Text>
         </View>

@@ -113,7 +113,7 @@ interface AddPetFormData {
   contactAddress: string;
   vaccinationRecordUrl: string;
   qrCodeUrl: string;
-  sterilized: boolean;
+  sterilized: boolean | null;
 }
 
 export default function AddPetScreen() {
@@ -147,7 +147,7 @@ export default function AddPetScreen() {
     contactAddress: '',
     vaccinationRecordUrl: '',
     qrCodeUrl: '',
-    sterilized: true,
+    sterilized: null,
   });
 
   const inputFontStyle = { fontFamily: 'Urbanist-Regular' };
@@ -590,6 +590,7 @@ export default function AddPetScreen() {
                     placeholderTextColor="#A1A1AA"
                     multiline
                     textAlignVertical="top"
+                    numberOfLines={1}
                   />
                 </View>
               </View>

@@ -847,18 +847,16 @@ export default function ShelterProfileScreen() {
             <View className="bg-white w-full rounded-[32px] overflow-hidden max-h-[80%] shadow-2xl pt-8">
 
               <View className='mx-[20px]'>
-
-                <View className="flex-row items-center justify-between">
-                  <SectionLabel title="Location" />
+                {/* Ô hiển thị vị trí tự động cập nhật */}
+                <View className="">
+                  <View className="flex-row items-center justify-between">
+                  <SectionLabel title="Pet Type" />
 
                   {/* Nút X đóng modal */}
                   <TouchableOpacity onPress={() => setIsFilterVisible(false)} className="p-2.5 -mt-1 -mr-1">
                     <Feather name="x" size={16} color="#111827" />
                   </TouchableOpacity>
                 </View>
-                {/* Ô hiển thị vị trí tự động cập nhật */}
-                <View className="mt-5">
-                  <SectionLabel title="Pet Type" />
                   <View className="flex-row justify-between gap-3 mt-3">
                     <FilterChip
                       label="All"

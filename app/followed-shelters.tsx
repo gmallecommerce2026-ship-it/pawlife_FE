@@ -114,7 +114,7 @@ export default function FollowedSheltersScreen() {
   };
 
   const renderEmptyState = () => (
-    <View className="flex items-center justify-center px-6 pb-20 mt-20">
+    <View className="flex items-center justify-center px-6 pb-20 mt-24">
       <Image
         source={require('../assets/images/cat-in-house.png')}
         resizeMode="contain"
@@ -125,11 +125,11 @@ export default function FollowedSheltersScreen() {
         }}
       />
 
-      <Text className="text-gray-800 text-lg font-bold mt-8">A little empty here</Text>
-      <Text className="text-gray-400 text-center mt-2 mb-8">Look like we missing a paw...</Text>
+      <Text className="text-black text-[16px] font-medium mt-8">A little empty here</Text>
+      <Text className="text-[#8E8E93] text-[14px] text-center mt-2 mb-8">Look like we missing a paw...</Text>
 
       <TouchableOpacity
-        className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-4"
+        className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50"
         activeOpacity={0.7}
         onPress={() => router.push('/')}
       >

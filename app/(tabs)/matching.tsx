@@ -1569,11 +1569,10 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                             <Text className="font-medium text-black text-[16px] mb-2">About {currentPet.name}</Text>
                             <Text className="text-[#8E8E93] text-[14px] leading-6 mb-2">{description}</Text>
 
-                            {/* Trình bày Tags theo ảnh (Vàng nhạt cho tag đầu tiên) */}
                             <View className="flex-row gap-2 mt-[6px]">
-                                <View className="bg-[#FFF4E8] px-3.5 py-0.5 rounded-full border border-[#E8A53C]/25"><Text className="text-[#E8A53C] text-[12px] font-medium">Playful</Text></View>
-                                <View className="bg-[#EBF4FE] px-3.5 py-0.5 rounded-full border border-[#5A90DA]/25"><Text className="text-[#5A90DA] text-[12px] font-medium">Clingy</Text></View>
-                                <View className="bg-[#EAF8EF] px-3.5 py-0.5 rounded-full border border-[#83DA5A]/25"><Text className="text-[#77C852] text-[12px] font-medium">Friendly</Text></View>
+                                <View className="bg-[#FFF4E8] px-[10px] rounded-full border border-[#E8A53C]/25"><Text className="text-[#E8A53C] text-[10px] leading-5 font-regular">Playful</Text></View>
+                                <View className="bg-[#EBF4FE] px-[10px] rounded-full border border-[#5A90DA]/25"><Text className="text-[#5A90DA] text-[10px] leading-5 font-regular">Clingy</Text></View>
+                                <View className="bg-[#EAF8EF] px-[10px] rounded-full border border-[#83DA5A]/25"><Text className="text-[#77C852] text-[10px] leading-5 font-regular">Friendly</Text></View>
                             </View>
                         </View>
 

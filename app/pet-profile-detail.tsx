@@ -824,7 +824,7 @@ export default function PetProfileDetailScreen() {
                 console.log("Trigger Upload File");
               }}
             >
-              <Text className="text-[14px] text-gray-700 ml-3 font-regular">Upload new file</Text>
+              <Text className="text-[14px] text-gray-700 ml-2 font-regular">Upload new file</Text>
             </TouchableOpacity>
 
             {/* Option 2: Report */}
@@ -836,7 +836,7 @@ export default function PetProfileDetailScreen() {
                 console.log("Trigger downlpad");
               }}
             >
-              <Text className="text-[14px] text-gray-700 ml-3 font-regular">Download</Text>
+              <Text className="text-[14px] text-gray-700 ml-2 font-regular">Download</Text>
             </TouchableOpacity>
 
             {/* Option 3: Delete */}
@@ -858,7 +858,7 @@ export default function PetProfileDetailScreen() {
                 }, 150);
               }}
             >
-              <Text className="text-[14px] text-[#FF3B30] ml-3 font-regular">Report</Text>
+              <Text className="text-[14px] text-[#FF3B30] ml-2 font-regular">Report</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

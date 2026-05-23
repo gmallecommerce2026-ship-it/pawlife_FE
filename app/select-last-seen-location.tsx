@@ -215,7 +215,7 @@ export default function SelectLocationMapScreen() {
       </View>
 
       <View
-        style={{ paddingBottom: insets.bottom + 10 }}
+        style={{ paddingBottom: insets.bottom }}
         className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[24px] p-6 shadow-2xl"
       >
         <Text className="text-black font-semibold text-[20px] tracking-[0.06px] mb-2">

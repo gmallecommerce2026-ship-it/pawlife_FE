@@ -101,11 +101,11 @@ export default function ReportLostPetScreen() {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     setDateTime(`${hours}:${minutes} - ${day}/${month}/${year}`);
-    
+
     hideDateTimePicker();
   };
 
-const [formattedLostDate, setFormattedLostDate] = useState<string>('');
+  const [formattedLostDate, setFormattedLostDate] = useState<string>('');
 
   useEffect(() => {
     const formatDateTime = (date: Date) => {
@@ -114,13 +114,13 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
       const dd = String(date.getDate()).padStart(2, '0');
       const MM = String(date.getMonth() + 1).padStart(2, '0');
       const yyyy = date.getFullYear();
-      
+
       return `${hh}:${mm} - ${dd}/${MM}/${yyyy}`;
     };
 
     setDateTime(formatDateTime(lostDate));
     console.log(dateTime);
-    
+
   }, [lostDate]);
 
   const isFormValid = location && dateTime && details && ownerName && ownerPhone && ownerAddress;
@@ -197,7 +197,7 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 20,
-            paddingBottom: insets.bottom + 40
+            paddingBottom: insets.bottom
           }}
           keyboardShouldPersistTaps="handled"
         >
@@ -205,7 +205,7 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
           <View className="w-full flex-row items-center justify-center relative py-4 px-5 mb-5 bg-white">
 
             <View className="items-center justify-center pr-6 pl-6">
-              <Text className="text-[20px] font-bold text-black text-center">
+              <Text className="text-[20px] font-semibold text-black text-center">
                 Report Lost Pet
               </Text>
 
@@ -264,7 +264,7 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
               className="w-[128px] h-[128px] rounded-full border-[4px] border-[#F9FAFB]"
               resizeMode="cover"
             />
-            <Text className="text-[20px] font-bold text-[#111827] mt-[30px] tracking-[0.06px]">
+            <Text className="text-[20px] font-semibold text-[#111827] mt-[30px] tracking-[0.06px]">
               {petName || 'Thú cưng'}
             </Text>
             <Text className="text-[14px] text-[#B8B8B8] mt-[8px] font-regular tracking-[0.5px]">
@@ -417,7 +417,7 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
               cancelTextIOS="Cancel"
 
             />
-            <View className='mb-2'>
+            <View className='mb-[30px]'>
               <Text className="text-[#8E8E93] font-medium text-[14px]">
                 Description
               </Text>
@@ -428,18 +428,18 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
                 placeholder="Describe what Luna looks like when gone missing..."
                 placeholderTextColor="#9CA3AF"
                 multiline
-                className="w-full border-b border-[#E5E5E5] py-2 text-[14px] text-[#111827] font-semibold bottom-1"
+                className="w-full border-b border-[#E5E5E5] py-2 text-[14px] text-[#111827] font-regular bottom-1"
                 textAlignVertical="top"
                 cursorColor="#EF4444"
               />
             </View>
             {/* PHOTOS */}
-            <View className="mb-4">
+            <View className="mb-[30px]">
               <View className="flex-row justify-between items-center mb-3">
                 <Text className="text-[14px] font-semibold text-black tracking-[0.06px]">
                   Photos <Text className="text-[#8E8E93] text-[12px] font-medium">(Optional)</Text>
                 </Text>
-                <Text className="text-[13px] font-semibold text-[#9CA3AF]">{photos.length}/5</Text>
+                <Text className="text-[13px] font-regular text-[#9CA3AF]">{photos.length}/5</Text>
               </View>
 
               <View className="flex-row flex-wrap gap-2">
@@ -510,7 +510,7 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
               </View>
             </View>
             {/* OWNER INFORMATION */}
-            <View className="mb-5">
+            <View className="mb-[20px]">
               <Text className="text-[14px] font-semibold text-black mb-3 tracking-[0.06px]">
                 Owner Information
               </Text>
@@ -544,20 +544,25 @@ const [formattedLostDate, setFormattedLostDate] = useState<string>('');
               </View>
             </View>
             {/* FOOTER BUTTONS */}
-            <View className="gap-y-3 mt-auto">
+            <View className="gap-y-3">
               <TouchableOpacity
                 activeOpacity={0.8}
                 disabled={!isFormValid || isSubmitting || isUploading}
                 onPress={handleActivateLostMode}
                 className={`w-full h-[48px] rounded-[16px] items-center justify-center flex-row ${isFormValid && !isSubmitting && !isUploading ? 'bg-[#E85A5A]' : 'bg-[#FFB4B4]'
                   }`}
-                style={{
-                  shadowColor: '#FF0000',
-                  shadowOffset: { width: 0, height: 3 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 10,
-                  elevation: 5,
-                }}
+                style={
+                  isFormValid && !isSubmitting && !isUploading
+                    ? {
+                      shadowColor: '#FF0000',
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 10,
+                      elevation: 5,
+                    }
+                    : {
+                    }
+                }
               >
                 <Image source={require('../assets/icon/bell.png')} style={{ width: 14, height: 17 }} resizeMode="cover" className='mr-2' />
                 {isSubmitting && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />}

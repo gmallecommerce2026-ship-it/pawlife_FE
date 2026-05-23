@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { Dropdown } from 'react-native-element-dropdown';
 import {
   ActivityIndicator,
   Alert,
@@ -22,13 +23,67 @@ import { petService } from '../services/petService';
 import { useModalStore } from '@/store/useModalStore';
 
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
+type SpeciesType = 'Dog' | 'Cat';
+type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
+
+const BREED_OPTIONS: Record<string, { label: string; value: string }[]> = {
+  Dog: [
+    { label: 'Unknown Breed', value: 'Unknown Breed' },
+    { label: 'Mixed Breed', value: 'Mixed Breed' },
+    { label: 'VN Local Dog', value: 'VN Local Dog' },
+    { label: 'Poodle', value: 'Poodle' },
+    { label: 'Pomeranian', value: 'Pomeranian' },
+    { label: 'Corgi', value: 'Corgi' },
+    { label: 'Golden Retriever', value: 'Golden Retriever' },
+    { label: 'Labrador Retriever', value: 'Labrador Retriever' },
+    { label: 'Chihuahua', value: 'Chihuahua' },
+    { label: 'French Bulldog', value: 'French Bulldog' },
+    { label: 'Husky', value: 'Husky' },
+    { label: 'Shiba Inu', value: 'Shiba Inu' },
+    { label: 'Samoyed', value: 'Samoyed' },
+    { label: 'Dachshund', value: 'Dachshund' },
+    { label: 'Beagle', value: 'Beagle' },
+    { label: 'Pug', value: 'Pug' },
+  ],
+  Cat: [
+    { label: 'Unknown Breed', value: 'Unknown Breed' },
+    { label: 'Mixed Breed', value: 'Mixed Breed' },
+    { label: 'Domestic Cat', value: 'Domestic Cat' },
+    { label: 'British Shorthair', value: 'British Shorthair' },
+    { label: 'Scottish Fold', value: 'Scottish Fold' },
+    { label: 'Munchkin', value: 'Munchkin' },
+    { label: 'Persian', value: 'Persian' },
+    { label: 'Ragdoll', value: 'Ragdoll' },
+    { label: 'Maine Coon', value: 'Maine Coon' },
+    { label: 'Bengal', value: 'Bengal' },
+    { label: 'Sphynx', value: 'Sphynx' },
+  ]
+};
+
+const speciesData = [
+  { label: 'Dog', value: 'Dog' },
+  { label: 'Cat', value: 'Cat' },
+];
+
+const genderData = [
+  { label: 'Male', value: 'MALE' },
+  { label: 'Female', value: 'FEMALE' },
+  { label: 'Unknown', value: 'UNKNOWN' },
+];
+
+const sizeData = [
+  { label: 'Small', value: 'SMALL' },
+  { label: 'Medium', value: 'MEDIUM' },
+  { label: 'Large', value: 'LARGE' },
+];
 
 interface EditPetFormData {
   name: string;
-  species: string;
+  species: SpeciesType | string;
   breed: string;
   color: string;
   weight: string;
+  size: SizeType | string; 
   dob: string;
   microchip: string;
   description: string;
@@ -39,6 +94,7 @@ interface EditPetFormData {
   contactAddress: string;
   vaccinationRecordUrl: string;
   qrCodeUrl: string;
+  sterilized: boolean | null;
 }
 
 export default function EditPetScreen() {
@@ -65,6 +121,7 @@ export default function EditPetScreen() {
     breed: '',
     color: '',
     weight: '',
+    size: 'MEDIUM', 
     dob: '',
     microchip: '',
     description: '',
@@ -75,6 +132,7 @@ export default function EditPetScreen() {
     contactAddress: '',
     vaccinationRecordUrl: '',
     qrCodeUrl: '',
+    sterilized: null, 
   });
 
   const inputFontStyle = { fontFamily: 'Urbanist-Regular' };
@@ -89,6 +147,7 @@ export default function EditPetScreen() {
           species: data.species || 'Dog',
           breed: data.breed || '',
           color: data.color || '',
+          size: data.size,
           weight: data.weight ? data.weight.toString() : '',
           dob: data.dob ? new Date(data.dob).toISOString() : '',
           microchip: data.microchipNumber || '',
@@ -100,12 +159,14 @@ export default function EditPetScreen() {
           contactAddress: data.contactAddress || '',
           vaccinationRecordUrl: data.vaccinationRecordUrl || '',
           qrCodeUrl: data.qrCodeUrl || '',
+          sterilized: data.sterilized || null,
         });
       } catch (error) {
         Alert.alert("Error", "Could not load pet information.");
         router.back();
       } finally {
         setIsLoading(false);
+        
       }
     };
     if (id) fetchPet();
@@ -129,7 +190,7 @@ export default function EditPetScreen() {
     if (uploadedUrl) handleChange('qrCodeUrl', uploadedUrl);
   };
 
-  const handleChange = (field: keyof EditPetFormData, value: string) => {
+  const handleChange = (field: keyof EditPetFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -248,105 +309,131 @@ export default function EditPetScreen() {
               <Text className="text-[16px] font-semibold text-black mb-3">Pet Information</Text>
 
               <View className="bg-white p-6 rounded-[20px] border border-gray-200">
-                {/* Name & Type Row */}
-                <View className="flex-row gap-3 mb-4">
+                
+                {/* 1. Name & Type Row */}
+                <View className="flex-row gap-3 mb-5">
                   <View className="flex-1">
                     <Text className="text-[14px] text-black font-medium mb-1.5">Name</Text>
                     <TextInput
                       style={inputFontStyle}
-                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                      className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
                       value={formData.name}
                       onChangeText={(text) => handleChange('name', text)}
-                      placeholder="Enter pet name"
+                      placeholder="Pet name"
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
                   <View className="flex-1">
                     <Text className="text-[14px] text-black font-medium mb-1.5">Type</Text>
-                    <TouchableOpacity
-                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white"
-                      onPress={() => Alert.alert("Select Type", "Tính năng chọn Chó/Mèo đang được phát triển.")}
-                    >
-                      <Text className="text-black text-[14px]">
-                        {formData.species === 'Cat' ? 'Cat' : 'Dog'}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color="#A1A1AA" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Gender & Breed Row */}
-                <View className="flex-row gap-3 mb-4">
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Gender</Text>
-                    <TouchableOpacity className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 flex-row items-center justify-between bg-white">
-                      <Text className="text-[#A1A1AA] text-[14px] capitalize">
-                        {formData.gender === 'UNKNOWN' ? 'Select' : formData.gender.toLowerCase()}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color="#A1A1AA" />
-                    </TouchableOpacity>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Breed</Text>
-                    <TextInput
-                      style={inputFontStyle}
-                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
-                      value={formData.breed}
-                      onChangeText={(text) => handleChange('breed', text)}
-                      placeholder="e.g. Corgi"
-                      placeholderTextColor="#A1A1AA"
+                    <Dropdown
+                      style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
+                      containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
+                      placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
+                      selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                      itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                      data={speciesData}
+                      maxHeight={200}
+                      labelField="label"
+                      valueField="value"
+                      placeholder="Select type"
+                      value={formData.species}
+                      onChange={(item) => {
+                        handleChange('species', item.value);
+                        handleChange('breed', '');
+                      }}
                     />
                   </View>
                 </View>
 
-                {/* Color & Weight Row */}
-                <View className="flex-row gap-3 mb-4">
+                {/* 2. Gender & Sterilized Row */}
+                <View className="flex-row gap-3 mb-5">
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Gender</Text>
+                    <Dropdown
+                      style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
+                      containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 4, borderColor: '#E5E7EB', borderWidth: 1 }}
+                      placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
+                      selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                      itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                      data={genderData}
+                      maxHeight={200}
+                      labelField="label"
+                      valueField="value"
+                      placeholder="Select gender"
+                      value={formData.gender}
+                      onChange={(item) => handleChange('gender', item.value)}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-2.5">Sterilized</Text>
+                    <View className="flex-row items-center gap-8 h-[30px]">
+                      <TouchableOpacity onPress={() => handleChange('sterilized', true)} className="flex-row items-center">
+                        <View className={`w-4 h-4 rounded-full border items-center justify-center mr-2 ${formData.sterilized === true ? 'border-[#EFA062]' : ' border-[#E5E7EB]'}`}>
+                          {formData.sterilized === true && <View className="w-2.5 h-2.5 rounded-full bg-[#EFA062]" />}
+                        </View>
+                        <Text className="text-[14px] text-black">Yes</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleChange('sterilized', false)} className="flex-row items-center">
+                        <View className={`w-4 h-4 rounded-full border items-center justify-center mr-2 ${formData.sterilized === false ? 'border-[#EFA062]' : ' border-[#E5E7EB]'}`}>
+                          {formData.sterilized === false && <View className="w-2.5 h-2.5 rounded-full bg-[#EFA062]" />}
+                        </View>
+                        <Text className="text-[14px] text-black">No</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+
+                {/* 3. Breed & Color Row */}
+                <View className="flex-row gap-3 mb-5">
+                  <View className="flex-1">
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Breed</Text>
+                    <Dropdown
+                      style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
+                      containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
+                      placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
+                      selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                      itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                      data={BREED_OPTIONS[formData.species as string] || BREED_OPTIONS['Dog']}
+                      maxHeight={250}
+                      labelField="label"
+                      valueField="value"
+                      placeholder="Select breed"
+                      value={formData.breed}
+                      onChange={(item) => handleChange('breed', item.value)}
+                    />
+                  </View>
                   <View className="flex-1">
                     <Text className="text-[14px] text-black font-medium mb-1.5">Color</Text>
                     <TextInput
                       style={inputFontStyle}
-                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
+                      className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
                       value={formData.color}
                       onChangeText={(text) => handleChange('color', text)}
-                      placeholder="e.g. Brown"
-                      placeholderTextColor="#A1A1AA"
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Weight (kg)</Text>
-                    <TextInput
-                      style={inputFontStyle}
-                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
-                      value={formData.weight}
-                      onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
-                      keyboardType="decimal-pad"
-                      placeholder="0.0"
+                      placeholder="Color"
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
                 </View>
 
-                {/* Birthday & Microchip Row */}
-                <View className="flex-row gap-3">
+                {/* 4. Birthday & Weight Row */}
+                <View className="flex-row gap-3 mb-5">
                   <View className="flex-1">
                     <Text className="text-[14px] text-black font-medium mb-1.5">Birthday</Text>
-                    <TouchableOpacity
-                      onPress={() => setShowDatePicker(true)}
-                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 justify-center bg-white"
-                    >
+                    <TouchableOpacity onPress={() => setShowDatePicker(true)} className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 justify-center bg-white">
                       <Text className={`text-[14px] ${formData.dob ? 'text-black' : 'text-[#A1A1AA]'}`}>
                         {formData.dob ? new Date(formData.dob).toLocaleDateString('en-GB') : 'DD/MM/YYYY'}
                       </Text>
                     </TouchableOpacity>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Microchip</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">Weight</Text>
                     <TextInput
                       style={inputFontStyle}
-                      className="h-[44px] border border-gray-200 rounded-[12px] px-3.5 text-black text-[14px]"
-                      value={formData.microchip}
-                      onChangeText={(text) => handleChange('microchip', text)}
-                      placeholder="ID Number"
+                      className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
+                      value={formData.weight}
+                      onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
+                      keyboardType="decimal-pad"
+                      placeholder="Weight (kg)"
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
@@ -355,15 +442,15 @@ export default function EditPetScreen() {
                 {/* Divider */}
                 <View className="h-[1px] bg-gray-100 my-5" />
 
-                {/* Notes */}
+                {/* 6. Notes */}
                 <View>
                   <Text className="text-[14px] text-black font-medium mb-1.5">Notes</Text>
                   <TextInput
                     style={[inputFontStyle, { paddingTop: 12 }]}
-                    className="border border-gray-200 rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
+                    className="border border-[#E5E5E5] rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
                     value={formData.description}
                     onChangeText={(text) => handleChange('description', text)}
-                    placeholder="Loves belly rubs and playing fetch. Very friendly with children."
+                    placeholder="Loves belly rubs and playing fetch..."
                     placeholderTextColor="#A1A1AA"
                     multiline
                     textAlignVertical="top"

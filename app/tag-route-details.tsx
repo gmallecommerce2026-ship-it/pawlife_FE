@@ -314,8 +314,8 @@ export default function TagRouteDetailsScreen() {
               </TouchableOpacity>
 
               <View className="items-center">
-                <Text className="text-[16px] font-bold text-[#111827] tracking-tight">Scanned Tag</Text>
-                <Text className="text-[11px] font-bold text-gray-400 uppercase tracking-[1px] mt-0.5">
+                <Text className="text-[20px] font-semibold text-black tracking-tight">Scanned Tag</Text>
+                <Text className="text-[12px] font-regular text-[#8E8E93] tracking-[0.06px] mt-0.5">
                   {timeAgo}
                 </Text>
               </View>

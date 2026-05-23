@@ -202,15 +202,15 @@ export default function InterestedEventsScreen() {
                         ListEmptyComponent={() => {
                             if (events.length === 0) {
                                 return (
-                                    <View className="flex items-center justify-center px-6 pb-20 mt-20">
+                                    <View className="flex items-center justify-center px-6 pb-20 mt-24">
                                         <Image
                                             source={require('../assets/images/cat-sleepy.png')}
                                             resizeMode="contain"
                                             className="top-7 z-10"
                                             style={{ width: 330, height: 280 }}
                                         />
-                                        <Text className="text-gray-800 text-lg font-bold mt-4">A little empty here</Text>
-                                        <Text className="text-gray-400 text-center mt-2 mb-4">Look like we missing a paw...</Text>
+                                        <Text className="text-black text-[16px] font-medium mt-4">A little empty here</Text>
+                                        <Text className="text-[#8E8E93] text-[14px] text-center mt-2 mb-4">Look like we missing a paw...</Text>
                                         <TouchableOpacity
                                             className=" px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-2"
                                             activeOpacity={0.7}

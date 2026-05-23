@@ -236,7 +236,7 @@ export default function EventDetailScreen() {
                                     borderRightColor: 'transparent',
                                     justifyContent: 'center',
                                     alignItems: 'center',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
                                 }}>
                                 <LinearGradient
                                     colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
@@ -284,7 +284,7 @@ export default function EventDetailScreen() {
                                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                                     />
                                     <Image
-                                        source={ isInterested ? require('../assets/icon/book-mark.png') : require('../assets/icon/bookmark-black.png')}
+                                        source={isInterested ? require('../assets/icon/book-mark.png') : require('../assets/icon/bookmark-black.png')}
                                         style={{ width: 10, height: 13 }}
                                         resizeMode="cover"
                                     />
@@ -316,7 +316,7 @@ export default function EventDetailScreen() {
                                         borderRightColor: 'transparent',
                                         justifyContent: 'center',
                                         alignItems: 'center',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
                                     }}>
                                     <LinearGradient
                                         colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
@@ -335,7 +335,7 @@ export default function EventDetailScreen() {
                     </View>
                 </SafeAreaView>
             </View>
-            
+
             <BottomSheet
                 ref={bottomSheetRef}
                 index={0}
@@ -459,8 +459,11 @@ export default function EventDetailScreen() {
                             </View>
 
                             <View className="mb-[12px]">
-                                <Text className="text-[#8E8E93] text-[12px] font-medium flex-1" numberOfLines={2}>
-                                    {eventData.locationName} Mall, {eventData.address}
+                                <Text className="text-[#8E8E93] text-[14px] font-regular flex-1 mb-[6px]" numberOfLines={2}>
+                                    {eventData.locationName} Mall
+                                </Text>
+                                <Text className="text-[#8E8E93] text-[14px] font-regular flex-1" numberOfLines={2}>
+                                    {eventData.address}
                                 </Text>
                             </View>
 
@@ -486,7 +489,7 @@ export default function EventDetailScreen() {
                                 <Text className="text-[16px] font-medium text-black mb-[20px]">Photo Gallery</Text>
                                 <View className="flex-row justify-between">
                                     {eventData.images.slice(0, 4).map((img: any, index: number) => {
-                                        const isLastImage = index === 3; 
+                                        const isLastImage = index === 3;
                                         const remainingCount = eventData.images.length - 4;
 
                                         return (
@@ -494,13 +497,20 @@ export default function EventDetailScreen() {
                                                 key={img.id || index}
                                                 activeOpacity={0.8}
                                                 onPress={() => handleOpenImageViewer(index)}
-                                                className="w-[22%] aspect-square rounded-[16px] overflow-hidden relative bg-gray-200"
+                                                className="w-[22%] aspect-square rounded-[16px] relative"
+                                                style={{
+                                                    shadowColor: '#E89B5A',
+                                                    shadowOffset: { width: 2, height: 2 },
+                                                    shadowOpacity: 0.15,
+                                                    shadowRadius: 6.8,
+                                                    elevation: 4,
+                                                }}
                                             >
-                                                <Image source={{ uri: img.url }} className="w-[81px] h-[81px] rounded-[16px] bg-gray-100" resizeMode="cover" />
+                                                <Image source={{ uri: img.url }} className="w-full h-full rounded-[16px]" resizeMode="cover" />
 
                                                 {/* Overlay đen mờ và số lượng ảnh còn lại */}
                                                 {isLastImage && remainingCount > 0 && (
-                                                    <View className="absolute inset-0 bg-black/50 items-center justify-center">
+                                                    <View className="absolute inset-0 bg-black/50 items-center justify-center rounded-[16px] overflow-hidden">
                                                         <Text className="text-white text-[20px] font-bold tracking-wider">
                                                             +{remainingCount}
                                                         </Text>
@@ -525,7 +535,7 @@ export default function EventDetailScreen() {
                                         return (
                                             <TouchableOpacity
                                                 key={ev.id}
-                                                className="w-[300px] h-[79px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98]"
+                                                className="w-[300px] h-[56px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98]"
                                                 style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 6 }}
                                                 activeOpacity={0.85}
                                                 onPress={() => router.push(`/event-detail?id=${ev.id}`)}
@@ -535,51 +545,25 @@ export default function EventDetailScreen() {
                                                     {ev.bannerUrl ? (
                                                         <Image source={{ uri: ev.bannerUrl }} className="w-[98px] h-full bg-gray-100" resizeMode="cover" />
                                                     ) : (
-                                                        <View className="w-[98px] h-full bg-[#FDF5EF] items-center justify-center">
+                                                        <View className="w-[80px] h-full bg-[#FDF5EF] items-center justify-center">
                                                             <Feather name="image" size={24} color="#E89B5A" opacity={0.5} />
                                                         </View>
                                                     )}
-                                                    
-                                                    <View className="flex-1 flex-row items-center pl-6 pr-4 py-3">
-                                                        <View className="flex-1 justify-between h-full pr-2">
+
+                                                    <View className="flex-1 flex-row items-center pl-3 pr-4 py-3 bg-slate-200">
+                                                        <View className="flex-1 justify-between h-full pr-3">
                                                             <View>
-                                                                <Text className="font-semibold text-gray-800 text-sm leading-tight mb-0.5" numberOfLines={1}>{ev.title}</Text>
+                                                                <Text className="font-medium text-gray-800 text-[14px] leading-tight mb-0.5 tracking-[0.06px]" numberOfLines={1}>{ev.title}</Text>
                                                                 <View className="flex-row items-center mt-1.5">
-                                                                    <Ionicons name="location" size={12} color="#9CA3AF" />
-                                                                    <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>{ev.locationName || ev.address}</Text>
+                                                                    <Image source={require('../assets/icon/location-solid-gray.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                                                                    <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>{ev.locationName || ev.address}</Text>
                                                                 </View>
                                                             </View>
-                                                            <View className="flex-row mt-2 items-center">
-                                                                {/* Tích hợp Dữ liệu Avatar Thật ở đây */}
-                                                                <View className="flex-row">
-                                                                    {ev.interestedUsers && ev.interestedUsers.length > 0 ? (
-                                                                        ev.interestedUsers.slice(0, 3).map((u: any, index: number) => (
-                                                                            u.avatarUrl ? (
-                                                                                <Image 
-                                                                                    key={u.id || index}
-                                                                                    source={{ uri: u.avatarUrl }} 
-                                                                                    className={`w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 ${index > 0 ? '-ml-1.5' : ''}`}
-                                                                                    style={{ zIndex: 30 - index * 10 }}
-                                                                                />
-                                                                            ) : (
-                                                                                <View 
-                                                                                    key={u.id || index}
-                                                                                    className={`w-[15px] h-[15px] rounded-full border-[1.5px] border-white bg-gray-200 items-center justify-center ${index > 0 ? '-ml-1.5' : ''}`}
-                                                                                    style={{ zIndex: 30 - index * 10 }}
-                                                                                >
-                                                                                    <Feather name="user" size={8} color="#9CA3AF" />
-                                                                                </View>
-                                                                            )
-                                                                        ))
-                                                                    ) : (
-                                                                        <Text className="text-[10px] text-gray-400">Be the first to join</Text>
-                                                                    )}
-                                                                </View>
-                                                            </View>
+                                                            
                                                         </View>
                                                         <View className="items-center justify-center shrink-0 min-w-[32px]">
-                                                            <Text className="text-[18px] font-black text-gray-800 leading-tight">{evDate.getDate().toString().padStart(2, '0')}</Text>
-                                                            <Text className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">{evDate.toLocaleString('en-US', { month: 'short' }).toUpperCase()}</Text>
+                                                            <Text className="text-[20px] font-semibold text-black leading-tight">{evDate.getDate().toString().padStart(2, '0')}</Text>
+                                                            <Text className="text-[12px] font-regular text-[#8E8E93] tracking-[0.06px] mt-0.5">{evDate.toLocaleString('en-US', { month: 'short' }).toUpperCase()}</Text>
                                                         </View>
                                                     </View>
                                                 </View>

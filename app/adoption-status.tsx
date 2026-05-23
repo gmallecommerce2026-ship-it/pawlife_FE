@@ -5,7 +5,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useImageUpload } from '@/hooks/useImageUpload';
@@ -237,7 +237,7 @@ export default function AdoptionStatusScreen() {
         </TouchableOpacity>
 
         {/* 2. Tiêu đề "Adoption Status" nằm chính giữa */}
-        <Text className="text-[24px] font-semibold text-black tracking-tight">
+        <Text className="text-[20px] font-semibold text-black tracking-tight">
           Adoption Status
         </Text>
 
@@ -397,9 +397,9 @@ export default function AdoptionStatusScreen() {
                       {photos.length === 0 ? (
                         <TouchableOpacity className="self-start mt-3.5 flex-row items-center bg-[#FFFFFF] border border-gray-100 rounded-xl p-3.5" activeOpacity={0.7} onPress={handleAddPhoto}>
                           <Image
-                            className='mr-2'
+                            className='mr-2 bottom-[1px]'
                             source={require('../assets/icon/upload-gray.png')}
-                            style={{ width: 9, height: 9 }}
+                            style={{ width: 12, height: 12 }}
                             resizeMode="cover"
                           />
                           <Text className="text-[14px] font-medium text-gray-800">{step.actionRequired}</Text>
@@ -458,7 +458,7 @@ export default function AdoptionStatusScreen() {
           })}
         </View>
       </View>
-      {!isClosed && <Text className="text-center text-[13px] text-gray-400 mb-4 mt-[24px] font-medium tracking-[0.06px]">All adoption decisions are handled directly by the shelter.</Text>}
+      {!isClosed && <Text className="text-center text-[13px] text-gray-400 mb-4 mt-[24px] font-regular tracking-[0.06px]">All adoption decisions are handled directly by the shelter.</Text>}
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
@@ -547,13 +547,17 @@ export default function AdoptionStatusScreen() {
         transparent={true}
         onRequestClose={() => setIsDetailsVisible(false)}
       >
+        <BlurView
+          intensity={40}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+          className="flex-1 justify-center items-center"
+        />       
         <View className="flex-1 justify-center bg-black/50">
           <View className="bg-white rounded-[24px] mx-[20px] mt-[60px] flex-1 shadow-2xl overflow-hidden max-h-[75%]" style={{ height: SCREEN_HEIGHT * 0.75 }}>
 
-            {/* Header của Modal */}
             <View className="flex-row items-center justify-center px-5 py-6 border-b border-gray-100 relative">
 
-              {/* Tiêu đề căn giữa tuyệt đối */}
               <Text className="text-[20px] font-semibold text-gray-900 tracking-tight text-center">
                 Application Details
               </Text>
