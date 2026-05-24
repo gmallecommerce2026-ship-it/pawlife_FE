@@ -93,7 +93,7 @@ export default function ProfileSettingsScreen() {
                     </TouchableOpacity>
 
                     <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-                        <Text className="text-[24px] font-semibold text-[#000000]">{t('Settings')}</Text>
+                        <Text className="text-[20px] font-semibold text-[#000000]">{t('Settings')}</Text>
                     </View>
                 </View>
 
@@ -210,7 +210,7 @@ export default function ProfileSettingsScreen() {
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
-                            label={t('Saved Pets')}
+                            label={t('Favourite Pet')}
                             onPress={() => router.push('/favorite-pets')}
                         />
                         <MenuItem

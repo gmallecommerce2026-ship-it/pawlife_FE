@@ -406,7 +406,7 @@ export default function ViewQrCode() {
             <TouchableOpacity
               onPress={handleDownloadQr}
               activeOpacity={0.8}
-              className="absolute flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] bottom-12"
+              className="absolute flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] bottom-24"
             >
               <Feather name="download" size={20} color="#8E8E93" />
               <Text className="text-[#8E8E93] font-medium text-[16px] ml-3">Download QR code</Text>

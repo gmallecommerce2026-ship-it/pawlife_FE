@@ -564,7 +564,7 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
             {/* HEADER */}
             <View className="flex-row items-center justify-between px-4 pt-3">
                 <View className="w-10" />
-                <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 tracking-wide">
+                <Text className="flex-1 text-center font-semibold text-[20px] text-gray-900 tracking-wide">
                     Adoption Pawlicy
                 </Text>
                 {/* Đổi chức năng nút X thành onBack (Quay lại) thay vì onAgree (Đồng ý) */}
@@ -579,7 +579,7 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
             {/* NỘI DUNG CUỘN */}
             <View className="flex-1">
                 <Animated.ScrollView
-                    className="flex-1 px-[35px] pt-[30px]"
+                    className="flex-1 px-[30px] pt-[30px]"
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 40 }}
                 >

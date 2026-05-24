@@ -42,7 +42,7 @@ export default function PetDetailModal() {
   const [activeIndex, setActiveIndex] = useState(0);
   const { width, height } = Dimensions.get('window');
   const [headerHeight, setHeaderHeight] = useState(100);
-  const BOTTOM_BAR_HEIGHT = 125;
+  const BOTTOM_BAR_HEIGHT = 100;
   const [isFavourite, setIsFavourite] = useState(false);
 
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -133,7 +133,7 @@ export default function PetDetailModal() {
     const highestSnapPoint = SCREEN_HEIGHT - REQUIRED_TOP_INSET;
 
     const lowestSnapPoint = headerHeight + BOTTOM_BAR_HEIGHT;
-    const middleSnapPoint = 369;
+    const middleSnapPoint = SCREEN_HEIGHT / 2;
     return [lowestSnapPoint, middleSnapPoint, highestSnapPoint];
   }, [headerHeight, SCREEN_HEIGHT, insets.top]);
   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -160,7 +160,7 @@ export default function PetDetailModal() {
           visibilityTime: 2500,
           autoHide: true,
         })
-      } else{
+      } else {
         setIsFavourite(true);
         Toast.show({
           type: 'custom_badge',
@@ -359,6 +359,16 @@ export default function PetDetailModal() {
             if (height > 0) {
               setHeaderHeight(height); // Cập nhật chiều cao thực tế vào state
             }
+          }}
+          style={{
+            shadowColor: '#000000',
+            shadowOffset: {
+              width: 0,
+              height: 4
+            },
+            shadowOpacity: 0.1,
+            shadowRadius: 10,
+            elevation: 10,
           }}>
           <View className="flex-1 justify-between items-start">
             <View className="flex-row items-baseline">
@@ -381,10 +391,6 @@ export default function PetDetailModal() {
         >
           {/* --- NỘI DUNG THẺ TRẮNG --- */}
           <View className="bg-white px-[25px] pt-2">
-
-            {/* Header Info */}
-
-
             {/* Thuộc tính Pet */}
             <View className="flex-row justify-between mt-6 gap-[10px]">
               {/* Gender */}
@@ -578,11 +584,11 @@ export default function PetDetailModal() {
 
       {/* --- FOOTER CTA NẰM NGOÀI CÙNG (Fixed ở dưới) --- */}
       <View
-        style={{ paddingBottom: insets.bottom }}
+        style={{ paddingBottom: 21 }}
         className="absolute bottom-0 w-full px-[25px] pt-4 bg-white flex-row items-center gap-4"
       >
-        <TouchableOpacity className={`w-[56px] h-[56px] rounded-full border-2 items-center justify-center bg-white ${isFavourite ? "border-[#E89B5A]/50" : "border-[#E5E5EA]"}`}
-        onPress={handleFavourite}
+        <TouchableOpacity className={`w-[55px] h-[55px] rounded-full border-2 items-center justify-center bg-white ${isFavourite ? "border-[#E89B5A]/50" : "border-[#E5E5EA]"}`}
+          onPress={handleFavourite}
           style={
             isFavourite ? {
               shadowColor: '#E89B5A',

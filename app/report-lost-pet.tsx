@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import {
   ActivityIndicator,
   Alert,
@@ -126,14 +127,37 @@ export default function ReportLostPetScreen() {
   const isFormValid = location && dateTime && details && ownerName && ownerPhone && ownerAddress;
 
   const handleAddPhoto = async () => {
-    if (photos.length >= 5) return;
-    const imageUrl = await pickAndUploadImage({
-      folder: 'lost-pets',
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    if (imageUrl) {
-      setPhotos((prev) => [...prev, imageUrl]);
+    // 1. Tính toán số lượng ảnh còn lại có thể chọn
+    const remainingSlots = 5 - photos.length;
+    
+    // Nếu đã đủ 5 ảnh thì báo lỗi và không cho mở thư viện
+    if (remainingSlots <= 0) {
+      Alert.alert("Giới hạn ảnh", "Bạn chỉ được tải lên tối đa 5 ảnh.");
+      return;
+    }
+
+    try {
+      // 2. Mở thư viện với tính năng chọn nhiều ảnh
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,  // 🔴 Cho phép chọn nhiều
+        selectionLimit: remainingSlots, // 🔴 Khóa số lượng tối đa được chọn bằng đúng số slot còn trống
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets) {
+        // 3. Lấy ra mảng các đường dẫn URI của ảnh
+        const newLocalUrls = result.assets.map(asset => asset.uri);
+
+        // 4. Lưu vào state, cắt mảng đúng 5 phần tử (phòng hờ trường hợp lỗi OS trả về lố ảnh)
+        setPhotos((prev) => {
+          const combined = [...prev, ...newLocalUrls];
+          return combined.slice(0, 5);
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi khi chọn ảnh:", error);
+      Alert.alert("Lỗi", "Không thể mở thư viện ảnh.");
     }
   };
 
@@ -377,7 +401,7 @@ export default function ReportLostPetScreen() {
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={showDateTimePicker}
-                    className="flex-row items-center justify-between py-2.5 border-b border-[#E5E5E5] bg-white"
+                    className="flex-row items-center justify-between py-2 border-b border-[#E5E5E5] bg-white"
                   >
                     <Text className="text-[14px] text-black font-semibold">
                       {lostDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -393,7 +417,7 @@ export default function ReportLostPetScreen() {
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={showDateTimePicker}
-                    className="flex-row items-center justify-between py-2.5 border-b border-[#E5E5E5] bg-white"
+                    className="flex-row items-center justify-between py-2 border-b border-[#E5E5E5] bg-white"
                   >
                     <Text className="text-[14px] text-black font-semibold">
                       {lostDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
@@ -458,7 +482,7 @@ export default function ReportLostPetScreen() {
                         className="w-[18px] h-[18px]"
                       />
                     )}
-                    <Text className="text-[14px] font-regular text-black">
+                    <Text className="ml-[11px] text-[14px] font-regular text-black">
                       {isUploading ? 'Uploading...' : 'Upload photos'}
                     </Text>
                   </TouchableOpacity>
@@ -515,7 +539,7 @@ export default function ReportLostPetScreen() {
                 Owner Information
               </Text>
               <View className="flex justify-center items-center">
-                <View className='w-full rounded-[16px] border border-[#E5E5E5] pb-[23.15px]'>
+                <View className='w-full rounded-[16px] border border-[#E5E5E5] pb-[14px]'>
 
                   <View className='flex-row border-b border-[#E5E5E5] py-[13px] mx-4 items-center'>
                     <Image source={require('../assets/icon/user-form.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
@@ -566,7 +590,7 @@ export default function ReportLostPetScreen() {
               >
                 <Image source={require('../assets/icon/bell.png')} style={{ width: 14, height: 17 }} resizeMode="cover" className='mr-2' />
                 {isSubmitting && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />}
-                <Text className="text-white font-bold text-[16px] tracking-[-0.3px]">
+                <Text className="text-white font-semibold text-[16px] tracking-[-0.3px]">
                   {isSubmitting ? 'Activating...' : 'Activate Lost Mode'}
                 </Text>
               </TouchableOpacity>
