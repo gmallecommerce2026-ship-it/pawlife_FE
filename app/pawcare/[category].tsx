@@ -193,7 +193,7 @@ const AboutView = () => {
                 <Text className="text-gray-600 text-sm leading-6">{ABOUT_DATA.description}</Text>
             </View>
 
-            <View className="mb-8">
+            {/* <View className="mb-8">
                 <Text className="text-base font-bold text-gray-900 mb-4">Links</Text>
                 <View className="gap-5">
                     {ABOUT_DATA.links.map((link) => (
@@ -206,7 +206,7 @@ const AboutView = () => {
                         </TouchableOpacity>
                     ))}
                 </View>
-            </View>
+            </View> */}
         </ScrollView>
     );
 };

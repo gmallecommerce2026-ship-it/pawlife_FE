@@ -22,6 +22,14 @@ export const petService = {
     return response.data;
   },
 
+  replaceQrCode: async (petId: string, newTagId: string) => {
+    return axiosClient.patch(`/pets/${petId}/replace-qr`, { newTagId });
+  },
+
+  flagQrReplacement: async (petId: string, status: boolean) => {
+    return axiosClient.patch(`/pets/${petId}/flag-replacement`, { needsQrReplacement: status });
+  },
+
   swipePet: async (petId: string, data: SwipePayload) => {
     try {
       const response = await axiosClient.post(`/pets/${petId}/swipe`, data);

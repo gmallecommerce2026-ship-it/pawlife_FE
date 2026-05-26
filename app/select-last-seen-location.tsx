@@ -4,17 +4,15 @@ import { Slider } from '@miblanchard/react-native-slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, MapPin } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Keyboard, TouchableOpacity, View } from 'react-native';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-
-
-
 const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 export default function SelectLocationMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -24,7 +22,6 @@ export default function SelectLocationMapScreen() {
 
   const { petId, petName, petAvatar, petBreed, petAge, lostDateStr } = params;
 
-  // Tọa độ mặc định (Sẽ được cập nhật ngay khi lấy được GPS)
   const [region, setRegion] = useState({
     latitude: 21.028511,
     longitude: 105.804817,
@@ -35,7 +32,6 @@ export default function SelectLocationMapScreen() {
   const [selectedAddress, setSelectedAddress] = useState('Đang định vị...');
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
-  // 1. TỰ ĐỘNG LẤY GPS NGAY KHI VÀO MÀN HÌNH
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -59,9 +55,6 @@ export default function SelectLocationMapScreen() {
     })();
   }, []);
 
-
-
-  // 2. Dịch tọa độ thành địa chỉ chữ bằng Google Geocoding API
   const getAddressFromGoogleMapAPI = async (latitude: number, longitude: number) => {
     setIsLoadingAddress(true);
     try {
@@ -72,14 +65,11 @@ export default function SelectLocationMapScreen() {
 
       if (data.results && data.results.length > 0) {
         const fullAddress = data.results[0].formatted_address;
-
-        // --- XỬ LÝ LOẠI BỎ QUỐC GIA Ở ĐÂY ---
-        const addressParts = fullAddress.split(', '); // Cắt chuỗi thành mảng dựa trên dấu phẩy
+        const addressParts = fullAddress.split(', ');
         if (addressParts.length > 1) {
-          addressParts.pop(); // Xóa bỏ phần tử cuối cùng trong mảng (Quốc gia)
+          addressParts.pop();
         }
-        const cleanAddress = addressParts.join(', '); // Nối mảng lại thành chuỗi địa chỉ mới
-
+        const cleanAddress = addressParts.join(', ');
         setSelectedAddress(cleanAddress);
       } else {
         setSelectedAddress('Vị trí không xác định');
@@ -96,7 +86,6 @@ export default function SelectLocationMapScreen() {
     longitude: 105.804817,
   });
 
-  // 3. Khi người dùng vuốt/kéo thả bản đồ xong thì lấy địa chỉ mới
   const onRegionChangeComplete = (newRegion: any) => {
     setRegion(newRegion);
     setCenterCoord({
@@ -106,7 +95,6 @@ export default function SelectLocationMapScreen() {
     getAddressFromGoogleMapAPI(newRegion.latitude, newRegion.longitude);
   };
 
-  // 4. Bấm xác nhận và quay về form
   const handleConfirm = () => {
     router.replace({
       pathname: '/report-lost-pet',
@@ -119,14 +107,9 @@ export default function SelectLocationMapScreen() {
       }
     });
   };
-  const formatRadiusText = (val: number) => {
-    if (val < 1000) return `${Math.round(val)} m`;
-    return `${(val / 1000).toFixed(1)} km`;
-  };
 
   return (
     <View className="flex-1 bg-white">
-      {/* --- BẢN ĐỒ TOÀN MÀN HÌNH --- */}
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
@@ -135,7 +118,6 @@ export default function SelectLocationMapScreen() {
         showsCompass={false}
         showsBuildings={true}
         mapPadding={{ top: 120, right: 0, bottom: 350, left: 0 }}
-        // region={region}
         initialRegion={{
           latitude: centerCoord.latitude,
           longitude: centerCoord.longitude,
@@ -154,7 +136,7 @@ export default function SelectLocationMapScreen() {
             strokeWidth={1}
           />
         )}
-        <Marker coordinate={{ latitude: region.latitude, longitude: region.longitude }}>
+        <Marker coordinate={{ latitude: centerCoord.latitude, longitude: centerCoord.longitude }}>
           <View className="items-center justify-center">
             <View className='bg-[#E89B5A] rounded-full border-4 z-10 border-[#E89B5A] ' style={{ width: 40, height: 40, borderRadius: 20, overflow: 'hidden', backgroundColor: '#E89B5A' }}>
               <Image
@@ -172,48 +154,103 @@ export default function SelectLocationMapScreen() {
         </Marker>
       </MapView>
 
-      {/* --- NÚT BACK LƠ LỬNG Ở GÓC TRÁI (THAY CHO THANH SEARCH) --- */}
+      {/* --- FLOATING SEARCH BAR (CHUẨN GOOGLE MAPS) --- */}
       <View
-        style={{ paddingTop: insets.top + 10 }}
-        className="absolute top-0 left-0 px-5 z-10"
+        style={{
+          position: 'absolute',
+          top: insets.top + 10,
+          left: 16,
+          right: 16,
+          zIndex: 999, // iOS
+          elevation: 10, // Android: Bắt buộc phải có để nổi lên trên MapView
+        }}
       >
-        <TouchableOpacity
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-          style={{
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 5,
-            elevation: 3,
+        <GooglePlacesAutocomplete
+          placeholder="Tìm kiếm địa chỉ..."
+          fetchDetails={true}
+          onPress={(data, details = null) => {
+            if (details?.geometry?.location) {
+              const newRegion = {
+                latitude: details.geometry.location.lat,
+                longitude: details.geometry.location.lng,
+                latitudeDelta: 0.015,
+                longitudeDelta: 0.015,
+              };
+              mapRef.current?.animateToRegion(newRegion, 1000);
+              Keyboard.dismiss();
+            }
           }}
-        >
-          <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 28,
-              borderWidth: 0.5,
-              borderTopColor: 'white',
-              borderLeftColor: 'white',
-              borderBottomColor: 'transparent',
-              borderRightColor: 'transparent',
-              justifyContent: 'center',
+          query={{
+            key: GOOGLE_API_KEY,
+            language: 'vi',
+            components: 'country:vn',
+          }}
+          // Đẩy nút Back vào bên trong ô Search
+          renderLeftButton={() => (
+            <TouchableOpacity 
+              onPress={() => router.back()} 
+              style={{ justifyContent: 'center', alignItems: 'center', paddingLeft: 12, paddingRight: 8 }}
+            >
+              <Feather name="chevron-left" size={24} color="#1F2937" />
+            </TouchableOpacity>
+          )}
+          styles={{
+            container: {
+              flex: 0, // Bắt buộc là 0 để không chiếm toàn màn hình khi absolute
+            },
+            textInputContainer: {
+              backgroundColor: '#FFFFFF',
+              borderRadius: 30,
+              flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)', 
-            }}>
-            <LinearGradient
-              colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              locations={[0, 0.3, 1]}
-
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
-            />
-            <Feather name="chevron-left" size={20} color="#1F2937" />
-          </View>
-        </TouchableOpacity>
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 10,
+              elevation: 5,
+              height: 52, // Chiều cao cố định giống Google Maps
+            },
+            textInput: {
+              height: 52,
+              borderRadius: 30,
+              paddingHorizontal: 10,
+              fontSize: 16,
+              color: '#1F2937',
+              backgroundColor: 'transparent', // Để nền cho textInputContainer lo
+              marginBottom: 0, // Ghi đè margin mặc định của thư viện
+              marginTop: 0,
+            },
+            listView: {
+              backgroundColor: '#FFFFFF',
+              borderRadius: 16,
+              marginTop: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 5,
+              maxHeight: 250, // Tránh list dài quá che mất nút confirm ở dưới
+            },
+            row: {
+              padding: 14,
+              minHeight: 48,
+              flexDirection: 'row',
+            },
+            separator: {
+              height: 1,
+              backgroundColor: '#F3F4F6', // Tailwind gray-100
+              marginHorizontal: 14,
+            },
+          }}
+          textInputProps={{
+            placeholderTextColor: '#9CA3AF', // Tailwind gray-400
+            clearButtonMode: 'while-editing',
+          }}
+          keyboardShouldPersistTaps="handled"
+        />
       </View>
 
+      {/* --- BOTTOM SHEET TÙY CHỈNH LOCATION --- */}
       <View
         style={{ paddingBottom: insets.bottom }}
         className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[24px] p-6 shadow-2xl"
@@ -223,7 +260,7 @@ export default function SelectLocationMapScreen() {
         </Text>
 
         <Text className="text-[#8E8E93] font-regular text-[14px] tracking-[0.06px] mb-[30px]">
-          Drag the screen to move pin
+          Drag the screen or search to move pin
         </Text>
         <Text className="text-[#8E8E93] font-medium text-[14px] tracking-[0.06px] mb-[12px]">
           Lost Location
@@ -251,14 +288,12 @@ export default function SelectLocationMapScreen() {
               const percent = ((radius - 100) / 4900) * 100;
               return (
                 <View style={{ height: 40, justifyContent: 'center', position: 'relative' }}>
-
                   <LinearGradient
                     colors={['#FFD8B2', '#FF9C56', '#D84315']}
                     start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
                     style={{ position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2 }}
                   />
 
-                  {/* Dải màu nền xám che lấp phần chưa chọn */}
                   <View
                     style={{
                       position: 'absolute',
@@ -270,7 +305,6 @@ export default function SelectLocationMapScreen() {
                     }}
                   />
 
-                  {/* Slider trong suốt đè lên trên để nhận sự kiện kéo/chạm */}
                   <Slider
                     value={radius}
                     minimumValue={100}

@@ -1,5 +1,6 @@
 // app/(tabs)/scan.tsx
 import { Text } from '@/components/AppText';
+import { petService } from '@/services/petService';
 import { Feather } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -10,8 +11,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Dimensions, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, Mask, Rect } from 'react-native-svg';
-
-import { petService } from '@/services/petService';
 // 1. IMPORT CỦA BẠN VÀO ĐÂY
 import { useModalStore } from '@/store/useModalStore';
 
@@ -29,12 +28,13 @@ export default function ScanScreen() {
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const isFocused = useIsFocused(); 
-
   // 2. KHAI BÁO STATE GỌI MODAL
   const showModal = useModalStore((state) => state.showModal);
 
   const params = useLocalSearchParams();
   const linkPetId = params.linkPetId as string;
+  const replacePetId = params.replacePetId as string;
+  const action = params.action as string;
   const isAddingPet = params.isAddingPet === 'true';
   // Animations
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -91,88 +91,107 @@ export default function ScanScreen() {
   };
 
   const processValidScan = (data: string) => {
-    alert(`MÃ GỐC CAMERA ĐỌC ĐƯỢC LÀ:\n"${data}"`);
       setScanned(true);
       setScanSuccess(true);
 
-      // Trích xuất ID để xử lý logic Backend
+      // Trích xuất ID
       let finalTagId = data;
-      const tagMatch = data.match(/\/tag\/([a-zA-Z0-9-]+)/) || data.match(/pawlife:\/\/tag\/([a-zA-Z0-9-]+)/);
+      // Thêm dấu _ vào regex: [a-zA-Z0-9-_]+
+      const tagMatch = data.match(/\/tag\/([a-zA-Z0-9-_]+)/) || data.match(/pawlife:\/\/tag\/([a-zA-Z0-9-_]+)/);
       if (tagMatch && tagMatch[1]) {
         finalTagId = tagMatch[1];
       }
       finalTagId = finalTagId.trim().replace(/\/$/, "");
-      alert(`ID SẼ GỬI XUỐNG BACKEND LÀ:\n"${finalTagId}"`);
+      
       Animated.parallel([
         Animated.spring(successScaleAnim, { toValue: 1, friction: 4, tension: 50, useNativeDriver: true }),
         Animated.timing(successOpacityAnim, { toValue: 1, duration: 200, useNativeDriver: true })
       ]).start(async () => {
 
+        // LUỒNG 1: THÊM PET MỚI
         if (isAddingPet) {
           setTimeout(() => {
             router.push({
               pathname: '/add-pet',
-              // THÊM rawQrData VÀO PARAMS ĐỂ MANG ĐI
               params: { tagId: finalTagId, rawQrData: data } 
             });
-
-            // Reset camera âm thầm
-            setTimeout(() => {
-              setScanned(false);
-              setScanSuccess(false);
-              successScaleAnim.setValue(0);
-              successOpacityAnim.setValue(0);
-            }, 500);
+            resetCamera();
           }, 800);
         }
 
-        // LUỒNG 2: GÁN VÒNG CỔ CHO PET ĐÃ TỒN TẠI (Đã làm ở bước trước)
+        // LUỒNG 2: GÁN QR CHO PET CHƯA CÓ
         else if (linkPetId) {
           try {
             await petService.linkQrCode(linkPetId, finalTagId);
             showModal({
               title: 'Success',
-              message: 'Pet profile updated successfully! Vòng cổ đã được gán.',
+              message: 'QR code successfully assigned to the pet!',
               buttonText: 'View QR',
               onConfirm: () => {
-                setScanned(false); setScanSuccess(false);
-                successScaleAnim.setValue(0); successOpacityAnim.setValue(0);
+                resetCamera();
                 router.replace(`/view-qr-code?id=${linkPetId}`); 
               }
             });
           } catch (error: any) {
-            // SỬ DỤNG CUSTOM MODAL CHO ERROR LUÔN CHO ĐỒNG BỘ
-            showModal({
-              title: 'Error',
-              message: error.response?.data?.message || error.message || "Mã QR không hợp lệ!",
-              buttonText: 'Try Again',
-              onConfirm: () => {
-                setScanned(false);
-                setScanSuccess(false);
-                successScaleAnim.setValue(0);
-                successOpacityAnim.setValue(0);
-              }
-            });
+            handleScanError(error);
           }
         } 
         
-        // LUỒNG 2: CHẾ ĐỘ QUÉT PET LẠC BÌNH THƯỜNG
+        // LUỒNG 3: THAY THẾ QR CODE (REPLACE) - BỔ SUNG MỚI
+        else if (replacePetId) {
+          try {
+            // 1. Gọi API thay thế QR
+            await petService.replaceQrCode(replacePetId, finalTagId);
+            
+            // 2. [QUAN TRỌNG] Gọi thêm API để reset flag "Needs Replacement"
+            // Giả sử bạn có hàm updatePet trong petService
+            await petService.updatePet(replacePetId, { needsQrReplacement: false });
+            
+            showModal({
+              title: 'Replace Success',
+              message: 'Great! The pet\'s collar has been replaced with the new QR code.',
+              buttonText: 'View New QR',
+              onConfirm: () => {
+                resetCamera();
+                // Replace trang để quay lại màn xem QR và load lại data mới
+                router.replace(`/view-qr-code?id=${replacePetId}`); 
+              }
+            });
+          } catch (error: any) {
+            handleScanError(error);
+          }
+        }
+
+        // LUỒNG 4: QUÉT PET LẠC BÌNH THƯỜNG
         else {
           setTimeout(() => {
             router.push({
               pathname: '/scanned-pet',
               params: { tagId: finalTagId } 
             });
-
-            setTimeout(() => {
-              setScanned(false);
-              setScanSuccess(false);
-              successScaleAnim.setValue(0);
-              successOpacityAnim.setValue(0);
-            }, 500);
+            resetCamera();
           }, 800);
         }
       });
+  };
+
+  const resetCamera = () => {
+    setTimeout(() => {
+      setScanned(false);
+      setScanSuccess(false);
+      successScaleAnim.setValue(0);
+      successOpacityAnim.setValue(0);
+    }, 500);
+  };
+
+  // Hàm tiện ích xử lý lỗi show Modal
+  const handleScanError = (error: any) => {
+    showModal({
+      title: 'Error',
+      message: error.response?.data?.message || error.message || "Invalid QR code or already in use!",
+      buttonText: 'Try Again',
+      onConfirm: () => resetCamera()
+    });
   };
 
   if (!permission) {
@@ -186,9 +205,9 @@ export default function ScanScreen() {
   if (!permission.granted) {
     return (
       <View className="flex-1 bg-[#1A1A1A] items-center justify-center px-6">
-        <Text className="text-white mb-4 text-center">Cần cấp quyền truy cập Camera để quét mã QR vòng cổ.</Text>
+        <Text className="text-white mb-4 text-center">Need to grant camera access to scan QR code.</Text>
         <TouchableOpacity className="bg-[#F97316] py-3 px-6 rounded-xl" onPress={requestPermission}>
-          <Text className="text-white font-bold">Cấp quyền Camera</Text>
+          <Text className="text-white font-bold">Grant Camera Access</Text>
         </TouchableOpacity>
       </View>
     );

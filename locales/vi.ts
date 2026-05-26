@@ -417,4 +417,73 @@ export const viDict: Record<string, string> = {
   'lostMode.descOff': 'Bạn có chắc chắn bé thú cưng đã an toàn? Hành động này sẽ dừng các cảnh báo khi có người quét mã QR.',
   'lostMode.confirmOn': 'Bật chế độ',
   'lostMode.confirmOff': 'Vâng, bé đã an toàn',
+  // --- Trạng thái Loading & Lỗi chung (Common States) ---
+  "Loading data...": "Đang tải dữ liệu...",
+  "Loading pet info...": "Đang tải thông tin thú cưng...",
+  "Checking data...": "Đang kiểm tra dữ liệu...",
+  "Information not found": "Không tìm thấy thông tin",
+  "Go Back": "Quay lại",
+  "Abort": "Hủy bỏ",
+  "Missing Information": "Thiếu thông tin",
+  "An error occurred.": "Đã có lỗi xảy ra.",
+  "User": "Người dùng",
+
+  // --- Màn hình Home & Khám phá (Index & Matching) ---
+  "No pets nearby": "Chưa có thú cưng nào gần đây",
+  "No shelters available": "Chưa có trạm cứu hộ nào",
+  "No upcoming events": "Chưa có sự kiện nào sắp tới",
+  "Current Location": "Vị trí hiện tại của bạn",
+
+  // --- Màn hình Quét QR (Scan) ---
+  "QR code successfully assigned to the pet!": "Vòng cổ đã được gán thành công cho thú cưng!",
+  "Great! The pet's collar has been replaced with a new QR code.": "Tuyệt vời! Vòng cổ của thú cưng đã được thay thế sang mã QR mới.",
+  "Invalid or already used QR Code!": "Mã QR không hợp lệ hoặc đã được sử dụng!",
+  "Camera access is required to scan the collar QR code.": "Cần cấp quyền truy cập Camera để quét mã QR vòng cổ.",
+  "Grant Camera Permission": "Cấp quyền Camera",
+
+  // --- Màn hình Chi tiết Thú Cưng (Pet Profile Detail) ---
+  "Are you sure you want to delete this pet's profile? This action cannot be undone.": "Bạn có chắc chắn muốn xóa hồ sơ của thú cưng này không? Hành động này không thể hoàn tác.",
+  "Pet deleted successfully!": "Đã xóa thú cưng!",
+  "Unable to delete pet at this time.": "Không thể xóa thú cưng lúc này.",
+  "Unable to load pet details. Please try again.": "Không thể tải thông tin chi tiết thú cưng. Vui lòng thử lại.",
+  "Unable to open this file.": "Không thể mở file này.",
+
+  // --- Màn hình Thêm Thú Cưng (Add Pet) ---
+  "Limit Reached": "Giới hạn",
+  "You can only upload up to 5 vaccination documents.": "Bạn chỉ được tải lên tối đa 5 tài liệu tiêm chủng.",
+  "Upload Error": "Lỗi Upload",
+  "An error occurred while uploading images. Please try again.": "Có lỗi xảy ra khi tải ảnh lên máy chủ. Vui lòng thử lại.",
+  "Unable to open photo library.": "Không thể mở thư viện ảnh.",
+  "Pet profile created successfully! Collar is activated.": "Tạo hồ sơ thú cưng thành công! Vòng cổ đã được kích hoạt.",
+  "Profile created successfully!\n(Profile currently has no QR code, you can update and assign a collar later).": "Tạo hồ sơ thành công!\n(Profile hiện chưa có QR code, bạn có thể cập nhật và gán vòng cổ sau).",
+
+  // --- Popup Chọn Địa Chỉ (Address Picker) ---
+  "Update Address": "Cập nhật địa chỉ",
+  "Your Address": "Địa chỉ của bạn",
+  "City / Province": "Thành phố / Tỉnh",
+  "Select City/Province": "Chọn Tỉnh/Thành phố",
+  "District": "Quận / Huyện",
+  "Select District": "Chọn Quận/Huyện",
+  "Ward / Commune": "Phường / Xã",
+  "Select Ward/Commune": "Chọn Phường/Xã",
+  "Detailed Address": "Địa chỉ chi tiết",
+  "House number, street name...": "Số nhà, tên ngõ, tên đường...",
+  "Please fully select City, District, Ward and enter the detailed address.": "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.",
+
+  // --- Form Đăng ký Nhận Nuôi (Adoption Form) ---
+  "Pet information not found.": "Không tìm thấy thông tin thú cưng.",
+  "Please fill in all contact information and residential address.": "Vui lòng điền đầy đủ thông tin liên lạc và địa chỉ cư trú.",
+  "Application Submission Failed": "Gửi đơn thất bại",
+  "Registration Limit Reached": "Đạt giới hạn đăng ký",
+  "You currently have 5 pending applications. Please wait for the results of older applications before submitting a new one!": "Bạn đang có 5 đơn đăng ký chờ xử lý. Vui lòng đợi kết quả của các đơn cũ trước khi nộp thêm hồ sơ mới nhé!",
+
+  // --- Chi tiết Sự kiện & Trạm cứu hộ (Event & Shelter Profile) ---
+  "This shelter has not provided a Zalo phone number.": "Trạm cứu hộ này chưa cung cấp số điện thoại Zalo.",
+  "Event from PawLife": "Sự kiện từ PawLife",
+  "Unable to share at this time. Please try again later.": "Không thể chia sẻ lúc này. Vui lòng thử lại sau.",
+  "Event Does Not Exist": "Sự kiện không tồn tại",
+  "This event may have been deleted, expired, or you don't have access. Please return to the previous screen.": "Sự kiện này có thể đã bị xóa, hết hạn hoặc không có quyền truy cập. Vui lòng quay lại màn hình trước.",
+  "No description available for this event.": "Chưa có mô tả cho sự kiện này.",
+  "Shelter Not Found": "Không tìm thấy trạm cứu hộ",
+  "Shelter data may have been deleted or the link is incorrect.": "Dữ liệu trạm có thể đã bị xóa hoặc đường dẫn không chính xác."
 };

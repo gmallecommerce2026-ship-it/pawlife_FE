@@ -1,7 +1,7 @@
 // app/event-detail.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,7 +13,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview';
 import { eventService } from '../services/eventService';
 import { useEngagementStore } from '../store/useEngagementStore';
-
 const { width } = Dimensions.get('window');
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -45,13 +44,42 @@ export default function EventDetailScreen() {
     };
 
     const onShare = async () => {
-        if (!eventData) return;
+        if (actionLoading || !eventData) return;
+
+        const startDate = new Date(eventData.startDate);
+        const day = startDate.getDate();
+        const monthName = startDate.toLocaleDateString('en-US', { month: 'short' });
+        const year = startDate.getFullYear();
+        const timeString = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        const title = eventData.title || 'Sự kiện từ PawLife';
+        const organizer = eventData.organizer?.name || 'PawLife';
+        const location = [eventData.locationName, eventData.address].filter(Boolean).join(', ');
+        const date = `${day} ${monthName}, ${year} at ${timeString}`;
+        const interested = eventData.interestedCount ?? 0;
+        const description = eventData.description
+            ? eventData.description.length > 120
+                ? eventData.description.substring(0, 120) + '...'
+                : eventData.description
+            : null;
+
+        const lines = [
+            `🐾 ${title}`,
+            ``,
+            `📅 ${date}`,
+            `📍 ${location}`,
+            `🏠 Organizer: ${organizer}`,
+            `👥 ${interested} people interested`,
+            description ? `\n📝 ${description}` : null,
+        ].filter(Boolean).join('\n');
+
         try {
-            await Share.share({
-                message: `Hãy xem sự kiện thú vị này: ${eventData.title} diễn ra tại ${eventData.locationName || eventData.address}!`,
-            });
+            await Share.share(
+                { message: lines, title },
+                { dialogTitle: `Share: ${title}`, subject: `PawLife Event: ${title}`, tintColor: '#ffa053' }
+            );
         } catch (error: any) {
-            Alert.alert('Lỗi khi chia sẻ', error.message);
+            Alert.alert('Lỗi', 'Không thể chia sẻ lúc này. Vui lòng thử lại sau.');
         }
     };
 

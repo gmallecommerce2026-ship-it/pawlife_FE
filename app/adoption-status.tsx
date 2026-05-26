@@ -1,16 +1,16 @@
 // app/adoption-status.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { useImageUpload } from '@/hooks/useImageUpload';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import { useImageUpload } from '@/hooks/useImageUpload';
-import { X } from 'lucide-react-native';
-
+import { calculateAge } from '@/utils/dateHelper';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -25,32 +25,6 @@ interface TimelineStep {
   description?: string;
   actionRequired?: string;
 }
-
-const mockTimelineSteps: TimelineStep[] = [
-  {
-    id: '1',
-    title: 'Application Submitted',
-    state: 'completed',
-    date: 'May 20, 2026', // Bạn có thể tùy chỉnh ngày
-    description: 'Đơn đăng ký nhận nuôi của bạn đã được gửi thành công đến Shelter.'
-  },
-  {
-    id: '2',
-    title: 'Pending Review',
-    state: 'completed',
-    date: 'May 21, 2026',
-    description: 'Shelter đang xem xét hồ sơ và thông tin của bạn.'
-  },
-  {
-    id: '3',
-    title: 'Need More Information',
-    state: 'alert', // Trạng thái 'alert' sẽ hiện icon dấu chấm than (!) theo hàm renderNodeIcon của bạn
-    date: 'May 22, 2026',
-    description: 'Shelter needs a bit more information to verify.',
-    actionRequired: 'Photos of your living space' // Bạn có thể dùng trường này để render nút bấm bổ sung (nếu có)
-  }
-];
-
 
 export default function AdoptionStatusScreen() {
   const router = useRouter();
@@ -103,23 +77,54 @@ export default function AdoptionStatusScreen() {
     }
   };
 
-  const generateTimelineSteps = (status: string, createdAt: string) => {
-    const formattedDate = new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // --- LOGIC SINH TIMELINE ĐỘNG CHO 7 TRẠNG THÁI ---
+  const generateTimelineSteps = (status: string, createdAt: string, updatedAt: string) => {
+    const createdDate = new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const updatedDate = new Date(updatedAt || createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
     const steps: TimelineStep[] = [
-      { id: '1', title: 'Submitted', state: 'completed', date: formattedDate }
+      { id: '1', title: 'Application Submitted', state: 'completed', date: createdDate, description: 'Đơn đăng ký nhận nuôi của bạn đã được gửi thành công đến Shelter.' }
     ];
 
-    if (status === 'SUBMITTED') {
-      steps.push({ id: '2', title: 'Pending Review', state: 'active', description: 'Shelter đang xem xét đơn của bạn.' });
-    } else if (status === 'PENDING') {
-      steps.push({ id: '2', title: 'Under Review', state: 'active', description: 'Shelter đang xử lý đơn của bạn.' });
-    } else if (status === 'ADOPTION_COMPLETED') {
-      steps.push({ id: '2', title: 'Approved', state: 'completed' });
-      steps.push({ id: '3', title: 'Adoption Completed', state: 'success', description: 'Cảm ơn bạn đã nhận nuôi! 💛' });
-    } else if (status === 'CLOSED') {
-      steps.push({ id: '2', title: 'Closed', state: 'error', description: 'Đơn đăng ký này đã bị đóng.' });
+    switch (status) {
+      case 'SUBMITTED':
+        steps.push({ id: '2', title: 'Pending Review', state: 'active', description: 'Shelter đang chuẩn bị xem xét hồ sơ của bạn.' });
+        break;
+      case 'PENDING':
+        steps.push({ id: '2', title: 'Under Review', state: 'active', date: updatedDate, description: 'Shelter đang xem xét hồ sơ và thông tin của bạn.' });
+        break;
+      case 'NEED_MORE_INFO':
+        steps.push({ 
+          id: '2', 
+          title: 'Need More Information', 
+          state: 'alert', 
+          date: updatedDate,
+          description: 'Shelter needs a bit more information to verify.',
+          actionRequired: 'Photos of your living space' 
+        });
+        break;
+      case 'INTERVIEW_SCHEDULED':
+        steps.push({ id: '2', title: 'Reviewed', state: 'completed' });
+        steps.push({ id: '3', title: 'Interview Scheduled', state: 'active', date: updatedDate, description: 'Shelter đã lên lịch phỏng vấn với bạn. Vui lòng kiểm tra tin nhắn.' });
+        break;
+      case 'APPROVED':
+        steps.push({ id: '2', title: 'Reviewed', state: 'completed' });
+        steps.push({ id: '3', title: 'Interviewed', state: 'completed' });
+        steps.push({ id: '4', title: 'Application Approved', state: 'active', date: updatedDate, description: 'Chúc mừng! Hồ sơ của bạn đã được duyệt. Hãy chuẩn bị đón bé về.' });
+        break;
+      case 'ADOPTION_COMPLETED':
+        steps.push({ id: '2', title: 'Reviewed', state: 'completed' });
+        steps.push({ id: '3', title: 'Interviewed', state: 'completed' });
+        steps.push({ id: '4', title: 'Approved', state: 'completed' });
+        steps.push({ id: '5', title: 'Adoption Completed', state: 'success', date: updatedDate, description: 'Cảm ơn bạn đã nhận nuôi! 💛' });
+        break;
+      case 'CLOSED':
+        steps.push({ id: '2', title: 'Closed', state: 'error', date: updatedDate, description: 'Đơn đăng ký này đã bị đóng hoặc thu hồi.' });
+        break;
+      default:
+        steps.push({ id: '2', title: 'Processing', state: 'active', description: 'Đơn đang được xử lý.' });
+        break;
     }
-
     return steps;
   };
 
@@ -184,8 +189,10 @@ export default function AdoptionStatusScreen() {
 
   const pet = applicationData.pet;
   const isClosed = applicationData.status === 'CLOSED';
-  // const timelineSteps = generateTimelineSteps(applicationData.status, applicationData.createdAt);
-  const timelineSteps = mockTimelineSteps;
+  
+  // DÙNG HÀM TẠO TIMELINE ĐỘNG DỰA VÀO DỮ LIỆU BACKEND
+  const timelineSteps = generateTimelineSteps(applicationData.status, applicationData.createdAt, applicationData.updatedAt);
+  
   const commitments = applicationData.commitments || {};
 
   const submittedDate = new Date(applicationData.createdAt).toLocaleDateString('en-US', {
@@ -308,11 +315,15 @@ export default function AdoptionStatusScreen() {
         />
         {/* Phần trên: Ảnh và Thông tin cơ bản */}
         <TouchableOpacity
-          className="flex-row mb-3.5"
+          className="flex-row mb-3.5 relative z-10" // Thêm relative z-10
           activeOpacity={0.7}
           onPress={() => {
             if (pet?.id) {
-              router.push(`/shelter-pet-detail?id=${pet.id}`);
+              // Fix: Dùng Object navigation để tránh lỗi parse URL
+              router.push({
+                pathname: '/shelter-pet-detail',
+                params: { id: pet.id }
+              });
             }
           }}
         >
@@ -322,27 +333,28 @@ export default function AdoptionStatusScreen() {
             resizeMode="cover"
           />
 
-          <View className="flex-1 mb-2 ml-[10px] justify-center">
+          <View className="flex-1 mb-2 ml-[10px] justify-center pointer-events-none"> 
+            {/* Thêm pointer-events-none để text không chặn bấm */}
             <Text className="text-[16px] font-medium text-black leading-tight" numberOfLines={1}>
               {pet?.name}
             </Text>
 
+            {/* Fix: Tính toán tuổi từ DOB */}
             <Text className="text-[#8E8E93] text-[12px] font-regular mt-[7px]" numberOfLines={1}>
-              {pet?.age || 'Unknown'} • {pet?.breed || 'Unknown'}
+              {calculateAge(pet?.dob) || 'Unknown'} • {pet?.breed || 'Unknown'}
             </Text>
+          </View>
 
-            {/* Nút bấm riêng cho Tên Shelter */}
+          {/* Sửa lại nút bấm Shelter: Bọc riêng ra góc để không conflict vùng bấm */}
+          <View className="absolute bottom-0 right-0 z-20"> 
             <TouchableOpacity
               activeOpacity={0.6}
-              hitSlop={{ top: 5, right: 10, bottom: 5, left: 0 }} // Tăng vùng bấm cho text
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
               onPress={(e) => {
-                e.stopPropagation(); // Ngăn sự kiện click lan ra ngoài thẻ cha
-                // Đảm bảo dữ liệu pet có chứa shelterId hoặc shelter.id
+                e.stopPropagation(); 
                 const shelterId = pet?.shelter?.id || pet?.shelterId;
                 if (shelterId) {
                   router.push(`/shelter-profile?id=${shelterId}`);
-                } else {
-                  console.warn("Không tìm thấy ID của shelter");
                 }
               }}
             >

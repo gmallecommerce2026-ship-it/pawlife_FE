@@ -3,13 +3,13 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { memo, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, StatusBar, TextInput, TouchableOpacity, View, LayoutAnimation } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Image, LayoutAnimation, StatusBar, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { eventService } from '../services/eventService';
 import { petService } from '../services/petService';
 import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
-import FilterModal from '@/components/filter-modal';
+// import FilterModal from '@/components/filter-modal';
 
 import { Text } from '@/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -416,7 +416,7 @@ export default function SearchScreen() {
     const [activeTab, setActiveTab] = useState<'Pet' | 'Shelter' | 'Event'>(initialTab);
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearchQuery = useDebounce(searchInput, 500);
-    const [isFilterVisible, setIsFilterVisible] = useState(false);
+    // const [isFilterVisible, setIsFilterVisible] = useState(false);
 
     const [isFocused, setIsFocused] = useState(false);
     const handleFocus = () => {
@@ -551,12 +551,12 @@ export default function SearchScreen() {
                         onFocus={handleFocus}
                         onBlur={handleBlur}
                     />
-                    <TouchableOpacity onPress={() => setIsFilterVisible(true)} activeOpacity={0.6} className="p-1">
+                    {/* <TouchableOpacity onPress={() => setIsFilterVisible(true)} activeOpacity={0.6} className="p-1">
                         <Image
                             source={require('../assets/icon/sliders-gray.png')}
                             className="w-[16px] h-[16px]"
                         />
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
                 </View>
             </View>
             <View className='px-[20px] mb-[6px]'>
@@ -573,10 +573,10 @@ export default function SearchScreen() {
                 {activeTab === 'Event' && <EventsSection searchQuery={debouncedSearchQuery} onEventPress={handleEventPress} />}
             </View>
 
-            <FilterModal 
+            {/* <FilterModal 
                 visible={isFilterVisible} 
                 onClose={() => setIsFilterVisible(false)} 
-            />
+            /> */}
         </SafeAreaView>
     );
 }

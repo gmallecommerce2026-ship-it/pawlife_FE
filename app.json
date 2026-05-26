@@ -24,11 +24,22 @@
           { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
           { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" }
         ],
+
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Ứng dụng cần quyền truy cập Camera để quét mã QR và tìm kiếm thú cưng bị thất lạc.",
-        "NSPhotoLibraryUsageDescription": "Ứng dụng cần quyền truy cập thư viện ảnh để cập nhật ảnh đại diện và hồ sơ thú cưng.",
-        "LSApplicationQueriesSchemes": ["zalo"],
-        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần quyền vị trí để gửi tọa độ giúp chủ nhân tìm lại thú cưng bị lạc." 
+
+        "NSCameraUsageDescription": "PawLife cần quyền Camera để quét mã QR trên thẻ định danh thú cưng và hỗ trợ tìm kiếm thú cưng thất lạc.",
+
+        "NSPhotoLibraryUsageDescription": "PawLife cần truy cập thư viện ảnh để cập nhật ảnh hồ sơ cá nhân và thú cưng.",
+
+        "NSPhotoLibraryAddUsageDescription": "PawLife cần lưu QR code và hình ảnh thú cưng vào thư viện ảnh của bạn.",
+
+        "NSLocationWhenInUseUsageDescription": "PawLife cần quyền vị trí để gửi tọa độ hỗ trợ tìm kiếm thú cưng thất lạc và hiển thị nội dung phù hợp gần bạn.",
+
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "PawLife cần quyền vị trí để hỗ trợ các tính năng tìm kiếm thú cưng thất lạc ngay cả khi ứng dụng đang chạy nền.",
+
+        "NSUserTrackingUsageDescription": "Dữ liệu được sử dụng để cải thiện trải nghiệm và đo lường hiệu quả ứng dụng.",
+
+        "LSApplicationQueriesSchemes": ["zalo"]
       }
     },
     "android": {

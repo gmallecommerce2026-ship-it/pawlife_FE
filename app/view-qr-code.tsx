@@ -1,8 +1,10 @@
 import { Text } from '@/components/AppText';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+// 1. Thêm useRef
+import { File, Paths } from 'expo-file-system';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,12 +15,12 @@ import {
   Modal,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgUri } from 'react-native-svg';
@@ -31,7 +33,6 @@ const SHADOW_OPACITY = 0.05;
 const SHADOW_RADIUS = 8;
 const ELEVATION = 3;
 
-// FIX 2: Thêm Type cho RadioOption để tránh lỗi TS7031 (implicitly has an 'any' type)
 interface RadioOptionProps {
   label: string;
   subLabel?: string;
@@ -48,11 +49,14 @@ export default function ViewQrCode() {
   const [petData, setPetData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showQrOverlay, setShowQrOverlay] = useState(false);
-
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [pendingReplace, setPendingReplace] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [replaceTag, setReplaceTag] = useState<string | null>(null);
   const [otherDetail, setOtherDetail] = useState('');
+
+  // 3. Khai báo ref để lấy ảnh Base64 từ QR
 
   const RadioOption = ({ label, subLabel, selected, onPress }: RadioOptionProps) => (
     <TouchableOpacity
@@ -72,7 +76,6 @@ export default function ViewQrCode() {
     </TouchableOpacity>
   );
 
-  // --- FETCH DATA ---
   useFocusEffect(
     useCallback(() => {
       const fetchPetDetail = async () => {
@@ -96,11 +99,6 @@ export default function ViewQrCode() {
     }, [petId])
   );
 
-  const handleDownloadQr = () => {
-    Alert.alert("Thông báo", "Tính năng tải QR Code đang được phát triển.");
-  };
-
-  // --- RENDER LOADING STATE ---
   if (isLoading) {
     return (
       <View className="flex-1 justify-center items-center bg-[#FAFAFA]">
@@ -110,7 +108,6 @@ export default function ViewQrCode() {
     );
   }
 
-  // --- RENDER NOT FOUND STATE ---
   if (!petData) {
     return (
       <View className="flex-1 justify-center items-center bg-[#FAFAFA] px-4">
@@ -123,18 +120,66 @@ export default function ViewQrCode() {
     );
   }
 
-  // --- XỬ LÝ DỮ LIỆU HIỂN THỊ ---
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId?.substring(0, 8).toUpperCase();
-  const avatarUrl = petData.avatarUrl || petData.images?.[0]?.url || 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=2043&auto=format&fit=crop';
+  const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop';
+  const avatarUrl = petData?.avatarUrl || petData?.images?.[0]?.url || FALLBACK_AVATAR;
 
   const activeTag = petData?.tags?.find((tag: any) => tag.status === 'ACTIVE') || petData?.tags?.[0];
-
   const tagId = activeTag?.id;
   const publicDomain = "https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev";
   const qrUri = tagId ? `${publicDomain}/qr-codes/${tagId}.svg` : null;
 
-  // FIX 1: Khai báo qrValue fallback để truyền vào thẻ QRCode không bị văng app
-  const qrValue = qrUri || `https://pawlife.com/pet/${displayId}`;
+  const handleDownloadQr = async () => {
+    try {
+      if (!qrUri) {
+        Alert.alert('Lỗi', 'Không tìm thấy mã QR để tải về.');
+        return;
+      }
+
+      const fileName = `pawlife_qr_${petData?.name ?? 'pet'}_${Date.now()}.svg`;
+      const file = new File(Paths.cache, fileName);
+
+      // Fetch SVG content rồi ghi vào file
+      const response = await fetch(qrUri);
+      const svgText = await response.text();
+      await file.write(svgText);
+
+      // Share file
+      await Share.share({
+        url: file.uri,
+        message: `Mã QR của ${petData?.name} - PawLife`,
+        title: `QR Code - ${petData?.name}`,
+      });
+
+      // Dọn file
+      file.delete();
+
+    } catch (error) {
+      console.error('[handleDownloadQr] Error:', error);
+      Alert.alert('Lỗi', 'Không thể lưu mã QR. Vui lòng thử lại.');
+    }
+  };
+
+  async function handleSubmitReport() {
+    setShowReportModal(false);
+    
+    // Logic: Nếu là Damaged Tag VÀ chọn "No, I'll do it later"
+    const isDamaged = selectedIssue === 'damaged';
+    const isLater = replaceTag === 'no';
+
+    if (isDamaged && isLater) {
+      try {
+        // Gọi endpoint PATCH /pets/:id thông qua updatePet
+        await petService.updatePet(petId, { needsQrReplacement: true });
+      } catch (error) {
+        console.error("Lỗi cập nhật flag:", error);
+        Alert.alert("Lỗi", "Không thể ghi nhận trạng thái hỏng.");
+      }
+    }
+    
+    setPendingReplace(replaceTag === 'yes');
+    setShowSuccessModal(true);
+  }
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -176,6 +221,8 @@ export default function ViewQrCode() {
           </View>
 
           <TouchableOpacity
+            // Gắn tạm logic share vào nút share ở Header
+            onPress={handleDownloadQr}
             activeOpacity={0.7}
             style={{
               shadowColor: '#000',
@@ -206,7 +253,6 @@ export default function ViewQrCode() {
               className="bg-white rounded-[24px] items-center mt-24 w-full"
               style={{
                 maxWidth: 294,
-                // maxHeight: 339,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: SHADOW_OPACITY,
@@ -215,7 +261,6 @@ export default function ViewQrCode() {
               }}
             >
               <View className="absolute -top-[41px] self-center w-[82px] h-[82px] z-10">
-                {/* LAYER 1: NỬA TRÊN */}
                 <View style={{ position: 'absolute', width: 120, height: 80, bottom: 41, left: -19, overflow: 'hidden' }}>
                   <View
                     style={{
@@ -231,8 +276,6 @@ export default function ViewQrCode() {
                     }}
                   />
                 </View>
-
-                {/* LAYER 2: NỬA DƯỚI */}
                 <View style={{ position: 'absolute', width: 82, height: 41, top: 41, left: 0, overflow: 'hidden' }}>
                   <View
                     style={{
@@ -242,8 +285,6 @@ export default function ViewQrCode() {
                     }}
                   />
                 </View>
-
-                {/* LAYER 3: ẢNH PET */}
                 <View className="absolute inset-0 items-center justify-center pointer-events-none">
                   <Image
                     source={{ uri: avatarUrl }}
@@ -260,14 +301,11 @@ export default function ViewQrCode() {
                 ID: {displayId}
               </Text>
 
-              {/* BỌC TOUCHABLE ĐỂ MỞ OVERLAY */}
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setShowQrOverlay(true)}
-                // 1. Lớp ngoài cùng: w-full và tự động căn giữa mọi thứ bên trong
                 className="py-5 bg-white items-center justify-center w-full"
               >
-                {/* 2. Ép cứng khung chứa bằng đúng kích thước thật của SVG (189x189) */}
                 <View
                   style={{
                     width: 189,
@@ -278,7 +316,6 @@ export default function ViewQrCode() {
                 >
                   {qrUri ? (
                     <SvgUri
-                      // 3. Khai báo thẳng 189 ở đây, lỗi nhảy góc sẽ BẾN MẤT HOÀN TOÀN!
                       width="189"
                       height="189"
                       uri={qrUri}
@@ -316,7 +353,14 @@ export default function ViewQrCode() {
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity activeOpacity={0.7} className="w-full mt-[12px] bg-white border border-gray-200 py-[16px] rounded-[20px] items-center justify-center">
+              <TouchableOpacity
+              onPress={() => {
+                  router.push({
+                    pathname: '/(tabs)/scan',
+                    params: { replacePetId: petData.id }
+                  });
+                }}
+                activeOpacity={0.7} className="w-full mt-[12px] bg-white border border-gray-200 py-[16px] rounded-[20px] items-center justify-center">
                 <View className='flex-row items-center'>
                   <Image source={require('../assets/icon/refresh.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
                   <Text className="text-[16px] font-medium text-[#8E8E93] ml-2">Replace QR Code</Text>
@@ -333,7 +377,6 @@ export default function ViewQrCode() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* OVERLAY HIỂN THỊ QR PHÓNG TO */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -388,12 +431,28 @@ export default function ViewQrCode() {
               </Text>
 
               <View className='my-[24px]'>
-                <QRCode
-                  value={qrValue}
-                  size={196}
-                  color="#111827"
-                  backgroundColor="transparent"
-                />
+                {/* 5. Khai báo REF và thêm Background nền TRẮNG cho QR */}
+                <View
+                  style={{
+                    width: 196,
+                    height: 196,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  {qrUri ? (
+                    <SvgUri
+                      width="196"
+                      height="196"
+                      uri={qrUri}
+                    />
+                  ) : (
+                    <Text className="text-gray-400">
+                      QR unavailable
+                    </Text>
+                  )}
+                </View>
               </View>
 
               <View className="flex-row items-center justify-center">
@@ -402,14 +461,13 @@ export default function ViewQrCode() {
               </View>
             </View>
 
-            {/* Nút Download */}
             <TouchableOpacity
               onPress={handleDownloadQr}
               activeOpacity={0.8}
               className="absolute flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] bottom-24"
             >
-              <Feather name="download" size={20} color="#8E8E93" />
-              <Text className="text-[#8E8E93] font-medium text-[16px] ml-3">Download QR code</Text>
+              <Feather name="share" size={20} color="#8E8E93" />
+              <Text className="text-[#8E8E93] font-medium text-[16px] ml-3">Save QR</Text>
             </TouchableOpacity>
           </BlurView>
         </TouchableOpacity>
@@ -523,7 +581,7 @@ export default function ViewQrCode() {
             <TouchableOpacity
               onPress={() => {
                 console.log("Submit:", { selectedIssue, replaceTag, otherDetail });
-                setShowReportModal(false);
+                handleSubmitReport();
               }}
               className={`w-full py-4 rounded-full mt-6 ${((selectedIssue === 'lost' || selectedIssue === 'damaged') && replaceTag) ||
                 (selectedIssue === 'other' && otherDetail.trim().length > 0)
@@ -544,11 +602,53 @@ export default function ViewQrCode() {
           </View>
         </TouchableOpacity>
       </Modal>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showSuccessModal}
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white w-full rounded-[32px] p-8 items-center">
+            <View className="w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-4">
+              <Feather name="check" size={32} color="#22C55E" />
+            </View>
+            <Text className="text-xl font-bold text-black mb-2">Report Successful!</Text>
+            <Text className="text-gray-500 text-center mb-8">
+              {pendingReplace 
+                ? "We have recorded your report. Would you like to proceed with replacing your QR tag now?"
+                : "We have received your report and will process it shortly."}
+            </Text>
+            
+            <View className="flex-row gap-4 w-full">
+              <TouchableOpacity 
+                onPress={() => setShowSuccessModal(false)}
+                className="flex-1 py-4 rounded-full bg-gray-100"
+              >
+                <Text className="text-center font-semibold text-gray-600">Close</Text>
+              </TouchableOpacity>
+              
+              {pendingReplace && (
+                <TouchableOpacity 
+                  onPress={() => {
+                    setShowSuccessModal(false);
+                    router.push({
+                      pathname: '/(tabs)/scan',
+                      params: { replacePetId: petData.id }
+                    });
+                  }}
+                  className="flex-1 py-4 rounded-full bg-[#E89B5A]"
+                >
+                  <Text className="text-center font-semibold text-white">Replace Now</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   qrContainer: {

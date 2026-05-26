@@ -5,10 +5,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, LayoutAnimation, Linking, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
-
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -81,26 +80,30 @@ export default function PetProfileDetailScreen() {
   const [showVaccineMenu, setShowVaccineMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 28 });
   const { t } = useLanguage();
+  const [selectedVaccineIndex, setSelectedVaccineIndex] = useState<number | null>(null);
+  const [isUploadingVaccine, setIsUploadingVaccine] = useState(false);
 
-
+  // THÊM ĐOẠN NÀY ĐỂ DÙNG CHUNG ẢNH FALLBACK
+  const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop';
+  const displayAvatar = petData?.avatarUrl || petData?.images?.[0]?.url || FALLBACK_AVATAR;
 
   const handleRemovePet = () => {
     Alert.alert(
-      "Xóa thú cưng",
-      `Bạn có chắc chắn muốn xóa hồ sơ của ${petData?.name} không? Hành động này không thể hoàn tác.`,
+      "Delete Pet",
+      `Are you sure you want to delete the profile of ${petData?.name}? This action cannot be undone.`,
       [
-        { text: "Hủy", style: "cancel" },
+        { text: "Cancel", style: "cancel" },
         {
-          text: "Xóa",
+          text: "Delete",
           style: "destructive",
           onPress: async () => {
             try {
               setIsDeleting(true);
               await petService.deletePet(petId);
-              Alert.alert("Thành công", "Đã xóa thú cưng!");
+              Alert.alert("Success", "Pet profile deleted successfully!");
               router.replace('/(tabs)/my-pets');
             } catch (error: any) {
-              Alert.alert("Lỗi", error.message || "Không thể xóa thú cưng lúc này.");
+              Alert.alert("Error", error.message || "Unable to delete pet at this time.");
               setIsDeleting(false);
             }
           }
@@ -126,8 +129,8 @@ export default function PetProfileDetailScreen() {
             setIsLostMode(true);
           }
         } catch (error) {
-          console.error("Lỗi khi tải thông tin thú cưng:", error);
-          Alert.alert("Lỗi", "Không thể tải thông tin chi tiết thú cưng. Vui lòng thử lại.");
+          console.error("Error when loading pet information:", error);
+          Alert.alert("Error", "Unable to load pet information. Please try again.");
         } finally {
           setIsLoading(false);
         }
@@ -163,11 +166,11 @@ export default function PetProfileDetailScreen() {
         pathname: '/report-lost-pet' as any,
         params: {
           petId: petId,
-          petName: petData?.name, // Thêm dấu ? để an toàn
-          petAvatar: petData?.avatarUrl || petData?.images?.[0]?.url,
-          petShelterName: petData.contactName || ownerInfo.name || 'Chưa cập nhật',
-          petShelterPhone: petData.contactPhone || ownerInfo.phone || 'Chưa cập nhật',
-          petShelterAddress: petData.contactAddress || ownerInfo.address || 'Chưa cập nhật'
+          petName: petData?.name, 
+          petAvatar: displayAvatar, // ĐÃ SỬA Ở ĐÂY
+          petShelterName: petData?.contactName || ownerInfo?.name || 'Chưa cập nhật', // Thêm dấu ? cho an toàn
+          petShelterPhone: petData?.contactPhone || ownerInfo?.phone || 'Chưa cập nhật',
+          petShelterAddress: petData?.contactAddress || ownerInfo?.address || 'Chưa cập nhật'
         }
       });
     } else {
@@ -289,7 +292,7 @@ export default function PetProfileDetailScreen() {
     return (
       <View className="flex-1 justify-center items-center bg-[#FAFAFA]">
         <ActivityIndicator size="large" color="#ffa053" />
-        <Text className="mt-4 text-gray-500">Đang tải thông tin thú cưng...</Text>
+        <Text className="mt-4 text-gray-500">Loading pet information...</Text>
       </View>
     );
   }
@@ -298,9 +301,9 @@ export default function PetProfileDetailScreen() {
     return (
       <View className="flex-1 justify-center items-center bg-[#FAFAFA]">
         <MaterialCommunityIcons name="paw-off" size={64} color="#E5E7EB" />
-        <Text className="text-gray-800 text-lg font-bold mt-4">Không tìm thấy thông tin</Text>
+        <Text className="text-gray-800 text-lg font-bold mt-4">Information not found</Text>
         <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-orange-100 px-6 py-2 rounded-full">
-          <Text className="text-orange-600 font-bold">Quay lại</Text>
+          <Text className="text-orange-600 font-bold">Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -371,7 +374,7 @@ export default function PetProfileDetailScreen() {
           <View className="items-center mt-6 mb-[12px]">
             <View className="w-32 h-32 rounded-full bg-[#FFFFFF] border border-gray-200 items-center justify-center overflow-hidden shadow-sm">
               <Image
-                source={{ uri: petData.avatarUrl || petData.images?.[0]?.url || 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop' }}
+                source={{ uri: displayAvatar }}
                 className="w-full h-full"
                 resizeMode="cover"
               />
@@ -392,25 +395,31 @@ export default function PetProfileDetailScreen() {
 
             <View>
               <View>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => router.push({ pathname: '/(tabs)/scan', params: { linkPetId: petId } })}
-                  className="mx-[20px] mb-8 flex-row bg-[#FDF5E8] border border-[#FFAA33] rounded-[20px] p-[17px]"
-                >
-                  <View className="mr-2">
-                    <Image
-                      source={require('../assets/icon/alert.png')}
-                      style={{ width: 15, height: 15 }}
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[16px] font-semibold text-[#CF7900] mb-1">This Tag Needs Replacement ASAP!</Text>
-                    <Text className="text-[14px] text-[#CF7900]">
-                      A damaged tag may make it harder for other to access important info when needed.
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                {petData?.needsQrReplacement && (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      // Truyền petId vào replacePetId để scan.tsx hiểu đây là luồng replace
+                      router.push({ 
+                        pathname: '/(tabs)/scan', 
+                        params: { replacePetId: petId } 
+                      });
+                    }}
+                    className="mx-[20px] mb-8 flex-row bg-[#FDF5E8] border border-[#FFAA33] rounded-[20px] p-[17px]"
+                  >
+                    <View className="mr-2">
+                      <Image source={require('../assets/icon/alert.png')} style={{ width: 15, height: 15 }} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[16px] font-semibold text-[#CF7900] mb-1">
+                        This Tag Needs Replacement ASAP!
+                      </Text>
+                      <Text className="text-[14px] text-[#CF7900]">
+                        A damaged tag may make it harder to access important info.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
               </View>
               <View
                 className="mx-[20px] mb-8 rounded-[20px]"
@@ -529,7 +538,11 @@ export default function PetProfileDetailScreen() {
 
               <InfoRow
                 label1="Gender" value1={petData.gender || 'Chưa cập nhật'}
-                label2="Sterilized" value2={petData.sterilized || 'Chưa cập nhật'}
+                label2="Sterilized" value2={
+                  petData.isSpayedNeutered === true ? 'Yes' : 
+                  petData.isSpayedNeutered === false ? 'No' : 
+                  'Chưa cập nhật'
+                }
               />
               <InfoRow
                 label1="Breed"
@@ -651,35 +664,47 @@ export default function PetProfileDetailScreen() {
 
 
           {/* ========================================================= */}
-          {/* --- VACCINATION RECORD SECTION (MỚI THÊM VÀO ĐÂY) --- */}
+          {/* --- VACCINATION RECORD SECTION --- */}
           {/* ========================================================= */}
           <View className="mx-[20px] mb-8">
             <Text className="font-semibold text-[16px] text-black mb-3">Vaccination Record</Text>
-            {petData?.vaccinationRecordUrl ? (
-              <View className="border border-[#E5E5E5] rounded-[16px] pl-3 pt-3 pb-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
-                <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
-                <View className="flex-1 mx-3">
-                  <View className="flex-row justify-between items-center">
-                    <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>vaccination_record.jpg</Text>
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        const { pageY } = e.nativeEvent;
-                        setMenuPosition({ top: pageY + 10, right: 32 });
-                        setShowVaccineMenu(true);
-                      }}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                    </TouchableOpacity>
-                  </View>
-                  <View className="flex-row items-center mt-1">
-                    <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">1.2 MB • </Text>
-                    <View className="flex-row items-center">
-                      <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">Submitted on 01/01/2026</Text>
+            
+            {/* KIỂM TRA MẢNG MỚI: vaccinationRecordUrls */}
+            {petData?.vaccinationRecordUrls && petData.vaccinationRecordUrls.length > 0 ? (
+              <View className="flex-col gap-3">
+                {petData.vaccinationRecordUrls.map((url: string, index: number) => (
+                  <View key={index} className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
+                    <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                    <View className="flex-1 mx-3">
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
+                          vaccination_record_{index + 1}.jpg
+                        </Text>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            const { pageY } = e.nativeEvent;
+                            setMenuPosition({ top: pageY + 10, right: 32 });
+                            setSelectedVaccineIndex(index); // <--- LƯU LẠI VỊ TRÍ FILE ĐƯỢC CHỌN
+                            setShowVaccineMenu(true);
+                          }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                        </TouchableOpacity>
+                      </View>
+                      <View className="flex-row items-center mt-1">
+                        <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">Completed • </Text>
+                        <View className="flex-row items-center">
+                          <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">
+                            {/* Bạn có thể dùng petData.createdAt để hiển thị ngày tải lên */}
+                            Submitted on {new Date(petData.createdAt || Date.now()).toLocaleDateString('en-GB')}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
                   </View>
-                </View>
+                ))}
               </View>
             ) : (
               <View className="bg-white border border-dashed border-[#E5E5E5] rounded-[12px] py-5 items-center justify-center">
@@ -796,13 +821,11 @@ export default function PetProfileDetailScreen() {
         transparent={true}
         onRequestClose={() => setShowVaccineMenu(false)}
       >
-        {/* Lớp phủ tàng hình, click vào đây sẽ đóng menu */}
         <TouchableOpacity
           style={{ flex: 1 }}
           activeOpacity={1}
           onPress={() => setShowVaccineMenu(false)}
         >
-          {/* Menu Dropdown sử dụng toạ độ động */}
           <View
             className="absolute bg-white rounded-xl border border-gray-100 w-36"
             style={{
@@ -815,51 +838,95 @@ export default function PetProfileDetailScreen() {
               shadowRadius: 10
             }}
           >
-            {/* Option 1: Upload */}
+            {/* Option 1: View */}
             <TouchableOpacity
               className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
-                console.log("Trigger Upload File");
+                
+                // Kiểm tra xem đã xác định được file đang chọn chưa
+                if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
+                  const urlToView = petData.vaccinationRecordUrls[selectedVaccineIndex];
+                  
+                  if (urlToView) {
+                    // Mở URL ảnh bằng trình duyệt / trình xem ảnh mặc định
+                    Linking.openURL(urlToView).catch(() => {
+                      Alert.alert("Error", "Unable to open this file.");
+                    });
+                  }
+                }
               }}
             >
-              <Text className="text-[14px] text-gray-700 ml-2 font-regular">Upload new file</Text>
+              <Text className="text-[14px] text-gray-700 ml-2 font-regular">View file</Text>
             </TouchableOpacity>
 
-            {/* Option 2: Report */}
+            {/* Option 2: Download / Xem ảnh */}
             <TouchableOpacity
               className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
-                console.log("Trigger downlpad");
+                if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
+                  const urlToDownload = petData.vaccinationRecordUrls[selectedVaccineIndex];
+                  if (urlToDownload) {
+                    // Dùng Linking để mở browser hoặc app xem ảnh mặc định
+                    Linking.openURL(urlToDownload).catch(() => {
+                      Alert.alert("Lỗi", "Không thể mở file này.");
+                    });
+                  }
+                }
               }}
             >
               <Text className="text-[14px] text-gray-700 ml-2 font-regular">Download</Text>
             </TouchableOpacity>
 
             {/* Option 3: Delete */}
-            <TouchableOpacity
+            {/* <TouchableOpacity
               className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
-                // Delay một chút để Modal đóng mượt mà trước khi hiện Alert
                 setTimeout(() => {
                   Alert.alert(
                     "Delete Record",
                     "Are you sure you want to delete this vaccination record?",
                     [
                       { text: "Cancel", style: "cancel" },
-                      { text: "Delete", style: "destructive", onPress: () => console.log("Deleted") }
+                      { 
+                        text: "Delete", 
+                        style: "destructive", 
+                        onPress: async () => {
+                          if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
+                            // Tạo mảng mới loại bỏ file đang chọn
+                            const newUrlsList = petData.vaccinationRecordUrls.filter(
+                              (_: string, i: number) => i !== selectedVaccineIndex
+                            );
+
+                            try {
+                              // Gọi API cập nhật Pet
+                              await petService.updatePet(petId, { vaccinationRecordUrls: newUrlsList });
+                              
+                              // Cập nhật State để UI render lại ngay lập tức
+                              setPetData((prev: any) => ({
+                                ...prev,
+                                vaccinationRecordUrls: newUrlsList
+                              }));
+                              
+                            } catch (error) {
+                              Alert.alert("Lỗi", "Không thể xóa file lúc này.");
+                            }
+                          }
+                        } 
+                      }
                     ]
                   );
                 }, 150);
               }}
             >
-              <Text className="text-[14px] text-[#FF3B30] ml-2 font-regular">Report</Text>
-            </TouchableOpacity>
+              <Text className="text-[14px] text-[#FF3B30] ml-2 font-regular">Delete</Text>
+            </TouchableOpacity> */}
+            
           </View>
         </TouchableOpacity>
       </Modal>

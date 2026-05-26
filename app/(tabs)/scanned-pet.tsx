@@ -21,6 +21,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
+// --- COMPONENT XỬ LÝ ẢNH CÓ LOADING (MỚI) ---
+const ImageWithLoading = ({ uri, imgWidth }: { uri: string; imgWidth: number }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+
+  return (
+    <View style={{ width: imgWidth, height: 210, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}>
+      {isLoading && !isError && (
+        <ActivityIndicator size="small" color="#E89B5A" style={{ position: 'absolute' }} />
+      )}
+      <Image
+        source={{ uri: isError ? 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop' : uri }}
+        style={{ width: '100%', height: '100%' }}
+        resizeMode="cover"
+        onLoadStart={() => setIsLoading(true)}
+        onLoadEnd={() => setIsLoading(false)}
+        onError={() => {
+          setIsLoading(false);
+          setIsError(true);
+        }}
+      />
+    </View>
+  );
+};
+
 export default function ScannedPetScreen() {
   const router = useRouter();
   const { tagId } = useLocalSearchParams();
@@ -32,23 +57,92 @@ export default function ScannedPetScreen() {
   const [hasReported, setHasReported] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReportVisible, setIsReportVisible] = useState(false);
+  
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const displayImages = React.useMemo(() => {
+    // 1. Kiểm tra nếu pet chưa load xong
+    if (!pet) return ['https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop'];
+
+    const isLost = pet.isLost || pet.status?.toUpperCase() === 'LOST';
+    let images: string[] = [];
+
+    // 2. Xử lý ảnh Lost (từ lostPhotos)
+    if (isLost && pet.lostPhotos) {
+      try {
+        const parsed = JSON.parse(pet.lostPhotos);
+        if (Array.isArray(parsed)) {
+          images = parsed.filter(url => typeof url === 'string' && url.trim() !== '');
+        }
+      } catch (e) {
+        console.warn("Lỗi parse lostPhotos:", e);
+      }
+    }
+
+    // 3. Nếu không có ảnh Lost, xử lý ảnh mặc định (từ pet.images)
+    if (images.length === 0) {
+      const imagesArray = Array.isArray(pet.images) ? pet.images : [];
+      images = imagesArray
+        .map((img: any) => (typeof img === 'string' ? img : img?.url))
+        .filter((url: any) => typeof url === 'string' && url.trim() !== '');
+    }
+
+    // 4. Nếu pet.image là string đơn lẻ (fallback cho dữ liệu cũ)
+    if (images.length === 0 && typeof pet.image === 'string' && pet.image.trim() !== '') {
+      images = [pet.image];
+    }
+
+    // 5. Fallback cuối cùng
+    return images.length > 0 
+      ? images 
+      : ['https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop'];
+  }, [pet]);
+  const calculateAgeDisplay = (dob: string | Date | undefined | null): string => {
+    if (!dob) return 'Unknown age';
+    
+    const birthDate = new Date(dob);
+    // Validate date hợp lệ
+    if (isNaN(birthDate.getTime())) return 'Unknown age';
+    
+    const today = new Date();
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+    
+    if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+      years--;
+      months += 12;
+    }
+    
+    if (years > 0) return `${years} year${years > 1 ? 's' : ''} old`;
+    if (months > 0) return `${months} month${months > 1 ? 's' : ''} old`;
+    return 'Less than 1 month old';
+  };
+
 
   useFocusEffect(
     useCallback(() => {
-      let isActive = true; // Cleanup function để tránh memory leak
+      let isActive = true;
 
       const fetchPetData = async () => {
         try {
           setLoading(true);
-          setHasReported(false); // Reset lại trạng thái report nếu user scan lại
+          setHasReported(false);
+          setCurrentImageIndex(0); 
           
-          // Thêm timestamp ?t=... để bypass hoàn toàn HTTP Cache của iOS/Android
           const response = await axiosClient.get(`/tags/${tagId}/scan?t=${Date.now()}`);
           
           if (!isActive) return;
           
           const petData = response.data;
+
+          // DEBUG - xóa sau khi fix xong
+          console.log('=== PET DATA RAW ===', JSON.stringify(petData, null, 2));
+          console.log('=== DOB VALUE ===', petData?.dob);
+          console.log('=== AGE VALUE ===', petData?.age);
+          console.log('=== DOB TYPE ===', typeof petData?.dob);
+
           setPet(petData);
+
 
           const isPetLost = petData.isLost || petData.status?.toUpperCase() === 'LOST';
 
@@ -67,23 +161,20 @@ export default function ScannedPetScreen() {
       if (tagId) fetchPetData();
 
       return () => {
-        isActive = false; // Cleanup khi user rời khỏi màn hình
+        isActive = false;
       };
     }, [tagId])
   );
 
-  // HÀM XỬ LÝ GỌI API DUY NHẤT
+  
   const handleShareLocation = async (location: any, formData: FormData, isSkipped: boolean) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
       const finalTagId = Array.isArray(tagId) ? tagId[0] : tagId;
-      
       const lat = location?.latitude || null;
       const lng = location?.longitude || null;
-      
-      // SỬA ĐÚNG DÒNG NÀY LÀ XONG
       const radius = location?.radius || null; 
 
       const payload = isSkipped ? {
@@ -100,7 +191,6 @@ export default function ScannedPetScreen() {
         longitude: lng,
         radius: radius,
       };
-
 
       await axiosClient.post('/tags/report', payload);
 
@@ -134,6 +224,12 @@ export default function ScannedPetScreen() {
     }
   };
 
+  const onImageScroll = (event: any) => {
+    const slideSize = event.nativeEvent.layoutMeasurement.width;
+    const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
+    setCurrentImageIndex(index);
+  };
+
   if (loading) {
     return (
       <View className="flex-1 bg-white items-center justify-center">
@@ -162,13 +258,28 @@ export default function ScannedPetScreen() {
   }
 
   const isLost = pet.isLost || pet.status?.toUpperCase() === 'LOST';
+  const rawDob = pet?.dob 
+  ?? pet?.birthDate 
+  ?? pet?.birthday 
+  ?? pet?.dateOfBirth 
+  ?? null;
 
-  // Thêm đoạn này: Xử lý fallback dữ liệu an toàn để tránh bị crash và bắt đúng field từ Backend trả về
+  const displayAge = calculateAgeDisplay(rawDob);
+
+
+
   const displayOwnerName = pet?.lostInfo?.ownerName || pet?.ownerName || pet?.owner?.name || 'Unknown Owner';
   const displayOwnerPhone = pet?.lostInfo?.ownerPhone || pet?.ownerPhone || pet?.owner?.phone || null;
   const displayOwnerAddress = pet?.lostInfo?.ownerAddress || pet?.ownerAddress || pet?.owner?.address || 'No address provided';
-  // Lấy trường `note` được gửi từ form Report, ưu tiên lostInfo.note hoặc pet.note
   const displayNote = pet?.lostInfo?.note || pet?.note || "Please contact me ASAP";
+
+  
+  
+  
+
+
+  const lostImageWidth = width - 40; 
+  const safeImageWidth = width - 48; 
 
   return (
     <View className="flex-1 bg-white">
@@ -206,12 +317,34 @@ export default function ScannedPetScreen() {
                 height: 210, shadowColor: '#000', shadowOffset: { width: 10, height: 10 },
                 shadowOpacity: 0.6, shadowRadius: 15, elevation: 4,
               }}>
-                <Image
-                  source={{ uri: pet.image || pet.images?.[0]?.url }}
-                  style={{ width: width - 20, height: 300 }}
-                  resizeMode="cover"
-                />
-                <View className="bottom-0 left-0 right-0 h-[105px] w-full absolute rounded-2xl overflow-hidden items-center justify-center">
+                
+                {/* --- SLIDER ẢNH --- */}
+                <ScrollView
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onMomentumScrollEnd={onImageScroll}
+                  style={{ width: '100%', height: 210 }}
+                >
+                  {displayImages.map((uri, index) => (
+                    <ImageWithLoading key={`lost-${index}`} uri={uri} imgWidth={lostImageWidth} />
+                  ))}
+                </ScrollView>
+
+                {/* Dấu chấm (Pagination Dots) đè lên ảnh */}
+                {displayImages.length > 1 && (
+                  <View className="absolute bottom-[90px] w-full flex-row justify-center z-20" pointerEvents="none">
+                    {displayImages.map((_, index) => (
+                      <View
+                        key={index}
+                        className={`h-1.5 rounded-full mx-1 transition-all ${index === currentImageIndex ? 'w-4 bg-[#E89B5A]' : 'w-1.5 bg-white/70'}`}
+                      />
+                    ))}
+                  </View>
+                )}
+
+                {/* Overlays LinearGradient */}
+                <View pointerEvents="none" className="bottom-0 left-0 right-0 h-[105px] w-full absolute rounded-2xl overflow-hidden items-center justify-center z-10">
                   <LinearGradient
                     colors={['rgba(232, 155, 90, 0.8)', 'transparent']}
                     start={{ x: 0.5, y: 1 }} end={{ x: 0.5, y: 0 }}
@@ -219,28 +352,25 @@ export default function ScannedPetScreen() {
                   />
                 </View>
 
-                {isLost && (
-                  <View className="absolute top-5 right-5 bg-[#E89B5A] px-4 py-1 rounded-full z-10">
-                    <Text className="text-white font-extrabold text-[16px] tracking-[0.5px] leading-5 uppercase">Lost</Text>
-                  </View>
-                )}
+                {/* Badge Lost */}
+                <View className="absolute top-5 right-5 bg-[#E89B5A] px-4 py-1 rounded-full z-20" pointerEvents="none">
+                  <Text className="text-white font-extrabold text-[16px] tracking-[0.5px] leading-5 uppercase">Lost</Text>
+                </View>
 
-                <View className="absolute bottom-0 left-0 right-0 mb-4 items-center">
-                  <Text
-                    className="text-white text-[24px] font-bold text-center capitalize mb-2"
-                  >
+                {/* Tên & Tuổi thú cưng */}
+                <View className="absolute bottom-0 left-0 right-0 mb-4 items-center z-20" pointerEvents="none">
+                  <Text className="text-white text-[24px] font-bold text-center capitalize mb-2">
                     {pet?.name?.toLowerCase() || 'pet'}
                   </Text>
-                  <Text
-                    className="text-white text-[14px] font-regular text-center tracking-[0.5px]"
-                  >
-                    {pet?.age || 'Unknown'} years old • {pet?.breed || 'Unknown'}
+                  <Text className="text-white text-[14px] font-regular text-center tracking-[0.5px]">
+                                        {displayAge !== 'Unknown' ? `${displayAge}` : 'Age unknown'} • {pet?.breed || 'Unknown breed'}
                   </Text>
                 </View>
               </View>
             </View>
           </View>
         ) : (
+          /* TRẠNG THÁI SAFE (KHÔNG BÁO MẤT) */
           <View className="pt-4 px-6">
             <View className="bg-white rounded-[32px]" style={{
               shadowColor: '#000000',
@@ -249,13 +379,31 @@ export default function ScannedPetScreen() {
               shadowRadius: 5,
               elevation: 3,
             }}>
+              <View className="w-full rounded-[24px] overflow-hidden shadow-lg shadow-black/10 bg-gray-200" style={{ height: 210 }}>
+                {/* --- SLIDER ẢNH --- */}
+                <ScrollView
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onMomentumScrollEnd={onImageScroll}
+                  style={{ width: '100%', height: 210 }}
+                >
+                  {displayImages.map((uri, index) => (
+                    <ImageWithLoading key={`safe-${index}`} uri={uri} imgWidth={safeImageWidth} />
+                  ))}
+                </ScrollView>
 
-              <View className="w-full h-64 rounded-[24px]  overflow-hidden shadow-lg shadow-black/10 bg-gray-100rounded-[24px] bg-gray-200" style={{ height: 210 }}>
-                <Image
-                  source={{ uri: pet.image || pet.images?.[0]?.url }}
-                  style={{ width: width - 20, height: 300 }}
-                  resizeMode="cover"
-                />
+                {/* Dấu chấm (Pagination Dots) đè lên ảnh */}
+                {displayImages.length > 1 && (
+                  <View className="absolute bottom-3 w-full flex-row justify-center z-20" pointerEvents="none">
+                    {displayImages.map((_, index) => (
+                      <View
+                        key={index}
+                        className={`h-1.5 rounded-full mx-1 transition-all ${index === currentImageIndex ? 'w-4 bg-[#E89B5A]' : 'w-1.5 bg-white/50'}`}
+                      />
+                    ))}
+                  </View>
+                )}
               </View>
             </View>
             <View className='items-center'>
@@ -266,8 +414,6 @@ export default function ScannedPetScreen() {
 
         {/* --- 2. INFORMATION BODY --- */}
         <View className="px-5">
-
-          {/* Thay đổi điều kiện từ: isLost && pet.owner sang chỉ isLost để tránh lỗi mất UI */}
           {isLost ? (
             <View className="bg-white">
               <Text className="text-[18px] font-semibold text-[#AB5C1A] my-[21px]">Owner Information</Text>
@@ -314,7 +460,7 @@ export default function ScannedPetScreen() {
                       </View>
                       <View className="flex-1 justify-center -mx-1">
                         <Text className="text-[#AB5C1A] text-[16px] font-semibold leading-[16px] mb-[7px]">Address</Text>
-                        <Text className="text-[#8E8E93] text-[14px] ffont-regular leading-[16px]">
+                        <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">
                           {displayOwnerAddress}
                         </Text>
                       </View>
@@ -323,20 +469,18 @@ export default function ScannedPetScreen() {
                 </View>
                 <View className="flex items-center w-4/5 bg-[#FFF8F5] px-2.5 rounded-full border border-[#E89B5A] bottom-5">
                   <Text className="text-[#AB5C1A] text-[14px] text-center font-regular leading-[20px] py-[6px]">
-                    {/* BƯỚC ĐỔI QUAN TRỌNG: Gọi ra biến displayNote đã xử lý ở trên */}
                     {displayNote}
                   </Text>
                 </View>
               </View>
             </View>
-
           ) : (
             <View className='flex justify-center items-center'>
               <View className="bg-white border border-[#D9D9D9] rounded-[16px] px-7 pt-5 pb-9">
                 <View className="flex-row justify-between gap-2 mb-7">
                   <View className="w-1/2">
                     <Text className="font-medium text-[16px] mb-[12.5px]" >Gender</Text>
-                    <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">{pet.gender.toLowerCase() || 'Unknown'}</Text>
+                    <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">{pet.gender?.toLowerCase() || 'Unknown'}</Text>
                   </View>
                   <View className="w-1/2">
                     <Text className="font-medium text-[16px] mb-[12.5px] ">Breed</Text>
@@ -346,7 +490,7 @@ export default function ScannedPetScreen() {
                 <View className="flex-row justify-between items-center gap-2">
                   <View className="w-1/2">
                     <Text className="font-medium text-[16px] mb-[12.5px]" >Color</Text>
-                    <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">{pet.color.toLowerCase() || 'Unknown'}</Text>
+                    <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">{pet.color?.toLowerCase() || 'Unknown'}</Text>
                   </View>
                   <View className="w-1/2">
                     <Text className="font-medium text-[16px] mb-[12.5px]" >Birthday</Text>
@@ -360,7 +504,6 @@ export default function ScannedPetScreen() {
                   This pet is safe and sound with their owner
                 </Text>
               </View>
-
             </View>
           )}
 
@@ -418,7 +561,6 @@ export default function ScannedPetScreen() {
         onClose={() => setIsReportVisible(false)}
       />
 
-      {/* Render duy nhất Modal mới */}
       <LostModeShareModal
         isVisible={isModalVisible}
         onClose={() => setIsModalVisible(false)}

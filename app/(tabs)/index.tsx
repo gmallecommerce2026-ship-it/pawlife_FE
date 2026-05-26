@@ -297,7 +297,7 @@ export default function HomeScreen() {
         return (
             <View className="flex-1 bg-white justify-center items-center">
                 <ActivityIndicator size="large" color="#FF8C42" />
-                <Text className="mt-4 text-gray-500 font-medium">Đang tải dữ liệu...</Text>
+                <Text className="mt-4 text-gray-500 font-medium">Loading data...</Text>
             </View>
         );
     }
@@ -381,7 +381,7 @@ export default function HomeScreen() {
                         <View className="mt-[38px]">
                             <SectionHeader title="Pets Near You" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })} />
                             {pets.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có thú cưng nào gần đây</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">No pets nearby</Text>
                             ) : (
                                 <FlatList
                                     horizontal
@@ -410,7 +410,7 @@ export default function HomeScreen() {
                         <View className="mt-[38px]">
                             <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} />
                             {shelters.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">No shelters available</Text>
                             ) : (
                                 <ScrollView
                                     horizontal
@@ -445,7 +445,7 @@ export default function HomeScreen() {
                         <View className="mt-[38px] mb-6">
                             <SectionHeader title="Upcoming Events" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })} />
                             {events.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có sự kiện nào sắp tới</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">No upcoming events</Text>
                             ) : (
                                 <ScrollView
                                     horizontal

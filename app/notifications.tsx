@@ -10,11 +10,34 @@ import {
   Trash2
 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Modal, RefreshControl, SectionList, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  RefreshControl, SectionList,
+  Share,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  UIManager,
+  View
+} from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient';
 import { groupNotifications } from '../utils/dateUtils';
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+// Kích hoạt LayoutAnimation cho thiết bị Android
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 const getIconByType = (type: string) => {
   const props = { size: 22, color: "#4B5563", strokeWidth: 2 };
@@ -29,47 +52,74 @@ const getIconByType = (type: string) => {
   }
 };
 
-// Tạo Animated Component cho Nút bấm
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-// --- Component Item với hiệu ứng Swipe Premium, Parallax & Border Masking ---
+// --- Component Item kết hợp: Khấc 80px gốc + Hiệu ứng Vút hẳn ---
+// Cập nhật lại Component NotificationItem
 const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPress: any, onDelete: any, onView: any }) => {
-  const [dragXNode, setDragXNode] = useState<any>(null);
   const swipeableRef = useRef<Swipeable>(null);
+  const [dragXNode, setDragXNode] = useState<any>(null);
+  const dragXRef = useRef(0); // 1. [MỚI] Thêm Ref để theo dõi quãng đường ngón tay kéo
   const triggeredRef = useRef(false);
 
+  // Hiệu ứng để bắn cụm nội dung ra khỏi màn hình
+  const flyOutAnim = useRef(new Animated.Value(0)).current;
+
   const captureDragX = (dragX: any) => {
-    if (!dragXNode) {
-      setTimeout(() => setDragXNode(dragX), 0);
-    }
+    if (!dragXNode) setTimeout(() => setDragXNode(dragX), 0);
   };
 
-  // Lắng nghe khoảng cách kéo để tự động kích hoạt hành động (Full Swipe)
+  // 2. [MỚI] Lắng nghe và cập nhật liên tục vị trí vuốt thực tế vào dragXRef
   useEffect(() => {
-    if (!dragXNode) return;
-    const listenerId = dragXNode.addListener(({ value }: { value: number }) => {
-      const threshold = 110; // Đã giảm xuống 110 để thao tác dứt khoát là kích hoạt ngay
-
-      if (value > threshold && !triggeredRef.current) {
-        // Full Swipe Right (Xem)
-        triggeredRef.current = true;
-        onView(item);
-        swipeableRef.current?.close();
-      } else if (value < -threshold && !triggeredRef.current) {
-        // Full Swipe Left (Xóa)
-        triggeredRef.current = true;
-        onDelete(item);
-        swipeableRef.current?.close();
-      } else if (Math.abs(value) < 80) {
-        // Reset trạng thái nếu nhả tay ở khấc hoặc kéo ngược lại
-        triggeredRef.current = false;
+    let listenerId: string = '';
+    if (dragXNode) {
+      listenerId = dragXNode.addListener(({ value }: any) => {
+        dragXRef.current = value;
+      });
+    }
+    return () => {
+      if (dragXNode && listenerId) {
+        dragXNode.removeListener(listenerId);
       }
+    };
+  }, [dragXNode]);
+
+  const triggerView = () => {
+    if (triggeredRef.current) return;
+    triggeredRef.current = true;
+    
+    // Bắn cụm UI vút sang phải (Xem)
+    Animated.timing(flyOutAnim, {
+      toValue: SCREEN_WIDTH,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      onView(item);
+      setTimeout(() => {
+        flyOutAnim.setValue(0);
+        swipeableRef.current?.close();
+        triggeredRef.current = false;
+      }, 400);
     });
+  };
 
-    return () => dragXNode.removeListener(listenerId);
-  }, [dragXNode, item, onView, onDelete]);
+  const triggerDelete = () => {
+    if (triggeredRef.current) return;
+    triggeredRef.current = true;
+    
+    // Bắn cụm UI vút sang trái (Xóa)
+    Animated.timing(flyOutAnim, {
+      toValue: -SCREEN_WIDTH,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      onDelete(item);
+    });
+  };
 
-  // NÚT XEM (XANH LÁ)
+  
+
+  // UI NÚT XEM (XANH LÁ)
   const renderLeftActions = (progress: any, dragX: any) => {
     captureDragX(dragX);
     const transX = dragX.interpolate({
@@ -82,10 +132,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       <View style={{ width: 80, overflow: 'visible' }}>
         <AnimatedTouchableOpacity
           activeOpacity={0.8}
-          onPress={() => {
-            onView(item);
-            swipeableRef.current?.close();
-          }}
+          onPress={triggerView}
           style={{
             position: 'absolute', top: 0, bottom: 0, left: 0,
             width: 1000, 
@@ -103,7 +150,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
     );
   };
 
-  // NÚT XÓA (ĐỎ)
+  // UI NÚT XÓA (ĐỎ)
   const renderRightActions = (progress: any, dragX: any) => {
     captureDragX(dragX);
     const transX = dragX.interpolate({
@@ -116,10 +163,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       <View style={{ width: 80, overflow: 'visible' }}>
         <AnimatedTouchableOpacity
           activeOpacity={0.8}
-          onPress={() => {
-            onDelete(item);
-            swipeableRef.current?.close();
-          }}
+          onPress={triggerDelete}
           style={{
             position: 'absolute', top: 0, bottom: 0, right: 0,
             width: 1000, 
@@ -156,12 +200,22 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       ref={swipeableRef}
       renderLeftActions={renderLeftActions}
       renderRightActions={renderRightActions}
-      overshootLeft={true} 
-      overshootRight={true} 
-      friction={1} // Đã trả về 1 để vuốt nhẹ và mượt mà nhất
-      overshootFriction={1} // Không tạo lực ghì khi cố tình kéo dài
+      friction={1.5}
+      overshootFriction={8} 
+      // 3. [SỬA] Đã xóa leftThreshold và rightThreshold để vuốt nhẹ thì nó tự hít lại mức 80px tự nhiên
+      onSwipeableWillOpen={(direction) => {
+        // 4. [SỬA] Sử dụng onSwipeableWillOpen: Khi bắt đầu quyết định mở khấc, ta kiểm tra độ dài vuốt
+        // Chỉ kích hoạt vút mất đi khi người dùng đã vuốt vượt ngưỡng 110px. Nếu dưới 110px, nó chỉ hít vào điểm 80px.
+        if (direction === 'left' && dragXRef.current > 110) {
+          triggerView();
+        } else if (direction === 'right' && dragXRef.current < -110) {
+          triggerDelete();
+        }
+      }}
     >
-      <View style={{ position: 'relative' }}>
+      {/* ... Phần UI bên trong giữ nguyên y hệt của bạn */}
+      <Animated.View style={{ transform: [{ translateX: flyOutAnim }], position: 'relative' }}>
+        {/* Lớp áo che góc vuông (Masking) */}
         <Animated.View
           key={dragXNode ? 'left-active' : 'left-static'}
           style={{
@@ -179,6 +233,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
           }}
         />
 
+        {/* Cụm UI Bo tròn 16px gốc */}
         <View style={{
           borderRadius: 16,
           backgroundColor: bgColorHex,
@@ -211,8 +266,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
             </View>
           </TouchableOpacity>
         </View>
-
-      </View>
+      </Animated.View>
     </Swipeable>
   );
 };
@@ -229,7 +283,6 @@ export default function NotificationsScreen() {
   const [popupConfig, setPopupConfig] = useState({
     visible: false, title: '', message: '', type: 'info', buttonText: 'Close'
   });
-  const [isProcessing, setIsProcessing] = useState(false);
 
   const closePopup = () => setPopupConfig(prev => ({ ...prev, visible: false }));
 
@@ -264,6 +317,31 @@ export default function NotificationsScreen() {
     if (!loadingMore && hasMore && !loading) fetchNotifications(page + 1);
   };
 
+  const handleShare = async () => {
+    try {
+      const result = await Share.share({
+        // Lời nhắn mặc định khi user chọn app để share (Zalo, Facebook, Messenger...)
+        message: 'Cùng tham gia cộng đồng yêu thú cưng PawLife ngay hôm nay nhé! 🐾 \nhttps://pawlife.vn', 
+        title: 'Chia sẻ PawLife' // Thường có tác dụng làm tiêu đề hiển thị trên Android
+      });
+
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Shared qua một app cụ thể (ví dụ com.apple.social.facebook) - Chỉ có trên iOS
+          console.log('Đã share qua:', result.activityType);
+        } else {
+          // Đã share thành công
+          console.log('Share thành công!');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // User tắt popup, không share nữa
+        console.log('Đã hủy share');
+      }
+    } catch (error: any) {
+      Alert.alert('Lỗi', 'Không thể chia sẻ lúc này. Vui lòng thử lại!');
+    }
+  };
+
   const handleMarkAllAsRead = async () => {
     try {
       setSections(prevSections => prevSections.map(section => ({
@@ -277,15 +355,24 @@ export default function NotificationsScreen() {
   };
 
   const handleDeleteNotification = async (item: any) => {
+    // Tạo hiệu ứng dồn list lên tự động
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
     try {
       setSections(prevSections => prevSections.map(section => ({
         ...section,
         data: section.data.filter((note: any) => note.id !== item.id)
-      })).filter(section => section.data.length > 0));
+      })).filter(section => section.data.length > 0)); 
+      
       await axiosClient.delete(`/notifications/${item.id}`);
     } catch (error) {
       console.error("Error deleting notification:", error);
-      fetchNotifications(1, true);
+      setPopupConfig({ 
+        visible: true, title: "Lỗi", 
+        message: "Không thể xóa thông báo lúc này. Vui lòng thử lại sau.", 
+        type: "error", buttonText: "Đóng" 
+      });
+      fetchNotifications(1, true); 
     }
   };
 
@@ -322,12 +409,7 @@ export default function NotificationsScreen() {
     switch (item.type) {
       case 'TAG_SCANNED':
         if (!item.id) return;
-        router.push({
-          pathname: '/tag-report-detail',
-          params: {
-            reportId: item.referenceId
-          }
-        });
+        router.push({ pathname: '/tag-report-detail', params: { reportId: item.referenceId } });
         break;
       case 'TAG':
         showCustomAlert(item.title, item.body, "system", "Got it"); break;
@@ -356,13 +438,13 @@ export default function NotificationsScreen() {
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
             <Text className="text-[24px] font-bold text-gray-900 tracking-tight">Notifications</Text>
           </View>
-          <TouchableOpacity onPress={() => console.log("Share")} className="p-2 -mr-2 rounded-full active:bg-gray-50 z-20">
+          {/* <TouchableOpacity onPress={() => handleShare()} className="p-2 -mr-2 rounded-full active:bg-gray-50 z-20">
             <Image
               source={require('../assets/icon/share.png')}
               style={{ width: 20, height: 20 }}
               resizeMode="cover"
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {loading ? (

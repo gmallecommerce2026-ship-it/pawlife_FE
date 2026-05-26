@@ -1,6 +1,6 @@
 // app/pet-detail-modal.tsx
 import { Text } from '@/components/AppText';
-import { Feather, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,8 +12,8 @@ import Animated, {
   useSharedValue
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { petService } from '../services/petService';
 import Toast from 'react-native-toast-message';
+import { petService } from '../services/petService';
 
 const getAge = (dobString?: string) => {
   if (!dobString) return 'Unknown';
@@ -65,17 +65,12 @@ export default function PetDetailModal() {
     };
   });
 
-  // --- MOCK DATA GIỮ NGUYÊN ---
-  const MOCK_IMAGES: string[] = [
-    'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=800&auto=format&fit=crop'
-  ];
-
-  const baseImage: string = 'https://images.unsplash.com/photo-1600804340584-c7db2eacf0bf?q=80&w=800&auto=format&fit=crop';
-  const CLONED_IMAGES: string[] = Array(3).fill(baseImage);
-  const petImages = MOCK_IMAGES; // Hoặc dùng CLONED_IMAGES / pet.images tùy ý
-
+  const displayImages = useMemo(() => {
+    return pet?.images?.length > 0 
+      ? pet.images.map((img: any) => img.url) 
+      : [pet?.avatarUrl || 'https://images.unsplash.com/photo-1600804340584-c7db2eacf0bf?q=80&w=800&auto=format&fit=crop'];
+  }, [pet]);
+  
   const MOCK_PAW_HISTORY = [
     {
       id: '1',
@@ -145,47 +140,14 @@ export default function PetDetailModal() {
     setShowHistory(!showHistory);
   };
 
-  const handleFavourite = () => {
-    setIsFavourite(true);
-    try {
-      if (isFavourite) {
-        // petService.unfavoritePet(pet.id).catch(err => console.error("Lỗi bỏ tim:", err));
-        setIsFavourite(false);
-        Toast.show({
-          type: 'custom_badge',
-          props: {
-            petName: pet.name || 'This pet',
-            actionText: ' has been removed from Favourite Pet'
-          },
-          visibilityTime: 2500,
-          autoHide: true,
-        })
-      } else {
-        setIsFavourite(true);
-        Toast.show({
-          type: 'custom_badge',
-          props: {
-            petName: pet.name || 'This pet',
-            actionText: ' has been added from Favourite Pet'
-          },
-          visibilityTime: 2500,
-          autoHide: true,
-        })
-      }
-    }
-    catch {
-
-    }
-    finally {
-
-    }
-  }
-
   useEffect(() => {
     const fetchDetail = async () => {
       try {
         const res = await petService.getPetById(params.id as string);
-        setPet(res.data || res);
+        const petData = res.data || res;
+        setPet(petData);
+        // Giả sử API trả về field isFavorited (boolean) để biết user đã tim chưa
+        setIsFavourite(!!petData.isFavorited); 
       } catch (error) {
         console.error(error);
       } finally {
@@ -194,6 +156,43 @@ export default function PetDetailModal() {
     };
     fetchDetail();
   }, [params.id]);
+
+  // Áp dụng Optimistic UI cho nút tim
+  const handleFavourite = async () => {
+    const previousState = isFavourite;
+    // 1. Cập nhật UI ngay lập tức để tạo cảm giác mượt mà
+    setIsFavourite(!previousState);
+
+    try {
+      if (previousState) {
+        // Đang tim -> Bỏ tim
+        await petService.unfavoritePet(pet.id);
+        Toast.show({
+          type: 'custom_badge',
+          props: { petName: pet.name || 'This pet', actionText: ' has been removed from Favourite' },
+          visibilityTime: 2500, autoHide: true,
+        });
+      } else {
+        // Chưa tim -> Tim
+        await petService.favoritePet(pet.id);
+        Toast.show({
+          type: 'custom_badge',
+          props: { petName: pet.name || 'This pet', actionText: ' has been added to Favourite' },
+          visibilityTime: 2500, autoHide: true,
+        });
+      }
+    } catch (error) {
+      // 2. Nếu API lỗi, rollback lại trạng thái cũ
+      setIsFavourite(previousState);
+      Toast.show({
+        type: 'error',
+        text1: 'Oops!',
+        text2: 'Something went wrong. Please try again.',
+        visibilityTime: 2500, autoHide: true,
+      });
+      console.error("Lỗi thả tim:", error);
+    }
+  };
 
   if (isLoading || !pet) {
     return (
@@ -297,7 +296,7 @@ export default function PetDetailModal() {
 
         {/* FlatList chứa các ảnh thú cưng */}
         <FlatList
-          data={MOCK_IMAGES}
+          data={displayImages}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
@@ -321,15 +320,32 @@ export default function PetDetailModal() {
            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%' }}
         /> */}
 
-        {/* Pagination Dots (Vì dùng position absolute theo Đáy của Animated.View, nó sẽ tự động chạy lên/xuống theo) */}
-        <View className="absolute bottom-[40px] w-full flex-row justify-center items-center gap-2 z-10">
-          {MOCK_IMAGES.map((_, index) => (
-            <View
-              key={index}
-              className={`h-2 rounded-full ${activeIndex === index ? 'w-6 bg-[#E89B5A]' : 'w-2 bg-white/60'}`}
-            />
-          ))}
-        </View>
+        {displayImages.length > 1 && (
+          <View 
+            style={{
+              position: 'absolute',
+              bottom: 40,
+              left: 0,
+              right: 0,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 6, // Khoảng cách giữa các chấm
+              zIndex: 10
+            }}
+          >
+            {displayImages.map((_: any, index: any) => (
+              <View
+                key={index}
+                className={`h-2 rounded-full transition-all ${
+                  activeIndex === index 
+                    ? 'w-6 bg-[#E89B5A]'  // Chấm đang active (dài hơn)
+                    : 'w-2 bg-white/60'   // Chấm inactive (tròn)
+                }`}
+              />
+            ))}
+          </View>
+        )}
 
       </Animated.View>
 
@@ -467,43 +483,88 @@ export default function PetDetailModal() {
               </View>
             </View>
 
-            {/* Description */}
             <View>
               <Text className="text-[16px] font-medium text-black mb-2">About {pet.name}</Text>
               <Text className="text-[14px] text-[#8E8E93] leading-[20px] font-regular tracking-[0.06px]">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam
+                {pet?.description || "There is no description available for this pet yet."}
               </Text>
-              <View className="flex-row gap-2 mt-[6px]">
-                <View className="bg-[#FFF4E8] px-3.5 py-0.5 rounded-full border border-[#E8A53C]/25"><Text className="text-[#E8A53C] text-[12px] font-medium">Playful</Text></View>
-                <View className="bg-[#EBF4FE] px-3.5 py-0.5 rounded-full border border-[#5A90DA]/25"><Text className="text-[#5A90DA] text-[12px] font-medium">Clingy</Text></View>
-                <View className="bg-[#EAF8EF] px-3.5 py-0.5 rounded-full border border-[#83DA5A]/25"><Text className="text-[#77C852] text-[12px] font-medium">Friendly</Text></View>
-              </View>
+              
+              {/* Dynamic Traits List */}
+                {/* Đọc từ petData.traitsList (như db seed) hoặc fallback về petData.traits */}
+                {(pet?.traitsList?.length > 0 || pet?.traits?.length > 0) && (
+                    <View className="flex-row flex-wrap gap-2 mt-[12px]">
+                        {(pet?.traitsList || pet?.traits).map((traitItem: any, index: number) => {
+                            // Xử lý linh hoạt: Nếu là Object (từ DB) thì lấy .name, nếu là String thì lấy luôn
+                            const traitName = typeof traitItem === 'string' ? traitItem : traitItem.name;
+                            
+                            if (!traitName) return null;
+
+                            const colorStyles = [
+                                { bg: 'bg-[#FFF4E8]', text: 'text-[#F3B27B]' }, // Cam
+                                { bg: 'bg-[#EBF4FE]', text: 'text-[#88B2F3]' }, // Xanh dương
+                                { bg: 'bg-[#EAF8EF]', text: 'text-[#8FD49D]' }, // Xanh lá
+                                { bg: 'bg-[#F3E8FF]', text: 'text-[#A855F7]' }  // Tím
+                            ];
+                            const style = colorStyles[index % colorStyles.length];
+                            
+                            return (
+                                <View key={index} className={`${style.bg} px-3.5 py-1 rounded-full`}>
+                                    <Text className={`${style.text} text-[12px] font-medium`}>{traitName}</Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                )}
             </View>
 
-            {/* Behavior */}
+            {/* Behavior (Good with / Not suitable) */}
             <View className="mt-6">
-              <Text className="text-[16px] font-medium text-black mb-2">{pet.name}'s Behavior</Text>
-              <View className="flex-row items-start">
-                <View className="flex-row items-center mr-1 mt-[2px]">
-                  <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                  <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">Good with:</Text>
+              <Text className="text-[16px] font-medium text-black mb-3">{pet.name}'s Behavior</Text>
+              
+              {/* Kiểm tra cả pet (từ danh sách) và fullPet (từ API chi tiết) */}
+              {((pet?.goodWith)?.length > 0 || (pet?.badWith)?.length > 0) ? (
+                <View>
+                  {/* Good With */}
+                  {(pet?.goodWith)?.length > 0 && (
+                    <View className="flex-row items-start mb-2">
+                      <View className="flex-row items-center mr-1 mt-[2px]">
+                        <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                        <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium w-[90px]">Good with:</Text>
+                      </View>
+                      <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
+                        {Array.isArray(pet?.goodWith) 
+                          ? (pet?.goodWith).join(', ') 
+                          : (pet?.goodWith)}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Not Suitable */}
+                  {(pet?.badWith)?.length > 0 && (
+                    <View className="flex-row items-start mt-1">
+                      <View className="flex-row items-center mr-1 mt-[2px]">
+                        <Image source={require('../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                        <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium w-[90px]">Not suitable:</Text>
+                      </View>
+                      <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
+                        {Array.isArray(pet?.badWith) 
+                          ? (pet?.badWith).join(', ') 
+                          : (pet?.badWith)}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
-              </View>
-              <View className="flex-row items-start">
-                <View className="flex-row items-center mr-1 mt-[2px]">
-                  <Image source={require('../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                  <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">Not suitable:</Text>
-                </View>
-                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
-              </View>
+              ) : (
+                /* Hiển thị khi không có dữ liệu */
+                <Text className="text-[14px] text-[#8E8E93] italic">Behavioral details have not been updated.</Text>
+              )}
             </View>
 
             {/* Ideal Home */}
             <View className="mt-6 mb-6">
               <Text className="text-[16px] font-medium text-black mb-2">Ideal Home</Text>
               <Text className="text-[14px] text-[#8E8E93] leading-[22px]">
-                {pet.idealHome || "TLorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. "}
+                {pet?.idealHome || "The shelter hasn't specified the ideal home conditions for this pet yet. Contact them for more details."}
               </Text>
             </View>
 
@@ -592,15 +653,19 @@ export default function PetDetailModal() {
           style={
             isFavourite ? {
               shadowColor: '#E89B5A',
-              shadowOpacity: 0.25,
-              shadowOffset: { width: 0, height: 3 },
-              shadowRadius: 6,
-              elevation: 3
-            } : {
-
-            }}>
-          <Image className='' source={isFavourite ? require('../assets/icon/heart-filled-pawdoption.png') : require('../assets/icon/heart-pawdoption.png')}
-            style={{ width: 27, height: 27 }} resizeMode="cover" />
+              shadowOpacity: 0.3,
+              shadowOffset: { width: 0, height: 4 },
+              shadowRadius: 8,
+              elevation: 5
+            } : {}
+          }
+        >
+          {/* Cấu trúc hiển thị icon Filled hoặc Outline tuỳ thuộc vào state isFavourite */}
+          <Image 
+            source={isFavourite ? require('../assets/icon/heart-filled-pawdoption.png') : require('../assets/icon/heart-pawdoption.png')}
+            style={{ width: 27, height: 27, tintColor: isFavourite ? '#E89B5A' : '#8E8E93' }} 
+            resizeMode="cover" 
+          />
         </TouchableOpacity>
 
         <TouchableOpacity

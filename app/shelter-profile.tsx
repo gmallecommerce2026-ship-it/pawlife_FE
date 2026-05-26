@@ -2,7 +2,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Linking, TextInput, TouchableOpacity, View, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Keyboard, Linking, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -149,7 +149,7 @@ export default function ShelterProfileScreen() {
   const COLUMN_WIDTH = (width - 40 - 13) / 2;
 
   const scrollY = useSharedValue(0);
-  const HEADER_HEIGHT = insets.top + 50; // Chiều cao header
+  const HEADER_HEIGHT = insets.top + 60; // Chiều cao header
   const SCROLL_THRESHOLD = 200; // Khoảng cách để header hiện ra hoàn toàn
   const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
 
@@ -501,7 +501,7 @@ export default function ShelterProfileScreen() {
       )}
       {/* --- STICKY HEADER (Luôn nằm trên cùng) --- */}
       <Animated.View
-        style={[headerBarStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 10, paddingHorizontal: 20 }]}
+        style={[headerBarStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 20, paddingHorizontal: 20 }]}
       >
         <View className="flex-1 items-center">
           <Animated.Text style={headerTitleStyle} className="text-[20px] font-semibold text-black tracking-[0.5px]">
@@ -601,11 +601,11 @@ export default function ShelterProfileScreen() {
                     className="flex-1 text-[14px] text-black"
                     style={{ fontFamily: 'Urbanist' }}
                   />
-                  {isSearching && (
+                  {/* {isSearching && (
                     <TouchableOpacity onPress={() => setIsFilterVisible(true)} className="ml-1 px-1">
                       <Image className='ml-2' source={require('../assets/icon/sliders-gray.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                     </TouchableOpacity>
-                  )}
+                  )} */}
                 </Animated.View>
               </Animated.View>
             </TouchableOpacity>

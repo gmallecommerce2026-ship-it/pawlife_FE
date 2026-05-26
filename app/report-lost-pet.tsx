@@ -1,32 +1,113 @@
 import { Text } from '@/components/AppText';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { petService } from '@/services/petService';
-import { Feather } from '@expo/vector-icons';
+import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import * as ImagePicker from 'expo-image-picker';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 interface LocItem {
   code: number;
   name: string;
 }
+
+// --- CÁC COMPONENT PHỤ TRỢ CHO POPUP ĐỊA CHỈ ---
+const Label = ({ text, required = false }: { text: string; required?: boolean }) => (
+  <Text className="text-[#8E8E93] text-[14px] font-medium mb-2 mt-4">
+    {text} {required && <Text className="text-red-500">*</Text>}
+  </Text>
+);
+
+const CustomInput = ({ value, onChangeText, placeholder }: { value?: string; onChangeText?: (text: string) => void; placeholder?: string }) => (
+  <View>
+    <TextInput
+      className="w-full bg-white border border-[#E5E5E5] rounded-2xl px-4 text-black h-14"
+      placeholder={placeholder}
+      placeholderTextColor="#9CA3AF"
+      value={value}
+      onChangeText={onChangeText}
+      style={{ fontFamily: "Urbanist" }}
+    />
+  </View>
+);
+
+const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeholder: string; value?: string; options?: string[]; onSelect?: (val: string) => void }) => {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <View>
+      <TouchableOpacity
+        onPress={() => setVisible(true)}
+        activeOpacity={0.7}
+        className={`w-full bg-white border border-[#E5E5E5] rounded-2xl h-14 px-4 flex-row items-center justify-between ${visible ? 'border-[#E89B5A]' : ''}`}
+      >
+        <Text className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`} numberOfLines={1}>
+          {value || placeholder}
+        </Text>
+        <Feather name={visible ? "chevron-up" : "chevron-down"} size={20} color="#9CA3AF" />
+      </TouchableOpacity>
+
+      <Modal visible={visible} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => setVisible(false)}>
+          <View className="flex-1 bg-black/40 justify-center px-6">
+            <TouchableWithoutFeedback>
+              <View className="bg-white rounded-3xl max-h-[60%] overflow-hidden shadow-2xl">
+                <View className="px-5 py-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
+                  <Text className="font-bold text-gray-700 text-base">{placeholder}</Text>
+                  <TouchableOpacity onPress={() => setVisible(false)}>
+                    <AntDesign name="close" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+
+                <FlatList
+                  data={options}
+                  keyExtractor={(item) => item}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item }) => {
+                    const isSelected = item === value;
+                    return (
+                      <TouchableOpacity
+                        className={`px-5 py-4 border-b border-gray-50 flex-row items-center justify-between ${isSelected ? 'bg-orange-50' : 'active:bg-gray-50'}`}
+                        onPress={() => {
+                          if (onSelect) onSelect(item);
+                          setVisible(false);
+                        }}
+                      >
+                        <Text className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}>
+                          {item}
+                        </Text>
+                        {isSelected && <Ionicons name="checkmark" size={18} color="#E89B5A" />}
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
+  );
+};
 
 export default function ReportLostPetScreen() {
   const router = useRouter();
@@ -50,8 +131,38 @@ export default function ReportLostPetScreen() {
   // --- Date Picker States ---
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
+  // --- ADDRESS POPUP STATE & LOGIC ---
+  const [showAddressPopup, setShowAddressPopup] = useState(false);
+  const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+  const [tempCity, setTempCity] = useState('');
+  const [tempDistrict, setTempDistrict] = useState('');
+  const [tempWard, setTempWard] = useState('');
+  const [tempDetail, setTempDetail] = useState('');
 
+  useEffect(() => {
+    fetch('https://provinces.open-api.vn/api/?depth=3')
+      .then(res => res.json())
+      .then(data => setAddressDataAPI(data))
+      .catch(e => console.error("Lỗi fetch địa chỉ:", e));
+  }, []);
 
+  const cityOptions = addressDataAPI.map((c: any) => c.name);
+  const districtOptions = tempCity 
+    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.map((d: any) => d.name) || [] 
+    : [];
+  const wardOptions = tempDistrict 
+    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.find((d: any) => d.name === tempDistrict)?.wards?.map((w: any) => w.name) || [] 
+    : [];
+
+  const handleConfirmAddress = () => {
+    if (!tempCity || !tempDistrict || !tempWard || !tempDetail.trim()) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.");
+      return;
+    }
+    const fullAddress = `${tempDetail.trim()}, ${tempWard}, ${tempDistrict}, ${tempCity}`;
+    setOwnerAddress(fullAddress);
+    setShowAddressPopup(false);
+  };
 
   const {
     petId, petName, petAvatar, petBreed, petAge,
@@ -73,7 +184,6 @@ export default function ReportLostPetScreen() {
 
   useEffect(() => {
     if (selectedMapAddress) {
-      // Gán chuỗi địa chỉ kèm theo bán kính (nếu muốn) vào state location của bạn
       setLocation(selectedMapAddress);
     }
   }, [selectedMapAddress]);
@@ -83,16 +193,10 @@ export default function ReportLostPetScreen() {
   const mapRadius = selectedRadius ? parseFloat(selectedRadius) : 500;
   const mapAddress = selectedMapAddress as string;
 
-  // Khởi tạo mặc định là thời gian hiện tại
   const [lostDate, setLostDate] = useState<Date>(new Date());
 
-  const showDateTimePicker = () => {
-    setDatePickerVisibility(true);
-  };
-
-  const hideDateTimePicker = () => {
-    setDatePickerVisibility(false);
-  };
+  const showDateTimePicker = () => setDatePickerVisibility(true);
+  const hideDateTimePicker = () => setDatePickerVisibility(false);
 
   const handleConfirmDateTime = (date: Date) => {
     setLostDate(date);
@@ -102,11 +206,8 @@ export default function ReportLostPetScreen() {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     setDateTime(`${hours}:${minutes} - ${day}/${month}/${year}`);
-
     hideDateTimePicker();
   };
-
-  const [formattedLostDate, setFormattedLostDate] = useState<string>('');
 
   useEffect(() => {
     const formatDateTime = (date: Date) => {
@@ -115,13 +216,9 @@ export default function ReportLostPetScreen() {
       const dd = String(date.getDate()).padStart(2, '0');
       const MM = String(date.getMonth() + 1).padStart(2, '0');
       const yyyy = date.getFullYear();
-
       return `${hh}:${mm} - ${dd}/${MM}/${yyyy}`;
     };
-
     setDateTime(formatDateTime(lostDate));
-    console.log(dateTime);
-
   }, [lostDate]);
 
   const isFormValid = location && dateTime && details && ownerName && ownerPhone && ownerAddress;
@@ -167,9 +264,6 @@ export default function ReportLostPetScreen() {
 
   const handleClose = () => {
     if (petId) {
-      // Sử dụng router.replace thay vì router.back() để điều hướng thẳng về Profile
-      // Việc dùng 'replace' cũng giúp xóa form này khỏi lịch sử điều hướng, 
-      // tránh lỗi người dùng ấn nút Back trên Android bị quay lại trang form.
       router.replace(`/pet-profile-detail?id=${petId}`);
     } else {
       router.replace('/(tabs)/my-pets');
@@ -181,7 +275,7 @@ export default function ReportLostPetScreen() {
 
     setIsSubmitting(true);
     try {
-      const result = await petService.toggleLostMode(petId, {
+      await petService.toggleLostMode(petId, {
         isLost: true,
         location: location || "",
         dateTime: dateTime || "",
@@ -196,10 +290,9 @@ export default function ReportLostPetScreen() {
       Alert.alert(
         'Báo lạc thành công',
         `Đã kích hoạt chế độ báo lạc cho ${petName || 'thú cưng'}.`,
-        [{ text: 'OK', onPress: () => handleClose() }] // Gọi hàm handleClose ở trên
+        [{ text: 'OK', onPress: () => handleClose() }]
       );
     } catch (error: any) {
-      // Đọc message lỗi trả về từ Axios hoặc Server một cách chính xác
       const errorMsg = error?.message || 'Lỗi hệ thống, vui lòng thử lại.';
       Alert.alert('Lỗi', errorMsg);
     } finally {
@@ -208,13 +301,82 @@ export default function ReportLostPetScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFFFFF', paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      {/* --- POPUP ADDRESS MODAL --- */}
+      {showAddressPopup && (
+        <View 
+          className="absolute inset-0 bg-black/50 justify-center px-4" 
+          style={{ zIndex: 9999, elevation: 9999, paddingTop: insets.top }}
+        >
+          <View className="bg-white rounded-[24px] p-6 shadow-2xl max-h-[85%]">
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text className="text-[20px] font-semibold text-black mb-2 text-center">
+                Your Location
+              </Text>
+              
+              <Label text="Thành phố / Tỉnh" required />
+              <CustomDropdown
+                placeholder="Chọn Tỉnh/Thành phố"
+                value={tempCity}
+                options={cityOptions}
+                onSelect={(val) => {
+                  setTempCity(val);
+                  setTempDistrict('');
+                  setTempWard('');
+                }}
+              />
+
+              <Label text="Quận / Huyện" required />
+              <CustomDropdown
+                placeholder="Chọn Quận/Huyện"
+                value={tempDistrict}
+                options={districtOptions}
+                onSelect={(val) => {
+                  setTempDistrict(val);
+                  setTempWard('');
+                }}
+              />
+
+              <Label text="Phường / Xã" required />
+              <CustomDropdown
+                placeholder="Chọn Phường/Xã"
+                value={tempWard}
+                options={wardOptions}
+                onSelect={setTempWard}
+              />
+
+              <Label text="Địa chỉ chi tiết" required />
+              <CustomInput
+                placeholder="Số nhà, tên ngõ, tên đường..."
+                value={tempDetail}
+                onChangeText={setTempDetail}
+              />
+
+              <View className="flex-row gap-3 mt-8 mb-4">
+                <TouchableOpacity
+                  className="flex-1 py-4 rounded-xl border border-[#E5E5E5] items-center bg-[#F9FAFB]"
+                  onPress={() => setShowAddressPopup(false)}
+                >
+                  <Text className="text-[#8E8E93] font-bold">Hủy bỏ</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="flex-1 py-4 rounded-xl bg-[#E89B5A] items-center shadow-sm"
+                  onPress={handleConfirmAddress}
+                >
+                  <Text className="text-white font-bold">Xác nhận</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      )}
+
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <Stack.Screen options={{ headerShown: false }} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+        style={{ flex: 1, paddingTop: insets.top }}
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -227,12 +389,10 @@ export default function ReportLostPetScreen() {
         >
           {/* HEADER */}
           <View className="w-full flex-row items-center justify-center relative py-4 px-5 mb-5 bg-white">
-
             <View className="items-center justify-center pr-6 pl-6">
               <Text className="text-[20px] font-semibold text-black text-center">
                 Report Lost Pet
               </Text>
-
               <Text className="text-[13px] text-[#8E8E93] text-center mt-0.5">
                 Please confirm the information below
               </Text>
@@ -241,50 +401,29 @@ export default function ReportLostPetScreen() {
             <TouchableOpacity
               onPress={() => router.back()}
               activeOpacity={0.7}
-              style={{
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 5,
-                elevation: 3,
-              }}
+              style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 }}
               className="absolute right-0 p-2 rounded-full"
             >
               <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 28,
-                  borderWidth: 0.5,
-                  borderTopColor: 'white',
-                  borderLeftColor: 'white',
-                  borderBottomColor: 'transparent',
-                  borderRightColor: 'transparent',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  width: 36, height: 36, borderRadius: 28, borderWidth: 0.5, borderTopColor: 'white',
+                  borderLeftColor: 'white', borderBottomColor: 'transparent', borderRightColor: 'transparent',
+                  justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 }}>
                 <LinearGradient
                   colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  locations={[0, 0.3, 1]}
-
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]}
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                 />
                 <Feather name="x" size={20} color="#1F2937" />
               </View>
             </TouchableOpacity>
-
           </View>
 
           {/* PET INFO */}
           <View className="items-center mb-[21px]">
             <Image
-              source={{
-                uri: petAvatar && petAvatar !== 'undefined'
-                  ? petAvatar
-                  : 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop'
-              }}
+              source={{ uri: petAvatar && petAvatar !== 'undefined' ? petAvatar : 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }}
               className="w-[128px] h-[128px] rounded-full border-[4px] border-[#F9FAFB]"
               resizeMode="cover"
             />
@@ -305,21 +444,11 @@ export default function ReportLostPetScreen() {
               Lost Location
             </Text>
 
-            {/* NÚT CHỌN KHU VỰC VÀ ĐỊA CHỈ */}
             {mapLat && mapLng ? (
-
-              /* --- TRẠNG THÁI 1: ĐÃ CHỌN VỊ TRÍ (Hiện Card + Mini Map) --- */
               <View className="bg-white">
-
-                {/* 1. Phần Text Địa chỉ & Bán kính (Bấm vào để sửa) */}
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  onPress={() => {
-                    router.push({
-                      pathname: '/select-last-seen-location',
-                      params: { petId, petName, petAvatar, petBreed, petAge, lostDateStr: lostDate.toISOString() }
-                    });
-                  }}
+                  onPress={() => router.push({ pathname: '/select-last-seen-location', params: { petId, petName, petAvatar, petBreed, petAge, lostDateStr: lostDate.toISOString() } })}
                   className="flex-row items-center justify-between"
                 >
                   <View className="flex-1 border-b border-[#E5E5E5] mb-2">
@@ -327,61 +456,31 @@ export default function ReportLostPetScreen() {
                       {mapAddress} {mapRadius < 1000 ? `(${Math.round(mapRadius)}m)` : `(${(mapRadius / 1000).toFixed(1)}km)`}
                     </Text>
                   </View>
-
                 </TouchableOpacity>
 
                 <View className="h-[150px] w-full">
                   <MapView
                     provider={PROVIDER_GOOGLE}
                     style={{ height: 150, borderRadius: 22 }}
-                    initialRegion={{
-                      latitude: mapLat,
-                      longitude: mapLng,
-                      latitudeDelta: 0.015,
-                      longitudeDelta: 0.015,
-                    }}
-                    scrollEnabled={false}
-                    zoomEnabled={false}
-                    pitchEnabled={false}
-                    rotateEnabled={false}
+                    initialRegion={{ latitude: mapLat, longitude: mapLng, latitudeDelta: 0.015, longitudeDelta: 0.015 }}
+                    scrollEnabled={false} zoomEnabled={false} pitchEnabled={false} rotateEnabled={false}
                   >
-                    <Circle
-                      center={{ latitude: mapLat, longitude: mapLng }}
-                      radius={mapRadius}
-                      fillColor="rgba(232, 155, 90, 0.2)"
-                      strokeColor="rgba(232, 155, 90, 0.8)"
-                      strokeWidth={1}
-                    />
+                    <Circle center={{ latitude: mapLat, longitude: mapLng }} radius={mapRadius} fillColor="rgba(232, 155, 90, 0.2)" strokeColor="rgba(232, 155, 90, 0.8)" strokeWidth={1} />
                     <Marker coordinate={{ latitude: mapLat, longitude: mapLng }}>
                       <View className="items-center justify-center">
                         <View className='bg-[#E89B5A] rounded-full border-2 z-10 border-[#E89B5A] ' style={{ width: 30, height: 30, borderRadius: 20, overflow: 'hidden', backgroundColor: '#E89B5A' }}>
-                          <Image
-                            source={
-                              petAvatar
-                                ? { uri: petAvatar as string }
-                                : require('../assets/icon/location-form.png')
-                            }
-                            style={{ width: '100%', height: '100%' }}
-                            resizeMode="cover"
-                          />
+                          <Image source={petAvatar ? { uri: petAvatar as string } : require('../assets/icon/location-form.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                         </View>
                         <View className="w-2 h-2 bg-[#E89B5A] rotate-45 -mt-1 shadow-sm" />
                       </View>
                     </Marker>
                   </MapView>
                 </View>
-
               </View>
             ) : (
-              /* --- TRẠNG THÁI 2: CHƯA CHỌN VỊ TRÍ (Hiện nút mặc định) --- */
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => {
-                  router.push({
-                    pathname: '/select-last-seen-location',
-                    params: { petId, petName, petAvatar, petBreed, petAge, lostDateStr: lostDate.toISOString() }
-                  });
-                }}
+                onPress={() => router.push({ pathname: '/select-last-seen-location', params: { petId, petName, petAvatar, petBreed, petAge, lostDateStr: lostDate.toISOString() } })}
                 className="w-full py-1 border-b border-[#E5E5E5] bg-white"
               >
                 <Text className="text-[14px] text-[#8E8E93] font-regular tracking-[0.06p]" numberOfLines={1}>
@@ -392,7 +491,6 @@ export default function ReportLostPetScreen() {
 
             <View className="mt-2 mb-2">
               <View className="flex-row justify-between gap-5">
-
                 <View className="flex-1">
                   <Text className="text-[#8E8E93] font-medium text-[14px]">
                     Date
@@ -424,7 +522,6 @@ export default function ReportLostPetScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-
               </View>
             </View>
 
@@ -439,12 +536,10 @@ export default function ReportLostPetScreen() {
               onCancel={hideDateTimePicker}
               confirmTextIOS="Confirm"
               cancelTextIOS="Cancel"
-
             />
+            
             <View className='mb-[30px]'>
-              <Text className="text-[#8E8E93] font-medium text-[14px]">
-                Description
-              </Text>
+              <Text className="text-[#8E8E93] font-medium text-[14px]">Description</Text>
               <TextInput
                 style={{ fontFamily: 'Urbanist' }}
                 value={details}
@@ -457,6 +552,7 @@ export default function ReportLostPetScreen() {
                 cursorColor="#EF4444"
               />
             </View>
+
             {/* PHOTOS */}
             <View className="mb-[30px]">
               <View className="flex-row justify-between items-center mb-3">
@@ -477,10 +573,7 @@ export default function ReportLostPetScreen() {
                     {isUploading ? (
                       <ActivityIndicator size="small" color="#9CA3AF" className="mr-1" />
                     ) : (
-                      <Image
-                        source={require('../assets/icon/upload-gray.png')}
-                        className="w-[18px] h-[18px]"
-                      />
+                      <Image source={require('../assets/icon/upload-gray.png')} className="w-[18px] h-[18px]" />
                     )}
                     <Text className="ml-[11px] text-[14px] font-regular text-black">
                       {isUploading ? 'Uploading...' : 'Upload photos'}
@@ -490,49 +583,28 @@ export default function ReportLostPetScreen() {
                   <>
                     {photos.map((uri, index) => (
                       <View key={index} className="relative w-[60px] h-[60px]">
-                        <Image
-                          source={{ uri }}
-                          className="w-full h-full rounded-[14px] bg-[#F3F4F6]"
-                        />
+                        <Image source={{ uri }} className="w-full h-full rounded-[14px] bg-[#F3F4F6]" />
                         <TouchableOpacity
                           onPress={() => handleRemovePhoto(index)}
                           activeOpacity={0.7}
                           className="absolute -top-2 -right-2 w-6 h-6 rounded-full items-center justify-center"
                           style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 }}
                         >
-                          <LinearGradient
-                            colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
-                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                            locations={[0, 0.3, 1]}
-
-                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
-                          />
+                          <LinearGradient colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }} />
                           <X size={10} color="#000000" strokeWidth={3} />
                         </TouchableOpacity>
                       </View>
                     ))}
-
                     {photos.length < 5 && (
-                      <TouchableOpacity
-                        onPress={handleAddPhoto}
-                        activeOpacity={0.7}
-                        disabled={isUploading}
-                        className="w-[60px] h-[60px] bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center"
-                      >
-                        {isUploading ? (
-                          <ActivityIndicator size="small" color="#9CA3AF" />
-                        ) : (
-                          <Image
-                            source={require('../assets/icon/upload-gray.png')}
-                            className="w-[18px] h-[18px] mr-1"
-                          />
-                        )}
+                      <TouchableOpacity onPress={handleAddPhoto} activeOpacity={0.7} disabled={isUploading} className="w-[60px] h-[60px] bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center">
+                        {isUploading ? <ActivityIndicator size="small" color="#9CA3AF" /> : <Image source={require('../assets/icon/upload-gray.png')} className="w-[18px] h-[18px] mr-1" />}
                       </TouchableOpacity>
                     )}
                   </>
                 )}
               </View>
             </View>
+
             {/* OWNER INFORMATION */}
             <View className="mb-[20px]">
               <Text className="text-[14px] font-semibold text-black mb-3 tracking-[0.06px]">
@@ -547,19 +619,25 @@ export default function ReportLostPetScreen() {
                     <TextInput value={ownerName} onChangeText={setOwnerName} placeholder="Sarah Johnson" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="flex-1 text-[13px] text-black p-0 text-right tracking-[0.06px]" />
                   </View>
 
-                  {/* Mở Date Picker */}
                   <View className='flex-row py-[13px] mx-4 border-b border-[#E5E5E5] items-center'>
                     <Image source={require('../assets/icon/phone-form.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
                     <Text className="text-[14px] font-medium text-[#8E8E93] px-2">Phone</Text>
-                    <TextInput value={ownerPhone} onChangeText={setOwnerPhone} placeholder="01234567890" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="flex-1 text-[13px] text-black p-0 text-right tracking-[0.06px]" />
+                    <TextInput value={ownerPhone} onChangeText={setOwnerPhone} placeholder="01234567890" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="flex-1 text-[13px] text-black p-0 text-right tracking-[0.06px]" keyboardType="phone-pad" />
                   </View>
 
+                  {/* THAY THẾ NÚT NHẬP ĐỊA CHỈ TẠI ĐÂY */}
                   <View className='flex-row py-[13px] mx-4 items-center'>
                     <Image source={require('../assets/icon/location-form.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
                     <Text className="text-[14px] font-medium text-[#8E8E93] px-2">Address</Text>
-                    <TextInput value={ownerAddress} onChangeText={setOwnerAddress} placeholder="Hanoi, Vietnam" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="font-regular flex-1 text-[12px] text-black p-0 text-right tracking-[0.06px]" />
+                    <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
+                      <Text className={`font-regular text-[12px] text-right tracking-[0.06px] ${ownerAddress ? 'text-black' : 'text-[#9CA3AF]'}`} numberOfLines={1}>
+                        {ownerAddress || "Nhấn để chọn địa chỉ..."}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
+
                 </View>
+                
                 <View className="flex items-center justify-center w-4/5 bg-[#FAFAFA] px-2.5 py-1 rounded-full border border-[#D9D9D9] bottom-5">
                   <Text className="text-[#AB5C1A] text-[14px] text-center font-regular leading-[20px] py-[6px]">
                     <TextInput value={note} onChangeText={setNote} placeholder='"Leave your note here"' placeholderTextColor="#757575" style={{ fontFamily: "Urbanist" }} className="font-regular flex-1 text-[12px] text-black p-0 text-center tracking-[0.06px]" />
@@ -567,26 +645,15 @@ export default function ReportLostPetScreen() {
                 </View>
               </View>
             </View>
+
             {/* FOOTER BUTTONS */}
             <View className="gap-y-3">
               <TouchableOpacity
                 activeOpacity={0.8}
                 disabled={!isFormValid || isSubmitting || isUploading}
                 onPress={handleActivateLostMode}
-                className={`w-full h-[48px] rounded-[16px] items-center justify-center flex-row ${isFormValid && !isSubmitting && !isUploading ? 'bg-[#E85A5A]' : 'bg-[#FFB4B4]'
-                  }`}
-                style={
-                  isFormValid && !isSubmitting && !isUploading
-                    ? {
-                      shadowColor: '#FF0000',
-                      shadowOffset: { width: 0, height: 3 },
-                      shadowOpacity: 0.25,
-                      shadowRadius: 10,
-                      elevation: 5,
-                    }
-                    : {
-                    }
-                }
+                className={`w-full h-[48px] rounded-[16px] items-center justify-center flex-row ${isFormValid && !isSubmitting && !isUploading ? 'bg-[#E85A5A]' : 'bg-[#FFB4B4]'}`}
+                style={isFormValid && !isSubmitting && !isUploading ? { shadowColor: '#FF0000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 } : {}}
               >
                 <Image source={require('../assets/icon/bell.png')} style={{ width: 14, height: 17 }} resizeMode="cover" className='mr-2' />
                 {isSubmitting && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />}

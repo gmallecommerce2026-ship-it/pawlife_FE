@@ -377,7 +377,7 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
         setIsRequestingGps(false);
         if (loc) {
             setIsUsingGps(true);
-            setLocationText('Vị trí hiện tại của bạn');
+            setLocationText('Current Location');
         }
     };
     // LOGIC NÚT BACK: Lùi bước, hoặc thoát hẳn nếu ở bước 1
@@ -1438,9 +1438,22 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
     const shelterAddress = shelter?.address || '123 Rescue Street, San Francisco, CA 94102';
     const shelterAvatar = shelter?.avatarUrl || shelter?.coverUrl || currentPet.image || 'https://via.placeholder.com/150';
 
-    const description = fullPet?.description || `${currentPet.name} is a wonderful ${displayBreed} looking for a loving home. He is playful, energetic, and friendly and would make a great companion for the right family.`;
-    const idealHome = fullPet?.idealHome || `${currentPet.name} would thrive in a home with a fenced yard and an active family. They do best with older children and would enjoy being the only pet to receive all your attention.`;
+    const description = fullPet?.description || `${currentPet.name} is a wonderful ${displayBreed} looking for a loving home...`;
+    const idealHome = fullPet?.idealHome || `${currentPet.name} would thrive in a home with a fenced yard...`;
 
+    // ================== CHUẨN HOÁ DỮ LIỆU HIỂN THỊ ==================
+    
+    // 1. Chuẩn hoá Gender (FEMALE -> Female, MALE -> Male, UNKNOWN -> Unknown)
+    const rawGender = currentPet?.gender || 'UNKNOWN';
+    const displayGender = rawGender.charAt(0).toUpperCase() + rawGender.slice(1).toLowerCase();
+
+    // 2. Xử lý Age (Ưu tiên lấy từ list bên ngoài truyền vào, nếu không có lấy từ API fullPet)
+    const displayAge = pet?.age || fullPet?.age || 'Unknown';
+
+    // 3. Xử lý Weight (Lấy từ fullPet API trả về, fallback sang currentPet)
+    const displayWeight = fullPet?.weight 
+        ? `${fullPet.weight} kg` 
+        : (currentPet?.weight ? `${currentPet.weight} kg` : 'Unknown');
     return (
         <Animated.View
             style={[
@@ -1492,17 +1505,22 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                         </View>
 
                         <View className="flex-row justify-between mb-6 gap-[10px]">
-                            <View className={`flex-1 ${pet?.gender.toLowerCase() === 'male' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'} py-[12px] rounded-[16px] items-center`}>
+                            {/* GENDER */}
+                            <View className={`flex-1 ${rawGender.toUpperCase() === 'MALE' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'} py-[12px] rounded-[16px] items-center`}>
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
-                                <Text className="text-black text-[14px] font-semibold">{pet?.gender || 'Unknow'}</Text>
+                                <Text className="text-black text-[14px] font-semibold">{displayGender}</Text>
                             </View>
+                            
+                            {/* AGE */}
                             <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
-                                <Text className="text-black text-[14px] font-semibold">Young</Text>
+                                <Text className="text-black text-[14px] font-semibold">{displayAge}</Text>
                             </View>
+                            
+                            {/* WEIGHT */}
                             <View className="flex-1 bg-[#E8F9E6] py-[12px] rounded-[16px] items-center">
-                                <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Size</Text>
-                                <Text className="text-black text-[14px] font-semibold">Large</Text>
+                                <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Weight</Text>
+                                <Text className="text-black text-[14px] font-semibold">{displayWeight}</Text>
                             </View>
                         </View>
 
@@ -1542,7 +1560,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                                 await Linking.openURL(webUrl);
                                             }
                                         } else {
-                                            Alert.alert("Thông báo", "Trạm cứu hộ này chưa cung cấp số điện thoại Zalo.");
+                                            Alert.alert("Notification", "This shelter has not provided a Zalo phone number.");
                                         }
                                     }}>
                                     <Image
@@ -1570,28 +1588,70 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                             <Text className="text-[#8E8E93] text-[14px] leading-6 mb-2">{description}</Text>
 
                             <View className="flex-row gap-2 mt-[6px]">
-                                <View className="bg-[#FFF4E8] px-[10px] rounded-full border border-[#E8A53C]/25"><Text className="text-[#E8A53C] text-[10px] leading-5 font-regular">Playful</Text></View>
-                                <View className="bg-[#EBF4FE] px-[10px] rounded-full border border-[#5A90DA]/25"><Text className="text-[#5A90DA] text-[10px] leading-5 font-regular">Clingy</Text></View>
-                                <View className="bg-[#EAF8EF] px-[10px] rounded-full border border-[#83DA5A]/25"><Text className="text-[#77C852] text-[10px] leading-5 font-regular">Friendly</Text></View>
+                                {currentPet.tags?.map((tag: any, index: number) => {
+                                    // Màu sắc ngẫu nhiên hoặc theo tag
+                                    const colors = ['#FFF4E8', '#EBF4FE', '#EAF8EF'];
+                                    const textColors = ['#E8A53C', '#5A90DA', '#77C852'];
+                                    const borderColor = ['#E8A53C', '#5A90DA', '#77C852'];
+                                    
+                                    return (
+                                        <View 
+                                            key={tag.id || index}
+                                            style={{ 
+                                                backgroundColor: colors[index % 3],
+                                                borderColor: `${borderColor[index % 3]}25` 
+                                            }}
+                                            className="px-[10px] py-1 rounded-full border"
+                                        >
+                                            <Text style={{ color: textColors[index % 3] }} className="text-[10px] leading-5 font-regular">
+                                                {tag.name}
+                                            </Text>
+                                        </View>
+                                    );
+                                })}
                             </View>
                         </View>
 
                         <View className="mb-4">
                             <Text className="font-medium text-black text-[16px] mb-2">{currentPet.name}'s Behavior</Text>
-                            <View className="flex-row items-start mb-1">
-                                <View className="flex-row items-center mr-1 mt-[2px]">
-                                    <Image source={require('../../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                                    <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">Good with:</Text>
+                            
+                            {((fullPet?.goodWith || currentPet?.goodWith)?.length > 0 || (fullPet?.badWith || currentPet?.badWith)?.length > 0) ? (
+                                <View>
+                                    {/* --- Good With --- */}
+                                    {(fullPet?.goodWith || currentPet?.goodWith)?.length > 0 && (
+                                        <View className="flex-row items-start mb-2">
+                                            <View className="flex-row items-center mr-1 mt-[2px]">
+                                                <Image source={require('../../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                                                <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium w-[90px]">Good with:</Text>
+                                            </View>
+                                            <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
+                                                {Array.isArray(fullPet?.goodWith || currentPet?.goodWith) 
+                                                    ? (fullPet?.goodWith || currentPet?.goodWith).join(', ') 
+                                                    : (fullPet?.goodWith || currentPet?.goodWith)}
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {/* --- Bad With / Not Suitable --- */}
+                                    {(fullPet?.badWith || currentPet?.badWith)?.length > 0 && (
+                                        <View className="flex-row items-start mt-1">
+                                            <View className="flex-row items-center mr-1 mt-[2px]">
+                                                <Image source={require('../../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                                                <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium w-[90px]">Not suitable:</Text>
+                                            </View>
+                                            <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
+                                                {Array.isArray(fullPet?.badWith || currentPet?.badWith) 
+                                                    ? (fullPet?.badWith || currentPet?.badWith).join(', ') 
+                                                    : (fullPet?.badWith || currentPet?.badWith)}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
-                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
-                            </View>
-                            <View className="flex-row items-start">
-                                <View className="flex-row items-center mr-1 mt-[2px]">
-                                    <Image source={require('../../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                                    <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">Not suitable:</Text>
-                                </View>
-                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">Children, Seniors, Dogs, Cats.</Text>
-                            </View>
+                            ) : (
+                                <Text className="text-[14px] text-[#8E8E93] italic leading-[22px]">
+                                    Behavioral details have not been updated.
+                                </Text>
+                            )}
                         </View>
 
                         {/* Section: Ideal Home */}
@@ -1628,83 +1688,62 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 // ==================================================================
 // MAIN PARENT COMPONENT
 // ==================================================================
+// ==================================================================
+// MAIN PARENT COMPONENT
+// ==================================================================
 export default function MatchingScreen() {
     const router = useRouter();
     const navigation = useNavigation();
     const { returnFromSuccess } = useLocalSearchParams();
     const { user } = useContext(AuthContext);
 
-    const [appStage, setAppStage] = useState<number>(3);
-    const [isLoadingStage, setIsLoadingStage] = useState<boolean>(true);
-    const [selectedPet, setSelectedPet] = useState<any>(null);
-    const [isCheckingStatus, setIsCheckingStatus] = useState(true);
-
     const COMPLETED_USERS_KEY = 'completed_onboarding_users_list';
+
+    // 1. Chỉ giữ lại các State cần thiết
+    const [appStage, setAppStage] = useState<number>(3);
+    const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+    const [selectedPet, setSelectedPet] = useState<any>(null);
 
     // ---> THÊM STATE ĐỂ NHẬN BIẾT LÀ ĐANG CHỈNH SỬA
     const [isEditing, setIsEditing] = useState<boolean>(false);
 
-    // ---> THÊM STATE ĐỂ NHẬN BIẾT USER CŨ (Đã từng hoàn thành Onboarding)
-    const [isReturningUser, setIsReturningUser] = useState<boolean>(false);
-
+    // 2. Dùng ĐÚNG MỘT useEffect này để điều hướng luồng
     useEffect(() => {
         const checkUserStatus = async () => {
-            // Nếu chưa có user (chưa đăng nhập), bỏ qua
+            // Nếu vừa hoàn thành form adopt xong thì nhảy thẳng vào Swipe
+            if (returnFromSuccess === '1') {
+                setAppStage(3);
+                setIsCheckingStatus(false);
+                return;
+            }
+
+            // Nếu chưa có user (chưa đăng nhập), bắt đầu từ màn 0
             if (!user?.id) {
+                setAppStage(0);
                 setIsCheckingStatus(false);
                 return;
             }
 
             try {
                 const storedUsersJSON = await AsyncStorage.getItem(COMPLETED_USERS_KEY);
-
                 const completedUsers: string[] = storedUsersJSON ? JSON.parse(storedUsersJSON) : [];
 
                 if (completedUsers.includes(user.id)) {
-                    setAppStage(3); // Đã có -> Nhảy thẳng vào Main Swipe
+                    // USER CŨ: Đã có ID trong mảng -> Nhảy thẳng vào màn Swipe chính
+                    setAppStage(3); 
                 } else {
-                    setAppStage(0); // Chưa có -> Bắt đầu Onboarding (hoặc Stage 1 tùy bạn)
+                    // USER MỚI: Chưa có ID -> Bắt đầu luồng Onboarding từ Filter
+                    setAppStage(0); 
                 }
             } catch (error) {
                 console.error("Lỗi khi đọc danh sách user:", error);
-                setAppStage(0); // Lỗi thì cứ cho xem lại từ đầu
+                setAppStage(0); 
             } finally {
-                setIsCheckingStatus(false); // Hoàn thành việc check
+                setIsCheckingStatus(false); 
             }
         };
 
         checkUserStatus();
-    }, [user?.id]);
-
-    useEffect(() => {
-        const checkOnboardingStatus = async () => {
-            try {
-                if (returnFromSuccess === '1') {
-                    setAppStage(3);
-                    setIsLoadingStage(false);
-                    return;
-                }
-
-                const userId = user?.id || 'guest';
-                const hasCompleted = await AsyncStorage.getItem(`@matching_onboarding_${userId}`);
-
-                if (hasCompleted === 'true') {
-                    // SỬA TẠI ĐÂY: Đánh dấu là user cũ và ép vào màn hình Policy (Stage 1)
-                    setIsReturningUser(true);
-                    setAppStage(1);
-                } else {
-                    setIsReturningUser(false);
-                    setAppStage(0);
-                }
-            } catch (error) {
-                console.error("Lỗi khi kiểm tra AsyncStorage:", error);
-                setAppStage(0);
-            } finally {
-                setIsLoadingStage(false);
-            }
-        };
-
-        checkOnboardingStatus();
     }, [user?.id, returnFromSuccess]);
 
     useEffect(() => {
@@ -1748,10 +1787,6 @@ export default function MatchingScreen() {
         }
     };
 
-    if (isLoadingStage) {
-        return <View className="flex-1 bg-white" />;
-    }
-
     if (isCheckingStatus) {
         return (
             <View className="flex-1 justify-center items-center bg-white">
@@ -1767,8 +1802,11 @@ export default function MatchingScreen() {
                 <SurveyScreen
                     onComplete={() => {
                         if (isEditing) {
-                            setAppStage(2);
+                            // FIX: Đang chỉnh sửa filter xong thì về lại thẻ vuốt (Stage 3)
+                            setAppStage(3);
+                            setIsEditing(false); // Reset cờ edit
                         } else {
+                            // Nếu là lần đầu, đi tiếp sang màn Policy (Stage 1)
                             setAppStage(1);
                         }
                     }}
@@ -1788,11 +1826,8 @@ export default function MatchingScreen() {
             {appStage === 1 && (
                 <PolicyScreen
                     onAgree={() => {
-                        if (isReturningUser) {
-                            setAppStage(3);
-                        } else {
-                            setAppStage(2);
-                        }
+                        // FIX: Đồng ý Policy xong thì luôn sang Tutorial (Stage 2)
+                        setAppStage(2);
                     }}
                     onBack={() => {
                         // Nếu user bấm X ở màn Policy, lùi về màn Survey
@@ -1807,7 +1842,7 @@ export default function MatchingScreen() {
                 />
             )}
 
-            {appStage >= 2 && (
+            {appStage >= 3 && (
                 <MainSwipeScreen
                     onBack={() => {
                         setIsEditing(true);
@@ -1815,12 +1850,6 @@ export default function MatchingScreen() {
                     }}
                     onDetail={handleDetail}
                     onAdopt={handleAdopt}
-                />
-            )}
-
-            {appStage === 2 && (
-                <TutorialScreen
-                    onComplete={handleCompleteOnboarding}
                 />
             )}
         </View>

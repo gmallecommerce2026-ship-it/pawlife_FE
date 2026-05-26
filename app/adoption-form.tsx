@@ -1,10 +1,11 @@
 // app/adoption-form.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { petService } from '@/services/petService';
+import { calculateAge } from '@/utils/dateHelper';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { useModalStore } from '../store/useModalStore';
 import {
   ActivityIndicator,
   Alert,
@@ -20,14 +21,9 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useModalStore } from '../store/useModalStore';
 
 // --- DATA CONSTANTS ---
-const LOCATIONS = [
-  "Quận Ba Đình", "Quận Đống Đa", "Quận Hoàn Kiếm", "Quận Tây Hồ",
-  "Quận Long Biên", "Quận Cầu Giấy", "Quận Hoàng Mai", "Quận Thanh Xuân",
-  "Quận Bắc Từ Liêm", "Quận Nam Từ Liêm", "Ngoại thành Hà Nội"
-];
-
 const HOUSING_TYPES = [
   "House",
   "House with a garden",
@@ -60,15 +56,6 @@ const ADOPTION_REASONS = [
   "Because I want to give them a forever home",
   "Other"
 ];
-
-interface AdoptionFormParams {
-  id?: string;
-  petId?: string;
-  name?: string;
-  age?: string;
-  breed?: string;
-  image?: string;
-}
 
 // --- COMPONENTS ---
 const SectionTitle = ({ title }: { title: string }) => (
@@ -227,36 +214,38 @@ export default function AdoptionFormScreen() {
   const showModal = useModalStore((state) => state.showModal);
   const router = useRouter();
   const rawParams = useLocalSearchParams();
+  const petId = rawParams.id as string;
   const insets = useSafeAreaInsets();
-  const params = rawParams as unknown as {
-    id?: string;
-    petId?: string;
-    name?: string;
-    age?: string;
-    breed?: string;
-    image?: string;
-  };
 
+  const [petData, setPetData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingLimit, setIsCheckingLimit] = useState(true);
-  const [showLimitModal, setShowLimitModal] = useState(false); // <--- State mới cho popup custom
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
-  const petId = params.id || params.petId;
+  useEffect(() => {
+    const fetchPetDetail = async () => {
+      try {
+        if (petId) {
+          const data = await petService.getPetById(petId);
+          setPetData(data);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy chi tiết thú cưng:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPetDetail();
+  }, [petId]);
 
-  const pet = {
-    name: params.name || 'Max',
-    age: params.age || '2 years',
-    breed: params.breed || 'Labrador Retriever',
-    shelter: 'Sân Nhà Nhiều Chó',
-    image: (params.image as string) || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=1000&auto=format&fit=crop',
-  };
-
-  // --- STATE ---
-  const [fullName, setFullName] = useState('Test User');
-  const [phone, setPhone] = useState('+84 1234567890');
-  const [zalo, setZalo] = useState('+84 1234567890');
+  // --- STATE FOR FORM ---
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [zalo, setZalo] = useState('');
   const [adoptFor, setAdoptFor] = useState('Myself');
-  const [location, setLocation] = useState('Quận Cầu Giấy');
+  
+  const [location, setLocation] = useState(''); // Lưu chuỗi địa chỉ cuối cùng
   const [housing, setHousing] = useState('Apartment (allows pet ownership)');
   const [otherHousing, setOtherHousing] = useState('');
   const [exp, setExp] = useState('Yes, I used to have one');
@@ -274,17 +263,52 @@ export default function AdoptionFormScreen() {
   const [provideID, setProvideID] = useState('Yes');
   const [isAgreed, setIsAgreed] = useState(false);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
+
+  // --- ADDRESS POPUP STATE & LOGIC ---
+  const [showAddressPopup, setShowAddressPopup] = useState(false);
+  const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+  const [tempCity, setTempCity] = useState('');
+  const [tempDistrict, setTempDistrict] = useState('');
+  const [tempWard, setTempWard] = useState('');
+  const [tempDetail, setTempDetail] = useState('');
+
+  // Tự động load danh sách Tỉnh thành khi vào form
+  useEffect(() => {
+    fetch('https://provinces.open-api.vn/api/?depth=3')
+      .then(res => res.json())
+      .then(data => setAddressDataAPI(data))
+      .catch(e => console.error("Lỗi fetch địa chỉ:", e));
+  }, []);
+
+  // Map ra mảng strings cho Dropdown
+  const cityOptions = addressDataAPI.map((c: any) => c.name);
+  const districtOptions = tempCity 
+    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.map((d: any) => d.name) || [] 
+    : [];
+  const wardOptions = tempDistrict 
+    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.find((d: any) => d.name === tempDistrict)?.wards?.map((w: any) => w.name) || [] 
+    : [];
+
+  const handleConfirmAddress = () => {
+    if (!tempCity || !tempDistrict || !tempWard || !tempDetail.trim()) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.");
+      return;
+    }
+    // Nối chuỗi tạo ra địa chỉ hoàn chỉnh
+    const fullAddress = `${tempDetail.trim()}, ${tempWard}, ${tempDistrict}, ${tempCity}`;
+    setLocation(fullAddress);
+    setShowAddressPopup(false); // Đóng popup
+  };
+
   // --- USE EFFECT CHECK LIMIT ---
   useEffect(() => {
     const checkLimit = async () => {
       try {
         const response = await axiosClient.get('/applications/my-applications');
         const applications = response.data?.data || [];
-
         const activeApps = applications.filter(
           (app: any) => app.status !== 'CLOSED' && app.status !== 'ADOPTION_COMPLETED'
         );
-
         if (activeApps.length >= 5) {
           setShowLimitModal(true);
         }
@@ -294,24 +318,33 @@ export default function AdoptionFormScreen() {
         setIsCheckingLimit(false);
       }
     };
-
     checkLimit();
   }, []);
 
-  // --- SUBMIT HANDLER ---
+  if (loading || !petData) {
+    return <ActivityIndicator size="large" color="#F99C2E" />;
+  }
+
+  const petInfo = {
+    name: petData?.name || 'Pet',
+    age: petData?.dob ? calculateAge(petData.dob) : 'Unknown',
+    breed: petData?.breed || 'Unknown',
+    shelterName: petData?.shelter?.name || 'Sân Nhà Nhiều Chó',
+    image: petData?.avatarUrl || 'https://images.unsplash.com/default_pet.jpg',
+  };
+
   const handleSubmit = async () => {
     if (!petId) {
       Alert.alert('Lỗi', 'Không tìm thấy thông tin thú cưng.');
       return;
     }
     if (!fullName || !phone || !zalo || !location) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin liên lạc.');
+      Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin liên lạc và địa chỉ cư trú.');
       return;
     }
 
     try {
       setIsLoading(true);
-
       const finalHousing = housing === 'Other' ? otherHousing : housing;
       const finalReason = reason === 'Other' ? otherReason : reason;
 
@@ -321,7 +354,7 @@ export default function AdoptionFormScreen() {
         phone,
         zalo,
         adoptFor,
-        location,
+        location, // Gửi chuỗi location đã nối
         housing: finalHousing,
         children,
         cage,
@@ -350,7 +383,6 @@ export default function AdoptionFormScreen() {
             pathname: '/(tabs)/matching',
             params: { returnFromSuccess: '1' }
           });
-          console.log('User bấm OK');
         }
       });
     } catch (error: any) {
@@ -371,22 +403,90 @@ export default function AdoptionFormScreen() {
 
   return (
     <View className="flex-1 bg-white">
+      {/* --- ADDRESS POPUP MODAL (ABSOLUTE OVERLAY) ---
+        Dùng absolute view đè lên app để tránh lỗi nested Modal trên Android khi CustomDropdown mở Modal của chính nó.
+      */}
+      {showAddressPopup && (
+        <View 
+          className="absolute inset-0 bg-black/50 justify-center px-4" 
+          style={{ zIndex: 999, elevation: 999, paddingTop: insets.top }}
+        >
+          <View className="bg-white rounded-3xl p-6 shadow-2xl max-h-[85%]">
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text className="text-xl font-bold text-gray-900 mb-2 text-center">
+                Cập nhật địa chỉ
+              </Text>
+              
+              <Label text="Thành phố / Tỉnh" required />
+              <CustomDropdown
+                placeholder="Chọn Tỉnh/Thành phố"
+                value={tempCity}
+                options={cityOptions}
+                onSelect={(val) => {
+                  setTempCity(val);
+                  setTempDistrict(''); // Reset quận/huyện
+                  setTempWard('');     // Reset phường/xã
+                }}
+              />
+
+              <Label text="Quận / Huyện" required />
+              <CustomDropdown
+                placeholder="Chọn Quận/Huyện"
+                value={tempDistrict}
+                options={districtOptions}
+                onSelect={(val) => {
+                  setTempDistrict(val);
+                  setTempWard(''); // Reset phường/xã
+                }}
+              />
+
+              <Label text="Phường / Xã" required />
+              <CustomDropdown
+                placeholder="Chọn Phường/Xã"
+                value={tempWard}
+                options={wardOptions}
+                onSelect={setTempWard}
+              />
+
+              <Label text="Địa chỉ chi tiết" required />
+              <CustomInput
+                placeholder="Số nhà, tên ngõ, tên đường..."
+                value={tempDetail}
+                onChangeText={setTempDetail}
+              />
+
+              <View className="flex-row gap-3 mt-8 mb-4">
+                <TouchableOpacity
+                  className="flex-1 py-4 rounded-xl border border-gray-200 items-center bg-gray-50"
+                  onPress={() => setShowAddressPopup(false)}
+                >
+                  <Text className="text-gray-600 font-bold">Hủy bỏ</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="flex-1 py-4 rounded-xl bg-[#E89B5A] items-center shadow-sm"
+                  onPress={handleConfirmAddress}
+                >
+                  <Text className="text-white font-bold">Xác nhận</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      )}
+
       <SafeAreaView className="flex-1 bg-white" edges={['top']}>
         {/* --- CUSTOM LIMIT MODAL --- */}
         <Modal visible={showLimitModal} transparent animationType="fade">
+          {/* Nội dung giữ nguyên */}
           <View className="flex-1 bg-black/50 justify-center items-center px-6">
             <View className="bg-white w-full rounded-[28px] p-6 items-center shadow-2xl">
               <View className="w-16 h-16 bg-red-50 rounded-full items-center justify-center mb-5">
                 <Ionicons name="warning-outline" size={32} color="#EF4444" />
               </View>
-
-              <Text className="text-xl font-bold text-gray-900 mb-2 text-center">
-                Đạt giới hạn đăng ký
-              </Text>
+              <Text className="text-xl font-bold text-gray-900 mb-2 text-center">Đạt giới hạn đăng ký</Text>
               <Text className="text-gray-500 text-center mb-6 leading-6 text-sm">
                 Bạn đang có 5 đơn đăng ký chờ xử lý. Vui lòng đợi kết quả của các đơn cũ trước khi nộp thêm hồ sơ mới nhé!
               </Text>
-
               <TouchableOpacity
                 className="w-full bg-[#F99C2E] py-4 rounded-xl items-center shadow-sm"
                 activeOpacity={0.8}
@@ -400,22 +500,17 @@ export default function AdoptionFormScreen() {
             </View>
           </View>
         </Modal>
+
         {/* --- POLICY MODAL --- */}
         <Modal visible={showPolicyModal} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setShowPolicyModal(false)}>
           <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
             <View className="flex-row items-center justify-between px-4 pt-3">
               <View className="w-10" />
-              <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 tracking-wide">
-                Adoption Pawlicy
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowPolicyModal(false)}
-                className="w-10 items-end py-1.5"
-              >
+              <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 tracking-wide">Adoption Pawlicy</Text>
+              <TouchableOpacity onPress={() => setShowPolicyModal(false)} className="w-10 items-end py-1.5">
                 <Feather name="x" size={22} color="#374151" />
               </TouchableOpacity>
             </View>
-
             <ScrollView className="flex-1 px-[35px] pt-[50px]" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
               <View className="mb-4">
                 <PolicyItem number="1" title="Love and care for your pet for life" content="Do not abandon, harm, or use the pet for any illegal or inhumane purposes." />
@@ -428,6 +523,7 @@ export default function AdoptionFormScreen() {
             </ScrollView>
           </View>
         </Modal>
+
         {/* --- HEADER --- */}
         <View className="flex-row items-center px-4 py-3 border-b border-gray-50 bg-white">
           <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
@@ -438,28 +534,24 @@ export default function AdoptionFormScreen() {
           </Text>
         </View>
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1"
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 40 }}
             className="px-5 pt-6 bg-white"
           >
-            {/* --- PET INFO CARD --- */}
+            {/* PET INFO CARD */}
             <View className="bg-[#EFF8FF] p-4 rounded-2xl flex-row items-center border border-blue-50">
-              <Image source={{ uri: pet.image }} className="w-16 h-16 rounded-xl bg-gray-200" resizeMode="cover" />
+              <Image source={{ uri: petInfo.image }} className="w-16 h-16 rounded-xl" />
               <View className="ml-4 flex-1">
-                <Text className="text-gray-900 font-bold text-lg">{pet.name}</Text>
-                <Text className="text-gray-500 text-xs mt-0.5">{pet.age} · {pet.breed}</Text>
-                <Text className="text-[#F97316] text-xs font-bold mt-1">{pet.shelter}</Text>
+                <Text className="text-gray-900 font-bold text-lg">{petInfo.name}</Text>
+                <Text className="text-gray-500 text-xs">{petInfo.age} · {petInfo.breed}</Text>
+                <Text className="text-[#F97316] text-xs font-bold">{petInfo.shelterName}</Text>
               </View>
             </View>
 
-            {/* --- SECTION A --- */}
+            {/* SECTION A */}
             <SectionTitle title="Section A – Contact Information" />
-
             <Label text="Full Name" required />
             <CustomInput value={fullName} onChangeText={setFullName} />
 
@@ -469,19 +561,23 @@ export default function AdoptionFormScreen() {
             <Label text="Zalo/WhatsApp number" required />
             <CustomInput value={zalo} onChangeText={setZalo} />
 
-            <Label text={`Are you filling out this form to adopt ${pet.name} for yourself or on behalf of someone else?`} required />
+            <Label text={`Are you filling out this form to adopt ${petInfo.name} for yourself or on behalf of someone else?`} required />
             <OptionGroup options={['Myself', 'Someone else']} selected={adoptFor} onSelect={setAdoptFor} />
 
-            {/* --- SECTION B --- */}
+            {/* SECTION B */}
             <SectionTitle title="Section B – Living Conditions" />
 
             <Label text="Where will your pet stay?" required />
-            <CustomDropdown
-              placeholder="Select district"
-              value={location}
-              options={LOCATIONS}
-              onSelect={setLocation}
-            />
+            {/* NÚT MỞ POPUP CHỌN ĐỊA CHỈ */}
+            <TouchableOpacity 
+              onPress={() => setShowAddressPopup(true)}
+              className="w-full bg-white border border-gray-200 rounded-2xl h-14 px-4 flex-row items-center justify-between"
+            >
+              <Text className={`${location ? 'text-gray-900 font-medium' : 'text-gray-400'}`} numberOfLines={1}>
+                {location || "Nhấn để nhập địa chỉ chi tiết..."}
+              </Text>
+              <Feather name="map-pin" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
 
             <Label text="Specify your type of housing" required />
             <CustomDropdown
@@ -505,9 +601,8 @@ export default function AdoptionFormScreen() {
             <Label text="Are you planning to keep the pet in a cage?" required />
             <OptionGroup options={['Yes', 'No', 'Sometimes']} selected={cage} onSelect={setCage} />
 
-            {/* --- SECTION C --- */}
+            {/* SECTION C */}
             <SectionTitle title="Section C – Pet Experience" />
-
             <Label text="Have you raised any pet before?" required />
             <AdviceText text="Some pets in the rescue center are not suitable for living with other pets" />
             <CustomDropdown
@@ -520,7 +615,7 @@ export default function AdoptionFormScreen() {
             <Label text="If your pet(s) is no longer with you, what happened to them?" required />
             <CustomInput multiline value={prevPetHistory} onChangeText={setPrevPetHistory} />
 
-            {/* --- SECTION D --- */}
+            {/* SECTION D */}
             <SectionTitle title="Section D – Employment & Personal" />
             <Label text="Specify your employment status?" required />
             <CustomDropdown
@@ -530,9 +625,8 @@ export default function AdoptionFormScreen() {
               onSelect={setJob}
             />
 
-            {/* --- SECTION E --- */}
+            {/* SECTION E */}
             <SectionTitle title="Section E – Adoption Commitment" />
-
             <Label text="Reason of adoption" required />
             <CustomDropdown
               placeholder="Select reason"
@@ -541,12 +635,7 @@ export default function AdoptionFormScreen() {
               onSelect={setReason}
             />
             {reason === 'Other' && (
-              <CustomInput
-                placeholder="Please specify your reason"
-                value={otherReason}
-                onChangeText={setOtherReason}
-                multiline={true}
-              />
+              <CustomInput placeholder="Please specify your reason" value={otherReason} onChangeText={setOtherReason} multiline={true} />
             )}
 
             <Label text="Are you willing to provide yearly vaccinations and medical care for the pet?" required />
@@ -569,40 +658,22 @@ export default function AdoptionFormScreen() {
             <Label text="In accordance with SNNC's regulations and to ensure proper management of adopted pets, are you willing to provide your ID details and your exact address where the pet will be kept?" required />
             <OptionGroup options={['Yes', 'No']} selected={provideID} onSelect={setProvideID} />
 
-            {/* --- SUBMIT BUTTON --- */}
+            {/* SUBMIT BUTTON */}
             <View className="flex-row items-center mt-[50px] mb-[21px]">
-              <TouchableOpacity
-                onPress={() => setIsAgreed(!isAgreed)}
-                className="mr-3" // Xóa mt-0.5 ở đây
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={isAgreed ? "checkbox" : "square-outline"}
-                  size={24}
-                  color={isAgreed ? "#E89B5A" : "#9CA3AF"}
-                />
+              <TouchableOpacity onPress={() => setIsAgreed(!isAgreed)} className="mr-3" activeOpacity={0.7}>
+                <Ionicons name={isAgreed ? "checkbox" : "square-outline"} size={24} color={isAgreed ? "#E89B5A" : "#9CA3AF"} />
               </TouchableOpacity>
               <Text className="flex-1 text-gray-600 text-[14px] leading-5">
                 I agree to {" "}
-                <Text
-                  className="text-[#E89B5A] font-bold"
-                  onPress={() => setShowPolicyModal(true)}
-                >
+                <Text className="text-[#E89B5A] font-bold" onPress={() => setShowPolicyModal(true)}>
                   conditions of PawLife Adoption Policy.
                 </Text>
               </Text>
             </View>
 
-            {/* --- SUBMIT BUTTON --- */}
             <TouchableOpacity
-              // Bỏ các class bg- ra khỏi className
               className="w-full py-4 rounded-full mt-4 mb-8 flex-row justify-center items-center"
-              style={{
-                // Quản lý màu nền trực tiếp qua style
-                backgroundColor: isLoading
-                  ? '#fcd3a0'
-                  : (!isAgreed ? '#F6F6F6' : '#E89B5A') // #D1D5DB tương đương bg-gray-300
-              }}
+              style={{ backgroundColor: isLoading ? '#fcd3a0' : (!isAgreed ? '#F6F6F6' : '#E89B5A') }}
               activeOpacity={0.8}
               onPress={handleSubmit}
               disabled={isLoading || !isAgreed}

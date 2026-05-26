@@ -5,7 +5,13 @@ export interface LoginPayload {
   email: string;
   password?: string;
 }
-
+export interface UpdateProfilePayload {
+  name?: string;
+  avatarUrl?: string;
+  phone?: string;
+  dob?: string;
+  gender?: string;
+}
 export interface RegisterPayload {
   email: string;
   password?: string;
@@ -33,6 +39,13 @@ export const authService = {
       // Bắt lỗi từ Backend trả về (nếu có), nếu không lấy lỗi mặc định của Axios
       throw error.response?.data || { message: error.message };
     }
+  },
+
+  updateProfileAPI: async (data: UpdateProfilePayload) => {
+    // Lưu ý: Đổi URL '/auth/me/profile' thành đường dẫn chính xác 
+    // mà bạn vừa tạo ở Backend API
+    const response = await axiosClient.patch('/auth/me/profile', data);
+    return response.data;
   },
 
   registerAPI: async (data: RegisterPayload) => {

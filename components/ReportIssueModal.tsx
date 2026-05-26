@@ -1,20 +1,24 @@
 // components/ReportIssueModal.tsx
-import React, { useState } from 'react';
-import {
-    Modal,
-    View,
-    TouchableOpacity,
-    TextInput,
-    TouchableWithoutFeedback,
-    Image,
-    Platform,
-    KeyboardAvoidingView,
-    Keyboard
-} from 'react-native';
-import { BlurView } from 'expo-blur';
-import { Text } from './AppText';
-import { Ionicons } from '@expo/vector-icons';
+import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { BlurView } from 'expo-blur';
+import React, { useEffect, useState } from 'react';
+import {
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
+} from 'react-native';
+import { Text } from './AppText';
+import ReportSuccessModal from './ReportSuccessModal';
 
 interface Props {
     isVisible: boolean;
@@ -32,45 +36,183 @@ const REPORT_OPTIONS = [
     "Other",
 ];
 
+// --- CÁC COMPONENT PHỤ TRỢ CHO POPUP ĐỊA CHỈ ---
+const Label = ({ text, required = false }: { text: string; required?: boolean }) => (
+    <Text className="text-[#8E8E93] text-[14px] font-medium mb-2 mt-4">
+        {text} {required && <Text className="text-red-500">*</Text>}
+    </Text>
+);
+
+const CustomInput = ({ value, onChangeText, placeholder }: { value?: string; onChangeText?: (text: string) => void; placeholder?: string }) => (
+    <View>
+        <TextInput
+            className="w-full bg-white border border-[#E5E5E5] rounded-2xl px-4 text-black h-14"
+            placeholder={placeholder}
+            placeholderTextColor="#9CA3AF"
+            value={value}
+            onChangeText={onChangeText}
+            style={{ fontFamily: "Urbanist" }}
+        />
+    </View>
+);
+
+const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeholder: string; value?: string; options?: string[]; onSelect?: (val: string) => void }) => {
+    const [visible, setVisible] = useState(false);
+
+    return (
+        <View>
+            <TouchableOpacity
+                onPress={() => setVisible(true)}
+                activeOpacity={0.7}
+                className={`w-full bg-white border border-[#E5E5E5] rounded-2xl h-14 px-4 flex-row items-center justify-between ${visible ? 'border-[#E89B5A]' : ''}`}
+            >
+                <Text className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`} numberOfLines={1}>
+                    {value || placeholder}
+                </Text>
+                <Feather name={visible ? "chevron-up" : "chevron-down"} size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            <Modal visible={visible} transparent animationType="fade">
+                <TouchableWithoutFeedback onPress={() => setVisible(false)}>
+                    <View className="flex-1 bg-black/40 justify-center px-6">
+                        <TouchableWithoutFeedback>
+                            <View className="bg-white rounded-3xl max-h-[60%] overflow-hidden shadow-2xl">
+                                <View className="px-5 py-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
+                                    <Text className="font-bold text-gray-700 text-base">{placeholder}</Text>
+                                    <TouchableOpacity onPress={() => setVisible(false)}>
+                                        <AntDesign name="close" size={20} color="#9CA3AF" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <FlatList
+                                    data={options}
+                                    keyExtractor={(item) => item}
+                                    showsVerticalScrollIndicator={false}
+                                    renderItem={({ item }) => {
+                                        const isSelected = item === value;
+                                        return (
+                                            <TouchableOpacity
+                                                className={`px-5 py-4 border-b border-gray-50 flex-row items-center justify-between ${isSelected ? 'bg-orange-50' : 'active:bg-gray-50'}`}
+                                                onPress={() => {
+                                                    if (onSelect) onSelect(item);
+                                                    setVisible(false);
+                                                }}
+                                            >
+                                                <Text className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}>
+                                                    {item}
+                                                </Text>
+                                                {isSelected && <Ionicons name="checkmark" size={18} color="#E89B5A" />}
+                                            </TouchableOpacity>
+                                        );
+                                    }}
+                                />
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
+        </View>
+    );
+};
+
+
 export default function ReportIssueModal({ isVisible, onClose }: Props) {
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [otherReason, setOtherReason] = useState('');
+    const [isSuccessVisible, setIsSuccessVisible] = useState(false);
+    const [submittedAt, setSubmittedAt] = useState<Date | null>(null);
+    const handleSubmit = async () => {
+        try {
+            // TODO: await yourApiCall(...)
+            setSubmittedAt(new Date());
+            
+            // 1. Đóng report modal trước
+            onClose();
+            
+            // 2. Đợi animation đóng xong (~300ms) rồi mới mở success
+            setTimeout(() => {
+                setIsSuccessVisible(true);
+            }, 350);
+        } catch (e) {
+            Alert.alert('Error', 'Failed to submit report. Please try again.');
+        }
+    };
+    const handleSuccessClose = () => {
+        setIsSuccessVisible(false);
+        // Reset form — KHÔNG gọi onClose() ở đây nữa vì đã gọi ở handleSubmit
+        setSelectedOption(null);
+        setOtherReason('');
+        setLocation('');
+        setDate(new Date());
+    };
+
+
+    // Khai báo state lưu địa chỉ sau khi gộp
+    const [location, setLocation] = useState('');
 
     // --- STATE QUẢN LÝ NGÀY GIỜ VÀ LUỒNG (FLOW) ---
     const [date, setDate] = useState<Date>(new Date());
     const [tempDate, setTempDate] = useState<Date>(new Date());
     const [isDatePickerVisible, setDatePickerVisible] = useState(false);
-
-    // Thêm state quản lý bước: 'date' (Ngày) -> 'time' (Giờ)
     const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
+
+    // --- ADDRESS POPUP STATE & LOGIC ---
+    const [showAddressPopup, setShowAddressPopup] = useState(false);
+    const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+    const [tempCity, setTempCity] = useState('');
+    const [tempDistrict, setTempDistrict] = useState('');
+    const [tempWard, setTempWard] = useState('');
+    const [tempDetail, setTempDetail] = useState('');
+
+    useEffect(() => {
+        // Chỉ fetch data nếu Modal đang hiển thị (tối ưu hóa)
+        if (isVisible) {
+            fetch('https://provinces.open-api.vn/api/?depth=3')
+                .then(res => res.json())
+                .then(data => setAddressDataAPI(data))
+                .catch(e => console.error("Lỗi fetch địa chỉ:", e));
+        }
+    }, [isVisible]);
+
+    const cityOptions = addressDataAPI.map((c: any) => c.name);
+    const districtOptions = tempCity
+        ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.map((d: any) => d.name) || []
+        : [];
+    const wardOptions = tempDistrict
+        ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.find((d: any) => d.name === tempDistrict)?.wards?.map((w: any) => w.name) || []
+        : [];
+
+    const handleConfirmAddress = () => {
+        if (!tempCity || !tempDistrict || !tempWard || !tempDetail.trim()) {
+            Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.");
+            return;
+        }
+        const fullAddress = `${tempDetail.trim()}, ${tempWard}, ${tempDistrict}, ${tempCity}`;
+        setLocation(fullAddress);
+        setShowAddressPopup(false);
+    };
 
     const openDatePicker = () => {
         setTempDate(new Date());
-        setPickerMode('date'); // Luôn bắt đầu từ bước chọn ngày
+        setPickerMode('date');
         Keyboard.dismiss();
         setDatePickerVisible(true);
     };
 
-    // Hàm xử lý nút bên phải (Next / Done)
     const handleNextOrDone = () => {
         if (pickerMode === 'date') {
-            // Đang ở chọn ngày -> chuyển sang chọn giờ
             setPickerMode('time');
         } else {
-            // Đang ở chọn giờ -> xác nhận toàn bộ và đóng
             setDate(tempDate);
             setDatePickerVisible(false);
         }
     };
 
-    // Hàm xử lý nút bên trái (Cancel / Back)
     const handleCancelOrBack = () => {
         if (pickerMode === 'time') {
-            // Đang ở chọn giờ -> quay lại chọn ngày
             setPickerMode('date');
         } else {
-            // Đang ở chọn ngày -> hủy bỏ
             setDatePickerVisible(false);
         }
     };
@@ -81,6 +223,7 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
     }).replace(',', ' at');
 
     return (
+        <>
         <Modal visible={isVisible} transparent animationType="fade">
             <TouchableWithoutFeedback onPress={onClose}>
                 <BlurView intensity={30} tint="dark" className="flex-1 bg-black/50 justify-center px-6">
@@ -116,7 +259,6 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                                                     </Text>
                                                 </TouchableOpacity>
 
-                                                {/* Conditional Rendering: Chỉ hiện Input khi option là 'Other' và đang được chọn */}
                                                 {isSelected && option === 'Other' && (
                                                     <TextInput
                                                         placeholder="Please specify your concern..."
@@ -135,10 +277,15 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                                 <Text className="font-semibold mb-[15px] text-[16px] tracking-[0.06px]">Where did you see Princess?</Text>
 
                                 <View className='mb-[30px] rounded-[16px] border border-[#E5E5E5]'>
+                                    {/* NÚT BẤM ĐỂ MỞ POPUP ĐỊA CHỈ */}
                                     <View className='flex-row border-b border-[#E5E5E5] py-3 mx-4 items-center'>
-                                        <Image source={require('../assets/icon/location-gray-icon.png')} style={{ width: 9, height: 11 }} resizeMode="cover"  />
+                                        <Image source={require('../assets/icon/location-gray-icon.png')} style={{ width: 9, height: 11 }} resizeMode="cover" />
                                         <Text className="text-[13px] font-medium text-[#8E8E93] px-2">Location</Text>
-                                        <TextInput placeholder="123 Street, District, City" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="flex-1 text-[13px] text-[#1C1C1E] p-0 text-right tracking-[0.06px]" />
+                                        <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
+                                            <Text className={`font-regular text-[13px] text-right tracking-[0.06px] ${location ? 'text-[#1C1C1E]' : 'text-[#9CA3AF]'}`} numberOfLines={1}>
+                                                {location || "Nhấn để chọn địa chỉ..."}
+                                            </Text>
+                                        </TouchableOpacity>
                                     </View>
 
                                     {/* Mở Date Picker */}
@@ -157,10 +304,13 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
 
                                 <View className='w-full justify-center items-center mb-[12px]'>
                                     <TouchableOpacity
-                                        // Nút sẽ bị disable nếu: Chưa chọn option HOẶC (Chọn Other nhưng chưa nhập text) HOẶC chưa confirm
-                                        disabled={!selectedOption || (selectedOption === 'Other' && !otherReason.trim()) || !isConfirmed}
-                                        className={`w-[80%] py-3 rounded-2xl items-center justify-center ${selectedOption && (selectedOption !== 'Other' || otherReason.trim() !== '') ? 'bg-[#F2A465]' : 'bg-gray-200'
-                                            }`}
+                                        onPress={handleSubmit}
+                                        disabled={!selectedOption || (selectedOption === 'Other' && !otherReason.trim())}
+                                        className={`w-[80%] py-3 rounded-2xl items-center justify-center ${
+                                            selectedOption && (selectedOption !== 'Other' || otherReason.trim())
+                                                ? 'bg-[#F2A465]'
+                                                : 'bg-gray-200'
+                                        }`}
                                     >
                                         <Text className="text-white font-bold text-[16px]">Submit Concern</Text>
                                     </TouchableOpacity>
@@ -176,6 +326,75 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                     </KeyboardAvoidingView>
                 </BlurView>
             </TouchableWithoutFeedback>
+
+            {/* --- ADDRESS POPUP MODAL (ABSOLUTE OVERLAY) --- */}
+            {showAddressPopup && (
+                <View
+                    className="absolute inset-0 bg-black/50 justify-center px-4"
+                    style={{ zIndex: 9999, elevation: 9999 }}
+                >
+                    <View className="bg-white rounded-[24px] p-6 shadow-2xl max-h-[85%]">
+                        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                            <Text className="text-[20px] font-semibold text-black mb-2 text-center">
+                                Địa điểm phát hiện
+                            </Text>
+
+                            <Label text="Thành phố / Tỉnh" required />
+                            <CustomDropdown
+                                placeholder="Chọn Tỉnh/Thành phố"
+                                value={tempCity}
+                                options={cityOptions}
+                                onSelect={(val) => {
+                                    setTempCity(val);
+                                    setTempDistrict('');
+                                    setTempWard('');
+                                }}
+                            />
+
+                            <Label text="Quận / Huyện" required />
+                            <CustomDropdown
+                                placeholder="Chọn Quận/Huyện"
+                                value={tempDistrict}
+                                options={districtOptions}
+                                onSelect={(val) => {
+                                    setTempDistrict(val);
+                                    setTempWard('');
+                                }}
+                            />
+
+                            <Label text="Phường / Xã" required />
+                            <CustomDropdown
+                                placeholder="Chọn Phường/Xã"
+                                value={tempWard}
+                                options={wardOptions}
+                                onSelect={setTempWard}
+                            />
+
+                            <Label text="Địa chỉ chi tiết" required />
+                            <CustomInput
+                                placeholder="Số nhà, tên ngõ, tên đường..."
+                                value={tempDetail}
+                                onChangeText={setTempDetail}
+                            />
+
+                            <View className="flex-row gap-3 mt-8 mb-4">
+                                <TouchableOpacity
+                                    className="flex-1 py-4 rounded-xl border border-[#E5E5E5] items-center bg-[#F9FAFB]"
+                                    onPress={() => setShowAddressPopup(false)}
+                                >
+                                    <Text className="text-[#8E8E93] font-bold">Hủy bỏ</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    className="flex-1 py-4 rounded-xl bg-[#E89B5A] items-center shadow-sm"
+                                    onPress={handleConfirmAddress}
+                                >
+                                    <Text className="text-white font-bold">Xác nhận</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            )}
 
             {/* --- OVERLAY CHỌN NGÀY VÀ GIỜ --- */}
             {isDatePickerVisible && (
@@ -222,6 +441,16 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                     </View>
                 </View>
             )}
+           
+
+
         </Modal>
+         <ReportSuccessModal
+                isVisible={isSuccessVisible}
+                onClose={handleSuccessClose}
+                reason={selectedOption === 'Other' ? otherReason : selectedOption}
+                submittedAt={submittedAt}
+            />
+        </>
     );
 }

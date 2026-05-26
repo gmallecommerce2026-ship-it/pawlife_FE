@@ -1,4 +1,6 @@
 // contexts/AuthContext.tsx
+import axiosClient from '@/api/axiosClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useEffect, useState } from 'react';
 import { authService, LoginPayload, RegisterPayload, SendOtpPayload } from '../services/authService';
@@ -77,12 +79,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
-  const updateUser = async (updatedData: Partial<User>) => {
-    if (!user) return;
-    const newUser = { ...user, ...updatedData };
-    setUser(newUser);
-    // Cập nhật lại vào SecureStore để giữ data khi tắt app
-    await SecureStore.setItemAsync('userData', JSON.stringify(newUser));
+  const updateUser = async (updatePayload: any) => {
+    try {
+      // 1. Gửi request lên server
+      const response = await axiosClient.patch('/auth/me/profile', updatePayload);
+      
+      // 2. Lấy user data mới nhất từ response
+      const updatedUserData = response.data.user;
+
+      // 3. Update state trên UI
+      setUser((prev) => ({ ...prev, ...updatedUserData }));
+
+      // 4. Update AsyncStorage để lần mở app sau không bị lấy data cũ dưới local
+      const currentStorageStr = await AsyncStorage.getItem('user_data');
+      if (currentStorageStr) {
+        const currentStorage = JSON.parse(currentStorageStr);
+        await AsyncStorage.setItem('user_data', JSON.stringify({ ...currentStorage, ...updatedUserData }));
+      }
+    } catch (error) {
+      console.error("Lỗi cập nhật profile:", error);
+      throw error;
+    }
   };
 
   // BỔ SUNG: Hàm setAuth dùng cho 2FA và Social Login
