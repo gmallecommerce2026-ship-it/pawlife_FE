@@ -495,6 +495,17 @@ export default function EventDetailScreen() {
                                             Event Organizer
                                         </Text>
                                     </View>
+
+                                      <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        className="w-[36px] h-[36px] items-center justify-center ml-2"
+                                        onPress={() => router.push({
+                                            pathname: '/organizer-profile',
+                                            params: { id: eventData.organizer.id }
+                                        })}
+                                    >
+                                        <Feather name="chevron-right" size={18} color="black" />
+                                    </TouchableOpacity>
                                 </View>
                             </View>
                         )}
@@ -502,8 +513,8 @@ export default function EventDetailScreen() {
                         <View className="mb-[32px]">
                             <View className='flex-row justify-between items-center mb-[12px]'>
                                 <Text className="text-[16px] font-medium text-black">Location</Text>
-                                <TouchableOpacity onPress={handleOpenMap} activeOpacity={0.7} className="py-1 px-2 -mr-2 rounded-lg bg-[#FDF5EF]">
-                                    <Text className="text-[14px] font-semibold text-[#E89B5A]">View on Map</Text>
+                                <TouchableOpacity onPress={handleOpenMap} activeOpacity={0.7} className="py-1 px-2 -mr-2 ">
+                                    <Text className="text-[14px] font-regular text-[#E89B5A]">View on Map</Text>
                                 </TouchableOpacity>
                             </View>
 
@@ -547,7 +558,7 @@ export default function EventDetailScreen() {
                                                 key={img.id || index}
                                                 activeOpacity={0.8}
                                                 onPress={() => handleOpenImageViewer(index)}
-                                                className="w-[22%] aspect-square rounded-[16px] relative"
+                                                className="w-[22%] aspect-square rounded-[16px] relative bg-gray-300 overflow-hidden"
                                                 style={{
                                                     shadowColor: '#E89B5A',
                                                     shadowOffset: { width: 2, height: 2 },
@@ -596,7 +607,7 @@ export default function EventDetailScreen() {
                                                         </View>
                                                     )}
 
-                                                    <View className="flex-1 flex-row items-center pl-3 pr-4 py-3 bg-slate-200">
+                                                    <View className="flex-1 flex-row items-center pl-3 pr-4 py-3">
                                                         <View className="flex-1 justify-between h-full pr-3">
                                                             <View>
                                                                 <Text className="font-medium text-gray-800 text-[14px] leading-tight mb-0.5 tracking-[0.06px]" numberOfLines={1}>{ev.title}</Text>

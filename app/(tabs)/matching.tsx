@@ -105,8 +105,8 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#E89B5A]`} onPress={() => onAction && onAction('heart')}>
                     <Image className='mr-3' source={
                         isFavorited
-                            ? require('../../assets/icon/heart-filled-pawdoption.png') // Trái tim tô kín (khi đã double tap)
-                            : require('../../assets/icon/heart-pawdoption.png') // Trái tim rỗng (mặc định)
+                            ? require('../../assets/icon/heart-filled-pawdoption.png')
+                            : require('../../assets/icon/heart-pawdoption.png')
                     } style={{ width: 27, height: 27 }} resizeMode="cover" />
                 </TouchableOpacity>
 
@@ -139,16 +139,12 @@ const SwipeableCard = ({
 
     useEffect(() => {
         if (isFavorited) {
-            // Khi XUẤT HIỆN: Nẩy lên tự nhiên
-            // Damping thấp (12) giúp trái tim có độ rung nhẹ khi bật ra
             popScale.value = withSpring(1, {
                 damping: 12,
                 stiffness: 250,
                 mass: 1
             });
         } else {
-            // Khi BIẾN MẤT: Rút ngược lại nhanh, dứt khoát 
-            // Stiffness cao (350) và mass nhỏ (0.8) giúp nó co rúm lại tức thì
             popScale.value = 0;
         }
     }, [isFavorited]);
@@ -227,37 +223,25 @@ const SwipeableCard = ({
         <GestureDetector gesture={pan}>
             <Animated.View style={[animatedStyle]} className="absolute top-0 left-0 right-0 bottom-0 z-10">
                 <View className="flex-1 relative justify-center items-center"
-                    style={{
-                        position: 'absolute',
-                        width: '100%',
-                        height: '100%',
-                        // --- LỚP NGOÀI: CHỈ ĐỔ BÓNG, KHÔNG DÙNG OVERFLOW HIDDEN ---
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 30,
-                        elevation: 10, // Quan trọng để hiện bóng trên Android
-                        backgroundColor: 'transparent',
-                    }}>
+                    style={[
+                        {
+                            position: 'absolute',
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: 'transparent',
+                        },
+                        !isTutorialCard && !hideOverlay && {
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 10,
+                            elevation: 5,
+                        }
 
-                    {!isTutorialCard && (
-                        <View
-                            style={{
-                                position: 'absolute',
-                                top: 40, left: 20, right: 20, bottom: 0,
-                                backgroundColor: 'white',
-                                borderRadius: 32,
-                                shadowColor: '#000000d1',
-                                shadowOffset: { width: 0, height: 12 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 10,
-                                elevation: 15,
-                            }}
-                        />
-                    )}
+                    ]}>
 
                     <View className={`flex-1 w-full rounded-[32px] overflow-hidden relative ${isTutorialCard ? 'bg-transparent' : 'bg-gray-100'}`}>
-                        
+
                         {/* GESTURE TẦNG 2: TAPS - Chỉ bọc riêng khu vực Ảnh để mở Image Viewer */}
                         <GestureDetector gesture={taps}>
                             <View style={{ position: 'absolute', width: '100%', height: '100%' }}>
@@ -271,7 +255,7 @@ const SwipeableCard = ({
 
                                 <Image
                                     source={require('../../assets/images/light-top-left.png')}
-                                    contentFit="contain" // Hoặc "cover" tùy vào viền ảnh
+                                    contentFit="contain"
                                 />
                             </View>
                         </GestureDetector>
@@ -281,10 +265,10 @@ const SwipeableCard = ({
                                 likeOpacity,
                                 {
                                     position: 'absolute',
-                                    top: isTutorialCard ? height * 0.12 : 64, // Đẩy xuống 25% chiều cao màn hình nếu là tutorial
-                                    left: 32, // Neo cố định bên trái
+                                    top: isTutorialCard ? height * 0.12 : 64,
+                                    left: 32,
                                     zIndex: 50,
-                                    transform: [{ rotate: '-12deg' }] // Xoay nghiêng
+                                    transform: [{ rotate: '-12deg' }]
                                 }
                             ]}
                             className="border-[6px] border-green-400 rounded-xl px-4 py-2 pointer-events-none"
@@ -293,16 +277,15 @@ const SwipeableCard = ({
                             <Text className="text-green-400 font-extrabold text-5xl uppercase tracking-widest">LIKE</Text>
                         </Animated.View>
 
-                        {/* CHỮ NOPE */}
                         <Animated.View
                             style={[
                                 nopeOpacity,
                                 {
                                     position: 'absolute',
-                                    top: isTutorialCard ? height * 0.12 : 64, // Đẩy xuống 25% chiều cao màn hình nếu là tutorial
-                                    right: 32, // Neo cố định bên phải
+                                    top: isTutorialCard ? height * 0.12 : 64,
+                                    right: 32,
                                     zIndex: 50,
-                                    transform: [{ rotate: '12deg' }] // Xoay nghiêng
+                                    transform: [{ rotate: '12deg' }]
                                 }
                             ]}
                             className="border-[6px] border-red-500 rounded-xl px-4 py-2 pointer-events-none"
@@ -356,11 +339,11 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
 
     const [isUsingGps, setIsUsingGps] = useState(false);
     const [surveyStep, setSurveyStep] = useState(1);
-    
+
     // Lấy giá trị khởi tạo từ filter đã lưu (nếu có)
     const [selectedType, setSelectedType] = useState<string | null>(initialFilters?.type || null);
     const [selectedAge, setSelectedAge] = useState<string | null>(initialFilters?.age || null);
-    
+
     const [locationText, setLocationText] = useState('');
     const [isRequestingGps, setIsRequestingGps] = useState(false);
 
@@ -380,7 +363,6 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
             if (!isUsingGps && locationText.trim().length > 0) {
                 await saveManualCity(locationText.trim());
             }
-            // TRUYỀN DỮ LIỆU ĐÃ CHỌN VỀ COMPONENT CHA
             onComplete({ type: selectedType, age: selectedAge });
         }
     };
@@ -393,7 +375,6 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
             setLocationText('Current Location');
         }
     };
-    // LOGIC NÚT BACK: Lùi bước, hoặc thoát hẳn nếu ở bước 1
     const handleBack = () => {
         if (surveyStep > 1) {
             setSurveyStep(prev => prev - 1);
@@ -445,7 +426,6 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
                                                     source={item.icon}
                                                     style={{ width: 40, height: 40 }}
                                                 />
-                                                {/* <FontAwesome5 name={item.icon as any} size={32} color={selectedType === item.id ? '#E89B5A' : '#9CA3AF'} /> */}
                                                 <Text className={`mt-3 font-medium text-[14px] ${selectedType === item.id ? 'text-[#E89B5A]' : 'text-black'}`}>{item.label}</Text>
                                             </TouchableOpacity>
                                         ))}
@@ -559,12 +539,15 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
 const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => void }) => {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    // STATE: Quản lý trạng thái Checkbox
     const [isAgreed, setIsAgreed] = useState(false);
 
     const PolicyItem = ({ number, title, content }: any) => (
         <View className="flex-row items-start mb-[21px]">
-            <Text className="font-medium text-[16px] text-black w-4">{number}.</Text>
+            <View className="w-4 shrink-0 mr-2 items-start">
+                <Text className="text-black text-[16px] font-medium">
+                    {number}.
+                </Text>
+            </View>
             <View className="flex-1">
                 <Text className="text-gray-800 font-medium text-[16px] mb-[4px]" numberOfLines={1}>{title}</Text>
                 <Text className="text-gray-500 font-regular text-[14px] leading-[20px] tracking-[0.06px]">{content}</Text>
@@ -607,7 +590,6 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                 </Animated.ScrollView>
             </View>
 
-            {/* VÙNG BOTTOM ACTION (CỐ ĐỊNH Ở ĐÁY: CHECKBOX + SUBMIT) */}
             <View
                 style={{
                     paddingBottom: Math.max(insets.bottom, 16),
@@ -618,7 +600,6 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                 className='items-center justify-center'
             >
 
-                {/* Custom Checkbox */}
                 <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => setIsAgreed(!isAgreed)}
@@ -635,7 +616,6 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                             I agree to{' '}
                             <Text
                                 onPress={() => {
-                                    // Thêm hành động mở link hoặc màn hình Policy của bạn ở đây
                                     router.push('/terms-of-service');
                                 }}
                                 className="text-[#E89B5A]"
@@ -647,7 +627,6 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                     </View>
                 </TouchableOpacity>
 
-                {/* Nút Submit */}
                 <TouchableOpacity
                     onPress={onAgree}
                     disabled={!isAgreed}
@@ -667,7 +646,7 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
 const TUTORIAL_DATA = [
     {
         id: 'step1',
-        image: require('../../assets/images/t-left.jpg'),
+        image: require('../../assets/images/t-left.png'),
         forcedDir: 'left',
         instruction: "Not this one",
         subInstruction: "",
@@ -675,7 +654,7 @@ const TUTORIAL_DATA = [
     },
     {
         id: 'step2',
-        image: require('../../assets/images/t-right.jpg'),
+        image: require('../../assets/images/t-right.png'),
         forcedDir: 'right',
         instruction: "Hmm... this one!",
         subInstruction: "",
@@ -683,7 +662,7 @@ const TUTORIAL_DATA = [
     },
     {
         id: 'step3',
-        image: require('../../assets/images/t-top.jpg'),
+        image: require('../../assets/images/t-top.png'),
         forcedDir: 'up',
         instruction: "What’s their story?",
         subInstruction: "",
@@ -698,38 +677,7 @@ const TUTORIAL_DATA = [
         iconName: "gesture-double-tap"
     }
 ];
-// Component tạo hiệu ứng vầng sáng mặt trời
-const SunGlow = ({ style }: { style: any }) => (
-    <View style={[
-        {
-            position: 'absolute',
-            pointerEvents: 'none',
-            width: 160,
-            height: 160,
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 0,
-        },
-        style
-    ]}>
-        {/* Vầng sáng vàng nhạt tỏa rộng ra ngoài */}
-        <View style={{
-            position: 'absolute',
-            width: 160, height: 160, borderRadius: 80,
-            backgroundColor: 'rgba(255, 245, 180, 0.25)',
-            shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.8, shadowRadius: 50, elevation: 10
-        }} />
-        {/* Lõi trắng sáng rực ở giữa */}
-        <View style={{
-            position: 'absolute',
-            width: 90, height: 90, borderRadius: 45,
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            shadowColor: '#FFFFFF', shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 1, shadowRadius: 30, elevation: 20
-        }} />
-    </View>
-);
+
 // ==================================================================
 // 3. TUTORIAL SCREEN (PURE UI)
 // ==================================================================
@@ -866,11 +814,7 @@ const TutorialScreen = ({ onComplete }: { onComplete: () => void }) => {
             style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         >
             <View className="flex-1 w-full flex-col">
-                {/* YÊU CẦU 1 & 2: 
-                 - Đổi px-[38px] thành px-6 để thẻ rộng ra. 
-                 - Đổi pt-[108px] thành pt-[64px] để thẻ cao lên.
-                 - Đổi pb-12 thành pb-0 để thẻ tràn xuống sát khu vực Skip Button. 
-             */}
+
                 <View className="flex-1 px-6 pt-[64px] pb-0 relative z-10 w-full bg-white">
                     <View className="flex-1 relative w-full h-full">
 
@@ -906,10 +850,6 @@ const TutorialScreen = ({ onComplete }: { onComplete: () => void }) => {
                                         isTutorialCard={true}
                                     />
 
-                                    {/* YÊU CẦU 3: Đẩy text lên trên 
-                                    - Đổi `justify-center` thành `justify-start` 
-                                    - Thêm paddingTop ~20%-25% để responsive đẹp trên mọi chiều cao màn hình 
-                                */}
                                     <Animated.View
                                         className="absolute inset-0 items-center justify-start z-50 pointer-events-none"
                                         style={tutorialMovingStyle}
@@ -921,16 +861,16 @@ const TutorialScreen = ({ onComplete }: { onComplete: () => void }) => {
                                             <RNText
                                                 style={{
                                                     color: 'white',
-                                                    fontSize: 26, // Tăng nhẹ size để dễ đọc hơn
-                                                    fontWeight: '500', // Đậm nhất có thể
+                                                    fontSize: 26,
+                                                    fontWeight: '500',
                                                     textAlign: 'center',
-                                                    letterSpacing: 26 * 0.05, // Chuẩn 5% của 26px = 1.3px
+                                                    letterSpacing: 26 * 0.05,
                                                     fontFamily: "Urbanist",
 
                                                     // --- CHUẨN TEXT SHADOW CHO CẢ IOS & ANDROID ---
-                                                    textShadowColor: 'rgba(0, 0, 0, 0.2)', // Nền đen độ mờ 80% (đẹp hơn đen đặc 1)
+                                                    textShadowColor: 'rgba(0, 0, 0, 0.2)',
                                                     textShadowOffset: { width: 0, height: 2 },
-                                                    textShadowRadius: 2, // Android chỉ nhận đẹp nhất ở mức < 6
+                                                    textShadowRadius: 2,
                                                 }}
                                             >
                                                 {activeItem.instruction}
@@ -944,11 +884,6 @@ const TutorialScreen = ({ onComplete }: { onComplete: () => void }) => {
                     </View>
                 </View>
 
-                {/* YÊU CẦU 2 (Phần chia khoảng cách): 
-                 - Xóa mt-1, mb-2.
-                 - Dùng py-8 (padding cả trên và dưới) để đảm bảo nút Skip nằm chính giữa khoảng trống 
-                   từ đáy thẻ tutorial đến đáy màn hình (footer).
-             */}
                 <View className="items-center w-full py-8 px-6 z-20 bg-white">
                     <TouchableOpacity onPress={onComplete} activeOpacity={0.7} className="w-full items-center">
                         <Text className="text-[#B8B8B8] font-regular text-[14px] tracking-widest">
@@ -961,7 +896,6 @@ const TutorialScreen = ({ onComplete }: { onComplete: () => void }) => {
     );
 };
 const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], isVisible: boolean, onClose: () => void }) => {
-    // 1. Dùng hook lấy chính xác chiều cao của Notch/Dynamic Island
     const insets = useSafeAreaInsets();
     const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -980,49 +914,40 @@ const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], 
     };
 
     return (
-        // Thêm statusBarTranslucent={true} để Modal phủ kín màn hình chuẩn xác hơn
-        <Modal visible={isVisible} transparent animationType="fade" statusBarTranslucent={true}>
+        <Modal visible={isVisible} transparent animationType="fade">
             <View className="flex-1 bg-black">
+                <View
+                    className="flex-row items-center justify-between px-4 py-2 z-50 absolute left-0 right-0"
+                    style={{ top: Math.max(insets.top, 20) }}
+                >
+                    <TouchableOpacity
+                        onPress={onClose}
+                        className="p-2 bg-black/40 rounded-full"
+                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                    >
+                        <Feather name="x" size={24} color="white" />
+                    </TouchableOpacity>
+
+                    <View className="bg-black/40 px-3 py-1 rounded-full">
+                        <Text className="text-white text-[14px] font-medium">
+                            {currentIndex + 1} / {images.length}
+                        </Text>
+                    </View>
+
+                    <View className="w-10" />
+                </View>
+
                 <Image
                     source={{ uri: images[currentIndex] }}
                     style={{ width: '100%', height: '100%' }}
                     contentFit="contain"
                 />
 
-                {/* 2. Ép khoảng cách cứng dựa trên insets.top */}
-                <View
-                    className="absolute top-0 left-0 right-0 z-50"
-                    style={{ paddingTop: Math.max(insets.top, 50) }} // Luôn cách đỉnh ít nhất 50px
-                >
-                    <View className="px-5">
-                        <View className="flex-row justify-end mb-4">
-                            <TouchableOpacity
-                                onPress={onClose}
-                                className="p-2 bg-black/40 rounded-full"
-                                // 3. Mở rộng vùng nhận diện cảm ứng để dễ bấm hơn
-                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                            >
-                                <Feather name="x" size={26} color="white" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <View className="flex-row gap-1.5">
-                            {images.map((_, idx) => (
-                                <View
-                                    key={idx}
-                                    className={`flex-1 h-[3px] rounded-full ${idx === currentIndex ? 'bg-white' : 'bg-white/30'
-                                        }`}
-                                />
-                            ))}
-                        </View>
-                    </View>
-                </View>
-
-                {/* Vùng chạm (Tăng zIndex để chắc chắn không bị che) */}
                 <View style={{ position: 'absolute', top: '25%', bottom: 0, left: 0, right: 0, flexDirection: 'row', zIndex: 10 }}>
                     <TouchableOpacity style={{ flex: 1 }} onPress={handlePressLeft} activeOpacity={1} />
                     <TouchableOpacity style={{ flex: 1 }} onPress={handlePressRight} activeOpacity={1} />
                 </View>
+
             </View>
         </Modal>
     );
@@ -1071,11 +996,11 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
             // =========================================================
             // 2. LOGIC LỌC LOCAL (Theo bộ lọc Survey)
             // =========================================================
-            
+
             // A. Lọc theo Giống loài (Dog / Cat / Both)
             if (filters?.type && filters.type !== 'both') {
-                petsData = petsData.filter((p: any) => 
-                    p.species?.toUpperCase() === filters.type.toUpperCase() || 
+                petsData = petsData.filter((p: any) =>
+                    p.species?.toUpperCase() === filters.type.toUpperCase() ||
                     p.type?.toUpperCase() === filters.type.toUpperCase()
                 );
             }
@@ -1088,7 +1013,7 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                         const birthDate = new Date(p.dob);
                         const today = new Date();
                         ageInYears = today.getFullYear() - birthDate.getFullYear();
-                        if (today.getMonth() < birthDate.getMonth() || 
+                        if (today.getMonth() < birthDate.getMonth() ||
                             (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) {
                             ageInYears--;
                         }
@@ -1108,30 +1033,27 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
             // 3. CHUẨN HOÁ DỮ LIỆU HIỂN THỊ LÊN THẺ (UI)
             // =========================================================
             const mappedPets = petsData.map((pet: any) => {
-                
-                // Xử lý khoảng cách
+
                 const displayDistance = pet.distance
                     ? `${pet.distance}`
                     : (pet.city || pet.location || 'Gần bạn');
 
-                // Xử lý mảng ảnh
                 const petImages = pet.images && pet.images.length > 0
                     ? pet.images.map((img: any) => img.url)
                     : ['https://via.placeholder.com/400x600?text=No+Image'];
 
-                // Xử lý tuổi (Hiển thị ra thẻ)
                 let calculatedAge = pet.age;
                 if (!calculatedAge && pet.dob) {
                     const birthDate = new Date(pet.dob);
                     const today = new Date();
                     let years = today.getFullYear() - birthDate.getFullYear();
                     let months = today.getMonth() - birthDate.getMonth();
-                    
+
                     if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
                         years--;
                         months += 12;
                     }
-                    
+
                     if (years > 0) {
                         calculatedAge = `${years}`;
                     } else if (months > 0) {
@@ -1144,12 +1066,12 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                 return {
                     id: pet.id,
                     name: pet.name,
-                    age: calculatedAge || 'Unknown', 
+                    age: calculatedAge || 'Unknown',
                     gender: pet.gender || 'MALE',
                     distance: displayDistance,
                     location: pet.shelter?.name || pet.location || 'Location',
-                    image: petImages[0], 
-                    images: petImages    
+                    image: petImages[0],
+                    images: petImages
                 };
             });
 
@@ -1157,13 +1079,13 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
             // 4. CẬP NHẬT STATE & RESET ANIMATION
             // =========================================================
             setPets(mappedPets);
-            setOriginalPets(mappedPets); // LƯU LẠI MẢNG GỐC ĐỂ DÙNG CHO LOOP
+            setOriginalPets(mappedPets);
             setCurrentIndex(0);
 
             translateX_Even.value = 0; translateX_Odd.value = 0;
             translateY_Even.value = 0; translateY_Odd.value = 0;
             setLastSwipe(null);
-            
+
         } catch (error) {
             console.error("Lỗi khi lấy danh sách thú cưng:", error);
         } finally {
@@ -1178,7 +1100,6 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
     };
     useFocusEffect(
         useCallback(() => {
-            // SỬA Ở ĐÂY: Dùng isLocationLoaded thay vì location !== null
             if (isLocationLoaded) {
                 loadPets();
                 loadFavoritesCount();
@@ -1229,7 +1150,7 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                         queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
                     })
                     .catch(err => console.error("Lỗi bỏ tim:", err));
-                
+
                 Toast.show({
                     type: 'custom_badge',
                     props: { petName: activeCard.name || 'This pet', actionText: ' has been removed from Saved Pet' },
@@ -1243,7 +1164,7 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                         queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
                     })
                     .catch(err => console.error("Lỗi thả tim:", err));
-                
+
                 Toast.show({
                     type: 'custom_badge',
                     props: { petName: activeCard.name || 'This pet', actionText: ' has been added to Saved Pet' },
@@ -1299,13 +1220,10 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 
     const loadFavoritesCount = async () => {
         try {
-            // Đã sửa thành getFavorites() theo đúng định nghĩa trong petService của bạn
             const response = await petService.getFavorites();
 
-            // Xử lý logic tùy thuộc vào cấu trúc trả về của API
             const favoriteData = response?.data?.data || response?.data || response || [];
 
-            // Cập nhật tổng số lượng
             setLikeCount(favoriteData.length);
 
             const favoriteIds = favoriteData.map((pet: any) => pet.id || pet._id);
@@ -1318,7 +1236,6 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 
     return (
         <SafeAreaView className="flex-1 bg-[#fff8f0]" edges={['top']}>
-            {/* NÂNG CẤP: Thêm Linear Gradient làm nền nền giống Home Tab */}
             <LinearGradient
                 colors={['#FFFFFF', '#FFFBF5', '#FFF9F0']}
                 start={{ x: 0, y: 0 }}
@@ -1330,8 +1247,8 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 
                 <View className="flex-row items-center">
                     <Text className="text-3xl font-normal text-gray-900 tracking-tight">Pawdoption</Text>
-                    <TouchableOpacity onPress={onBack} className="p-2">
-                        <Image className='top-[7px]' source={require('../../assets/icon/Sliders.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
+                    <TouchableOpacity onPress={onBack} className="px-2 pt-1">
+                        <Image className='top-[10px]' source={require('../../assets/icon/Sliders.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
                     </TouchableOpacity>
                 </View>
 
@@ -1354,10 +1271,8 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                         <Text className="text-gray-400 font-medium">Loading pets...</Text>
                     </View>
                 ) : (
-                    /* THÊM CONTAINER CHUNG relative CHO CẢ 2 THẺ */
                     <View className="flex-1 relative w-full h-full">
 
-                        {/* THẺ ĐẰNG SAU (Next Card) */}
                         {nextCard && (
                             <View className="absolute top-0 left-0 right-0 bottom-0 z-0 pointer-events-none">
                                 <Animated.View style={[{ flex: 1, position: 'relative' }, nextCardStyle]}>
@@ -1453,7 +1368,6 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 };
 
 const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVisible: boolean, onClose: () => void, onAdopt: (pet: any) => void }) => {
-    // Không cần dùng insets nữa vì overlay sẽ nằm vừa khít trong container của thẻ vuốt
     const translateY = useSharedValue(height);
 
     // --- STATE LẤY CHI TIẾT TỪ API ---
@@ -1467,12 +1381,10 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                 .then(res => setFullPet(res.data || res))
                 .catch(err => console.error("Lỗi lấy chi tiết popup:", err))
                 .finally(() => setIsLoading(false));
-            // Hiệu ứng trượt nhẹ lên để tạo cảm giác vuốt tiếp từ thẻ
             translateY.value = withSpring(0, { damping: 35, stiffness: 250, mass: 0.8 });
         } else {
-            // Khi đóng, trượt tuột xuống dưới
             translateY.value = withTiming(height, { duration: 300 });
-            setTimeout(() => setFullPet(null), 300); // Clear data cũ sau khi animation xong
+            setTimeout(() => setFullPet(null), 300);
         }
     }, [isVisible, pet?.id]);
 
@@ -1497,10 +1409,12 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
     const rawPersonalityTags = fullPet?.personalityTags || [];
     const apiTags = Array.isArray(rawPersonalityTags) ? rawPersonalityTags : [];
+    const displayTraits = currentPet?.traitsList || [];
 
     const displayTags = apiTags.length > 0 ? apiTags : (currentPet.tags || ['Playful', 'Energetic', 'Friendly']);
     const displayBreed = fullPet?.breed || currentPet.breed || 'Labrador Retriever';
     const shelter = fullPet?.shelter || currentPet.shelter || null;
+
 
     const shelterId = shelter?.id;
     const shelterName = shelter?.name || 'Happy Paws Rescue Center';
@@ -1511,24 +1425,20 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
     const idealHome = fullPet?.idealHome || `${currentPet.name} would thrive in a home with a fenced yard...`;
 
     // ================== CHUẨN HOÁ DỮ LIỆU HIỂN THỊ ==================
-    
-    // 1. Chuẩn hoá Gender (FEMALE -> Female, MALE -> Male, UNKNOWN -> Unknown)
+
     const rawGender = currentPet?.gender || 'UNKNOWN';
     const displayGender = rawGender.charAt(0).toUpperCase() + rawGender.slice(1).toLowerCase();
 
-    // 2. Xử lý Age (Ưu tiên lấy từ list bên ngoài truyền vào, nếu không có lấy từ API fullPet)
     const displayAge = pet?.age || fullPet?.age || 'Unknown';
 
-    // 3. Xử lý Weight (Lấy từ fullPet API trả về, fallback sang currentPet)
-    const displayWeight = fullPet?.weight 
-        ? `${fullPet.weight} kg` 
+    const displayWeight = fullPet?.weight
+        ? `${fullPet.weight} kg`
         : (currentPet?.weight ? `${currentPet.weight} kg` : 'Unknown');
     return (
         <Animated.View
             style={[
                 { transform: [{ translateY }] },
                 {
-                    // Nằm đè tuyệt đối lên thẻ cha, không dùng shadow để phẳng hoàn toàn
                     position: 'absolute',
                     top: 0,
                     left: 0,
@@ -1538,25 +1448,15 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                 }
             ]}
             className="bg-white rounded-[32px] overflow-hidden border border-gray-100"
-            // Vô hiệu hóa tương tác khi ẩn để không chặn thao tác quẹt thẻ bên dưới
             pointerEvents={isVisible ? 'auto' : 'none'}
         >
             <GestureDetector gesture={pan}>
                 <View className="flex-1">
-                    {/* Thanh line nhỏ báo hiệu có thể kéo (Drag handle) */}
                     <View className="items-center pt-3 pb-1 bg-white z-20">
                         <View className="w-10 h-1 bg-gray-200 rounded-full" />
                     </View>
 
-                    {/* Nút X Góc phải */}
-                    {/* <View className="absolute top-6 right-4 z-20">
-                        <TouchableOpacity onPress={onClose} className="p-2">
-                            <Feather name="x" size={22} color="#374151" />
-                        </TouchableOpacity>
-                    </View> */}
-
                     <ScrollView className="flex-1 px-6 pt-2 bg-white" showsVerticalScrollIndicator={false} bounces={true}>
-                        {/* Tiêu đề & Sub-info */}
                         <View className='mb-6'>
                             <View className="pr-10">
                                 <View className="flex-row items-baseline gap-1">
@@ -1574,19 +1474,16 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                         </View>
 
                         <View className="flex-row justify-between mb-6 gap-[10px]">
-                            {/* GENDER */}
                             <View className={`flex-1 ${rawGender.toUpperCase() === 'MALE' ? 'bg-[#E2EFF8]' : 'bg-[#FAE8ED]'} py-[12px] rounded-[16px] items-center`}>
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
                                 <Text className="text-black text-[14px] font-semibold">{displayGender}</Text>
                             </View>
-                            
-                            {/* AGE */}
+
                             <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
                                 <Text className="text-black text-[14px] font-semibold">{displayAge}</Text>
                             </View>
-                            
-                            {/* WEIGHT */}
+
                             <View className="flex-1 bg-[#E8F9E6] py-[12px] rounded-[16px] items-center">
                                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Weight</Text>
                                 <Text className="text-black text-[14px] font-semibold">{displayWeight}</Text>
@@ -1594,7 +1491,6 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                         </View>
 
 
-                        {/* Shelter Info (Theo chuẩn design) */}
                         <View className="flex-row items-center border-gray-100 mb-6">
                             <Image
                                 source={{ uri: shelterAvatar }}
@@ -1652,50 +1548,52 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
 
                         {/* Section: About */}
-                        <View className="mb-6">
+                        <View className="mb-4">
                             <Text className="font-medium text-black text-[16px] mb-2">About {currentPet.name}</Text>
                             <Text className="text-[#8E8E93] text-[14px] leading-6 mb-2">{description}</Text>
+                            {(displayTraits.length > 0) && (
+                                <View className="flex-row gap-2 mt-[6px]">
+                                    {displayTraits.map((trait: any, index: number) => {
 
-                            <View className="flex-row gap-2 mt-[6px]">
-                                {currentPet.tags?.map((tag: any, index: number) => {
-                                    // Màu sắc ngẫu nhiên hoặc theo tag
-                                    const colors = ['#FFF4E8', '#EBF4FE', '#EAF8EF'];
-                                    const textColors = ['#E8A53C', '#5A90DA', '#77C852'];
-                                    const borderColor = ['#E8A53C', '#5A90DA', '#77C852'];
-                                    
-                                    return (
-                                        <View 
-                                            key={tag.id || index}
-                                            style={{ 
-                                                backgroundColor: colors[index % 3],
-                                                borderColor: `${borderColor[index % 3]}25` 
-                                            }}
-                                            className="px-[10px] py-1 rounded-full border"
-                                        >
-                                            <Text style={{ color: textColors[index % 3] }} className="text-[10px] leading-5 font-regular">
-                                                {tag.name}
-                                            </Text>
-                                        </View>
-                                    );
-                                })}
-                            </View>
+                                        const traitName = typeof trait === 'string' ? trait : trait?.name;
+
+                                        if (!traitName) return null;
+
+                                        const colorStyles = [
+                                            { bg: 'bg-[#FFF4E8]', text: 'text-[#F3B27B]', border: 'border-[#E8A53C]/25' }, // Cam
+                                            { bg: 'bg-[#EBF4FE]', text: 'text-[#88B2F3]', border: 'border-[#5A90DA]/25' }, // Xanh dương
+                                            { bg: 'bg-[#EAF8EF]', text: 'text-[#8FD49D]', border: 'border-[#83DA5A]/25' }, // Xanh lá
+                                        ];
+                                        const style = colorStyles[index % colorStyles.length];
+
+                                        return (
+                                            <View
+                                                key={index}
+                                                className={`${style.bg} ${style.border} border px-3.5 py-1 rounded-full`}
+                                            >
+                                                <Text className={`${style.text} text-[12px] font-medium`}>{traitName}</Text>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            )}
                         </View>
 
                         <View className="mb-4">
                             <Text className="font-medium text-black text-[16px] mb-2">{currentPet.name}'s Behavior</Text>
-                            
+
                             {((fullPet?.goodWith || currentPet?.goodWith)?.length > 0 || (fullPet?.badWith || currentPet?.badWith)?.length > 0) ? (
                                 <View>
                                     {/* --- Good With --- */}
                                     {(fullPet?.goodWith || currentPet?.goodWith)?.length > 0 && (
-                                        <View className="flex-row items-start mb-2">
+                                        <View className="flex-row items-start">
                                             <View className="flex-row items-center mr-1 mt-[2px]">
                                                 <Image source={require('../../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                                                 <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium w-[90px]">Good with:</Text>
                                             </View>
                                             <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                                                {Array.isArray(fullPet?.goodWith || currentPet?.goodWith) 
-                                                    ? (fullPet?.goodWith || currentPet?.goodWith).join(', ') 
+                                                {Array.isArray(fullPet?.goodWith || currentPet?.goodWith)
+                                                    ? (fullPet?.goodWith || currentPet?.goodWith).join(', ')
                                                     : (fullPet?.goodWith || currentPet?.goodWith)}
                                             </Text>
                                         </View>
@@ -1703,14 +1601,14 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
                                     {/* --- Bad With / Not Suitable --- */}
                                     {(fullPet?.badWith || currentPet?.badWith)?.length > 0 && (
-                                        <View className="flex-row items-start mt-1">
+                                        <View className="flex-row items-start">
                                             <View className="flex-row items-center mr-1 mt-[2px]">
                                                 <Image source={require('../../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                                                 <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium w-[90px]">Not suitable:</Text>
                                             </View>
                                             <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                                                {Array.isArray(fullPet?.badWith || currentPet?.badWith) 
-                                                    ? (fullPet?.badWith || currentPet?.badWith).join(', ') 
+                                                {Array.isArray(fullPet?.badWith || currentPet?.badWith)
+                                                    ? (fullPet?.badWith || currentPet?.badWith).join(', ')
                                                     : (fullPet?.badWith || currentPet?.badWith)}
                                             </Text>
                                         </View>
@@ -1723,17 +1621,14 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                             )}
                         </View>
 
-                        {/* Section: Ideal Home */}
                         <View className="mb-6">
                             <Text className="font-medium text-black text-lg mb-1">Ideal Home</Text>
                             <Text className="text-[14px] text-[#8E8E93] leading-6">{idealHome}</Text>
                         </View>
 
-                        {/* Spacer mỏng cuối nội dung cuộn để text không sát đáy */}
                         <View style={{ height: 20 }} />
                     </ScrollView>
 
-                    {/* Sticky Footer: Chứa 2 nút bấm */}
                     <View className="w-full px-6 pt-4 pb-6 bg-white items-center ">
                         <TouchableOpacity
                             className="px-10 bg-[#E89B5A] py-4 rounded-full items-center mb-4 shadow-sm"
@@ -1751,12 +1646,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
         </Animated.View>
     );
 };
-// ==================================================================
-// MAIN PARENT COMPONENT
-// ==================================================================
-// ==================================================================
-// MAIN PARENT COMPONENT
-// ==================================================================
+
 // ==================================================================
 // MAIN PARENT COMPONENT
 // ==================================================================
@@ -1772,9 +1662,9 @@ export default function MatchingScreen() {
     const [isCheckingStatus, setIsCheckingStatus] = useState(true);
     const [selectedPet, setSelectedPet] = useState<any>(null);
     const [isEditing, setIsEditing] = useState<boolean>(false);
-    
+
     // THÊM STATE LƯU TRỮ BỘ LỌC TỪ SURVEY
-    const [surveyFilters, setSurveyFilters] = useState<{type: string | null, age: string | null}>({ type: null, age: null });
+    const [surveyFilters, setSurveyFilters] = useState<{ type: string | null, age: string | null }>({ type: null, age: null });
     // 2. Dùng ĐÚNG MỘT useEffect này để điều hướng luồng
     useEffect(() => {
         const checkUserStatus = async () => {
@@ -1798,16 +1688,17 @@ export default function MatchingScreen() {
 
                 if (completedUsers.includes(user.id)) {
                     // USER CŨ: Đã có ID trong mảng -> Nhảy thẳng vào màn Swipe chính
-                    setAppStage(3); 
+                    setAppStage(3);
                 } else {
                     // USER MỚI: Chưa có ID -> Bắt đầu luồng Onboarding từ Filter
-                    setAppStage(0); 
+                    setAppStage(0);
                 }
             } catch (error) {
                 console.error("Lỗi khi đọc danh sách user:", error);
-                setAppStage(0); 
+                setAppStage(0);
             } finally {
-                setIsCheckingStatus(false); 
+                setIsCheckingStatus(false);
+
             }
         };
 
@@ -1870,7 +1761,7 @@ export default function MatchingScreen() {
                     initialFilters={surveyFilters} // Truyền vào trạng thái filter cũ
                     onComplete={(data) => {
                         setSurveyFilters(data); // Lưu bộ lọc do user vừa chọn
-                        
+
                         if (isEditing) {
                             setAppStage(3);
                             setIsEditing(false);

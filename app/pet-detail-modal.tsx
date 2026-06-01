@@ -7,14 +7,63 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, LayoutAnimation, Platform, TouchableOpacity, UIManager, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, LayoutAnimation, Linking, Platform, TouchableOpacity, UIManager, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
-  useSharedValue
+  useSharedValue,
+  withTiming
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { petService } from '../services/petService';
+
+const MOCK_PAW_HISTORY = [
+  {
+    id: '1',
+    title: 'Current Owner',
+    date: '01/01/2026',
+    description: 'Ownership transferred to Jane Doe',
+    icon: 'user',
+    color: '#F2A465', // Cam
+    bgColor: '#FFF4EC'
+  },
+  {
+    id: '2',
+    title: 'Annual Checkup',
+    date: '01/01/2026',
+    description: 'Health examination completed',
+    icon: 'check',
+    color: '#77C582', // Xanh lá
+    bgColor: '#EBFFE2'
+  },
+  {
+    id: '3',
+    title: 'DHPP Vaccination',
+    date: '01/01/2026',
+    description: 'Vaccinated: hepatitis, rabies, parvo, and parainfluenza',
+    icon: 'user', // Bạn có thể đổi thành 'syringe' cho hợp ngữ cảnh y tế
+    color: '#5A90DA', // Xanh dương
+    bgColor: '#E8F1FF'
+  },
+  {
+    id: '4',
+    title: 'QR Code Registered',
+    date: '01/01/2026',
+    description: 'PawLife QR tag activated and linked to Luna',
+    icon: 'expand',
+    color: '#885BF2', // Tím
+    bgColor: '#EAE7FB'
+  },
+  {
+    id: '5',
+    title: 'Date of Birth',
+    date: '01/01/2026',
+    description: 'Luna was born',
+    icon: 'user',
+    color: '#F2A465', // Vàng cam
+    bgColor: '#FFF4EC'
+  }
+];
 
 const getAge = (dobString?: string) => {
   if (!dobString) return 'Unknown';
@@ -48,6 +97,25 @@ export default function PetDetailModal() {
   const [isFavourite, setIsFavourite] = useState(false);
 
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+  const scrollY = useSharedValue(0);
+
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    const isScrolled = scrollY.value > 20;
+    return {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: withTiming(isScrolled ? 0.08 : 0, { duration: 200 }),
+      shadowRadius: 4,
+      elevation: withTiming(isScrolled ? 6 : 0, { duration: 200 }),
+
+      backgroundColor: '#FFFFFF',
+    };
+  });
+
+  const handleScroll = (event: any) => {
+    scrollY.value = event.nativeEvent.contentOffset.y;
+  };
+
 
   // 1. Dùng animatedPosition để lấy chính xác tọa độ Y của Bottom Sheet
   const animatedPosition = useSharedValue(SCREEN_HEIGHT);
@@ -62,18 +130,18 @@ export default function PetDetailModal() {
   });
 
   const getHistoryUIConfig = (type: string) => {
-    switch(type) {
-      case 'BIRTH': 
+    switch (type) {
+      case 'BIRTH':
         return { icon: 'birthday-cake', color: '#F2A465', bgColor: '#FFF4EC' };
-      case 'CREATED': 
+      case 'CREATED':
         return { icon: 'paw', color: '#885BF2', bgColor: '#EAE7FB' };
-      case 'QR_LINKED': 
+      case 'QR_LINKED':
         return { icon: 'qrcode', color: '#5A90DA', bgColor: '#E8F1FF' };
-      case 'TRANSFER': 
+      case 'TRANSFER':
         return { icon: 'home', color: '#77C582', bgColor: '#EBFFE2' };
-      case 'VACCINE': 
+      case 'VACCINE':
         return { icon: 'syringe', color: '#EF4444', bgColor: '#FEE2E2' };
-      default: 
+      default:
         return { icon: 'history', color: '#8E8E93', bgColor: '#F5F5F5' };
     }
   };
@@ -88,11 +156,11 @@ export default function PetDetailModal() {
   });
 
   const displayImages = useMemo(() => {
-    return pet?.images?.length > 0 
-      ? pet.images.map((img: any) => img.url) 
+    return pet?.images?.length > 0
+      ? pet.images.map((img: any) => img.url)
       : [pet?.avatarUrl || 'https://images.unsplash.com/photo-1600804340584-c7db2eacf0bf?q=80&w=800&auto=format&fit=crop'];
   }, [pet]);
-  
+
   const REQUIRED_TOP_INSET = insets.top + 44 + 21;
   // --- CẤU HÌNH BOTTOM SHEET ---
   const snapPoints = useMemo(() => {
@@ -113,7 +181,7 @@ export default function PetDetailModal() {
 
   useEffect(() => {
     if (pet) {
-      setIsFavourite(!!pet.isFavorited); 
+      setIsFavourite(!!pet.isFavorited);
     }
   }, [pet]);
 
@@ -128,12 +196,12 @@ export default function PetDetailModal() {
     onSuccess: (_, currentlyFavorited) => {
       // HỦY CACHE DANH SÁCH FAVORITES: Sẽ tự động lấy data mới khi quay về tab kia
       queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
-      
+
       Toast.show({
         type: 'custom_badge',
-        props: { 
-          petName: pet.name || 'This pet', 
-          actionText: currentlyFavorited ? ' has been removed from Favourite' : ' has been added to Favourite' 
+        props: {
+          petName: pet.name || 'This pet',
+          actionText: currentlyFavorited ? ' has been removed from Favourite' : ' has been added to Favourite'
         },
         visibilityTime: 2500, autoHide: true,
       });
@@ -197,7 +265,7 @@ export default function PetDetailModal() {
             borderRightColor: 'transparent',
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
           }}>
           <LinearGradient
             colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
@@ -233,7 +301,7 @@ export default function PetDetailModal() {
         />
 
         {displayImages.length > 1 && (
-          <View 
+          <View
             style={{
               position: 'absolute',
               bottom: 40,
@@ -249,11 +317,10 @@ export default function PetDetailModal() {
             {displayImages.map((_: any, index: any) => (
               <View
                 key={index}
-                className={`h-2 rounded-full transition-all ${
-                  activeIndex === index 
+                className={`h-2 rounded-full transition-all ${activeIndex === index
                     ? 'w-6 bg-[#E89B5A]'  // Chấm đang active (dài hơn)
                     : 'w-2 bg-white/60'   // Chấm inactive (tròn)
-                }`}
+                  }`}
               />
             ))}
           </View>
@@ -281,59 +348,49 @@ export default function PetDetailModal() {
           elevation: 10,
         }}
       >
-        <BottomSheetView className="px-[25px] pt-[12px] pb-[16px] bg-white z-10"
+        <BottomSheetView className="pt-[12px] bg-white z-10"
           onLayout={(event) => {
             const { height } = event.nativeEvent.layout;
             if (height > 0) {
               setHeaderHeight(height); // Cập nhật chiều cao thực tế vào state
             }
           }}
-          style={{
-            shadowColor: '#000000',
-            shadowOffset: {
-              width: 0,
-              height: 4
-            },
-            shadowOpacity: 0.1,
-            shadowRadius: 10,
-            elevation: 10,
-          }}>
-          <View className="flex-1 justify-between items-start">
-            <View className="flex-row items-baseline">
-              <Text className="text-[24px] font-semibold text-black">{pet.name}</Text>
-              <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({pet.breed})</Text>
+        >
+          <Animated.View style={headerAnimatedStyle}>
+            <View className="flex-1 justify-between items-start px-[25px] pb-[16px]">
+              <View className="flex-row items-baseline">
+                <Text className="text-[24px] font-semibold text-black">{pet.name}</Text>
+                <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({pet.breed})</Text>
+              </View>
+              <View className="flex-row items-center mt-1.5">
+                <Image
+                  source={require('../assets/icon/location_solid.png')}
+                  style={{ width: 16, height: 16 }}
+                  resizeMode="cover"
+                />
+                <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">1.2 km away</Text>
+              </View>
             </View>
-            <View className="flex-row items-center mt-1.5">
-              <Image
-                source={require('../assets/icon/location_solid.png')}
-                style={{ width: 16, height: 16 }}
-                resizeMode="cover"
-              />
-              <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">1.2 km away</Text>
-            </View>
-          </View>
+          </Animated.View>
         </BottomSheetView>
         <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 55 }} // Chừa chỗ cho Footer
+          onScroll={handleScroll}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 50 }}
         >
-          {/* --- NỘI DUNG THẺ TRẮNG --- */}
-          <View className="bg-white px-[25px] pt-2">
-            {/* Thuộc tính Pet */}
+          <View className="bg-white px-[25px]">
             <View className="flex-row justify-between mt-6 gap-[10px]">
-              {/* Gender */}
+
               <View className={`flex-1 ${pet?.gender?.toUpperCase() === 'FEMALE' ? 'bg-[#FAE8ED]' : 'bg-[#EAF4FB]'} py-[12px] rounded-[16px] items-center`}>
                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Gender</Text>
                 <Text className="text-black text-[14px] font-semibold">{formatCapitalize(pet?.gender)}</Text>
               </View>
 
-              {/* Age */}
               <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Age</Text>
                 <Text className="text-black text-[14px] font-semibold">{getAge(pet?.dob)}</Text>
               </View>
 
-              {/* Weight / Size */}
               <View className="flex-1 bg-[#E8F9E6] py-[12px] rounded-[16px] items-center">
                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">Weight</Text>
                 <Text className="text-black text-[14px] font-semibold">
@@ -342,7 +399,6 @@ export default function PetDetailModal() {
               </View>
             </View>
 
-            {/* Shelter Info */}
             <View className="flex-row items-center my-6">
               <Image
                 source={{ uri: pet.shelter?.avatarUrl || 'https://cdn-icons-png.flaticon.com/512/3592/3592182.png' }}
@@ -372,77 +428,74 @@ export default function PetDetailModal() {
               <Text className="text-[14px] text-[#8E8E93] leading-[20px] font-regular tracking-[0.06px]">
                 {pet?.description || "There is no description available for this pet yet."}
               </Text>
-              
-              {/* Dynamic Traits List */}
-                {(pet?.traitsList?.length > 0 || pet?.traits?.length > 0) && (
-                    <View className="flex-row flex-wrap gap-2 mt-[12px]">
-                        {(pet?.traitsList || pet?.traits).map((traitItem: any, index: number) => {
-                            const traitName = typeof traitItem === 'string' ? traitItem : traitItem.name;
-                            
-                            if (!traitName) return null;
 
-                            const colorStyles = [
-                                { bg: 'bg-[#FFF4E8]', text: 'text-[#F3B27B]' }, // Cam
-                                { bg: 'bg-[#EBF4FE]', text: 'text-[#88B2F3]' }, // Xanh dương
-                                { bg: 'bg-[#EAF8EF]', text: 'text-[#8FD49D]' }, // Xanh lá
-                                { bg: 'bg-[#F3E8FF]', text: 'text-[#A855F7]' }  // Tím
-                            ];
-                            const style = colorStyles[index % colorStyles.length];
-                            
-                            return (
-                                <View key={index} className={`${style.bg} px-3.5 py-1 rounded-full`}>
-                                    <Text className={`${style.text} text-[12px] font-medium`}>{traitName}</Text>
-                                </View>
-                            );
-                        })}
-                    </View>
-                )}
+              {(pet?.traitsList?.length > 0 || pet?.traits?.length > 0) && (
+                <View className="flex-row flex-wrap gap-2 mt-[12px]">
+                  {(pet?.traitsList || pet?.traits).map((traitItem: any, index: number) => {
+                    const traitName = typeof traitItem === 'string' ? traitItem : traitItem?.name;
+
+                    if (!traitName) return null;
+
+                    // Giữ colorStyles ở đây theo ý bạn và thêm key 'border'
+                    const colorStyles = [
+                      { bg: 'bg-[#FFF4E8]', text: 'text-[#F3B27B]', border: 'border-[#E8A53C]/25' }, // Cam
+                      { bg: 'bg-[#EBF4FE]', text: 'text-[#88B2F3]', border: 'border-[#5A90DA]/25' }, // Xanh dương
+                      { bg: 'bg-[#EAF8EF]', text: 'text-[#8FD49D]', border: 'border-[#83DA5A]/25' }, // Xanh lá
+                    ];
+                    const style = colorStyles[index % colorStyles.length];
+
+                    return (
+                      <View
+                        key={index}
+                        // Thêm class 'border' và màu viền từ style.border
+                        className={`${style.bg} ${style.border} border px-3.5 py-1 rounded-full`}
+                      >
+                        <Text className={`${style.text} text-[12px] font-medium`}>{traitName}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </View>
 
-            {/* Behavior (Good with / Not suitable) */}
             <View className="mt-6">
               <Text className="text-[16px] font-medium text-black mb-3">{pet.name}'s Behavior</Text>
-              
-              {/* Kiểm tra cả pet (từ danh sách) và fullPet (từ API chi tiết) */}
+
               {((pet?.goodWith)?.length > 0 || (pet?.badWith)?.length > 0) ? (
                 <View>
-                  {/* Good With */}
                   {(pet?.goodWith)?.length > 0 && (
-                    <View className="flex-row items-start mb-2">
+                    <View className="flex-row items-start">
                       <View className="flex-row items-center mr-1 mt-[2px]">
                         <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                         <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium w-[90px]">Good with:</Text>
                       </View>
                       <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                        {Array.isArray(pet?.goodWith) 
-                          ? (pet?.goodWith).join(', ') 
+                        {Array.isArray(pet?.goodWith)
+                          ? (pet?.goodWith).join(', ')
                           : (pet?.goodWith)}
                       </Text>
                     </View>
                   )}
 
-                  {/* Not Suitable */}
                   {(pet?.badWith)?.length > 0 && (
-                    <View className="flex-row items-start mt-1">
+                    <View className="flex-row items-start">
                       <View className="flex-row items-center mr-1 mt-[2px]">
                         <Image source={require('../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                         <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium w-[90px]">Not suitable:</Text>
                       </View>
                       <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                        {Array.isArray(pet?.badWith) 
-                          ? (pet?.badWith).join(', ') 
+                        {Array.isArray(pet?.badWith)
+                          ? (pet?.badWith).join(', ')
                           : (pet?.badWith)}
                       </Text>
                     </View>
                   )}
                 </View>
               ) : (
-                /* Hiển thị khi không có dữ liệu */
                 <Text className="text-[14px] text-[#8E8E93] italic">Behavioral details have not been updated.</Text>
               )}
             </View>
 
-            {/* Ideal Home */}
             <View className="mt-6 mb-6">
               <Text className="text-[16px] font-medium text-black mb-2">Ideal Home</Text>
               <Text className="text-[14px] text-[#8E8E93] leading-[22px]">
@@ -450,7 +503,6 @@ export default function PetDetailModal() {
               </Text>
             </View>
 
-            {/* Paw History Section */}
             <View className="mb-10">
               <View className="flex-row justify-between items-center mb-5">
                 <Text className="text-[16px] font-medium text-black">Paw History</Text>
@@ -464,21 +516,17 @@ export default function PetDetailModal() {
                 </TouchableOpacity>
               </View>
 
-              {/* SỬ DỤNG DỮ LIỆU THỰC TỪ API */}
               {showHistory && pet?.pawHistory && (
                 <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
                   {pet.pawHistory.map((item: any, index: number) => {
                     const isLastItem = index === pet.pawHistory.length - 1;
                     const uiConfig = getHistoryUIConfig(item.type);
-                    
-                    // Format ngày tháng từ chuỗi ISO của DB (vd: 01/01/2026)
+
                     const formattedDate = new Date(item.date).toLocaleDateString('en-GB');
 
                     return (
                       <View key={item.id} className="flex-row">
-                        {/* Cột trái: Chứa Icon và Line nối */}
                         <View className="items-center mr-4 w-[32px]">
-                          {/* Icon Container */}
                           <View
                             className="w-[32px] h-[32px] rounded-full items-center justify-center z-10"
                             style={{ backgroundColor: uiConfig.bgColor }}
@@ -486,7 +534,6 @@ export default function PetDetailModal() {
                             <FontAwesome5 name={uiConfig.icon} size={13} color={uiConfig.color} />
                           </View>
 
-                          {/* Vertical Line nối xuống node tiếp theo */}
                           {!isLastItem && (
                             <View
                               className="w-[2px] flex-1 my-1"
@@ -495,7 +542,6 @@ export default function PetDetailModal() {
                           )}
                         </View>
 
-                        {/* Cột phải: Chứa Text content */}
                         <View className={`flex-1 pt-1 ${!isLastItem ? 'pb-6' : ''}`}>
                           <View className="flex-row justify-between items-start">
                             <Text className="text-[16px] font-medium text-black">
@@ -513,7 +559,6 @@ export default function PetDetailModal() {
                     );
                   })}
 
-                  {/* Hiển thị khi mảng rỗng */}
                   {pet.pawHistory.length === 0 && (
                     <Text className="text-center text-gray-400 py-4 font-regular text-[13px]">No history available yet.</Text>
                   )}
@@ -534,7 +579,6 @@ export default function PetDetailModal() {
         </BottomSheetScrollView>
       </BottomSheet>
 
-      {/* --- FOOTER CTA NẰM NGOÀI CÙNG (Fixed ở dưới) --- */}
       <View
         style={{ paddingBottom: 21 }}
         className="absolute bottom-0 w-full px-[25px] pt-4 bg-white flex-row items-center gap-4"
@@ -552,10 +596,10 @@ export default function PetDetailModal() {
           }
         >
           {/* Cấu trúc hiển thị icon Filled hoặc Outline tuỳ thuộc vào state isFavourite */}
-          <Image 
+          <Image
             source={isFavourite ? require('../assets/icon/heart-filled-pawdoption.png') : require('../assets/icon/heart-pawdoption.png')}
-            style={{ width: 27, height: 27, tintColor: isFavourite ? '#E89B5A' : '#8E8E93' }} 
-            resizeMode="cover" 
+            style={{ width: 27, height: 27 }}
+            resizeMode="cover"
           />
         </TouchableOpacity>
 

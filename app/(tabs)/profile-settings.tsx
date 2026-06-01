@@ -216,7 +216,7 @@ export default function ProfileSettingsScreen() {
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
-                            label={t('Favourite Pet')}
+                            label={t('Favorite Pet')}
                             onPress={() => router.push('/favorite-pets')}
                         />
                         <MenuItem
