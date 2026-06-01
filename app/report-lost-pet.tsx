@@ -133,33 +133,72 @@ export default function ReportLostPetScreen() {
 
   // --- ADDRESS POPUP STATE & LOGIC ---
   const [showAddressPopup, setShowAddressPopup] = useState(false);
-  const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [wardOptions, setWardOptions] = useState<string[]>([]);
+  
   const [tempCity, setTempCity] = useState('');
-  const [tempDistrict, setTempDistrict] = useState('');
   const [tempWard, setTempWard] = useState('');
   const [tempDetail, setTempDetail] = useState('');
 
+  // 1. Fetch danh sách Tỉnh/Thành (API v2) và đẩy Hà Nội, TP.HCM lên đầu
   useEffect(() => {
-    fetch('https://provinces.open-api.vn/api/?depth=3')
+    fetch('https://provinces.open-api.vn/api/v2/p/')
       .then(res => res.json())
-      .then(data => setAddressDataAPI(data))
-      .catch(e => console.error("Lỗi fetch địa chỉ:", e));
+      .then(data => {
+        if (Array.isArray(data)) {
+          const hanoi = data.find((p: any) => p.codename === 'ha_noi');
+          const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
+          
+          const remainingProvinces = data.filter(
+            (p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh'
+          );
+
+          const priorityProvinces = [];
+          if (hanoi) priorityProvinces.push(hanoi);
+          if (hcm) priorityProvinces.push(hcm);
+
+          setProvinces([...priorityProvinces, ...remainingProvinces]);
+        }
+      })
+      .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
   }, []);
 
-  const cityOptions = addressDataAPI.map((c: any) => c.name);
-  const districtOptions = tempCity 
-    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.map((d: any) => d.name) || [] 
-    : [];
-  const wardOptions = tempDistrict 
-    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.find((d: any) => d.name === tempDistrict)?.wards?.map((w: any) => w.name) || [] 
-    : [];
+  const cityOptions = provinces.map((c: any) => c.name);
 
-  const handleConfirmAddress = () => {
-    if (!tempCity || !tempDistrict || !tempWard || !tempDetail.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.");
+  // 2. Fetch danh sách Phường/Xã khi user chọn 1 Tỉnh (CHUẨN API V2)
+  useEffect(() => {
+    if (!tempCity) {
+      setWardOptions([]);
       return;
     }
-    const fullAddress = `${tempDetail.trim()}, ${tempWard}, ${tempDistrict}, ${tempCity}`;
+
+    const selectedProvince = provinces.find((p: any) => p.name === tempCity);
+    
+    if (selectedProvince && selectedProvince.code) {
+      fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            const allWards = data.map((ward: any) => ward.name);
+            setWardOptions(allWards);
+          }
+        })
+        .catch(e => console.error("Lỗi fetch chi tiết phường/xã:", e));
+    }
+  }, [tempCity, provinces]);
+
+  const handleConfirmAddress = () => {
+    if (!tempCity || !tempWard) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn Tỉnh/Thành phố và Phường/Xã.");
+      return;
+    }
+    
+    let fullAddress = `${tempWard}, ${tempCity}`; 
+    if (tempDetail.trim()) {
+      fullAddress = `${tempDetail.trim()}, ${fullAddress}`;
+    }
+    
+    // Gán vào state của form Lost Pet
     setOwnerAddress(fullAddress);
     setShowAddressPopup(false);
   };
@@ -264,9 +303,9 @@ export default function ReportLostPetScreen() {
 
   const handleClose = () => {
     if (petId) {
-      router.replace(`/pet-profile-detail?id=${petId}`);
+      router.push(`/pet-profile-detail?id=${petId}`);
     } else {
-      router.replace('/(tabs)/my-pets');
+      router.push('/(tabs)/my-pets');
     }
   };
 
@@ -321,23 +360,11 @@ export default function ReportLostPetScreen() {
                 options={cityOptions}
                 onSelect={(val) => {
                   setTempCity(val);
-                  setTempDistrict('');
-                  setTempWard('');
+                  setTempWard(''); // Xoá trắng dữ liệu xã khi đổi tỉnh
                 }}
               />
 
-              <Label text="Quận / Huyện" required />
-              <CustomDropdown
-                placeholder="Chọn Quận/Huyện"
-                value={tempDistrict}
-                options={districtOptions}
-                onSelect={(val) => {
-                  setTempDistrict(val);
-                  setTempWard('');
-                }}
-              />
-
-              <Label text="Phường / Xã" required />
+              <Label text="Quận/Huyện & Phường/Xã" required />
               <CustomDropdown
                 placeholder="Chọn Phường/Xã"
                 value={tempWard}
@@ -345,7 +372,7 @@ export default function ReportLostPetScreen() {
                 onSelect={setTempWard}
               />
 
-              <Label text="Địa chỉ chi tiết" required />
+              <Label text="Địa chỉ chi tiết (Tùy chọn)" />
               <CustomInput
                 placeholder="Số nhà, tên ngõ, tên đường..."
                 value={tempDetail}
@@ -357,13 +384,13 @@ export default function ReportLostPetScreen() {
                   className="flex-1 py-4 rounded-xl border border-[#E5E5E5] items-center bg-[#F9FAFB]"
                   onPress={() => setShowAddressPopup(false)}
                 >
-                  <Text className="text-[#8E8E93] font-bold">Hủy bỏ</Text>
+                  <Text className="text-[#8E8E93] font-bold text-[14px]">Hủy bỏ</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   className="flex-1 py-4 rounded-xl bg-[#E89B5A] items-center shadow-sm"
                   onPress={handleConfirmAddress}
                 >
-                  <Text className="text-white font-bold">Xác nhận</Text>
+                  <Text className="text-white font-bold text-[14px]">Xác nhận</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -431,7 +458,7 @@ export default function ReportLostPetScreen() {
               {petName || 'Thú cưng'}
             </Text>
             <Text className="text-[14px] text-[#B8B8B8] mt-[8px] font-regular tracking-[0.5px]">
-              {petAge ? `${petAge} Years • ` : ''}{petBreed || 'Chưa rõ giống loài'}
+              {petAge ? `${petAge} Years • ` : ''}{petBreed || 'Unidentified species'}
             </Text>
           </View>
 
@@ -544,7 +571,7 @@ export default function ReportLostPetScreen() {
                 style={{ fontFamily: 'Urbanist' }}
                 value={details}
                 onChangeText={setDetails}
-                placeholder="Describe what Luna looks like when gone missing..."
+                placeholder="Describe what this pet looks like when gone missing..."
                 placeholderTextColor="#9CA3AF"
                 multiline
                 className="w-full border-b border-[#E5E5E5] py-2 text-[14px] text-[#111827] font-regular bottom-1"

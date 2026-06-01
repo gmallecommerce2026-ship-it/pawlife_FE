@@ -28,7 +28,7 @@ export default function ApplicationSuccessScreen() {
     router.dismissAll(); 
     
     // Quay về trang Matching kèm theo params 'returnFromSuccess'
-    router.replace({
+    router.push({
         pathname: '/(tabs)/matching',
         params: { returnFromSuccess: '1' } 
     }); 

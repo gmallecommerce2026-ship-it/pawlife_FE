@@ -1,11 +1,13 @@
 // app/adoption-form.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { AuthContext } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { petService } from '@/services/petService';
 import { calculateAge } from '@/utils/dateHelper';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -77,22 +79,30 @@ const CustomInput = ({
   onChangeText,
   placeholder,
   multiline = false,
+  keyboardType = 'default',
+  isPristine = false, // Thêm prop này
 }: {
   value?: string;
   onChangeText?: (text: string) => void;
   placeholder?: string;
   multiline?: boolean;
+  keyboardType?: any;
+  isPristine?: boolean; // Thêm type
 }) => (
   <View className="">
     <TextInput
-      className={`w-full bg-white border border-gray-200 rounded-2xl px-4 text-gray-800 ${multiline ? 'h-24 py-3' : 'h-14'
-        }`}
+      className={`w-full bg-white border border-gray-200 rounded-2xl px-4 ${
+        isPristine ? 'text-gray-400' : 'text-gray-800' // Đổi màu mờ nếu đang pristine
+      } ${multiline ? 'h-24 py-3' : 'h-14'}`}
       placeholder={placeholder}
       placeholderTextColor="#9CA3AF"
       value={value}
       onChangeText={onChangeText}
       multiline={multiline}
       textAlignVertical={multiline ? 'top' : 'center'}
+      keyboardType={keyboardType}
+      // Ép con trỏ về đầu dòng khi chưa có tương tác nhập mới
+      selection={isPristine ? { start: 0, end: 0 } : undefined} 
     />
   </View>
 );
@@ -211,6 +221,8 @@ const OptionGroup = ({
 );
 
 export default function AdoptionFormScreen() {
+  const { user } = useContext(AuthContext);
+  const { language } = useLanguage();
   const showModal = useModalStore((state) => state.showModal);
   const router = useRouter();
   const rawParams = useLocalSearchParams();
@@ -222,7 +234,7 @@ export default function AdoptionFormScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingLimit, setIsCheckingLimit] = useState(true);
   const [showLimitModal, setShowLimitModal] = useState(false);
-
+  const isVi = language === 'vi';
   useEffect(() => {
     const fetchPetDetail = async () => {
       try {
@@ -243,6 +255,9 @@ export default function AdoptionFormScreen() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [zalo, setZalo] = useState('');
+  const [isNamePristine, setIsNamePristine] = useState(false);
+  const [isPhonePristine, setIsPhonePristine] = useState(false);
+  const [isZaloPristine, setIsZaloPristine] = useState(false);
   const [adoptFor, setAdoptFor] = useState('Myself');
   
   const [location, setLocation] = useState(''); // Lưu chuỗi địa chỉ cuối cùng
@@ -266,38 +281,126 @@ export default function AdoptionFormScreen() {
 
   // --- ADDRESS POPUP STATE & LOGIC ---
   const [showAddressPopup, setShowAddressPopup] = useState(false);
-  const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [wardOptions, setWardOptions] = useState<string[]>([]);
   const [tempCity, setTempCity] = useState('');
-  const [tempDistrict, setTempDistrict] = useState('');
-  const [tempWard, setTempWard] = useState('');
+  const [tempWard, setTempWard] = useState(''); // Gom quận/huyện và phường/xã
   const [tempDetail, setTempDetail] = useState('');
+  const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+  const [tempDistrict, setTempDistrict] = useState('');
+  useEffect(() => {
+    if (user) {
+      if (user.name) {
+        setFullName(user.name);
+        setIsNamePristine(true);
+      }
+      if (user.phone) {
+        setPhone(user.phone);
+        setIsPhonePristine(true);
+        
+        // Mặc định số Zalo trùng hoàn toàn với số điện thoại profile
+        setZalo(user.phone); 
+        setIsZaloPristine(true);
+      }
+    }
+  }, [user]);
+  const handleNameChange = (text: string) => {
+    if (isNamePristine) {
+      // Nếu user bấm xoá (độ dài giảm), set rỗng luôn. Nếu gõ thêm, lấy kí tự mới gõ.
+      const newText = text.length < fullName.length ? '' : text.replace(fullName, '') || text.slice(-1);
+      setFullName(newText);
+      setIsNamePristine(false);
+    } else {
+      setFullName(text);
+    }
+  };
 
+  const handlePhoneChange = (text: string) => {
+    let finalPhone = text;
+    if (isPhonePristine) {
+      finalPhone = text.length < phone.length ? '' : text.replace(phone, '') || text.slice(-1);
+      setPhone(finalPhone);
+      setIsPhonePristine(false);
+    } else {
+      setPhone(text);
+    }
+
+    // Nếu ô Zalo vẫn chưa bị chạm vào, đồng bộ giá trị theo ô Phone luôn
+    if (isZaloPristine) {
+      setZalo(finalPhone);
+    }
+  };
+
+  const handleZaloChange = (text: string) => {
+    if (isZaloPristine) {
+      // Nếu xóa ký tự, clear trắng hoàn toàn. Nếu gõ ký tự mới, đè lên ký tự cũ.
+      const newText = text.length < zalo.length ? '' : text.replace(zalo, '') || text.slice(-1);
+      setZalo(newText);
+      setIsZaloPristine(false); // Đánh dấu đã qua chỉnh sửa, tắt chế độ pristine
+    } else {
+      setZalo(text);
+    }
+  };
   // Tự động load danh sách Tỉnh thành khi vào form
   useEffect(() => {
-    fetch('https://provinces.open-api.vn/api/?depth=3')
+    fetch('https://provinces.open-api.vn/api/v2/p/')
       .then(res => res.json())
-      .then(data => setAddressDataAPI(data))
-      .catch(e => console.error("Lỗi fetch địa chỉ:", e));
+      .then(data => {
+        if (Array.isArray(data)) {
+          const hanoi = data.find((p: any) => p.codename === 'ha_noi');
+          const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
+          
+          const remainingProvinces = data.filter(
+            (p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh'
+          );
+
+          const priorityProvinces = [];
+          if (hanoi) priorityProvinces.push(hanoi);
+          if (hcm) priorityProvinces.push(hcm);
+
+          setProvinces([...priorityProvinces, ...remainingProvinces]);
+        }
+      })
+      .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
   }, []);
 
-  // Map ra mảng strings cho Dropdown
-  const cityOptions = addressDataAPI.map((c: any) => c.name);
-  const districtOptions = tempCity 
-    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.map((d: any) => d.name) || [] 
-    : [];
-  const wardOptions = tempDistrict 
-    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.find((d: any) => d.name === tempDistrict)?.wards?.map((w: any) => w.name) || [] 
-    : [];
+  const cityOptions = provinces.map((c: any) => c.name);
 
-  const handleConfirmAddress = () => {
-    if (!tempCity || !tempDistrict || !tempWard || !tempDetail.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.");
+  // 2. Fetch danh sách Phường/Xã khi chọn Tỉnh
+  useEffect(() => {
+    if (!tempCity) {
+      setWardOptions([]);
       return;
     }
-    // Nối chuỗi tạo ra địa chỉ hoàn chỉnh
-    const fullAddress = `${tempDetail.trim()}, ${tempWard}, ${tempDistrict}, ${tempCity}`;
+
+    const selectedProvince = provinces.find((p: any) => p.name === tempCity);
+    
+    if (selectedProvince && selectedProvince.code) {
+      fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            const allWards = data.map((ward: any) => ward.name);
+            setWardOptions(allWards);
+          }
+        })
+        .catch(e => console.error("Lỗi fetch chi tiết phường/xã:", e));
+    }
+  }, [tempCity, provinces]);
+
+  const handleConfirmAddress = () => {
+    // Chỉ check Tỉnh/Thành và Phường/Xã
+    if (!tempCity || !tempWard) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành phố và Phường/Xã.");
+      return;
+    }
+    
+    // Nối chuỗi, nếu có detail thì thêm dấu phẩy, không thì bỏ qua
+    const detailPart = tempDetail.trim() ? `${tempDetail.trim()}, ` : '';
+    const fullAddress = `${detailPart}${tempWard}, ${tempCity}`;
+    
     setLocation(fullAddress);
-    setShowAddressPopup(false); // Đóng popup
+    setShowAddressPopup(false); 
   };
 
   // --- USE EFFECT CHECK LIMIT ---
@@ -375,11 +478,11 @@ export default function AdoptionFormScreen() {
       await axiosClient.post('/applications', payload);
       showModal({
         title: 'Terms of Service!',
-        message: 'Mauris id massa quis odio egestas interdum eget at felis. ',
+        message: 'Thanks For Your Application. We will review your application and contact you soon. Please be patient and make sure to keep your phone available for our call.',
         buttonText: 'Back',
         onConfirm: () => {
           router.dismissAll();
-          router.replace({
+          router.push({
             pathname: '/(tabs)/matching',
             params: { returnFromSuccess: '1' }
           });
@@ -403,9 +506,7 @@ export default function AdoptionFormScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      {/* --- ADDRESS POPUP MODAL (ABSOLUTE OVERLAY) ---
-        Dùng absolute view đè lên app để tránh lỗi nested Modal trên Android khi CustomDropdown mở Modal của chính nó.
-      */}
+      {/* --- ADDRESS POPUP MODAL --- */}
       {showAddressPopup && (
         <View 
           className="absolute inset-0 bg-black/50 justify-center px-4" 
@@ -414,43 +515,32 @@ export default function AdoptionFormScreen() {
           <View className="bg-white rounded-3xl p-6 shadow-2xl max-h-[85%]">
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text className="text-xl font-bold text-gray-900 mb-2 text-center">
-                Cập nhật địa chỉ
+                Update your address
               </Text>
               
-              <Label text="Thành phố / Tỉnh" required />
+              <Label text={isVi ? "Thành phố / Tỉnh" : "City / Province"} required />
               <CustomDropdown
-                placeholder="Chọn Tỉnh/Thành phố"
+                placeholder={isVi ? "Chọn Tỉnh/Thành phố" : "Select City / Province"}
                 value={tempCity}
                 options={cityOptions}
                 onSelect={(val) => {
                   setTempCity(val);
-                  setTempDistrict(''); // Reset quận/huyện
-                  setTempWard('');     // Reset phường/xã
+                  setTempWard(''); // Reset phường/xã (Ward/District)
                 }}
               />
 
-              <Label text="Quận / Huyện" required />
+              {/* Gộp Quận/Huyện & Phường/Xã */}
+              <Label text={isVi ? "Quận/Huyện & Phường/Xã" : "District & Ward"} required />
               <CustomDropdown
-                placeholder="Chọn Quận/Huyện"
-                value={tempDistrict}
-                options={districtOptions}
-                onSelect={(val) => {
-                  setTempDistrict(val);
-                  setTempWard(''); // Reset phường/xã
-                }}
-              />
-
-              <Label text="Phường / Xã" required />
-              <CustomDropdown
-                placeholder="Chọn Phường/Xã"
+                placeholder={isVi ? "Chọn Phường/Xã" : "Select Ward"}
                 value={tempWard}
                 options={wardOptions}
                 onSelect={setTempWard}
               />
 
-              <Label text="Địa chỉ chi tiết" required />
+              <Label text={isVi ? "Địa chỉ chi tiết" : "Detailed Address"} />
               <CustomInput
-                placeholder="Số nhà, tên ngõ, tên đường..."
+                placeholder={isVi ? "Số nhà, tên ngõ, tên đường... (Không bắt buộc)" : "House number, alley name, street name... (Optional)"} // Thêm gợi ý
                 value={tempDetail}
                 onChangeText={setTempDetail}
               />
@@ -460,13 +550,13 @@ export default function AdoptionFormScreen() {
                   className="flex-1 py-4 rounded-xl border border-gray-200 items-center bg-gray-50"
                   onPress={() => setShowAddressPopup(false)}
                 >
-                  <Text className="text-gray-600 font-bold">Hủy bỏ</Text>
+                  <Text className="text-gray-600 font-bold">{isVi ? "Hủy bỏ" : "Cancel"}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   className="flex-1 py-4 rounded-xl bg-[#E89B5A] items-center shadow-sm"
                   onPress={handleConfirmAddress}
                 >
-                  <Text className="text-white font-bold">Xác nhận</Text>
+                  <Text className="text-white font-bold">{isVi ? "Xác nhận" : "Confirm"}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -483,9 +573,13 @@ export default function AdoptionFormScreen() {
               <View className="w-16 h-16 bg-red-50 rounded-full items-center justify-center mb-5">
                 <Ionicons name="warning-outline" size={32} color="#EF4444" />
               </View>
-              <Text className="text-xl font-bold text-gray-900 mb-2 text-center">Đạt giới hạn đăng ký</Text>
+              <Text className="text-xl font-bold text-gray-900 mb-2 text-center">
+                {isVi ? "Đạt giới hạn đăng ký" : "Reached Registration Limit"}
+              </Text>
               <Text className="text-gray-500 text-center mb-6 leading-6 text-sm">
-                Bạn đang có 5 đơn đăng ký chờ xử lý. Vui lòng đợi kết quả của các đơn cũ trước khi nộp thêm hồ sơ mới nhé!
+                {isVi
+                  ? "Bạn đang có 5 đơn đăng ký chờ xử lý. Vui lòng đợi kết quả của các đơn cũ trước khi nộp thêm hồ sơ mới nhé!"
+                  : "You have 5 pending adoption applications. Please wait for the results of your previous applications before submitting a new one!"}
               </Text>
               <TouchableOpacity
                 className="w-full bg-[#F99C2E] py-4 rounded-xl items-center shadow-sm"
@@ -495,7 +589,7 @@ export default function AdoptionFormScreen() {
                   router.back();
                 }}
               >
-                <Text className="text-white font-bold text-base">Quay lại</Text>
+                <Text className="text-white font-bold text-base">{isVi ? "Quay lại" : "Go Back"}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -506,19 +600,21 @@ export default function AdoptionFormScreen() {
           <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
             <View className="flex-row items-center justify-between px-4 pt-3">
               <View className="w-10" />
-              <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 tracking-wide">Adoption Pawlicy</Text>
+              <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 tracking-wide">
+                {isVi ? "Chính sách nhận nuôi" : "Adoption Policy"}
+              </Text>
               <TouchableOpacity onPress={() => setShowPolicyModal(false)} className="w-10 items-end py-1.5">
                 <Feather name="x" size={22} color="#374151" />
               </TouchableOpacity>
             </View>
             <ScrollView className="flex-1 px-[35px] pt-[50px]" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
               <View className="mb-4">
-                <PolicyItem number="1" title="Love and care for your pet for life" content="Do not abandon, harm, or use the pet for any illegal or inhumane purposes." />
-                <PolicyItem number="2" title="Provide a safe and suitable living environment" content="This includes proper food, shelter, attention, and veterinary care when needed." />
-                <PolicyItem number="3" title="Take care of your pet's health" content="Check-ups, vaccinations, and rabies shots as recommended." />
-                <PolicyItem number="4" title="Stay in touch" content="During the first 6 months, share updates to ensure pet is doing well." />
-                <PolicyItem number="5" title="Do not transfer your pet" content="Contact PawLife if you can no longer care for the pet." />
-                <PolicyItem number="6" title="Provide truthful personal information" content="Basic info helps ensure your pet's safety." />
+                <PolicyItem number="1" title={isVi ? "Yêu thương và chăm sóc thú cưng suốt đời" : "Love and care for your pet for life"} content={isVi ? "Không được bỏ rơi, gây hại hoặc sử dụng thú cưng cho bất kỳ mục đích bất hợp pháp hay vô nhân đạo nào." : "Do not abandon, harm, or use the pet for any illegal or inhumane purposes."} />
+                <PolicyItem number="2" title={isVi ? "Cung cấp môi trường sống an toàn và phù hợp" : "Provide a safe and suitable living environment"} content={isVi ? "Điều này bao gồm thức ăn phù hợp, nơi trú ẩn, sự chú ý và chăm sóc thú y khi cần thiết." : "This includes proper food, shelter, attention, and veterinary care when needed."} />
+                <PolicyItem number="3" title={isVi ? "Chăm sóc sức khỏe của thú cưng" : "Take care of your pet's health"} content={isVi ? "Khám sức khỏe định kỳ, tiêm phòng và tiêm vacxin dại theo khuyến cáo." : "Check-ups, vaccinations, and rabies shots as recommended."} />
+                <PolicyItem number="4" title={isVi ? "Giữ liên lạc" : "Stay in touch"} content={isVi ? "Trong 6 tháng đầu tiên, chia sẻ các cập nhật để đảm bảo thú cưng đang được chăm sóc tốt." : "During the first 6 months, share updates to ensure pet is doing well."} />
+                <PolicyItem number="5" title={isVi ? "Không được chuyển nhượng thú cưng" : "Do not transfer your pet"} content={isVi ? "Liên hệ PawLife nếu bạn không còn khả năng chăm sóc thú cưng." : "Contact PawLife if you can no longer care for the pet."} />
+                <PolicyItem number="6" title={isVi ? "Cung cấp thông tin cá nhân chính xác" : "Provide truthful personal information"} content={isVi ? "Thông tin cơ bản giúp đảm bảo an toàn cho thú cưng của bạn." : "Basic info helps ensure your pet's safety."} />
               </View>
             </ScrollView>
           </View>
@@ -530,7 +626,7 @@ export default function AdoptionFormScreen() {
             <Feather name="chevron-left" size={24} color="#000000" />
           </TouchableOpacity>
           <Text className="flex-1 text-center font-semibold text-[24px] text-gray-900 mr-8">
-            Adoption Application
+            {isVi ? "Đơn đăng ký nhận nuôi" : "Adoption Application"}
           </Text>
         </View>
 
@@ -553,13 +649,26 @@ export default function AdoptionFormScreen() {
             {/* SECTION A */}
             <SectionTitle title="Section A – Contact Information" />
             <Label text="Full Name" required />
-            <CustomInput value={fullName} onChangeText={setFullName} />
+            <CustomInput 
+              value={fullName} 
+              onChangeText={handleNameChange} // Gọi handler tự tạo thay vì set state trực tiếp
+            />
 
             <Label text="Phone Number" required />
-            <CustomInput value={phone} onChangeText={setPhone} />
+            <CustomInput 
+              value={phone} 
+              onChangeText={handlePhoneChange} 
+              keyboardType="phone-pad"
+              isPristine={isPhonePristine} // Thêm dòng này
+            />
 
             <Label text="Zalo/WhatsApp number" required />
-            <CustomInput value={zalo} onChangeText={setZalo} />
+            <CustomInput 
+              value={zalo} 
+              onChangeText={handleZaloChange} 
+              keyboardType="phone-pad"
+              isPristine={isZaloPristine} // Thêm dòng này
+            />
 
             <Label text={`Are you filling out this form to adopt ${petInfo.name} for yourself or on behalf of someone else?`} required />
             <OptionGroup options={['Myself', 'Someone else']} selected={adoptFor} onSelect={setAdoptFor} />

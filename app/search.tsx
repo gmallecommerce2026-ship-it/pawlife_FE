@@ -3,19 +3,31 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { memo, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, LayoutAnimation, StatusBar, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Dimensions, FlatList, Image, LayoutAnimation, StatusBar, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { eventService } from '../services/eventService';
 import { petService } from '../services/petService';
 import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
 // import FilterModal from '@/components/filter-modal';
-
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
+const getAge = (dobString?: string) => {
+    if (!dobString) return 'Unknown';
+    const dob = new Date(dobString);
+    const diff_ms = Date.now() - dob.getTime();
+    const age_dt = new Date(diff_ms);
+    const years = Math.abs(age_dt.getUTCFullYear() - 1970);
+    const months = age_dt.getUTCMonth();
 
+    if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
+    if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
+    return 'Newborn';
+};
 function useDebounce<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value);
     useEffect(() => {
@@ -83,7 +95,7 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
                     className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
                     numberOfLines={1}
                 >
-                    {item.age || '1 years'} · {formatBreed(item.breed) || 'Unknown'}
+                    {item.age || getAge(item.dob)} · {formatBreed(item.breed) || 'Unknown'}
                 </Text>
             </View>
         </View>
@@ -92,10 +104,23 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
 
 const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
     const { user } = useContext(AuthContext);
+    const [isLoading, setIsLoading] = useState(false); 
 
-    // Lấy state từ Zustand
+    // 2. Khai báo queryClient
+    const queryClient = useQueryClient(); 
+
     const isFollowed = useEngagementStore(state => state.followedShelters[item.id] ?? item.isFollowed);
     const toggleShelterFollow = useEngagementStore(state => state.toggleShelterFollow);
+
+    // Thêm listener để bắt sự kiện từ chỗ khác (tùy chọn nhưng an toàn cho hệ thống lớn)
+    useEffect(() => {
+        const subscription = DeviceEventEmitter.addListener('SHELTER_FOLLOW_TOGGLED', (event) => {
+            if (event.shelterId === item.id) {
+                useEngagementStore.getState().setInitialShelterFollow(item.id, event.isFollowed);
+            }
+        });
+        return () => subscription.remove();
+    }, [item.id]);
 
     useEffect(() => {
         if (item.isFollowed !== undefined) {
@@ -105,14 +130,23 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
 
     const handleToggleFollow = async (e: any) => {
         if (e && e.stopPropagation) e.stopPropagation();
+        if (isLoading) return; 
 
+        setIsLoading(true);
         toggleShelterFollow(item.id);
 
         try {
             await shelterService.toggleFollow(item.id);
+            DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', { shelterId: item.id, isFollowed: !isFollowed });
+            
+            // 3. THÊM DÒNG NÀY: Ép React Query làm mới lại cache của màn Followed Shelters
+            queryClient.invalidateQueries({ queryKey: ['followed-shelters'] });
+
         } catch (error) {
             console.error("Lỗi khi toggle follow:", error);
-            toggleShelterFollow(item.id);
+            toggleShelterFollow(item.id); 
+        } finally {
+            setIsLoading(false); 
         }
     };
 
@@ -137,13 +171,12 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
 
             <TouchableOpacity
                 onPress={handleToggleFollow}
-                style={{ zIndex: 10, elevation: 10 }}
+                disabled={isLoading} // KHÓA NÚT KHI ĐANG LOADING
+                style={{ zIndex: 10, elevation: 10, opacity: isLoading ? 0.7 : 1 }}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                className={`px-5 py-[3.5px] rounded-full shadow-sm ${isFollowed ? 'bg-[#F8F8F8]' : 'bg-[#E89B5A]'
-                    }`}
+                className={`px-5 py-[3.5px] rounded-full shadow-sm ${isFollowed ? 'bg-[#F8F8F8]' : 'bg-[#E89B5A]'}`}
             >
-                <Text className={`text-[14px] font-semibold ${isFollowed ? 'text-[#8E8E93]' : 'text-white'
-                    }`}>
+                <Text className={`text-[14px] font-semibold ${isFollowed ? 'text-[#8E8E93]' : 'text-white'}`}>
                     {isFollowed ? 'Following' : 'Follow'}
                 </Text>
             </TouchableOpacity>
@@ -153,6 +186,7 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
 
 const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
     const { user } = useContext(AuthContext);
+    const queryClient = useQueryClient();
 
     // Lấy state từ Zustand
     const isInterested = useEngagementStore(state => state.interestedEvents[item.id] ?? item.isInterested);
@@ -174,9 +208,13 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
         try {
             const res = await eventService.toggleInterest(item.id, user?.id || 'guest');
             if (!res.success) throw new Error("API failed");
+            
+            // <-- 2. THÊM DÒNG NÀY: Ép màn Interested Events fetch lại data mới nhất
+            queryClient.invalidateQueries({ queryKey: ['interested-events', user?.id] });
+            
         } catch (error) {
             console.error("Lỗi khi bookmark:", error);
-            toggleEventInterest(item.id);
+            toggleEventInterest(item.id); // Rollback
         }
     };
 
@@ -417,7 +455,7 @@ export default function SearchScreen() {
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearchQuery = useDebounce(searchInput, 500);
     // const [isFilterVisible, setIsFilterVisible] = useState(false);
-
+    const { t } = useLanguage();
     const [isFocused, setIsFocused] = useState(false);
     const handleFocus = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -486,7 +524,8 @@ export default function SearchScreen() {
                     className={`text-[16px]  ${isActive ? 'text-[#E89B5A] font-semibold' : 'text-[#8E8E93] font-regular'
                         }`}
                 >
-                    {title}
+                    {/* 2. Dịch title ở đây, logic activeTab === title ở trên vẫn hoạt động bình thường */}
+                    {t(title)}
                 </Text>
 
                 {isActive && (
@@ -542,7 +581,8 @@ export default function SearchScreen() {
                     <Feather name="search" size={18} color="#8E8E93" />
                     <TextInput
                         className="flex-1 ml-3 text-[14px] text-gray-800 font-regular"
-                        placeholder="Search shelters, pets..."
+                        // Mẹo thêm: Bạn cũng có thể bọc t() vào placeholder cho thanh tìm kiếm
+                        placeholder={t('Search shelters, pets...')} 
                         placeholderTextColor="#8E8E93"
                         value={searchInput}
                         style={{ fontFamily: "Urbanist" }}

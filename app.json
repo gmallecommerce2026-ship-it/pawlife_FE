@@ -14,7 +14,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.annguyen.pawlife",
       "config": {
         "googleMapsApiKey": "AIzaSyDSiggtEz29dOMLPbALCl4YBAvxJTWKgAU"
@@ -38,8 +38,6 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "PawLife cần quyền vị trí để hỗ trợ các tính năng tìm kiếm thú cưng thất lạc ngay cả khi ứng dụng đang chạy nền.",
 
         "NSUserTrackingUsageDescription": "Dữ liệu được sử dụng để cải thiện trải nghiệm và đo lường hiệu quả ứng dụng.",
-
-        "LSApplicationQueriesSchemes": ["zalo"]
       }
     },
     "android": {

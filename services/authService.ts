@@ -27,14 +27,17 @@ export interface SendOtpPayload { email: string; type: 'SIGNUP' | 'FORGOT_PASSWO
 export const authService = {
   loginAPI: async (data: LoginPayload) => {
     try {
-      const deviceName = Device.modelName || Device.deviceName || 'Mobile Device';
-      const deviceOs = `${Device.osName || 'Unknown'} ${Device.osVersion || ''}`.trim();
-      const response = await axiosClient.post('auth/login', data, {
+      const deviceName = Device.modelName || Device.deviceName || "Unknown Mobile";
+      const deviceOs = `${Device.osName} ${Device.osVersion}`;
+      return await axiosClient.post('/auth/login', {
+        data
+      }, {
         headers: {
+          // Khớp với @Headers('x-device-name') trong auth.controller.ts
           'x-device-name': deviceName,
-          'x-device-os': deviceOs,
-        }});
-      return response.data;
+          'x-device-os': deviceOs
+        }
+      });
     } catch (error: any) {
       // Bắt lỗi từ Backend trả về (nếu có), nếu không lấy lỗi mặc định của Axios
       throw error.response?.data || { message: error.message };

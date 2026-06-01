@@ -3,11 +3,12 @@ import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Keyboard, Linking, Modal, Platform, Text as RNText, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Keyboard, Modal, Text as RNText, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
@@ -51,12 +52,11 @@ const SWIPE_CARDS = [
 
 // --- HELPER COMPONENTS ---
 const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }: { data: any, onAction?: (action: string) => void, canReload?: boolean, isFavorited?: boolean }) => {
-    // Thu hẹp viền thành 1.5px để tinh tế hơn
     const actionButtonClasses = "items-center justify-center bg-black/60 backdrop-blur-md rounded-full border-[1.5px]";
 
     return (
-        <View className="absolute bottom-0 left-0 right-0 justify-end z-40 pb-8 pt-32"
-        >
+        // 1. THÊM pointerEvents="box-none" VÀO ĐÂY
+        <View className="absolute bottom-0 left-0 right-0 justify-end z-40 pb-8 pt-32" pointerEvents="box-none">
             <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.85)', 'rgba(0, 0, 0, 0.75)']}
                 locations={[0, 0.4, 0.7, 1]}
@@ -88,7 +88,7 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
             </View>
 
             {/* Các nút thả tim, pass giữ nguyên... */}
-            <View className="flex-row justify-center items-center w-full z-50 gap-7">
+            <View className="flex-row justify-center items-center w-full z-50 gap-7" pointerEvents="box-none">
 
                 <TouchableOpacity
                     disabled={!canReload}
@@ -205,7 +205,7 @@ const SwipeableCard = ({
     const taps = Gesture.Exclusive(doubleTap, singleTap);
 
     // Đưa tổ hợp taps và pan vào Race
-    const gesture = Gesture.Race(taps, pan);
+    //const gesture = Gesture.Race(taps, pan);
 
     const animatedStyle = useAnimatedStyle(() => {
         const rotate = interpolate(sharedTranslateX.value, [-width / 2, 0, width / 2], [-10, 0, 10], Extrapolation.CLAMP);
@@ -224,7 +224,7 @@ const SwipeableCard = ({
 
 
     return (
-        <GestureDetector gesture={gesture}>
+        <GestureDetector gesture={pan}>
             <Animated.View style={[animatedStyle]} className="absolute top-0 left-0 right-0 bottom-0 z-10">
                 <View className="flex-1 relative justify-center items-center"
                     style={{
@@ -257,18 +257,24 @@ const SwipeableCard = ({
                     )}
 
                     <View className={`flex-1 w-full rounded-[32px] overflow-hidden relative ${isTutorialCard ? 'bg-transparent' : 'bg-gray-100'}`}>
-                        <Image
-                            source={imageSource}
-                            style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: 32 }}
-                            contentFit={isTutorialCard ? "contain" : "cover"}
-                            cachePolicy={cachePolicy}
-                            transition={0}
-                        />
+                        
+                        {/* GESTURE TẦNG 2: TAPS - Chỉ bọc riêng khu vực Ảnh để mở Image Viewer */}
+                        <GestureDetector gesture={taps}>
+                            <View style={{ position: 'absolute', width: '100%', height: '100%' }}>
+                                <Image
+                                    source={imageSource}
+                                    style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: 32 }}
+                                    contentFit={isTutorialCard ? "contain" : "cover"}
+                                    cachePolicy={cachePolicy}
+                                    transition={0}
+                                />
 
-                        <Image
-                            source={require('../../assets/images/light-top-left.png')}
-                            contentFit="contain" // Hoặc "cover" tùy vào viền ảnh
-                        />
+                                <Image
+                                    source={require('../../assets/images/light-top-left.png')}
+                                    contentFit="contain" // Hoặc "cover" tùy vào viền ảnh
+                                />
+                            </View>
+                        </GestureDetector>
 
                         <Animated.View
                             style={[
@@ -282,6 +288,7 @@ const SwipeableCard = ({
                                 }
                             ]}
                             className="border-[6px] border-green-400 rounded-xl px-4 py-2 pointer-events-none"
+                            pointerEvents="none"
                         >
                             <Text className="text-green-400 font-extrabold text-5xl uppercase tracking-widest">LIKE</Text>
                         </Animated.View>
@@ -299,6 +306,7 @@ const SwipeableCard = ({
                                 }
                             ]}
                             className="border-[6px] border-red-500 rounded-xl px-4 py-2 pointer-events-none"
+                            pointerEvents="none"
                         >
                             <Text className="text-red-500 font-extrabold text-5xl uppercase tracking-widest">NOPE</Text>
                         </Animated.View>
@@ -319,6 +327,7 @@ const SwipeableCard = ({
                                     shadowOpacity: 0.15, shadowRadius: 4, elevation: 5
                                 }
                             ]}
+                            pointerEvents="none"
                         >
                             <AntDesign name="heart" size={22} color="#ffa053" style={{ marginTop: 2 }} />
                         </Animated.View>
@@ -341,14 +350,17 @@ const ProgressBar = ({ current }: { current: number }) => (
     </View>
 );
 
-const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: () => void }) => {
+const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (filters: any) => void, onBack: () => void, initialFilters?: any }) => {
     const insets = useSafeAreaInsets();
     const { requestLocation, saveManualCity } = useLocation();
 
     const [isUsingGps, setIsUsingGps] = useState(false);
     const [surveyStep, setSurveyStep] = useState(1);
-    const [selectedType, setSelectedType] = useState<string | null>(null);
-    const [selectedAge, setSelectedAge] = useState<string | null>(null);
+    
+    // Lấy giá trị khởi tạo từ filter đã lưu (nếu có)
+    const [selectedType, setSelectedType] = useState<string | null>(initialFilters?.type || null);
+    const [selectedAge, setSelectedAge] = useState<string | null>(initialFilters?.age || null);
+    
     const [locationText, setLocationText] = useState('');
     const [isRequestingGps, setIsRequestingGps] = useState(false);
 
@@ -368,7 +380,8 @@ const SurveyScreen = ({ onComplete, onBack }: { onComplete: () => void, onBack: 
             if (!isUsingGps && locationText.trim().length > 0) {
                 await saveManualCity(locationText.trim());
             }
-            onComplete();
+            // TRUYỀN DỮ LIỆU ĐÃ CHỌN VỀ COMPONENT CHA
+            onComplete({ type: selectedType, age: selectedAge });
         }
     };
     const handleUseGps = async () => {
@@ -1018,8 +1031,9 @@ const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], 
 // ==================================================================
 // 4. MAIN SWIPE SCREEN (PURE UI)
 // ==================================================================
-const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, onDetail: (item: any) => void, onAdopt: (item: any) => void }) => {
+const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any, onBack: () => void, onDetail: (item: any) => void, onAdopt: (item: any) => void }) => {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const [isViewerVisible, setIsViewerVisible] = useState(false);
     const [viewerImages, setViewerImages] = useState<string[]>([]);
     const { user } = useContext(AuthContext);
@@ -1050,20 +1064,62 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
     const loadPets = async () => {
         setLoading(true);
         try {
-            const response = await petService.getFeed(10, location?.lat, location?.lng);
-            const petsData = response?.data?.data || response?.data || response || [];
+            // 1. Gọi API với limit lớn (vd 30 hoặc 50) để lấy đủ data phục vụ cho việc lọc local
+            const response = await petService.getFeed(30, location?.lat, location?.lng);
+            let petsData = response?.data?.data || response?.data || response || [];
 
+            // =========================================================
+            // 2. LOGIC LỌC LOCAL (Theo bộ lọc Survey)
+            // =========================================================
+            
+            // A. Lọc theo Giống loài (Dog / Cat / Both)
+            if (filters?.type && filters.type !== 'both') {
+                petsData = petsData.filter((p: any) => 
+                    p.species?.toUpperCase() === filters.type.toUpperCase() || 
+                    p.type?.toUpperCase() === filters.type.toUpperCase()
+                );
+            }
+
+            // B. Lọc theo Độ tuổi
+            if (filters?.age && filters.age !== 'Any Age') {
+                petsData = petsData.filter((p: any) => {
+                    let ageInYears = 0;
+                    if (p.dob) {
+                        const birthDate = new Date(p.dob);
+                        const today = new Date();
+                        ageInYears = today.getFullYear() - birthDate.getFullYear();
+                        if (today.getMonth() < birthDate.getMonth() || 
+                            (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) {
+                            ageInYears--;
+                        }
+                    } else if (p.age) {
+                        ageInYears = parseInt(p.age.toString()) || 0;
+                    }
+
+                    if (filters.age.includes('0-1')) return ageInYears <= 1;
+                    if (filters.age.includes('1-3')) return ageInYears > 1 && ageInYears <= 3;
+                    if (filters.age.includes('3-7')) return ageInYears > 3 && ageInYears <= 7;
+                    if (filters.age.includes('7+')) return ageInYears > 7;
+                    return true;
+                });
+            }
+
+            // =========================================================
+            // 3. CHUẨN HOÁ DỮ LIỆU HIỂN THỊ LÊN THẺ (UI)
+            // =========================================================
             const mappedPets = petsData.map((pet: any) => {
-                // SỬA Ở ĐÂY: Đồng bộ logic khoảng cách giống trang Home
-                // Nếu có distance (có GPS), thêm chữ km. Nếu không có thì lấy city/location
+                
+                // Xử lý khoảng cách
                 const displayDistance = pet.distance
                     ? `${pet.distance}`
                     : (pet.city || pet.location || 'Gần bạn');
 
+                // Xử lý mảng ảnh
                 const petImages = pet.images && pet.images.length > 0
                     ? pet.images.map((img: any) => img.url)
                     : ['https://via.placeholder.com/400x600?text=No+Image'];
 
+                // Xử lý tuổi (Hiển thị ra thẻ)
                 let calculatedAge = pet.age;
                 if (!calculatedAge && pet.dob) {
                     const birthDate = new Date(pet.dob);
@@ -1088,7 +1144,7 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                 return {
                     id: pet.id,
                     name: pet.name,
-                    age: calculatedAge || 'Unknown', // Đã fix! Sẽ ăn theo calculatedAge
+                    age: calculatedAge || 'Unknown', 
                     gender: pet.gender || 'MALE',
                     distance: displayDistance,
                     location: pet.shelter?.name || pet.location || 'Location',
@@ -1097,13 +1153,17 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                 };
             });
 
+            // =========================================================
+            // 4. CẬP NHẬT STATE & RESET ANIMATION
+            // =========================================================
             setPets(mappedPets);
-            setOriginalPets(mappedPets); // <--- LƯU LẠI MẢNG GỐC ĐỂ DÙNG CHO LOOP
+            setOriginalPets(mappedPets); // LƯU LẠI MẢNG GỐC ĐỂ DÙNG CHO LOOP
             setCurrentIndex(0);
 
             translateX_Even.value = 0; translateX_Odd.value = 0;
             translateY_Even.value = 0; translateY_Odd.value = 0;
             setLastSwipe(null);
+            
         } catch (error) {
             console.error("Lỗi khi lấy danh sách thú cưng:", error);
         } finally {
@@ -1161,28 +1221,34 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
                 return [...prev, activeCard.id];
             });
 
-            // Gọi API ngầm ở background
+            // Gọi API ngầm ở background và Đồng bộ React Query
             if (isCurrentlyFavorited) {
-                petService.unfavoritePet(activeCard.id).catch(err => console.error("Lỗi bỏ tim:", err));
+                petService.unfavoritePet(activeCard.id)
+                    .then(() => {
+                        // Báo cho tab Favorite fetch lại data
+                        queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
+                    })
+                    .catch(err => console.error("Lỗi bỏ tim:", err));
+                
                 Toast.show({
-                type: 'custom_badge',
-                props: {
-                    petName: activeCard.name || 'This pet',
-                    actionText: ' has been removed from Saved Pet'
-                },
-                visibilityTime: 2500,
-                autoHide: true,
-            });
+                    type: 'custom_badge',
+                    props: { petName: activeCard.name || 'This pet', actionText: ' has been removed from Saved Pet' },
+                    visibilityTime: 2500, autoHide: true,
+                });
             } else {
+                // <-- ĐOẠN API BỊ THIẾU TRƯỚC ĐÂY ĐƯỢC THÊM VÀO 
+                petService.favoritePet(activeCard.id) // Lưu ý: Đảm bảo tên hàm trong petService là favoritePet (hoặc tên tương đương của bạn)
+                    .then(() => {
+                        // Báo cho tab Favorite fetch lại data
+                        queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
+                    })
+                    .catch(err => console.error("Lỗi thả tim:", err));
+                
                 Toast.show({
-                type: 'custom_badge',
-                props: {
-                    petName: activeCard.name || 'This pet',
-                    actionText: ' has been added to Saved Pet'
-                },
-                visibilityTime: 2500,
-                autoHide: true,
-            });
+                    type: 'custom_badge',
+                    props: { petName: activeCard.name || 'This pet', actionText: ' has been added to Saved Pet' },
+                    visibilityTime: 2500, autoHide: true,
+                });
             }
             return;
         }
@@ -1241,6 +1307,9 @@ const MainSwipeScreen = ({ onBack, onDetail, onAdopt }: { onBack: () => void, on
 
             // Cập nhật tổng số lượng
             setLikeCount(favoriteData.length);
+
+            const favoriteIds = favoriteData.map((pet: any) => pet.id || pet._id);
+            setFavorites(favoriteIds);
 
         } catch (error) {
             console.error("Lỗi khi lấy tổng số lượng thú cưng yêu thích:", error);
@@ -1541,7 +1610,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                 </Text>
                             </View>
                             <View className="flex-row items-center gap-2">
-                                <TouchableOpacity activeOpacity={0.7} className="w-[41px] h-[41px] rounded-full bg-[#FFF4EC] items-center justify-center"
+                                {/* <TouchableOpacity activeOpacity={0.7} className="w-[41px] h-[41px] rounded-full bg-[#FFF4EC] items-center justify-center"
                                     onPress={async () => {
                                         const phoneNumber = pet?.shelter?.phone;
                                         if (phoneNumber) {
@@ -1568,7 +1637,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                         style={{ width: 24, height: 24 }}
                                         resizeMode="cover"
                                     />
-                                </TouchableOpacity>
+                                </TouchableOpacity> */}
                                 <TouchableOpacity
                                     activeOpacity={0.7}
                                     className="w-[36px] h-[36px] items-center justify-center"
@@ -1699,14 +1768,13 @@ export default function MatchingScreen() {
 
     const COMPLETED_USERS_KEY = 'completed_onboarding_users_list';
 
-    // 1. Chỉ giữ lại các State cần thiết
     const [appStage, setAppStage] = useState<number>(3);
     const [isCheckingStatus, setIsCheckingStatus] = useState(true);
     const [selectedPet, setSelectedPet] = useState<any>(null);
-
-    // ---> THÊM STATE ĐỂ NHẬN BIẾT LÀ ĐANG CHỈNH SỬA
     const [isEditing, setIsEditing] = useState<boolean>(false);
-
+    
+    // THÊM STATE LƯU TRỮ BỘ LỌC TỪ SURVEY
+    const [surveyFilters, setSurveyFilters] = useState<{type: string | null, age: string | null}>({ type: null, age: null });
     // 2. Dùng ĐÚNG MỘT useEffect này để điều hướng luồng
     useEffect(() => {
         const checkUserStatus = async () => {
@@ -1796,17 +1864,17 @@ export default function MatchingScreen() {
     }
 
     return (
-        /* ✅ SỬA LỖI 1: Thay GestureHandlerRootView bằng View thường */
         <View style={{ flex: 1 }}>
             {appStage === 0 && (
                 <SurveyScreen
-                    onComplete={() => {
+                    initialFilters={surveyFilters} // Truyền vào trạng thái filter cũ
+                    onComplete={(data) => {
+                        setSurveyFilters(data); // Lưu bộ lọc do user vừa chọn
+                        
                         if (isEditing) {
-                            // FIX: Đang chỉnh sửa filter xong thì về lại thẻ vuốt (Stage 3)
                             setAppStage(3);
-                            setIsEditing(false); // Reset cờ edit
+                            setIsEditing(false);
                         } else {
-                            // Nếu là lần đầu, đi tiếp sang màn Policy (Stage 1)
                             setAppStage(1);
                         }
                     }}
@@ -1817,7 +1885,7 @@ export default function MatchingScreen() {
                         } else if (router.canGoBack()) {
                             router.back();
                         } else {
-                            router.replace('/(tabs)');
+                            router.push('/(tabs)');
                         }
                     }}
                 />
@@ -1844,6 +1912,7 @@ export default function MatchingScreen() {
 
             {appStage >= 3 && (
                 <MainSwipeScreen
+                    filters={surveyFilters} // TRUYỀN BỘ LỌC XUỐNG SWIPE
                     onBack={() => {
                         setIsEditing(true);
                         setAppStage(0);

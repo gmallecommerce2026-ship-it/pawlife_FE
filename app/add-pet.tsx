@@ -1,4 +1,4 @@
-// app/add-pet.tsx
+import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { petService } from '@/services/petService';
 import { useModalStore } from '@/store/useModalStore';
@@ -25,9 +25,11 @@ import {
 import { Dropdown } from 'react-native-element-dropdown';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useImageUpload } from '../hooks/useImageUpload';
+
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
 type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
+
 const BREED_OPTIONS = {
   Dog: [
     { label: 'Unknown Breed', value: 'Unknown Breed' },
@@ -40,7 +42,7 @@ const BREED_OPTIONS = {
     { label: 'Labrador Retriever', value: 'Labrador Retriever' },
     { label: 'Chihuahua', value: 'Chihuahua' },
     { label: 'French Bulldog', value: 'French Bulldog' },
-    { label: 'aHusky', value: 'Husky' },
+    { label: 'Husky', value: 'Husky' },
     { label: 'Shiba Inu', value: 'Shiba Inu' },
     { label: 'Samoyed', value: 'Samoyed' },
     { label: 'Dachshund', value: 'Dachshund' },
@@ -103,8 +105,8 @@ interface AddPetFormData {
   species: SpeciesType;
   breed: string;
   color: string;
-  weight: string; // Vẫn để string ở form để dễ handle TextInput
-  size: SizeType; // Thêm trường size
+  weight: string;
+  size: SizeType;
   dob: string;
   microchip: string;
   description: string;
@@ -117,6 +119,7 @@ interface AddPetFormData {
   qrCodeUrl: string;
   sterilized: boolean | null;
 }
+
 // --- CÁC COMPONENT PHỤ TRỢ CHO POPUP ĐỊA CHỈ ---
 const Label = ({ text, required = false }: { text: string; required?: boolean }) => (
   <Text className="text-[#8E8E93] text-[14px] font-medium mb-2 mt-4">
@@ -195,6 +198,7 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
     </View>
   );
 };
+
 export default function AddPetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -202,47 +206,88 @@ export default function AddPetScreen() {
   const rawQrData = params.rawQrData as string;
 
   const showModal = useModalStore((state) => state.showModal);
-  // Tách biệt hook upload cho Avatar và Vaccination Record
+  
+  // Chỉ dùng hook này cho Avatar. Vaccine sẽ handle thủ công.
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
-  const { pickAndUploadImage: pickVaccine, isUploading: isUploadingVaccine } = useImageUpload();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // State tự quản lý thanh loading cho Vaccine
+  const [isUploadingVaccine, setIsUploadingVaccine] = useState(false);
+
   // --- ADDRESS POPUP STATE & LOGIC ---
   const [showAddressPopup, setShowAddressPopup] = useState(false);
-  const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+  
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [wardOptions, setWardOptions] = useState<string[]>([]);
+  
   const [tempCity, setTempCity] = useState('');
-  const [tempDistrict, setTempDistrict] = useState('');
   const [tempWard, setTempWard] = useState('');
   const [tempDetail, setTempDetail] = useState('');
 
-  // Fetch dữ liệu Tỉnh/Thành
+  // 1. Fetch danh sách Tỉnh/Thành (API v2)
   useEffect(() => {
-    fetch('https://provinces.open-api.vn/api/?depth=3')
+    fetch('https://provinces.open-api.vn/api/v2/p/')
       .then(res => res.json())
-      .then(data => setAddressDataAPI(data))
-      .catch(e => console.error("Lỗi fetch địa chỉ:", e));
+      .then(data => {
+        if (Array.isArray(data)) {
+          const hanoi = data.find((p: any) => p.codename === 'ha_noi');
+          const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
+          
+          const remainingProvinces = data.filter(
+            (p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh'
+          );
+
+          const priorityProvinces = [];
+          if (hanoi) priorityProvinces.push(hanoi);
+          if (hcm) priorityProvinces.push(hcm);
+
+          setProvinces([...priorityProvinces, ...remainingProvinces]);
+        }
+      })
+      .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
   }, []);
 
-  const cityOptions = addressDataAPI.map((c: any) => c.name);
-  const districtOptions = tempCity 
-    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.map((d: any) => d.name) || [] 
-    : [];
-  const wardOptions = tempDistrict 
-    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.find((d: any) => d.name === tempDistrict)?.wards?.map((w: any) => w.name) || [] 
-    : [];
+  const cityOptions = provinces.map((c: any) => c.name);
 
-  const handleConfirmAddress = () => {
-    if (!tempCity || !tempDistrict || !tempWard || !tempDetail.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.");
+  // 2. Fetch danh sách Phường/Xã khi user chọn 1 Tỉnh (CHUẨN API V2)
+  useEffect(() => {
+    if (!tempCity) {
+      setWardOptions([]);
       return;
     }
-    const fullAddress = `${tempDetail.trim()}, ${tempWard}, ${tempDistrict}, ${tempCity}`;
+
+    const selectedProvince = provinces.find((p: any) => p.name === tempCity);
     
-    // Lưu vào form data của bạn
+    if (selectedProvince && selectedProvince.code) {
+      fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            const allWards = data.map((ward: any) => ward.name);
+            setWardOptions(allWards);
+          }
+        })
+        .catch(e => console.error("Lỗi fetch chi tiết phường/xã:", e));
+    }
+  }, [tempCity, provinces]);
+
+  const handleConfirmAddress = () => {
+    if (!tempCity || !tempWard) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn Tỉnh/Thành phố và Phường/Xã.");
+      return;
+    }
+    
+    let fullAddress = `${tempWard}, ${tempCity}`; 
+    if (tempDetail.trim()) {
+      fullAddress = `${tempDetail.trim()}, ${fullAddress}`;
+    }
+    
     handleChange('contactAddress', fullAddress);
     setShowAddressPopup(false);
   };
+
   const [formData, setFormData] = useState<AddPetFormData>({
     name: '',
     species: 'Dog',
@@ -264,30 +309,7 @@ export default function AddPetScreen() {
   });
 
   const inputFontStyle = { fontFamily: 'Urbanist-Regular' };
-  const handleSelectOption = (title: string, options: { label: string, value: any }[], field: keyof AddPetFormData) => {
-    Alert.alert(
-      title,
-      "Vui lòng chọn",
-      [
-        ...options.map(opt => ({
-          text: opt.label,
-          onPress: () => handleChange(field, opt.value)
-        })),
-        { text: "Cancel", style: "cancel" }
-      ],
-      { cancelable: true }
-    );
-  };
-  const handlePickBreed = () => {
-    const currentSpecies = formData.species; // 'Dog' hoặc 'Cat'
-    const options = BREED_OPTIONS[currentSpecies];
 
-    handleSelectOption(
-      `Select ${currentSpecies} Breed`,
-      options,
-      'breed'
-    );
-  };
   // Xử lý upload Avatar
   const handlePickAvatar = async () => {
     const uploadedUrl = await pickAvatar({
@@ -301,13 +323,9 @@ export default function AddPetScreen() {
     }
   };
 
-  // 1. Thêm state quản lý loading riêng cho việc upload nhiều file
-  const [isUploadingRecords, setIsUploadingRecords] = useState(false);
-
-  // 2. Sửa lại hàm handlePickVaccine
+  // 1. Chỉ Chọn ảnh, lưu mảng file:// vào form (Không gọi API upload ở đây)
   const handlePickVaccine = async () => {
     try {
-      // Tính toán số lượng ảnh được phép chọn thêm
       const currentCount = formData.vaccinationRecordUrls.length;
       const remainingSlots = 5 - currentCount;
 
@@ -316,69 +334,20 @@ export default function AddPetScreen() {
         return;
       }
 
-      // Mở thư viện ảnh
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
-        selectionLimit: remainingSlots, // Giới hạn số lượng chọn (hỗ trợ iOS 14+ / Android 13+)
+        selectionLimit: remainingSlots,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets) {
-        // Cắt mảng phòng trường hợp hệ điều hành cũ không support selectionLimit
-        const selectedAssets = result.assets.slice(0, remainingSlots);
+        const newLocalUrls = result.assets.slice(0, remainingSlots).map(asset => asset.uri);
         
-        setIsUploadingRecords(true);
-
-        try {
-          // BƯỚC QUAN TRỌNG: Gọi API Upload từng ảnh lên R2
-          const uploadPromises = selectedAssets.map(async (asset) => {
-            // ==========================================
-            // TODO: GỌI API UPLOAD CỦA BẠN Ở ĐÂY
-            // Dưới đây là đoạn code mẫu dùng fetch và FormData chuẩn của React Native
-            // Bạn có thể thay bằng storageService / petService tương ứng trong dự án
-            // ==========================================
-            
-            const filename = asset.uri.split('/').pop() || `vaccine-${Date.now()}.jpg`;
-            const match = /\.(\w+)$/.exec(filename);
-            const type = match ? `image/${match[1]}` : `image/jpeg`;
-
-            const data = new FormData();
-            data.append('file', { uri: asset.uri, name: filename, type } as any);
-
-            // GỌI API (Thay 'YOUR_API_URL/storage/upload' bằng endpoint thật của backend)
-            /*
-            const response = await fetch('YOUR_API_URL/storage/upload', {
-              method: 'POST',
-              headers: { 'Content-Type': 'multipart/form-data' },
-              body: data,
-            });
-            const responseData = await response.json();
-            return responseData.url; // URL thực tế từ R2: https://...
-            */
-
-            // TẠM THỜI trả về uri local ĐỂ BẠN HIỂU LUỒNG (Hãy đổi thành code gọi API ở trên)
-            // Nếu dùng local URI backend sẽ báo lỗi validation IsUrl hoặc không xem được ảnh.
-            return asset.uri; 
-          });
-
-          // Chờ tất cả ảnh upload xong
-          const uploadedUrls = await Promise.all(uploadPromises);
-
-          // Lọc bỏ các url bị lỗi (undefined/null) và đưa vào state
-          const validUrls = uploadedUrls.filter(url => url);
-          
-          handleChange('vaccinationRecordUrls', [
-            ...formData.vaccinationRecordUrls,
-            ...validUrls
-          ]);
-
-        } catch (uploadError) {
-          console.error("Lỗi khi upload lên R2:", uploadError);
-          Alert.alert("Lỗi Upload", "Có lỗi xảy ra khi tải ảnh lên máy chủ R2. Vui lòng thử lại.");
-        } finally {
-          setIsUploadingRecords(false);
-        }
+        handleChange('vaccinationRecordUrls', [
+          ...formData.vaccinationRecordUrls,
+          ...newLocalUrls
+        ]);
       }
     } catch (error) {
       console.error("Lỗi picker:", error);
@@ -400,6 +369,7 @@ export default function AddPetScreen() {
     }
   };
 
+  // 2. Chạy logic Upload lên R2 lúc bấm nút Save
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
       showModal({
@@ -414,6 +384,63 @@ export default function AddPetScreen() {
     try {
       setIsSubmitting(true);
 
+      const localUris = formData.vaccinationRecordUrls.filter(url => !url.startsWith('http'));
+      let successfulUrls: string[] = [];
+
+      // Xử lý upload các file:// (nếu có)
+      if (localUris.length > 0) {
+        setIsUploadingVaccine(true); // Kích hoạt UI loading bar
+
+        const uploadPromises = localUris.map(async (uri) => {
+          try {
+            const filename = uri.split('/').pop() || `vaccine-${Date.now()}.jpg`;
+            const match = /\.(\w+)$/.exec(filename);
+            const ext = match ? match[1].toLowerCase() : 'jpeg';
+
+            let type = 'image/jpeg'; 
+            if (ext === 'png') type = 'image/png';
+            else if (ext === 'webp') type = 'image/webp';
+
+            const presignedRes = await axiosClient.post('/storage/presigned-url', {
+              fileName: filename,
+              fileType: type, 
+              folder: 'vaccines' 
+            });
+
+            const { uploadUrl, fileUrl } = presignedRes.data;
+
+            const localFileFetch = await fetch(uri);
+            const fileBlob = await localFileFetch.blob();
+
+            const uploadRes = await fetch(uploadUrl, {
+              method: 'PUT',
+              headers: { 'Content-Type': type },
+              body: fileBlob
+            });
+
+            if (!uploadRes.ok) throw new Error('Cloudflare R2 từ chối file');
+
+            return fileUrl; 
+          } catch (error) {
+            console.error("Lỗi upload 1 file:", error);
+            return null;
+          }
+        });
+
+        const uploadedUrls = await Promise.all(uploadPromises);
+        successfulUrls = uploadedUrls.filter((url): url is string => url !== null);
+
+        if (successfulUrls.length < localUris.length) {
+          Alert.alert("Cảnh báo", "Một số ảnh tiêm chủng không tải lên được. Dữ liệu sẽ lưu các file thành công.");
+        }
+      }
+
+      // Đẩy mảng thành công vào state để lỡ API bị lỗi, bấm Submit lại không bị upload lặp.
+      if (successfulUrls.length > 0) {
+         setFormData(prev => ({ ...prev, vaccinationRecordUrls: successfulUrls }));
+      }
+
+      // Đóng gói Payload sạch (chỉ có link https)
       const payload = {
         name: formData.name,
         species: formData.species,
@@ -427,30 +454,23 @@ export default function AddPetScreen() {
         contactPhone: formData.contactPhone || undefined,
         contactAddress: formData.contactAddress || undefined,
         images: formData.imageUrl ? [formData.imageUrl] : [],
-        vaccinationRecordUrls: formData.vaccinationRecordUrls.length > 0 ? formData.vaccinationRecordUrls : undefined,
+        vaccinationRecordUrls: successfulUrls.length > 0 ? successfulUrls : undefined,
         ...(formData.dob && { dob: formData.dob }),
-        
-        // Bổ sung field này để map với Backend
         isSpayedNeutered: formData.sterilized !== null ? formData.sterilized : undefined,
-
-        // QUAN TRỌNG: Đẩy thẳng tagId xuống Backend trong cùng 1 cục payload
         ...(tagId && { tagId: (tagId as string).trim() }),
         ...(rawQrData && { qrCodeUrl: rawQrData }),
       };
 
-      // 1. Chỉ gọi duy nhất 1 API (Backend sẽ tự xử lý việc gán QR bằng Transaction)
       const newPet = await petService.addPet(payload);
       const realPetId = newPet?.id || newPet?.data?.id;
 
-      // 2. Chuyển trang thẳng
-      router.replace(`/pet-profile-detail?id=${realPetId}`);
+      router.push(`/pet-profile-detail?id=${realPetId}`);
 
-      // 3. Hiển thị thông báo (SỬA LẠI ĐOẠN NÀY)
       showModal({
         title: 'Success',
         message: tagId
           ? 'Tạo hồ sơ thú cưng thành công! Vòng cổ đã được kích hoạt.'
-          : 'Tạo hồ sơ thành công!\n(Profile hiện chưa có QR code, bạn có thể cập nhật và gán vòng cổ sau).', // Nhắc nhở người dùng
+          : 'Tạo hồ sơ thành công!\n(Profile hiện chưa có QR code, bạn có thể cập nhật và gán vòng cổ sau).',
         buttonText: 'OK',
         onConfirm: () => { }
       });
@@ -464,8 +484,10 @@ export default function AddPetScreen() {
       });
     } finally {
       setIsSubmitting(false);
+      setIsUploadingVaccine(false);
     }
   };
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView
@@ -504,7 +526,6 @@ export default function AddPetScreen() {
                   colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   locations={[0, 0.3, 1]}
-
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                 />
                 <Feather name="chevron-left" size={20} color="#1F2937" />
@@ -611,7 +632,6 @@ export default function AddPetScreen() {
                         paddingHorizontal: 16,
                         backgroundColor: '#FFFFFF',
                       }}
-
                       containerStyle={{
                         borderRadius: 12,
                         overflow: 'hidden',
@@ -619,7 +639,6 @@ export default function AddPetScreen() {
                         borderColor: '#E5E7EB',
                         borderWidth: 1,
                       }}
-
                       placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
                       selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
                       itemTextStyle={{
@@ -649,10 +668,7 @@ export default function AddPetScreen() {
                         onPress={() => handleChange('sterilized', true)}
                         className="flex-row items-center"
                       >
-                        {/* Vòng tròn outer */}
-                        <View className={`w-[16px] h-[16px] rounded-full border items-center justify-center mr-2 ${formData.sterilized === true ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'
-                          }`}>
-                          {/* Dấu chấm inner (Chỉ hiện khi được chọn) */}
+                        <View className={`w-[16px] h-[16px] rounded-full border items-center justify-center mr-2 ${formData.sterilized === true ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'}`}>
                           {formData.sterilized === true && (
                             <View className="w-2.5 h-2.5 rounded-full bg-[#E89B5A]" />
                           )}
@@ -668,8 +684,7 @@ export default function AddPetScreen() {
                         onPress={() => handleChange('sterilized', false)}
                         className="flex-row items-center"
                       >
-                        <View className={`w-[16px] h-[16px] rounded-full border items-center justify-center mr-2  ${formData.sterilized === false ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'
-                          }`}>
+                        <View className={`w-[16px] h-[16px] rounded-full border items-center justify-center mr-2  ${formData.sterilized === false ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'}`}>
                           {formData.sterilized === false && (
                             <View className="w-2.5 h-2.5 rounded-full bg-[#E89B5A]" />
                           )}
@@ -839,13 +854,13 @@ export default function AddPetScreen() {
             </Text>
             <View className="mb-[38px] flex-col gap-3">
               
-              {/* 1. Nút Upload: CHỈ HIỂN THỊ KHI CHƯA ĐỦ 5 ẢNH */}
+              {/* 1. Nút Upload */}
               {formData.vaccinationRecordUrls.length < 5 && (
                 <TouchableOpacity
                   onPress={handlePickVaccine}
                   activeOpacity={0.7}
-                  disabled={isUploadingRecords}
-                  className={`bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center ${isUploadingRecords ? 'opacity-50' : ''}`}
+                  disabled={isUploadingVaccine}
+                  className={`bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center ${isUploadingVaccine ? 'opacity-50' : ''}`}
                 >
                   <View className="items-center justify-center mb-2">
                     <Image source={require('../assets/icon/upload-black.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
@@ -857,8 +872,8 @@ export default function AddPetScreen() {
                 </TouchableOpacity>
               )}
 
-              {/* 2. Trạng thái Đang tải lên (Uploading File Item) */}
-              {isUploadingRecords && (
+              {/* 2. Trạng thái Loading Bar khi ấn Save */}
+              {isUploadingVaccine && (
                 <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mt-2">
                   <View className='flex-row items-center mb-3'>
                     <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
@@ -880,36 +895,42 @@ export default function AddPetScreen() {
                 </View>
               )}
 
-              {/* 3. Danh sách File đã tải lên xong */}
-              {formData.vaccinationRecordUrls.map((url, index) => (
-                <View key={index}>
-                  <View className="h-[57px] rounded-[16px] p-3 flex-row items-center bg-[#F8F8F8] mt-2">
-                    <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
-                    <View className="flex-1 ml-3">
-                      <View className="flex-row justify-between items-center">
-                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
-                          vaccination_record_{index + 1}.jpg
-                        </Text>
-                        <TouchableOpacity
-                          onPress={() => {
-                            const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== index);
-                            handleChange('vaccinationRecordUrls', newUrls);
-                          }}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                          <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                        </TouchableOpacity>
-                      </View>
-                      <View className="flex-row items-center mt-1">
-                        <View className="flex-row items-center">
-                          <Feather name="check" size={12} color="#EFA062" />
-                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">Completed</Text>
+              {/* 3. Danh sách File Local (Chưa upload thật) */}
+              {formData.vaccinationRecordUrls.map((url, index) => {
+                const isLocalFile = !url.startsWith('http');
+
+                return (
+                  <View key={index}>
+                    <View className="h-[57px] rounded-[16px] p-3 flex-row items-center bg-[#F8F8F8] mt-2">
+                      <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                      <View className="flex-1 ml-3">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
+                            vaccination_record_{index + 1}.jpg
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== index);
+                              handleChange('vaccinationRecordUrls', newUrls);
+                            }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                          </TouchableOpacity>
+                        </View>
+                        <View className="flex-row items-center mt-1">
+                          <View className="flex-row items-center">
+                            {!isLocalFile && <Feather name="check" size={12} color="#EFA062" />}
+                            <Text className="text-[10px] text-[#8E8E93] font-regular tracking-[0.5px] leading-[13px]">
+                              {isLocalFile ? 'Ready to upload' : 'Completed'}
+                            </Text>
+                          </View>
                         </View>
                       </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
 
             {/* Action Buttons */}
@@ -917,9 +938,9 @@ export default function AddPetScreen() {
               <TouchableOpacity
                 onPress={handleSubmit}
                 disabled={isSubmitting || isUploadingAvatar || isUploadingVaccine}
-                className="bg-[#E89B5A] h-[52px] rounded-[16px] items-center justify-center flex-row"
+                className={`bg-[#E89B5A] h-[52px] rounded-[16px] items-center justify-center flex-row ${(isSubmitting || isUploadingVaccine) ? 'opacity-70' : ''}`}
               >
-                {isSubmitting ? (
+                {(isSubmitting || isUploadingVaccine) ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <Text className="text-white font-semibold text-[16px]">Save</Text>
@@ -928,7 +949,7 @@ export default function AddPetScreen() {
 
               <TouchableOpacity
                 onPress={() => router.back()}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingVaccine}
                 className="bg-white border border-[#E5E5E5] h-[52px] rounded-[16px] items-center justify-center mt-4"
               >
                 <Text className="text-[#9CA3AF] font-medium text-[16px]">Cancel</Text>
@@ -991,31 +1012,19 @@ export default function AddPetScreen() {
                 options={cityOptions}
                 onSelect={(val) => {
                   setTempCity(val);
-                  setTempDistrict('');
-                  setTempWard('');
+                  setTempWard(''); 
                 }}
               />
 
-              <Label text="Quận / Huyện" required />
-              <CustomDropdown
-                placeholder="Chọn Quận/Huyện"
-                value={tempDistrict}
-                options={districtOptions}
-                onSelect={(val) => {
-                  setTempDistrict(val);
-                  setTempWard('');
-                }}
-              />
-
-              <Label text="Phường / Xã" required />
+              <Label text="Quận/Huyện & Phường/Xã" required />
               <CustomDropdown
                 placeholder="Chọn Phường/Xã"
                 value={tempWard}
-                options={wardOptions}
+                options={wardOptions} 
                 onSelect={setTempWard}
               />
 
-              <Label text="Địa chỉ chi tiết" required />
+              <Label text="Địa chỉ chi tiết (Tùy chọn)" />
               <CustomInput
                 placeholder="Số nhà, tên ngõ, tên đường..."
                 value={tempDetail}

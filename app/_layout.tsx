@@ -9,26 +9,28 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useContext, useEffect, useRef, useState } from 'react';
 // BỔ SUNG 1: Thêm Alert vào import từ react-native
-import { Alert, AppState, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, AppState, Text, TextInput, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
 // Import thư viện bảo mật
+import { toastConfig } from '@/components/toastConfig';
 import { connectSocket, socket } from '@/utils/socket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
-import { SuccessModal } from '../components/SuccessModal';
 import Toast from 'react-native-toast-message';
-import { toastConfig } from '@/components/toastConfig';
-// BỔ SUNG 2: Import socket
+import { SuccessModal } from '../components/SuccessModal';
+// BỔ SUNG: Import React Query
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 export { ErrorBoundary } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
 const overrideDefaultFont = () => {
   const TextRender = Text as any;
   const TextInputRender = TextInput as any;
-
+  
   // Áp dụng font Urbanist cho Text
   TextRender.defaultProps = TextRender.defaultProps || {};
   TextRender.defaultProps.style = [{ fontFamily: 'Urbanist' }, TextRender.defaultProps.style];
@@ -39,11 +41,14 @@ const overrideDefaultFont = () => {
 };
 overrideDefaultFont();
 
+// Khởi tạo Query Client (Bên ngoài component để không bị re-create)
+const queryClient = new QueryClient();
+
 // ------------------------------------------------------------------
 // Component Guard: Xử lý logic điều hướng và FaceID Lock
 // ------------------------------------------------------------------
 function RootLayoutNavGuard() {
-  const { isAuthenticated, isLoading } = useContext(AuthContext);
+  const { isAuthenticated, isLoading, user } = useContext(AuthContext);
   const segments = useSegments() as string[];
   const router = useRouter();
 
@@ -153,8 +158,7 @@ function RootLayoutNavGuard() {
     };
   }, []);
 
-  // Xử lý Auth Routing
-  const inSignInScreen = segments.length === 0 || segments[0] === 'index' || segments[0] === 'sign-in' || segments[0] === 'fill-profile';
+  // Xử lý Auth Routing & Profile Completion Guard
   useEffect(() => {
     // Đợi quá trình Auth và check Intro hoàn tất mới bắt đầu xử lý luồng
     if (isLoading || hasSeenIntro === null) return;
@@ -162,23 +166,37 @@ function RootLayoutNavGuard() {
     const inAuthGroup = segments[0] === '(tabs)';
     const inIntroScreen = segments[0] === 'intro';
     const inSignInScreen = segments.length === 0 || segments[0] === 'index' || segments[0] === 'sign-in' || segments[0] === 'fill-profile';
+    const inCompleteProfileScreen = segments[0] === 'complete-social-profile';
 
     if (!isAuthenticated) {
       // Chưa đăng nhập mà cố vào màn hình cần bảo vệ -> đá về '/'
-      if (inAuthGroup || inIntroScreen) {
-        router.replace('/');
+      if (inAuthGroup || inIntroScreen || inCompleteProfileScreen) {
+        router.push('/');
       }
     } else {
-      // Đã đăng nhập nhưng đang kẹt ở màn hình Auth
-      if (inSignInScreen) {
-        // if (!hasSeenIntro) {
-        router.replace('/intro'); // Nếu chưa xem intro -> vào intro
-        // } else {
-        // router.replace('/(tabs)'); // Nếu xem rồi -> vào tabs
-        // }
+      // ĐÃ ĐĂNG NHẬP
+      // Kiểm tra xem user có thiếu 1 trong 3 thông tin quan trọng này không
+      const isProfileIncomplete = !user?.phone || !user?.dob || !user?.gender;
+
+      if (isProfileIncomplete) {
+        // Đang thiếu thông tin và chưa ở trang cập nhật -> Bắt buộc chuyển hướng
+        if (!inCompleteProfileScreen) {
+          router.push('/complete-social-profile');
+        }
+      } else {
+        // Đã đủ thông tin
+        if (inSignInScreen || inCompleteProfileScreen) {
+          // Nếu đang ở màn đăng nhập hoặc màn cập nhật profile (đã update xong) 
+          // -> Cho đi tiếp vào intro hoặc tabs
+          if (!hasSeenIntro) {
+            router.push('/intro'); 
+          } else {
+            router.push('/(tabs)'); 
+          }
+        }
       }
     }
-  }, [isAuthenticated, isLoading, segments, hasSeenIntro]);
+  }, [isAuthenticated, isLoading, user, segments, hasSeenIntro]);
 
 
   // Render Màn Hình Khóa nếu hết hạn 1 tiếng
@@ -213,7 +231,6 @@ function RootLayoutNavGuard() {
 // Component RootLayout chính: Load Font và Provider
 // ------------------------------------------------------------------
 export default function RootLayout() {
-  // Thay đổi phần useFonts như sau:
   const [loaded, error] = useFonts({
     Urbanist: Urbanist_400Regular,
     UrbanistMedium: Urbanist_500Medium,
@@ -234,20 +251,22 @@ export default function RootLayout() {
   }, [loaded]);
 
   if (!loaded) {
-    return <View />;
+    return null;
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppProvider>
-        <AuthProvider>
-          <LanguageProvider>
-            <RootLayoutNavGuard />
-            <Toast config={toastConfig} position="top" topOffset={50} />
-            <SuccessModal />
-          </LanguageProvider>
-        </AuthProvider>
-      </AppProvider>
+      <QueryClientProvider client={queryClient}>
+        <AppProvider>
+          <AuthProvider>
+            <LanguageProvider>
+              <RootLayoutNavGuard />
+              <Toast config={toastConfig} position="top" topOffset={50} />
+              <SuccessModal />
+            </LanguageProvider>
+          </AuthProvider>
+        </AppProvider>
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }
@@ -261,11 +280,10 @@ function RootLayoutNav() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="sign-in" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="fill-profile" options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }} />
-
       <Stack.Screen name="my-applications" options={{ headerShown: false, animation: 'slide_from_right' }} />
 
       <Stack.Screen name="adoption-status" options={{ headerShown: false, animation: 'slide_from_right' }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
 
       <Stack.Screen name="select-last-seen-location" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="tag-route-details" options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -281,7 +299,7 @@ function RootLayoutNav() {
       <Stack.Screen name="filter-modal" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="tag-report-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
-      <Stack.Screen name="profile-settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      {/* <Stack.Screen name="profile-settings" options={{ headerShown: false, animation: 'slide_from_right' }} /> */}
       <Stack.Screen name="edit-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="account-security" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="help-and-support" options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -302,6 +320,7 @@ function RootLayoutNav() {
       <Stack.Screen name="pawcare/[category]" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="intro" options={{ headerShown: false, animation: 'fade' }} />
       <Stack.Screen name="report-lost-pet" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <Stack.Screen name="complete-social-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
     </Stack>
   );
 }

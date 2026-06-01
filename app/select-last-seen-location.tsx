@@ -96,7 +96,7 @@ export default function SelectLocationMapScreen() {
   };
 
   const handleConfirm = () => {
-    router.replace({
+    router.push({
       pathname: '/report-lost-pet',
       params: {
         petId, petName, petAvatar, petBreed, petAge, lostDateStr,

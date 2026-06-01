@@ -1,7 +1,7 @@
 // app/profile-settings.tsx
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, TouchableOpacity, View, useWindowDimensions } from 'react-native';
@@ -75,7 +75,14 @@ export default function ProfileSettingsScreen() {
             setIsLoadingPets(false);
         }
     };
-
+    const getAvatarSource = (avatarUrl: any) => {
+        if (!avatarUrl || avatarUrl === '/assets/images/default-avatar.jpg') {
+            // Trả về require cục bộ của React Native nếu là ảnh mặc định
+            return require('@/assets/images/default-avatar.jpg');
+        }
+        // Trả về uri mạng nếu là ảnh người dùng upload lên đám mây
+        return { uri: avatarUrl };
+    };
     useFocusEffect(
         useCallback(() => {
             fetchMyPets();
@@ -104,9 +111,8 @@ export default function ProfileSettingsScreen() {
                         activeOpacity={0.8}
                         onPress={() => router.push('/edit-profile')}
                         className="flex-row items-center mx-5 px-5 py-4 mb-[7px] bg-white rounded-3xl"
-                    >
-                        <Image
-                            source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }}
+                    > 
+                        <Image source={getAvatarSource(user?.avatarUrl)}
                             className="w-[61px] h-[61px] rounded-full bg-gray-200 mr-4"
                             resizeMode="cover"
                         />
@@ -132,7 +138,7 @@ export default function ProfileSettingsScreen() {
                             <View className="flex-row items-center">
                                 <Image
                                     className=''
-                                    source={require('../assets/icon/paw-icon.png')}
+                                    source={require('../../assets/icon/paw-icon.png')}
                                     style={{ width: 17, height: 17 }}
                                     resizeMode="cover"
                                 />
@@ -196,7 +202,7 @@ export default function ProfileSettingsScreen() {
                         <MenuItem
                             icon={<Image
                                 className='-ml-1'
-                                source={require('../assets/icon/paper.png')}
+                                source={require('../../assets/icon/paper.png')}
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
@@ -206,7 +212,7 @@ export default function ProfileSettingsScreen() {
                         <MenuItem
                             icon={<Image
                                 className='-ml-1'
-                                source={require('../assets/icon/heart-setting.png')}
+                                source={require('../../assets/icon/heart-setting.png')}
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
@@ -216,7 +222,7 @@ export default function ProfileSettingsScreen() {
                         <MenuItem
                             icon={<Image
                                 className='-ml-1'
-                                source={require('../assets/icon/agent.png')}
+                                source={require('../../assets/icon/agent.png')}
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
@@ -226,7 +232,7 @@ export default function ProfileSettingsScreen() {
                         <MenuItem
                             icon={<Image
                                 className='-ml-1'
-                                source={require('../assets/icon/calendar.png')}
+                                source={require('../../assets/icon/calendar.png')}
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
@@ -241,7 +247,7 @@ export default function ProfileSettingsScreen() {
                         <MenuItem
                             icon={<Image
                                 className='-ml-1'
-                                source={require('../assets/icon/lock-setting.png')}
+                                source={require('../../assets/icon/lock-setting.png')}
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
@@ -251,7 +257,7 @@ export default function ProfileSettingsScreen() {
                         <MenuItem
                             icon={<Image
                                 className='-ml-1'
-                                source={require('../assets/icon/earth-setting.png')}
+                                source={require('../../assets/icon/earth-setting.png')}
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
@@ -262,7 +268,7 @@ export default function ProfileSettingsScreen() {
                         <MenuItem
                             icon={<Image
                                 className='-ml-1'
-                                source={require('../assets/icon/help.png')}
+                                source={require('../../assets/icon/help.png')}
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}

@@ -7,12 +7,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AlertCircle } from 'lucide-react-native';
-import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, Share, TouchableOpacity, View } from 'react-native';
+import React, { useContext, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, Share, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { WebView } from 'react-native-webview';
 import { eventService } from '../services/eventService';
 import { useEngagementStore } from '../store/useEngagementStore';
+// BỔ SUNG: Import React Query
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
 const { width } = Dimensions.get('window');
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -22,29 +26,61 @@ export default function EventDetailScreen() {
     const params = useLocalSearchParams();
     const eventId = params.id as string;
     const { user } = useContext(AuthContext);
-    const isInterested = useEngagementStore(state => state.interestedEvents[eventId] ?? eventData?.isInterested);
-    const toggleEventInterest = useEngagementStore(state => state.toggleEventInterest);
+    
+    const queryClient = useQueryClient();
 
     const bottomSheetRef = useRef<BottomSheet>(null);
     const snapPoints = useMemo(() => ['60%', '95%'], []);
 
-    const [eventData, setEventData] = useState<any>(null);
-    const [similarEvents, setSimilarEvents] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [isNotFound, setIsNotFound] = useState(false);
-    const [actionLoading, setActionLoading] = useState(false);
-
     const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
-    // Hàm mở xem ảnh
+    // --- 1. FETCH EVENT DETAIL VỚI USEQUERY ---
+    const { data: eventData, isLoading: detailLoading, isError: isNotFound } = useQuery({
+        queryKey: ['event-detail', eventId],
+        queryFn: async () => {
+            const res = await eventService.getEventDetail(eventId, user?.id);
+            if (res && res.data) {
+                // Map chuẩn dữ liệu Shelter
+                if (res.data.shelter) {
+                    res.data.organizer = {
+                        id: res.data.shelter.id,
+                        name: res.data.shelter.name,
+                        avatarUrl: res.data.shelter.avatarUrl
+                    };
+                }
+                // Đồng bộ store cục bộ
+                if (res.data.isInterested !== undefined) {
+                    useEngagementStore.getState().setInitialEventInterest(eventId, res.data.isInterested);
+                }
+                return res.data;
+            }
+            throw new Error('Not found');
+        },
+        enabled: !!eventId,
+        retry: false
+    });
+
+    // --- 2. FETCH SIMILAR EVENTS VỚI USEQUERY ---
+    const { data: similarEvents = [] } = useQuery({
+        queryKey: ['upcoming-events'],
+        queryFn: async () => {
+            const res = await eventService.getUpcomingEvents(5);
+            return res.data ? res.data.filter((ev: any) => ev.id !== eventId) : [];
+        },
+        enabled: !!eventId
+    });
+
+    const isInterested = useEngagementStore(state => state.interestedEvents[eventId] ?? eventData?.isInterested);
+    const toggleEventInterest = useEngagementStore(state => state.toggleEventInterest);
+
     const handleOpenImageViewer = (index: number) => {
         setSelectedImageIndex(index);
         setIsImageViewerVisible(true);
     };
 
     const onShare = async () => {
-        if (actionLoading || !eventData) return;
+        if (!eventData) return;
 
         const startDate = new Date(eventData.startDate);
         const day = startDate.getDate();
@@ -83,77 +119,66 @@ export default function EventDetailScreen() {
         }
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!eventId) {
-                setIsNotFound(true);
-                setLoading(false);
-                return;
-            }
-            try {
-                setLoading(true);
+    // --- 3. MUTATION CHO HÀNH ĐỘNG THÊM/HUỶ QUAN TÂM ---
+    const toggleInterestMutation = useMutation({
+        mutationFn: () => eventService.toggleInterest(eventId, user?.id || 'guest'),
+        onMutate: async () => {
+            const previousState = isInterested;
 
-                const res = await eventService.getEventDetail(eventId, user?.id);
-                if (res && res.data) {
-                    // ==========================================
-                    // Map chuẩn dữ liệu Shelter từ Backend (KHÔNG DÙNG FALLBACK IMAGE RÁC)
-                    // ==========================================
-                    if (res.data.shelter) {
-                        res.data.organizer = {
-                            id: res.data.shelter.id,
-                            name: res.data.shelter.name,
-                            avatarUrl: res.data.shelter.avatarUrl // Map thủ công ở đây
-                        };
-                    }
-
-                    setEventData(res.data);
-                    if (res.data.isInterested !== undefined) {
-                        useEngagementStore.getState().setInitialEventInterest(eventId, res.data.isInterested);
-                    }
-                } else {
-                    setIsNotFound(true);
-                }
-
-                const resSimilar = await eventService.getUpcomingEvents(5);
-                if (resSimilar.data) {
-                    const filteredEvents = resSimilar.data.filter((ev: any) => ev.id !== eventId);
-                    setSimilarEvents(filteredEvents);
-                }
-            } catch (error: any) {
-                console.error("Lỗi lấy chi tiết sự kiện:", error);
-                setIsNotFound(true);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, [eventId, user?.id]);
-
-    const handleInterest = async () => {
-        if (actionLoading || !eventData) return;
-        setActionLoading(true);
-        toggleEventInterest(eventId);
-        setEventData((prev: any) => ({
-            ...prev,
-            interestedCount: !isInterested ? prev.interestedCount + 1 : prev.interestedCount - 1
-        }));
-        try {
-            setActionLoading(true);
-            const res = await eventService.toggleInterest(eventId, user?.id || 'guest');
-            if (!res.success) throw new Error("API Failed");
-        } catch (error) {
-            // Rollback UI
+            // Optimistic Update cho Global Store
             toggleEventInterest(eventId);
-            setEventData((prev: any) => ({
-                ...prev,
-                interestedCount: isInterested ? prev.interestedCount + 1 : prev.interestedCount - 1
-            }));
-        } finally {
-            setActionLoading(false);
+
+            // Optimistic Update cho dữ liệu chi tiết hiển thị số người quan tâm
+            queryClient.setQueryData(['event-detail', eventId], (oldData: any) => {
+                if (!oldData) return oldData;
+                return {
+                    ...oldData,
+                    interestedCount: !previousState ? oldData.interestedCount + 1 : Math.max(0, oldData.interestedCount - 1)
+                };
+            });
+
+            // Hiện Toast lập tức
+            Toast.show({
+                type: 'custom_badge',
+                props: { 
+                    petName: eventData?.title || 'This event', 
+                    actionText: !previousState ? ' has been added to Interested' : ' has been removed from Interested' 
+                },
+                visibilityTime: 2500, autoHide: true,
+            });
+
+            return { previousState };
+        },
+        onSuccess: () => {
+            // ÉP CÁC TAB KHÁC FETCH LẠI DỮ LIỆU ĐỂ ĐỒNG BỘ MÀN HÌNH DANH SÁCH
+            queryClient.invalidateQueries({ queryKey: ['interested-events'] });
+        },
+        onError: (err, variables, context) => {
+            // Rollback nếu có sự cố
+            toggleEventInterest(eventId);
+            if (context) {
+                queryClient.setQueryData(['event-detail', eventId], (oldData: any) => {
+                    if (!oldData) return oldData;
+                    return {
+                        ...oldData,
+                        interestedCount: context.previousState ? oldData.interestedCount + 1 : Math.max(0, oldData.interestedCount - 1)
+                    };
+                });
+            }
+            Toast.show({
+                type: 'error',
+                text1: 'Oops!',
+                text2: 'Something went wrong. Please try again.',
+                visibilityTime: 2500, autoHide: true,
+            });
         }
+    });
+
+    const handleInterest = () => {
+        toggleInterestMutation.mutate();
     };
 
-    if (loading) {
+    if (detailLoading) {
         return (
             <View className="flex-1 bg-white justify-center items-center">
                 <ActivityIndicator size="large" color="#ffa053" />
@@ -192,14 +217,35 @@ export default function EventDetailScreen() {
     const year = startDate.getFullYear();
     const timeString = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-    // Chỉ dùng URL thực, nếu không có sẽ render UI thay thế bên dưới
     const bannerImage = eventData.bannerUrl || eventData.images?.[0]?.url;
 
-    // Tọa độ mặc định (Hà Nội) nếu API không trả về
     const mapLatitude = eventData.latitude || 21.028511;
     const mapLongitude = eventData.longitude || 105.804817;
+    const handleOpenMap = () => {
+        const lat = mapLatitude;
+        const lng = mapLongitude;
+        const label = eventData.locationName || eventData.address || "Event Location";
+        
+        const url = Platform.select({
+            ios: `maps:0,0?q=${label}&ll=${lat},${lng}`,
+            android: `geo:0,0?q=${lat},${lng}(${label})`
+        });
 
-    // Tạo URL embed cho Google Maps
+        const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
+        if (url) {
+            Linking.canOpenURL(url).then((supported) => {
+                if (supported) {
+                    Linking.openURL(url);
+                } else {
+                    Linking.openURL(fallbackUrl);
+                }
+            }).catch(() => Linking.openURL(fallbackUrl));
+        } else {
+            Linking.openURL(fallbackUrl);
+        }
+    };
+    
     const mapHtml = `
     <html>
         <head>
@@ -229,13 +275,11 @@ export default function EventDetailScreen() {
                         resizeMode="cover"
                     />
                 ) : (
-                    // UI Xử lý khi không có banner
                     <View className="w-full h-full items-center justify-center bg-[#FDF5EF]">
                         <Feather name="image" size={48} color="#E89B5A" style={{ opacity: 0.5 }} />
                     </View>
                 )}
 
-                {/* OVERLAY HEADER: 3 nút bấm nổi trên nền ảnh */}
                 <SafeAreaView edges={['top']} className="absolute top-0 left-0 right-0 z-10">
                     <View className="flex-row items-center justify-between px-5 mt-2 h-[44px]">
 
@@ -278,7 +322,6 @@ export default function EventDetailScreen() {
 
                         {/* BÊN PHẢI: Nút Share & Mark */}
                         <View className="flex-row items-center">
-                            {/* Nút Mark */}
                             <TouchableOpacity
                                 onPress={handleInterest}
                                 activeOpacity={0.7}
@@ -319,7 +362,6 @@ export default function EventDetailScreen() {
                                 </View>
                             </TouchableOpacity>
 
-                            {/* Nút Share */}
                             <TouchableOpacity
                                 onPress={onShare}
                                 activeOpacity={0.7}
@@ -374,7 +416,6 @@ export default function EventDetailScreen() {
                 <BottomSheetScrollView showsVerticalScrollIndicator={false}>
                     <View className="-mt-10 bg-white rounded-t-[24px] px-[20px] pt-[37px] pb-12 shadow-2xl">
 
-                        {/* CATEGORY */}
                         {eventData.category && (
                             <View className="flex-row mb-[20px]">
                                 <View className="bg-[#E89B5A]/10 border border-[#E89B5A]/50 px-3 py-1.5 rounded-[12px]">
@@ -385,12 +426,10 @@ export default function EventDetailScreen() {
                             </View>
                         )}
 
-                        {/* TITLE */}
                         <Text className="text-[24px] font-semibold text-black leading-8 mb-[15px]">
                             {eventData.title}
                         </Text>
 
-                        {/* THỜI GIAN VÀ ĐỊA ĐIỂM */}
                         <View className='mb-[30px]'>
                             <View className="flex-row items-center mb-[15px]">
                                 <View className="items-center justify-center mr-2">
@@ -406,7 +445,6 @@ export default function EventDetailScreen() {
                                     </Text>
                                 </View>
                             </View>
-                            {/* Cột Thời Gian */}
                             <View className="flex-row items-center flex-1 mr-2">
                                 <View className="items-center justify-center mr-2">
                                     <Image
@@ -423,7 +461,6 @@ export default function EventDetailScreen() {
                             </View>
                         </View>
 
-                        {/* ABOUT EVENT */}
                         <View className="mb-[30px]">
                             <Text className="text-[16px] font-medium text-black mb-[12px]">About Event</Text>
                             <Text className="text-[#8E8E93] font-regular leading-relaxed text-[14px] text-justify">
@@ -431,7 +468,6 @@ export default function EventDetailScreen() {
                             </Text>
                         </View>
 
-                        {/* ORGANIZER PROFILE */}
                         {eventData.organizer && (
                             <View className="mb-[30px]">
                                 <Text className="text-[16px] font-medium text-black mb-[20px]">Organizer</Text>
@@ -456,34 +492,19 @@ export default function EventDetailScreen() {
                                             {eventData.organizer.name || 'Pawlife Organizer'}
                                         </Text>
                                         <Text className="text-[12px] text-[#8E8E93]" numberOfLines={1}>
-                                            Event Organize
+                                            Event Organizer
                                         </Text>
                                     </View>
-                                    <TouchableOpacity
-                                        activeOpacity={0.7}
-                                        className="w-[41px] h-[41px] rounded-full bg-[#FDF5EF] items-center justify-center"
-                                    >
-                                        <Image source={require('../assets/icon/message.png')} style={{ width: 24, height: 24 }} resizeMode="cover" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        activeOpacity={0.7}
-                                        className="w-[36px] h-[36px] items-center justify-center ml-2"
-                                        onPress={() => router.push({
-                                            pathname: '/organizer-profile',
-                                            params: { id: eventData.organizer.id }
-                                        })}
-                                    >
-                                        <Feather name="chevron-right" size={18} color="black" />
-                                    </TouchableOpacity>
                                 </View>
                             </View>
                         )}
 
-                        {/* LOCATION MAP */}
                         <View className="mb-[32px]">
-                            <View className='flex-row justify-between'>
-                                <Text className="text-[16px] font-medium text-black mb-[12px]">Location</Text>
-                                <Text className="text-[14px] font-regular text-[#E89B5A] mb-[12px]">View on Map</Text>
+                            <View className='flex-row justify-between items-center mb-[12px]'>
+                                <Text className="text-[16px] font-medium text-black">Location</Text>
+                                <TouchableOpacity onPress={handleOpenMap} activeOpacity={0.7} className="py-1 px-2 -mr-2 rounded-lg bg-[#FDF5EF]">
+                                    <Text className="text-[14px] font-semibold text-[#E89B5A]">View on Map</Text>
+                                </TouchableOpacity>
                             </View>
 
                             <View className="mb-[12px]">
@@ -495,7 +516,6 @@ export default function EventDetailScreen() {
                                 </Text>
                             </View>
 
-                            {/* MapView Container dùng WebView */}
                             <View className="w-full h-[145px] rounded-[16px] overflow-hidden border border-gray-200 bg-gray-100 relative pointer-events-none">
                                 <WebView
                                     originWhitelist={['*']}
@@ -506,12 +526,14 @@ export default function EventDetailScreen() {
                                     showsVerticalScrollIndicator={false}
                                     bounces={false}
                                 />
-                                {/* Lớp phủ trong suốt để chặn thao tác vuốt trượt làm lỗi cuộn trang */}
-                                <View className="absolute inset-0 z-10" />
+                                <TouchableOpacity 
+                                    className="absolute inset-0 z-10" 
+                                    activeOpacity={0.8}
+                                    onPress={handleOpenMap}
+                                />
                             </View>
                         </View>
 
-                        {/* GALLERY */}
                         {eventData.images && eventData.images.length > 0 && (
                             <View className="mb-8">
                                 <Text className="text-[16px] font-medium text-black mb-[20px]">Photo Gallery</Text>
@@ -535,8 +557,6 @@ export default function EventDetailScreen() {
                                                 }}
                                             >
                                                 <Image source={{ uri: img.url }} className="w-full h-full rounded-[16px]" resizeMode="cover" />
-
-                                                {/* Overlay đen mờ và số lượng ảnh còn lại */}
                                                 {isLastImage && remainingCount > 0 && (
                                                     <View className="absolute inset-0 bg-black/50 items-center justify-center rounded-[16px] overflow-hidden">
                                                         <Text className="text-white text-[20px] font-bold tracking-wider">
@@ -551,14 +571,13 @@ export default function EventDetailScreen() {
                             </View>
                         )}
 
-                        {/* MORE EVENTS */}
                         {similarEvents.length > 0 && (
                             <View className="mb-4">
                                 <View className="flex-row justify-between items-center mb-4">
                                     <Text className="text-[16px] font-medium text-black">More Events</Text>
                                 </View>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingVertical: 8, paddingHorizontal: 4 }}>
-                                    {similarEvents.map(ev => {
+                                    {similarEvents.map((ev: any) => {
                                         const evDate = new Date(ev.startDate);
                                         return (
                                             <TouchableOpacity
@@ -569,7 +588,6 @@ export default function EventDetailScreen() {
                                                 onPress={() => router.push(`/event-detail?id=${ev.id}`)}
                                             >
                                                 <View className="flex-1 flex-row rounded-[20px] overflow-hidden">
-                                                    {/* Bỏ ảnh rác ở Event Card */}
                                                     {ev.bannerUrl ? (
                                                         <Image source={{ uri: ev.bannerUrl }} className="w-[98px] h-full bg-gray-100" resizeMode="cover" />
                                                     ) : (
@@ -587,7 +605,6 @@ export default function EventDetailScreen() {
                                                                     <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>{ev.locationName || ev.address}</Text>
                                                                 </View>
                                                             </View>
-                                                            
                                                         </View>
                                                         <View className="items-center justify-center shrink-0 min-w-[32px]">
                                                             <Text className="text-[20px] font-semibold text-black leading-tight">{evDate.getDate().toString().padStart(2, '0')}</Text>

@@ -3,7 +3,7 @@ import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 // Đã tạm tắt hook useInfiniteSlider để khắc phục lỗi liệt cảm ứng do re-render loop
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -577,7 +577,7 @@ export default function HomeScreen() {
                                         }}
                                     >
                                         <Image
-                                            source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }}
+                                            source={{ uri: user?.avatarUrl || 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg' || '/assets/images/default-avatar.jpg' }}
                                             className="w-full h-full"
                                         />
                                     </View>
@@ -617,7 +617,7 @@ export default function HomeScreen() {
                         </Text>
                         <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium tracking-tight overflow-hidden">
                             <Text>
-                                Let’s dive into your account
+                                Let's dive into your account
                             </Text>
                         </Animated.Text>
                     </Animated.View>

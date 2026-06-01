@@ -1,26 +1,33 @@
 // app/sign-in.tsx
-import axiosClient, { BASE_URL } from '@/api/axiosClient';
+import axiosClient, { BASE_URL, setCachedAccessToken } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 import { connectSocket } from '@/utils/socket';
-import { AntDesign, Feather, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import axios from 'axios';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView,
   Platform,
   ScrollView, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+GoogleSignin.configure({
+  webClientId: '725064672703-i8cmlg934i6m5v8ssi69577vf9d3k7hc.apps.googleusercontent.com', 
+  iosClientId: '725064672703-l61bog4iims28n57sspk6hokcf1l86c7.apps.googleusercontent.com',
+  offlineAccess: true,
+});
+// BỔ SUNG: Hằng số thời gian đếm ngược 120 giây (2 phút)
+const RESEND_OTP_TIME = 120;
 
 // --- COMMON INPUT COMPONENT ---
-// Loại bỏ các class động gây crash như bg-orange-50/10
 const InputField = ({
   placeholder, icon, value, onChangeText,
   secureTextEntry, isPassword, autoCapitalize = 'none', keyboardType = 'default', error, maxLength, title
@@ -90,46 +97,182 @@ export default function SignInScreen() {
   const [isBiometricReady, setIsBiometricReady] = useState(false);
   const [isRememberMe, setIsRememberMe] = useState(false);
 
-  useEffect(() => {
-    const checkSetup = async () => {
-      const isEnabled = await AsyncStorage.getItem('isFaceIdEnabled');
-      const savedEmail = await SecureStore.getItemAsync('secure_email');
-      const savedPass = await SecureStore.getItemAsync('secure_password');
+  // BỔ SUNG: State quản lý đếm ngược OTP
+  const [otpTimer, setOtpTimer] = useState<number>(RESEND_OTP_TIME);
 
-      if (isEnabled === 'true' && savedEmail && savedPass) setIsBiometricReady(true);
-      if (savedEmail && await AsyncStorage.getItem('isRememberMe') === 'true') {
-        setEmail(savedEmail); setIsRememberMe(true);
+  useEffect(() => {
+      const checkSetup = async () => {
+        const isEnabled = await AsyncStorage.getItem('isFaceIdEnabled');
+        const savedSecureEmail = await SecureStore.getItemAsync('secure_email');
+        const savedPass = await SecureStore.getItemAsync('secure_password');
+        if (isEnabled === 'true' && savedSecureEmail && savedPass) {
+          setIsBiometricReady(true);
+        }
+
+        const isRemember = await AsyncStorage.getItem('isRememberMe');
+      if (isRemember === 'true') {
+        const rememberedEmail = await AsyncStorage.getItem('remembered_email');
+        const savedPass = await SecureStore.getItemAsync('secure_password'); // THÊM DÒNG NÀY
+        
+        if (rememberedEmail) {
+          setEmail(rememberedEmail);
+        }
+        if (savedPass) {
+          setPassword(savedPass); // THÊM DÒNG NÀY: Tự động điền mật khẩu
+        }
+        setIsRememberMe(true);
       }
     };
     checkSetup();
   }, []);
 
-  const executeLogin = async (loginEmail: string, loginPass: string) => {
+  // BỔ SUNG: Logic đếm ngược OTP an toàn, chỉ chạy khi đang ở màn Verify OTP
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (currentView === 'VERIFY_OTP' && otpTimer > 0) {
+      interval = setInterval(() => { setOtpTimer((prev) => prev - 1); }, 1000);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [currentView, otpTimer]);
+
+  // BỔ SUNG: Hàm format thời gian MM:SS
+  const formatTime = useCallback((totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, []);
+
+  const handleGoogleLogin = async () => {
     try {
-      setIsLoading(true);
-      const response = await axiosClient.post('/auth/login', { email: loginEmail, password: loginPass });
+      setErrors({});
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
       
-      if (isRememberMe) {
-        await SecureStore.setItemAsync('secure_email', loginEmail);
-        await SecureStore.setItemAsync('secure_password', loginPass);
-        await AsyncStorage.setItem('isRememberMe', 'true');
-      } else {
-        await AsyncStorage.removeItem('isRememberMe');
-      }
-      
-      if (response.data.requires2FA) {
-        setTempAuthToken(response.data.tempToken); setCurrentView('VERIFY_2FA');
-      } else {
-        await login({ email: loginEmail, password: loginPass });
+      if (response.type === 'success' && response.data?.idToken) {
+        await executeSocialLogin('GOOGLE', response.data.idToken);
       }
     } catch (error: any) {
-      setErrors({ form: error.response?.data?.message || 'Incorrect email or password.' });
+      if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== '12501') {
+         console.error("Google Login Error:", error);
+         setErrors({ form: "Không thể kết nối với Google lúc này." });
+      }
+    }
+  };
+
+  // --- BỔ SUNG: XỬ LÝ ĐĂNG NHẬP APPLE ---
+  const handleAppleLogin = async () => {
+    try {
+      setErrors({});
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      
+      if (credential.identityToken) {
+        await executeSocialLogin('APPLE', credential.identityToken);
+      }
+    } catch (e: any) {
+      if (e.code !== 'ERR_REQUEST_CANCELED') {
+        setErrors({ form: e.message || "Lỗi xác thực Apple" });
+      }
+    }
+  };
+
+  const executeSocialLogin = async (provider: 'GOOGLE' | 'FACEBOOK' | 'APPLE', token: string, extraData?: any) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await axiosClient.post('/auth/social-login', { provider, token, ...extraData });
+      const { accessToken, user, requires2FA, tempToken } = response.data;
+
+      if (requires2FA) {
+        setTempAuthToken(tempToken); 
+        setCurrentView('VERIFY_2FA');
+        setIsLoading(false);
+        return;
+      }
+
+      if (setAuth) {
+        await setAuth(accessToken, user);
+        axiosClient.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+        
+        // <-- 2. BỔ SUNG: CẬP NHẬT RAM CACHE -->
+        setCachedAccessToken(accessToken); 
+        
+        connectSocket(accessToken); 
+      } else {
+        Alert.alert("Lỗi", "Không thể lưu phiên đăng nhập.");
+        return;
+      }
+
+      if (!user.isProfileComplete) {
+        router.replace('/complete-social-profile');
+      } else {
+        router.replace('/(tabs)');
+      }
+
+    } catch (error: any) {
+      setErrors({ form: error.response?.data?.message || `Lỗi đăng nhập ${provider}` });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // VALIDATION ĐƯỢC CHUYỂN VÀO HÀM NHẤN NÚT (Sửa dứt điểm lỗi crash)
+  const executeLogin = async (loginEmail: string, loginPass: string) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await axiosClient.post('/auth/login', { 
+        email: loginEmail, 
+        password: loginPass,
+        rememberMe: isRememberMe 
+      });
+      
+      if (isRememberMe) {
+        await AsyncStorage.setItem('isRememberMe', 'true');
+        await AsyncStorage.setItem('remembered_email', loginEmail);
+      } else {
+        await AsyncStorage.removeItem('isRememberMe');
+        await AsyncStorage.removeItem('remembered_email');
+      }
+
+      await SecureStore.setItemAsync('secure_email', loginEmail);
+      await SecureStore.setItemAsync('secure_password', loginPass);
+      
+      if (response.data.requires2FA) {
+        setTempAuthToken(response.data.tempToken); 
+        setCurrentView('VERIFY_2FA');
+      } else {
+        if (setAuth) {
+          await setAuth(response.data.accessToken, response.data.user);
+          axiosClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+          
+          // <-- 3. BỔ SUNG: CẬP NHẬT RAM CACHE -->
+          setCachedAccessToken(response.data.accessToken);
+          
+          connectSocket(response.data.accessToken); 
+        } else {
+          Alert.alert("Error", "Could not save login session.");
+        }
+      }
+    } catch (error: any) {
+      const errorData = error.response?.data;
+      let finalErrorMessage = 'Invalid username or password.';
+      if (errorData && errorData.message) {
+        if (typeof errorData.message === 'string') {
+          finalErrorMessage = errorData.message;
+        } else if (Array.isArray(errorData.message) && errorData.message.length > 0) {
+          finalErrorMessage = errorData.message[0]; 
+        }
+      } else if (error.message) { finalErrorMessage = error.message; }
+      setErrors({ form: finalErrorMessage });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogin = () => {
     let newErrors: Record<string, string> = {};
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -150,16 +293,40 @@ export default function SignInScreen() {
 
   const handleBiometricAuth = async () => {
     try {
+      const isEnabled = await AsyncStorage.getItem('isFaceIdEnabled');
+
+      if (isEnabled !== 'true') {
+        Alert.alert(
+          'Tính năng chưa kích hoạt',
+          'Đăng nhập bằng Face ID/Vân tay đang bị tắt hoặc chưa được thiết lập.\n\nVui lòng đăng nhập bằng mật khẩu, sau đó vào phần Cài đặt Bảo mật (Account & Security) để bật tính năng này.',
+          [{ text: 'Đã hiểu', style: 'default' }]
+        );
+        return;
+      }
+
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to log in', fallbackLabel: 'Use password', cancelLabel: 'Cancel',
+        promptMessage: 'Xác thực để đăng nhập vào ứng dụng',
+        fallbackLabel: 'Dùng mật khẩu',
+        cancelLabel: 'Hủy',
       });
+
       if (result.success) {
         const savedEmail = await SecureStore.getItemAsync('secure_email');
         const savedPass = await SecureStore.getItemAsync('secure_password');
-        if (savedEmail && savedPass) executeLogin(savedEmail, savedPass);
-        else Alert.alert('Error', 'No saved login data found.');
+        
+        if (savedEmail && savedPass) {
+          executeLogin(savedEmail, savedPass);
+        } else {
+          Alert.alert(
+            'Lỗi xác thực', 
+            'Phiên đăng nhập đã hết hạn hoặc thiết bị đã bị xóa dữ liệu an toàn. Vui lòng đăng nhập lại bằng mật khẩu.'
+          );
+          await AsyncStorage.removeItem('isFaceIdEnabled');
+        }
       }
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+      console.error('Lỗi Biometric:', error); 
+    }
   };
 
   const handleVerify2FAAndSubmit = async () => {
@@ -171,13 +338,13 @@ export default function SignInScreen() {
         await setAuth(response.data.accessToken, response.data.user);
         axiosClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
         
-        // BỔ SUNG: Kích hoạt socket ngay khi có token
-        connectSocket(response.data.accessToken); 
+        // <-- 4. BỔ SUNG: CẬP NHẬT RAM CACHE -->
+        setCachedAccessToken(response.data.accessToken);
         
+        connectSocket(response.data.accessToken); 
       } else {
         Alert.alert("Error", "Could not save login session."); return;
       }
-      // router.replace('/(tabs)');
     } catch (error: any) {
       setErrors({ form: error.response?.data?.message || 'Incorrect verification code.' });
     } finally { setIsLoading(false); }
@@ -188,19 +355,19 @@ export default function SignInScreen() {
     try {
       setIsLoading(true);
       await requestOtp({ email, type: 'FORGOT_PASSWORD' });
-      setCurrentView('VERIFY_OTP'); setErrors({});
+      setCurrentView('VERIFY_OTP'); 
+      setErrors({});
+      // BỔ SUNG: Reset lại thời gian 120s mỗi khi gọi hàm này thành công
+      setOtpTimer(RESEND_OTP_TIME);
     } catch (error: any) {
       setErrors({ form: error.response?.data?.message || 'Failed to send OTP. Please try again.' });
     } finally { setIsLoading(false); }
   };
 
   const handleVerifyOtpAndSubmit = async (currentOtp: string = otp) => {
-    // Luồng cũ của bạn: Chỉ kiểm tra độ dài rồi chuyển view luôn.
-    // Việc gọi API thật sự sẽ diễn ra ở màn hình RESET_PASSWORD
     if (currentOtp.length !== 6) return setErrors({ otp: 'OTP must be 6 digits.' });
     try {
       setIsLoading(true); 
-      // Chuyển thẳng sang view RESET_PASSWORD (giống hệt code gốc)
       setCurrentView('RESET_PASSWORD');
     } catch (error: any) {
       setErrors({ form: error.response?.data?.message || 'Incorrect or expired OTP.' });
@@ -253,7 +420,6 @@ export default function SignInScreen() {
         </View>
       )}
 
-      {/* SỬ DỤNG OPACITY QUA INLINE STYLE ĐỂ TRÁNH CRASH */}
       <View className="flex-row items-center w-full mb-4">
         <TouchableOpacity 
           className="flex-1 py-[15px] rounded-[100px] shadow-sm items-center bg-[#E89B5A]"
@@ -263,15 +429,13 @@ export default function SignInScreen() {
           {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">Log In</Text>}
         </TouchableOpacity>
 
-        {/* {isBiometricReady && ( */}
-          <TouchableOpacity 
-            onPress={handleBiometricAuth} disabled={isLoading} activeOpacity={0.7}
-            className="h-[64px] aspect-square items-center justify-center ml-1"
-            style={{ borderColor: 'rgba(232, 155, 90, 0.3)' }}
-          >
-             <MaterialCommunityIcons name="face-recognition" size={28} color="#61e250" />
-          </TouchableOpacity>
-        {/* )} */}
+        <TouchableOpacity 
+          onPress={handleBiometricAuth} disabled={isLoading} activeOpacity={0.7}
+          className="h-[64px] aspect-square items-center justify-center ml-1"
+          style={{ borderColor: 'rgba(232, 155, 90, 0.3)' }}
+        >
+            <MaterialCommunityIcons name="face-recognition" size={28} color="#61e250" />
+        </TouchableOpacity>
       </View>
 
       <View className="flex-row items-center mb-4">
@@ -283,35 +447,20 @@ export default function SignInScreen() {
       <View className="w-full mb-8">
           <SocialButton 
             icon={<AntDesign name="google" size={24} color="#DB4437" />} title="Continue with Google" 
-            onPress={() => Alert.alert("Notice", "Feature is under development")} disabled={isLoading}
+            onPress={handleGoogleLogin} disabled={isLoading}
           />
           {Platform.OS === 'ios' && (
               <SocialButton
                 icon={<AntDesign name="apple" size={24} color="black" />} title="Continue with Apple"
                 disabled={isLoading}
-                onPress={async () => {
-                  try {
-                    await AppleAuthentication.signInAsync({
-                      requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
-                    });
-                  } catch (e: any) {
-                    if (e.code !== 'ERR_REQUEST_CANCELED') Alert.alert("Apple Login Error", e.message);
-                  }
-                }}
+                onPress={handleAppleLogin}
               />
           )}
-          <SocialButton 
+          {/* <SocialButton 
             icon={<FontAwesome5 name="facebook" size={24} color="#4267B2" />} title="Continue with Facebook" 
             onPress={() => Alert.alert("Notice", "Feature is under development")} disabled={isLoading}
-          />
+          /> */}
       </View>
-      
-      {/* <View className="flex-row justify-center items-center mt-auto pb-8">
-        <Text className="text-gray-500 font-medium text-[15px]">Don't have an account? </Text>
-        <TouchableOpacity onPress={() => { setErrors({}); router.push('/fill-profile'); }}>
-          <Text className="text-[#E89B5A] font-bold text-[15px]">Sign up now</Text>
-        </TouchableOpacity>
-      </View> */}
     </>
   );
 
@@ -338,7 +487,6 @@ export default function SignInScreen() {
     </>
   );
 
-  // --- LOGIC BÀN PHÍM ẢO ---
   const handleOtpKeyPress = (value: string) => {
     setErrors({ ...errors, otp: '', form: '' }); 
     if (value === 'delete') {
@@ -348,8 +496,6 @@ export default function SignInScreen() {
         const newOtp = otp + value;
         setOtp(newOtp); 
         
-        // TÍNH NĂNG AUTO-SUBMIT:
-        // Ngay khi nhập đủ 6 số, tự động kích hoạt hàm chuyển view
         if (newOtp.length === 6) {
           handleVerifyOtpAndSubmit(newOtp);
         }
@@ -361,7 +507,7 @@ export default function SignInScreen() {
     const isEmpty = value === 'empty';
     return (
       <TouchableOpacity
-        disabled={isEmpty}
+        disabled={isEmpty || isLoading}
         onPress={() => handleOtpKeyPress(value)}
         activeOpacity={0.7}
         className={`w-[30%] h-[60px] justify-center items-center rounded-[16px] mb-3 ${
@@ -373,10 +519,8 @@ export default function SignInScreen() {
     );
   };
 
-  // --- GIAO DIỆN XÁC THỰC OTP ---
   const renderVerifyOtp = () => (
     <View className="flex-1 mt-4">
-      {/* Tiêu đề */}
       <View className="mb-10">
         <Text className="text-[32px] font-bold text-black mb-4 flex-row items-center">
           Enter OTP Code 🔐
@@ -386,16 +530,14 @@ export default function SignInScreen() {
         </Text>
       </View>
 
-      {/* 6 Ô hiển thị mã OTP */}
       <View className="flex-row justify-between mb-6">
-        {[0, 1, 2, 3, 4, 5].map((index) => { // Đã tăng mảng lên 6 phần tử
+        {[0, 1, 2, 3, 4, 5].map((index) => {
           const digit = otp[index] || '';
           const isActive = index === otp.length;
 
           return (
             <View
               key={index}
-              // Thu nhỏ width/height một chút để vừa 6 ô (w-[45px] h-[55px] hoặc tương tự tùy màn)
               className={`w-[48px] h-[60px] rounded-[12px] justify-center items-center border-[1.5px] ${
                 isActive ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'
               } ${digit ? 'border-[#E89B5A] bg-[#FFF8F3]' : 'bg-white'}`}
@@ -406,16 +548,29 @@ export default function SignInScreen() {
         })}
       </View>
 
-      {/* Hiển thị lỗi nếu có */}
       {errors.otp && <Text className="text-red-500 text-[14px] text-center font-medium mb-2">{errors.otp}</Text>}
       {errors.form && <Text className="text-red-500 font-medium text-center mb-2">{errors.form}</Text>}
 
-      <View className="items-center mb-6">
-        <Text className="text-[#9CA3AF] text-[15px] font-regular">Resend New Code 00:30</Text>
+      {/* BỔ SUNG: UI hiển thị đếm ngược và nút gửi lại OTP */}
+      <View className="items-center mb-6 h-[24px] justify-center">
+        {isLoading ? (
+          <View className="flex-row items-center">
+            <ActivityIndicator size="small" color="#E89B5A" className="mr-2" />
+            <Text className="text-[#9CA3AF] text-[15px] font-regular">Sending...</Text>
+          </View>
+        ) : otpTimer > 0 ? (
+          <Text className="text-[#9CA3AF] text-[15px] font-regular">
+            Resend New Code <Text className="font-semibold text-black">{formatTime(otpTimer)}</Text>
+          </Text>
+        ) : (
+          <TouchableOpacity onPress={handleRequestOtp} activeOpacity={0.7}>
+            <Text className="text-[#E89B5A] text-[16px] font-bold">
+              Resend New Code
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-
-      {/* Bàn phím ảo */}
       <View className="mt-auto pb-4">
         <View className="flex-row justify-between w-full">
           <KeyButton value="1" label="1" /><KeyButton value="2" label="2" /><KeyButton value="3" label="3" />

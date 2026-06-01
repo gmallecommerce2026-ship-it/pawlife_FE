@@ -159,36 +159,73 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
 
     // --- ADDRESS POPUP STATE & LOGIC ---
     const [showAddressPopup, setShowAddressPopup] = useState(false);
-    const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+    const [provinces, setProvinces] = useState<any[]>([]);
+    const [wardOptions, setWardOptions] = useState<string[]>([]);
+    
     const [tempCity, setTempCity] = useState('');
-    const [tempDistrict, setTempDistrict] = useState('');
     const [tempWard, setTempWard] = useState('');
     const [tempDetail, setTempDetail] = useState('');
 
+    // 1. Fetch Tỉnh/Thành (Tối ưu: chỉ fetch khi modal Report mở và chưa có data)
     useEffect(() => {
-        // Chỉ fetch data nếu Modal đang hiển thị (tối ưu hóa)
-        if (isVisible) {
-            fetch('https://provinces.open-api.vn/api/?depth=3')
+        if (isVisible && provinces.length === 0) {
+            fetch('https://provinces.open-api.vn/api/v2/p/')
                 .then(res => res.json())
-                .then(data => setAddressDataAPI(data))
-                .catch(e => console.error("Lỗi fetch địa chỉ:", e));
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        const hanoi = data.find((p: any) => p.codename === 'ha_noi');
+                        const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
+                        
+                        const remainingProvinces = data.filter(
+                            (p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh'
+                        );
+
+                        const priorityProvinces = [];
+                        if (hanoi) priorityProvinces.push(hanoi);
+                        if (hcm) priorityProvinces.push(hcm);
+
+                        setProvinces([...priorityProvinces, ...remainingProvinces]);
+                    }
+                })
+                .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
         }
-    }, [isVisible]);
+    }, [isVisible]); // Phụ thuộc vào isVisible
 
-    const cityOptions = addressDataAPI.map((c: any) => c.name);
-    const districtOptions = tempCity
-        ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.map((d: any) => d.name) || []
-        : [];
-    const wardOptions = tempDistrict
-        ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.find((d: any) => d.name === tempDistrict)?.wards?.map((w: any) => w.name) || []
-        : [];
+    const cityOptions = provinces.map((c: any) => c.name);
 
-    const handleConfirmAddress = () => {
-        if (!tempCity || !tempDistrict || !tempWard || !tempDetail.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.");
+    // 2. Fetch danh sách Phường/Xã khi chọn Tỉnh
+    useEffect(() => {
+        if (!tempCity) {
+            setWardOptions([]);
             return;
         }
-        const fullAddress = `${tempDetail.trim()}, ${tempWard}, ${tempDistrict}, ${tempCity}`;
+
+        const selectedProvince = provinces.find((p: any) => p.name === tempCity);
+        
+        if (selectedProvince && selectedProvince.code) {
+            fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        const allWards = data.map((ward: any) => ward.name);
+                        setWardOptions(allWards);
+                    }
+                })
+                .catch(e => console.error("Lỗi fetch chi tiết phường/xã:", e));
+        }
+    }, [tempCity, provinces]);
+
+    const handleConfirmAddress = () => {
+        if (!tempCity || !tempWard) {
+            Alert.alert("Thiếu thông tin", "Vui lòng chọn Tỉnh/Thành phố và Phường/Xã.");
+            return;
+        }
+        
+        let fullAddress = `${tempWard}, ${tempCity}`; 
+        if (tempDetail.trim()) {
+            fullAddress = `${tempDetail.trim()}, ${fullAddress}`;
+        }
+        
         setLocation(fullAddress);
         setShowAddressPopup(false);
     };
@@ -346,23 +383,11 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                                 options={cityOptions}
                                 onSelect={(val) => {
                                     setTempCity(val);
-                                    setTempDistrict('');
-                                    setTempWard('');
+                                    setTempWard(''); // Xoá dữ liệu xã khi đổi tỉnh
                                 }}
                             />
 
-                            <Label text="Quận / Huyện" required />
-                            <CustomDropdown
-                                placeholder="Chọn Quận/Huyện"
-                                value={tempDistrict}
-                                options={districtOptions}
-                                onSelect={(val) => {
-                                    setTempDistrict(val);
-                                    setTempWard('');
-                                }}
-                            />
-
-                            <Label text="Phường / Xã" required />
+                            <Label text="Quận/Huyện & Phường/Xã" required />
                             <CustomDropdown
                                 placeholder="Chọn Phường/Xã"
                                 value={tempWard}
@@ -370,7 +395,7 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
                                 onSelect={setTempWard}
                             />
 
-                            <Label text="Địa chỉ chi tiết" required />
+                            <Label text="Địa chỉ chi tiết (Tùy chọn)" />
                             <CustomInput
                                 placeholder="Số nhà, tên ngõ, tên đường..."
                                 value={tempDetail}

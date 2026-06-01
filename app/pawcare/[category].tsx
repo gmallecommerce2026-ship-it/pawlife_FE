@@ -1,11 +1,48 @@
 import { Text } from '@/components/AppText';
-import { AntDesign, Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, LayoutAnimation, Linking, Modal, Platform, ScrollView, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Keyboard, LayoutAnimation, Linking, Modal, Platform, ScrollView, TextInput, TouchableOpacity, TouchableWithoutFeedback, UIManager, View } from 'react-native';
+import Animated, {
+    interpolate,
+    interpolateColor,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming
+} from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import axiosClient from '../../api/axiosClient';
+const { width } = Dimensions.get('window');
+const AnimatedFeather = Animated.createAnimatedComponent(Feather);
+
+const translateTime = (timeStr?: string, t?: any) => {
+    if (!timeStr) return '';
+    if (!t) return timeStr;
+    
+    let str = timeStr.toLowerCase();
+    str = str.replace('just now', t('just now'));
+    str = str.replace('years', t('years'));
+    str = str.replace('year', t('year'));
+    str = str.replace('months', t('months'));
+    str = str.replace('month', t('month'));
+    str = str.replace('weeks', t('weeks'));
+    str = str.replace('week', t('week'));
+    str = str.replace('days', t('days'));
+    str = str.replace('day', t('day'));
+    str = str.replace('hours', t('hours'));
+    str = str.replace('hour', t('hour'));
+    str = str.replace('minutes', t('minutes'));
+    str = str.replace('minute', t('minute'));
+    str = str.replace('seconds', t('seconds'));
+    str = str.replace('second', t('second'));
+    str = str.replace('ago', t('ago'));
+    
+    return str;
+};
+
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -34,9 +71,9 @@ const ABOUT_DATA = {
 // ==========================================
 // 1. VIDEOS TAB CONTENT
 // ==========================================
-const VideosView = ({ data, category, loading, onPlayVideo }: any) => {
+const VideosView = ({ data, category, loading, onPlayVideo, t }: any) => {
     if (loading) return <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 50 }} />;
-    if (!data || data.length === 0) return <Text className="text-center mt-10 text-gray-500">Chưa có video nào phù hợp.</Text>;
+    if (!data || data.length === 0) return <Text className="text-center mt-10 text-gray-500">{t("No videos found.")}</Text>;
 
     const renderItem = ({ item }: { item: any }) => (
         <TouchableOpacity 
@@ -55,13 +92,12 @@ const VideosView = ({ data, category, loading, onPlayVideo }: any) => {
             </View>
             <View className="flex-1 ml-3 pr-2">
                 <View className="flex-row justify-between items-start">
+                    {/* Đã xóa nút 3 chấm ở đây */}
                     <Text className="text-gray-900 font-semibold text-[15px] leading-5 flex-1 mr-2" numberOfLines={2}>{item.title}</Text>
-                    <TouchableOpacity className="p-1 -mt-1 -mr-2 active:bg-gray-100 rounded-full">
-                        <MaterialCommunityIcons name="dots-vertical" size={20} color="#9CA3AF" />
-                    </TouchableOpacity>
                 </View>
                 <View className="mt-1">
-                    <Text className="text-gray-400 text-xs font-medium">{item.category || category} • {item.views} • {item.time}</Text>
+                    {/* Đã bọc item.time bằng translateTime */}
+                    <Text className="text-gray-400 text-xs font-medium">{item.category || category} • {item.views} • {translateTime(item.time, t)}</Text>
                 </View>
             </View>
         </TouchableOpacity>
@@ -81,7 +117,7 @@ const VideosView = ({ data, category, loading, onPlayVideo }: any) => {
 // ==========================================
 // 2. PLAYLISTS TAB CONTENT
 // ==========================================
-const PlaylistsView = ({ playlists, loading, searchQuery, onPlayVideo }: { playlists: any[], loading: boolean, searchQuery: string, onPlayVideo: (url: string) => void }) => {
+const PlaylistsView = ({ playlists, loading, searchQuery, onPlayVideo, t }: { playlists: any[], loading: boolean, searchQuery: string, onPlayVideo: (url: string) => void, t: any }) => {
     const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
 
     const handleSelectPlaylist = (item: any) => {
@@ -116,7 +152,8 @@ const PlaylistsView = ({ playlists, loading, searchQuery, onPlayVideo }: { playl
             </View>
             <View className="flex-1 ml-3 pr-2">
                 <Text className="text-gray-900 font-semibold text-[14px] leading-5" numberOfLines={2}>{item.title}</Text>
-                <Text className="text-gray-500 text-[11px] font-medium mt-1">{item.views} • {item.time}</Text>
+                {/* Dịch thời gian ở item video trong playlist */}
+                <Text className="text-gray-500 text-[11px] font-medium mt-1">{item.views} • {translateTime(item.time, t)}</Text>
             </View>
         </TouchableOpacity>
     );
@@ -219,6 +256,8 @@ export default function PawcareCategoryScreen() {
   const { category } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
 
+  const { t } = useLanguage();
+
   const categoryTitle = typeof category === 'string' ? category : 'Training';
 
   const [activeTab, setActiveTab] = useState('Videos');
@@ -231,7 +270,81 @@ export default function PawcareCategoryScreen() {
 
   // STATE: Quản lý ID của video đang được phát in-app
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+  
+  // SEARCH
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const searchAnimation = useSharedValue(0);
+  const inputRef = useRef<TextInput>(null);
 
+  const handleOpenSearch = () => {
+    // 1. Tự động chuyển về tab Videos nếu đang ở tab khác
+    if (activeTab !== 'Videos') {
+      setActiveTab('Videos');
+    }
+    
+    setIsSearchActive(true);
+    // 2. Chạy animation mở rộng
+    searchAnimation.value = withTiming(1, { duration: 300 });
+    // 3. Focus vào ô input sau khi mở
+    setTimeout(() => inputRef.current?.focus(), 300);
+  };
+
+  const handleCloseSearch = () => {
+    Keyboard.dismiss();
+    // Chạy animation thu nhỏ
+    searchAnimation.value = withTiming(0, { duration: 250 }, () => {
+      runOnJS(setIsSearchActive)(false);
+      runOnJS(setSearchQuery)(""); // Xóa text khi đóng
+    });
+  };
+
+  // --- ANIMATED STYLES ---
+  // Ẩn/hiện nút Back (scale nhỏ lại và mờ đi)
+  const backButtonStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.2], [1, 0]),
+    transform: [{ scale: interpolate(searchAnimation.value, [0, 0.2], [1, 0.8]) }],
+    zIndex: searchAnimation.value > 0 ? -1 : 1, // Đẩy xuống dưới khi ẩn để không chặn click
+  }));
+
+  // Ẩn/hiện Title ở giữa
+  const titleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
+  }));
+
+  // Container của thanh Search (kéo dài từ phải sang trái)
+  const searchContainerStyle = useAnimatedStyle(() => {
+    // Chiều dài thay đổi từ 40 (chỉ hiện icon) sang full chiều rộng (trừ margin)
+    const containerWidth = interpolate(searchAnimation.value, [0, 1], [40, width - 32]);
+    const backgroundColor = interpolateColor(
+      searchAnimation.value,
+      [0, 1],
+      ['transparent', '#F3F4F6'] // Từ trong suốt sang xám nhạt (bg-gray-100)
+    );
+
+    return {
+      width: containerWidth,
+      backgroundColor,
+      borderRadius: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 40,
+    };
+  });
+
+  const textInputStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.8, 1], [0, 0, 1]),
+    flex: 1,
+    display: searchAnimation.value === 0 ? 'none' : 'flex',
+  }));
+
+  const searchIconStyle = useAnimatedStyle(() => {
+    const color = interpolateColor(
+      searchAnimation.value,
+      [0, 1],
+      ['#1F2937', '#9CA3AF'] // Đen sậm sang Xám nhạt khi mở
+    );
+    return { color };
+  });
   const TABS = ['Videos', 'Playlists', 'About'];
 
   useEffect(() => {
@@ -293,41 +406,63 @@ export default function PawcareCategoryScreen() {
   return (
     <View className="flex-1 bg-white">
       <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
-        {/* HEADER */}
-        <View className="flex-row items-center justify-between px-4 py-2 border-b border-gray-50 bg-white z-10">
-            <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 active:bg-gray-100 rounded-full">
-                <AntDesign name="left" size={24} color="#1F2937" />
-            </TouchableOpacity>
-            
-            {isSearching ? (
-                <View className="flex-1 flex-row items-center bg-gray-100 rounded-lg px-3 mx-3 h-10">
-                    <TextInput
-                        className="flex-1 text-gray-900 text-[15px] py-0"
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        autoFocus
-                        placeholderTextColor="#9CA3AF"
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
-                            <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-            ) : (
-                <Text className="text-lg font-bold text-gray-900 tracking-tight">{categoryTitle}</Text>
-            )}
+        {/* VÙNG CHẠM ĐỂ TẮT KEYBOARD KHI ĐANG SEARCH */}
+        {isSearchActive && (
+        <TouchableWithoutFeedback onPress={handleCloseSearch}>
+            <View className="absolute inset-0 z-40 bg-transparent" />
+        </TouchableWithoutFeedback>
+        )}
 
-            <TouchableOpacity 
-                onPress={() => {
-                    setIsSearching(!isSearching);
-                    if (isSearching) setSearchQuery(''); 
-                }} 
-                className="p-2 -mr-2 active:bg-gray-100 rounded-full"
-            >
-                {isSearching ? <Text className="text-blue-500 font-medium">Hủy</Text> : <Feather name="search" size={22} color="#1F2937" />}
+        {/* HEADER */}
+        <View className="flex-row items-center justify-between px-4 py-2 border-b border-gray-50 bg-white z-50 h-[56px] relative">
+        
+        {/* Nút Back (Bị ẩn khi Search) */}
+        <Animated.View style={[backButtonStyle, { position: 'absolute', left: 16 }]}>
+            <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 active:bg-gray-100 rounded-full">
+            <Feather name="chevron-left" size={20} color="#000000" />
             </TouchableOpacity>
+        </Animated.View>
+
+        {/* Title ở giữa (Bị ẩn khi Search) */}
+        <Animated.View style={[titleStyle, { position: 'absolute', left: 0, right: 0, alignItems: 'center' }]} pointerEvents="none">
+            <Text className="text-lg font-bold text-gray-900 tracking-tight">{categoryTitle}</Text>
+        </Animated.View>
+
+        {/* Cụm Search Bar (Nằm bên phải và dãn ra) */}
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            {/* Chỉ hiển thị Search cụm này nếu KHÔNG PHẢI tab About */}
+            {activeTab !== 'About' && (
+            <Animated.View style={searchContainerStyle}>
+                
+                {/* Nút kính lúp */}
+                <TouchableOpacity 
+                onPress={isSearchActive ? undefined : handleOpenSearch} 
+                activeOpacity={isSearchActive ? 1 : 0.7}
+                className="w-[40px] h-[40px] items-center justify-center rounded-full"
+                >
+                <AnimatedFeather name="search" size={22} style={searchIconStyle} />
+                </TouchableOpacity>
+
+                {/* Ô Input (Hiện ra khi animate) */}
+                <Animated.View style={[textInputStyle, { paddingRight: 12 }]}>
+                <TextInput
+                    ref={inputRef}
+                    className="flex-1 text-gray-900 text-[15px] py-0 h-full"
+                    placeholder={t("Search videos...")} 
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholderTextColor="#9CA3AF"
+                />
+                {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
+                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
+                )}
+                </Animated.View>
+
+            </Animated.View>
+            )}
+        </View>
         </View>
 
         {/* TABS HEADER */}
@@ -344,8 +479,8 @@ export default function PawcareCategoryScreen() {
 
         {/* TABS CONTENT */}
         <View className="flex-1 bg-white">
-            {activeTab === 'Videos' && <VideosView data={filteredVideos} category={categoryTitle} loading={loading} onPlayVideo={handlePlayVideo} />}
-            {activeTab === 'Playlists' && <PlaylistsView playlists={filteredPlaylists} loading={loading} searchQuery={searchQuery} onPlayVideo={handlePlayVideo} />}
+            {activeTab === 'Videos' && <VideosView data={filteredVideos} category={categoryTitle} loading={loading} onPlayVideo={handlePlayVideo} t={t} />}
+            {activeTab === 'Playlists' && <PlaylistsView playlists={filteredPlaylists} loading={loading} searchQuery={searchQuery} onPlayVideo={handlePlayVideo} t={t} />}
             {activeTab === 'About' && <AboutView />}
         </View>
 

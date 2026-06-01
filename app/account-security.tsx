@@ -1,7 +1,7 @@
 // app/account-security.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-import { AntDesign, Feather } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useContext, useEffect, useState } from 'react';
@@ -235,7 +235,7 @@ export default function AccountSecurityScreen() {
               await axiosClient.delete('/auth/account');
               if (logout) await logout();
               Alert.alert("Success", "Your account has been permanently deleted.");
-              router.replace('/');
+              router.push('/');
             } catch (error) {
               console.error("Delete Error:", error);
               Alert.alert("Error", "Failed to delete account. Please try again later.");
@@ -272,7 +272,7 @@ export default function AccountSecurityScreen() {
               onValueChange={handleToggleFaceId}
             />
 
-            <View className="py-4">
+            {/* <View className="py-4">
               <View className="flex-row items-center justify-between">
                 <Text className="text-[16px] font-semibold text-black">Google Authenticator</Text>
                 <Switch
@@ -284,7 +284,7 @@ export default function AccountSecurityScreen() {
                   style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                 />
               </View>
-            </View>
+            </View> */}
           </View>
 
           {/* --- MANAGEMENT --- */}

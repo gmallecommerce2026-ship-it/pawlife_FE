@@ -3,18 +3,24 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import { Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
-import React, { useContext, useEffect, useState } from 'react';
-// IMPORT THÊM Keyboard và ScrollView
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+
+// THÊM MỚI: Hằng số thời gian đếm ngược (2 phút = 120 giây)
+const RESEND_OTP_TIME = 120; 
 
 export default function VerifyOtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams(); 
-  const { register } = useContext(AuthContext);
+  // Lưu ý: Đảm bảo trong AuthContext của bạn có hàm xử lý gọi API gửi lại OTP (vd: resendOtp)
+  const { register } = useContext(AuthContext) as any; // Thay as any bằng type thật của bạn
 
   const [code, setCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
+  // THÊM MỚI: State quản lý đếm ngược
+  const [timer, setTimer] = useState<number>(RESEND_OTP_TIME);
   
   const CODE_LENGTH = 6; 
 
@@ -22,6 +28,51 @@ export default function VerifyOtpScreen() {
   useEffect(() => {
     Keyboard.dismiss();
   }, []);
+
+  // THÊM MỚI: Logic đếm ngược an toàn, chống memory leak
+  useEffect(() => {
+    // SỬA LỖI TYPESCRIPT Ở DÒNG NÀY:
+    let interval: ReturnType<typeof setInterval>;
+    
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    }
+
+    // Cleanup function để clear interval khi unmount hoặc khi timer thay đổi
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [timer]);
+
+  // THÊM MỚI: Hàm format thời gian từ giây sang MM:SS
+  const formatTime = useCallback((totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, []);
+
+  // THÊM MỚI: Hàm xử lý gửi lại OTP
+  const handleResendOtp = async () => {
+    if (timer > 0 || isLoading) return; // Chặn spam click
+
+    try {
+      setIsLoading(true);
+      // Gọi API gửi lại OTP ở đây (Kết nối với NestJS)
+      // Ví dụ: await resendOtp({ email: params.email });
+      
+      console.log("Đã gọi API resend OTP cho:", params.email);
+      
+      // Reset lại bộ đếm về 2 phút
+      setTimer(RESEND_OTP_TIME);
+      Alert.alert("Success", "Mã OTP mới đã được gửi đến email của bạn.");
+    } catch (error: any) {
+      Alert.alert("Lỗi", error.message || "Không thể gửi lại OTP lúc này.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleKeyPress = (value: string) => {
     if (value === 'delete') {
@@ -141,18 +192,25 @@ export default function VerifyOtpScreen() {
             })}
           </View>
 
-          {isLoading ? (
-            <View className="items-center mb-8">
-              <ActivityIndicator size="small" color="#E89B5A" />
-              <Text className="text-[#9CA3AF] text-[15px] mt-2 font-regular">Verifying...</Text>
-            </View>
-          ) : (
-            <View className="items-center mb-8">
+          {/* CẬP NHẬT UI: Phần hiển thị nút Resend và Đếm ngược */}
+          <View className="items-center mb-8 h-[24px] justify-center">
+            {isLoading ? (
+              <View className="flex-row items-center">
+                <ActivityIndicator size="small" color="#E89B5A" className="mr-2" />
+                <Text className="text-[#9CA3AF] text-[15px] font-regular">Verifying...</Text>
+              </View>
+            ) : timer > 0 ? (
               <Text className="text-[#9CA3AF] text-[15px] font-regular">
-                Resend New Code 00:30
+                Resend New Code <Text className="font-semibold text-black">{formatTime(timer)}</Text>
               </Text>
-            </View>
-          )}
+            ) : (
+              <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.7}>
+                <Text className="text-[#E89B5A] text-[16px] font-bold">
+                  Resend New Code
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Keypad custom giữ nguyên */}
           <View className="mt-auto pb-8 pt-4">

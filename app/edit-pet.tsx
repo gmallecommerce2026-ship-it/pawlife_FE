@@ -1,4 +1,4 @@
-// app/edit-pet.tsx
+import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { useModalStore } from '@/store/useModalStore';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
@@ -30,6 +30,7 @@ type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
 type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
 
+// 1. ĐỒNG BỘ DANH SÁCH BREED TỪ ADD PET
 const BREED_OPTIONS: Record<string, { label: string; value: string }[]> = {
   Dog: [
     { label: 'Unknown Breed', value: 'Unknown Breed' },
@@ -42,12 +43,25 @@ const BREED_OPTIONS: Record<string, { label: string; value: string }[]> = {
     { label: 'Labrador Retriever', value: 'Labrador Retriever' },
     { label: 'Chihuahua', value: 'Chihuahua' },
     { label: 'French Bulldog', value: 'French Bulldog' },
-    { label: 'Husky', value: 'Husky' },
+    { label: 'Husky', value: 'Husky' }, 
     { label: 'Shiba Inu', value: 'Shiba Inu' },
     { label: 'Samoyed', value: 'Samoyed' },
     { label: 'Dachshund', value: 'Dachshund' },
     { label: 'Beagle', value: 'Beagle' },
     { label: 'Pug', value: 'Pug' },
+    { label: 'Border Collie', value: 'Border Collie' },
+    { label: 'Maltese', value: 'Maltese' },
+    { label: 'Yorkshire Terrier', value: 'Yorkshire Terrier' },
+    { label: 'Schnauzer', value: 'Schnauzer' },
+    { label: 'Chow Chow', value: 'Chow Chow' },
+    { label: 'Alaskan Malamute', value: 'Alaskan Malamute' },
+    { label: 'Akita', value: 'Akita' },
+    { label: 'Doberman', value: 'Doberman' },
+    { label: 'Rottweiler', value: 'Rottweiler' },
+    { label: 'German Shepherd', value: 'German Shepherd' },
+    { label: 'Phu Quoc Ridgeback', value: 'Phu Quoc Ridgeback' },
+    { label: 'Bac Ha Dog', value: 'Bac Ha Dog' },
+    { label: 'H’Mong Bobtail', value: 'H’Mong Bobtail' },
   ],
   Cat: [
     { label: 'Unknown Breed', value: 'Unknown Breed' },
@@ -61,6 +75,18 @@ const BREED_OPTIONS: Record<string, { label: string; value: string }[]> = {
     { label: 'Maine Coon', value: 'Maine Coon' },
     { label: 'Bengal', value: 'Bengal' },
     { label: 'Sphynx', value: 'Sphynx' },
+    { label: 'Russian Blue', value: 'Russian Blue' },
+    { label: 'Siamese', value: 'Siamese' },
+    { label: 'Exotic Shorthair', value: 'Exotic Shorthair' },
+    { label: 'Tabby Cat', value: 'Tabby Cat' },
+    { label: 'Orange Cat', value: 'Orange Cat' },
+    { label: 'Black Cat', value: 'Black Cat' },
+    { label: 'White Cat', value: 'White Cat' },
+    { label: 'Calico Cat', value: 'Calico Cat' },
+    { label: 'Tuxedo Cat', value: 'Tuxedo Cat' },
+    { label: 'Siamese Mix', value: 'Siamese Mix' },
+    { label: 'Long Hair', value: 'Long Hair' },
+    { label: 'Short Hair', value: 'Short Hair' },
   ]
 };
 
@@ -191,35 +217,64 @@ export default function EditPetScreen() {
   const [selectedVaccineIndex, setSelectedVaccineIndex] = useState<number | null>(null);
   const [isUploadingVaccine, setIsUploadingVaccine] = useState(false);
 
-  // State quản lý Address Popup
+  // 2. ĐỒNG BỘ POPUP ADDRESS (API V2 GIỐNG ADD PET)
   const [showAddressPopup, setShowAddressPopup] = useState(false);
-  const [addressDataAPI, setAddressDataAPI] = useState<any[]>([]);
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [wardOptions, setWardOptions] = useState<string[]>([]);
+  
   const [tempCity, setTempCity] = useState('');
-  const [tempDistrict, setTempDistrict] = useState('');
   const [tempWard, setTempWard] = useState('');
   const [tempDetail, setTempDetail] = useState('');
 
+  // Fetch Tỉnh/Thành
   useEffect(() => {
-    fetch('https://provinces.open-api.vn/api/?depth=3')
+    fetch('https://provinces.open-api.vn/api/v2/p/')
       .then(res => res.json())
-      .then(data => setAddressDataAPI(data))
-      .catch(e => console.error("Lỗi fetch địa chỉ:", e));
+      .then(data => {
+        if (Array.isArray(data)) {
+          const hanoi = data.find((p: any) => p.codename === 'ha_noi');
+          const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
+          const remainingProvinces = data.filter((p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh');
+          
+          const priorityProvinces = [];
+          if (hanoi) priorityProvinces.push(hanoi);
+          if (hcm) priorityProvinces.push(hcm);
+          setProvinces([...priorityProvinces, ...remainingProvinces]);
+        }
+      })
+      .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
   }, []);
 
-  const cityOptions = addressDataAPI.map((c: any) => c.name);
-  const districtOptions = tempCity 
-    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.map((d: any) => d.name) || [] 
-    : [];
-  const wardOptions = tempDistrict 
-    ? addressDataAPI.find((c: any) => c.name === tempCity)?.districts?.find((d: any) => d.name === tempDistrict)?.wards?.map((w: any) => w.name) || [] 
-    : [];
+  const cityOptions = provinces.map((c: any) => c.name);
 
-  const handleConfirmAddress = () => {
-    if (!tempCity || !tempDistrict || !tempWard || !tempDetail.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập địa chỉ chi tiết.");
+  // Fetch Phường/Xã
+  useEffect(() => {
+    if (!tempCity) {
+      setWardOptions([]);
       return;
     }
-    const fullAddress = `${tempDetail.trim()}, ${tempWard}, ${tempDistrict}, ${tempCity}`;
+    const selectedProvince = provinces.find((p: any) => p.name === tempCity);
+    if (selectedProvince && selectedProvince.code) {
+      fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setWardOptions(data.map((ward: any) => ward.name));
+          }
+        })
+        .catch(e => console.error("Lỗi fetch phường/xã:", e));
+    }
+  }, [tempCity, provinces]);
+
+  const handleConfirmAddress = () => {
+    if (!tempCity || !tempWard) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn Tỉnh/Thành phố và Phường/Xã.");
+      return;
+    }
+    let fullAddress = `${tempWard}, ${tempCity}`; 
+    if (tempDetail.trim()) {
+      fullAddress = `${tempDetail.trim()}, ${fullAddress}`;
+    }
     handleChange('contactAddress', fullAddress);
     setShowAddressPopup(false);
   };
@@ -256,7 +311,7 @@ export default function EditPetScreen() {
           species: data.species || 'Dog',
           breed: data.breed || '',
           color: data.color || '',
-          size: data.size,
+          size: data.size || 'MEDIUM',
           weight: data.weight ? data.weight.toString() : '',
           dob: data.dob ? new Date(data.dob).toISOString() : '',
           microchip: data.microchipNumber || '',
@@ -296,13 +351,14 @@ export default function EditPetScreen() {
       }
 
       let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Chỉnh sửa chuẩn Enum
         allowsMultipleSelection: true,
         selectionLimit: remainingSlots,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets) {
+        // Edit Pet: Vẫn lưu URI file local lại để hiện thanh "Ready to upload" và nút xoá
         const newLocalUrls = result.assets.slice(0, remainingSlots).map(asset => asset.uri);
         handleChange('vaccinationRecordUrls', [
           ...formData.vaccinationRecordUrls,
@@ -313,11 +369,6 @@ export default function EditPetScreen() {
       console.error("Lỗi khi chọn ảnh:", error);
       Alert.alert("Lỗi", "Không thể mở thư viện ảnh.");
     }
-  };
-
-  const handlePickQR = async () => {
-    const uploadedUrl = await pickQR({ folder: 'qr-codes', aspect: [1, 1], quality: 0.8 });
-    if (uploadedUrl) handleChange('qrCodeUrl', uploadedUrl);
   };
 
   const handleChange = (field: keyof EditPetFormData, value: any) => {
@@ -341,7 +392,71 @@ export default function EditPetScreen() {
 
     try {
       setIsSubmitting(true);
+
+      // 3. THỰC THI UPLOAD FILE:// TẠI ĐÂY TRƯỚC KHI GỌI API SERVER
+      const existingUrls = formData.vaccinationRecordUrls.filter(url => url.startsWith('http'));
+      const localUris = formData.vaccinationRecordUrls.filter(url => !url.startsWith('http'));
+
+      let successfulNewUrls: string[] = [];
+
+      if (localUris.length > 0) {
+        setIsUploadingVaccine(true); // Hiển thị Loading UI cho file local
+        
+        const uploadPromises = localUris.map(async (uri) => {
+          try {
+            const filename = uri.split('/').pop() || `vaccine-${Date.now()}.jpg`;
+            const match = /\.(\w+)$/.exec(filename);
+            const ext = match ? match[1].toLowerCase() : 'jpeg';
+
+            let type = 'image/jpeg';
+            if (ext === 'png') type = 'image/png';
+            else if (ext === 'webp') type = 'image/webp';
+
+            // Gọi API lấy Presigned URL
+            const presignedRes = await axiosClient.post('/storage/presigned-url', {
+              fileName: filename,
+              fileType: type,
+              folder: 'vaccines'
+            });
+
+            const { uploadUrl, fileUrl } = presignedRes.data;
+
+            const localFileFetch = await fetch(uri);
+            const fileBlob = await localFileFetch.blob();
+
+            // PUT thẳng lên R2
+            const uploadRes = await fetch(uploadUrl, {
+              method: 'PUT',
+              headers: { 'Content-Type': type },
+              body: fileBlob
+            });
+
+            if (!uploadRes.ok) throw new Error('Upload R2 failed');
+
+            return fileUrl;
+          } catch (fileError) {
+            console.error(`[Upload Lỗi] Không thể upload ảnh ${uri}:`, fileError);
+            return null; // Bỏ qua file bị lỗi
+          }
+        });
+
+        const uploadedResults = await Promise.all(uploadPromises);
+        successfulNewUrls = uploadedResults.filter((url): url is string => url !== null);
+
+        if (successfulNewUrls.length < localUris.length) {
+          Alert.alert("Cảnh báo", "Một số ảnh tiêm chủng không thể tải lên. Dữ liệu sẽ chỉ lưu các ảnh thành công.");
+        }
+      }
+
+      // Gộp ảnh cũ + ảnh vừa upload thành công
+      const finalVaccineUrls = [...existingUrls, ...successfulNewUrls];
       
+      // Mẹo an toàn: Cập nhật lại form state ở đây, đề phòng đoạn code petService.updatePet bị lỗi,
+      // thì lần bấm Submit tiếp theo người dùng sẽ không bị upload lặp các file đã đẩy R2 thành công.
+      setFormData(prev => ({ ...prev, vaccinationRecordUrls: finalVaccineUrls }));
+
+      // ----------------------------------------------------------- //
+
       const payload: any = {
         name: formData.name,
         species: formData.species,
@@ -349,14 +464,14 @@ export default function EditPetScreen() {
         gender: formData.gender !== 'UNKNOWN' ? formData.gender : null,
         color: formData.color || null,
         weight: formData.weight ? parseFloat(formData.weight) : null,
+        size: formData.size || null,
         microchipNumber: formData.microchip || null,
         description: formData.description || null,
         contactName: formData.contactName || null,
         contactPhone: formData.contactPhone || null,
         contactAddress: formData.contactAddress || null,
         images: formData.imageUrl ? [formData.imageUrl] : [],
-        // Chú ý: Cần update logic upload R2 cho mảng này giống màn Add Pet trước khi gọi hàm dưới
-        vaccinationRecordUrls: formData.vaccinationRecordUrls.length > 0 ? formData.vaccinationRecordUrls : [],
+        vaccinationRecordUrls: finalVaccineUrls, // Mảng sạch (toàn http)
         qrCodeUrl: formData.qrCodeUrl || null,
         isSpayedNeutered: formData.sterilized !== null ? formData.sterilized : null,
       };
@@ -378,6 +493,7 @@ export default function EditPetScreen() {
       Alert.alert('Error', error.message || 'Failed to update pet. Please try again.');
     } finally {
       setIsSubmitting(false);
+      setIsUploadingVaccine(false);
     }
   };
 
@@ -470,7 +586,7 @@ export default function EditPetScreen() {
                       value={formData.species}
                       onChange={(item) => {
                         handleChange('species', item.value);
-                        handleChange('breed', '');
+                        handleChange('breed', ''); // Reset breed khi đổi loại
                       }}
                     />
                   </View>
@@ -656,31 +772,35 @@ export default function EditPetScreen() {
                 </TouchableOpacity>
               )}
 
+              {/* Progress UI hiển thị khi ấn Save Changes và có file:// cần upload */}
               {isUploadingVaccine && (
                 <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mt-2">
                   <View className='flex-row items-center mb-3'>
                     <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
                     <View className="flex-1 ml-3">
                       <View className="flex-row justify-between items-center">
-                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>Uploading file...</Text>
+                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
+                          Uploading files...
+                        </Text>
                       </View>
                       <View className="flex-row items-center mt-1">
                         <View className="flex-row items-center">
                           <ActivityIndicator color="#E89B5A" style={{ transform: [{ scaleX: 0.6 }, { scaleY: 0.6 }] }} />
-                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">Please wait...</Text>
+                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">
+                            Please wait...
+                          </Text>
                         </View>
                       </View>
                     </View>
                   </View>
+                  
                   <View className="h-1.5 bg-[#E3E3E4] rounded-full ">
-                    <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '45%' }} />
+                    <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '100%' }} />
                   </View>
                 </View>
               )}
 
-              {/* LIST FILE THÔNG MINH KẾT HỢP HAI LOẠI ICON */}
               {formData.vaccinationRecordUrls.map((url, index) => {
-                // Kiểm tra nếu url không chứa http (Tức là file vừa chọn dưới dạng local file://)
                 const isLocalFile = !url.startsWith('http');
 
                 return (
@@ -692,11 +812,9 @@ export default function EditPetScreen() {
                           vaccination_record_{index + 1}.jpg
                         </Text>
                         
-                        {/* =========================================== */}
-                        {/* HIỂN THỊ LOGIC TÙY CHỌN DỰA THEO LOẠI FILE */}
-                        {/* =========================================== */}
-                        {isLocalFile ? (
-                          // File vừa tải lên -> Icon thùng rác xóa nhanh
+                        {/* ==================================================== */}
+                        {/* ĐÃ COMMENT BUTTON 3 CHẤM CŨ THEO YÊU CẦU             */}
+                        {/* {isLocalFile ? (
                           <TouchableOpacity
                             onPress={() => {
                               const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== index);
@@ -707,7 +825,6 @@ export default function EditPetScreen() {
                             <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
                           </TouchableOpacity>
                         ) : (
-                          // File cũ từ máy chủ -> Icon 3 chấm mở Modal
                           <TouchableOpacity
                             onPress={(e) => {
                               e.stopPropagation();
@@ -721,6 +838,19 @@ export default function EditPetScreen() {
                             <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
                           </TouchableOpacity>
                         )}
+                        */}
+                        {/* ==================================================== */}
+
+                        {/* LUÔN HIỂN THỊ NÚT XÓA BẤT KỂ LÀ LOCAL HAY REMOTE */}
+                        <TouchableOpacity
+                          onPress={() => {
+                            const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== index);
+                            handleChange('vaccinationRecordUrls', newUrls);
+                          }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                        </TouchableOpacity>
 
                       </View>
                       <View className="flex-row items-center mt-1">
@@ -744,9 +874,9 @@ export default function EditPetScreen() {
               <TouchableOpacity
                 onPress={handleSubmit}
                 disabled={isSubmitting || isUploadingAvatar || isUploadingVaccine || isUploadingQR}
-                className="bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm"
+                className={`bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm ${(isSubmitting || isUploadingVaccine) ? 'opacity-70' : ''}`}
               >
-                {isSubmitting ? (
+                {(isSubmitting || isUploadingVaccine) ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <Text className="text-white font-semibold text-[16px]">Save Changes</Text>
@@ -755,7 +885,7 @@ export default function EditPetScreen() {
 
               <TouchableOpacity
                 onPress={() => router.back()}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingVaccine}
                 className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-5"
               >
                 <Text className="text-[#9CA3AF] font-medium text-[16px]">Cancel</Text>
@@ -803,7 +933,7 @@ export default function EditPetScreen() {
         )
       )}
 
-      {/* --- MENU MODAL (CHỈ HIỂN THỊ CHO FILE ĐÃ CÓ TRÊN SERVER) --- */}
+      {/* --- MENU MODAL CHỈ HIỆN KHI BẤM DẤU 3 CHẤM NÊN KHÔNG ĐƯỢC GỌI NỮA --- */}
       <Modal
         visible={showVaccineMenu}
         animationType="fade"
@@ -827,7 +957,6 @@ export default function EditPetScreen() {
               shadowRadius: 10
             }}
           >
-            {/* Option 1: Replace */}
             <TouchableOpacity
               className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
@@ -835,30 +964,54 @@ export default function EditPetScreen() {
               onPress={async () => {
                 setShowVaccineMenu(false);
                 if (selectedVaccineIndex === null) return;
-
                 try {
                   let result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ['images'],
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     quality: 0.8,
                   });
-
                   if (!result.canceled && result.assets) {
-                    const newUrl = result.assets[0].uri;
+                    setIsUploadingVaccine(true);
+                    const asset = result.assets[0];
+                    const filename = asset.uri.split('/').pop() || `vaccine-${Date.now()}.jpg`;
+                    const match = /\.(\w+)$/.exec(filename);
+                    const ext = match ? match[1].toLowerCase() : 'jpeg';
+                    let type = 'image/jpeg';
+                    if (ext === 'png') type = 'image/png';
+                    else if (ext === 'webp') type = 'image/webp';
                     
+                    const presignedRes = await axiosClient.post('/storage/presigned-url', {
+                      fileName: filename,
+                      fileType: type,
+                      folder: 'vaccines'
+                    });
+                    
+                    const { uploadUrl, fileUrl } = presignedRes.data;
+                    const localFileFetch = await fetch(asset.uri);
+                    const fileBlob = await localFileFetch.blob();
+                    
+                    const uploadRes = await fetch(uploadUrl, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': type },
+                      body: fileBlob
+                    });
+
+                    if (!uploadRes.ok) throw new Error('Upload R2 thất bại');
+
                     const newUrlsList = [...formData.vaccinationRecordUrls];
-                    newUrlsList[selectedVaccineIndex] = newUrl;
-                    
+                    newUrlsList[selectedVaccineIndex] = fileUrl; 
                     handleChange('vaccinationRecordUrls', newUrlsList);
                   }
                 } catch (error) {
+                  console.error("Lỗi thay thế file:", error);
                   Alert.alert("Lỗi", "Không thể tải lên lúc này.");
+                } finally {
+                  setIsUploadingVaccine(false);
                 }
               }}
             >
               <Text className="text-[14px] text-gray-700 ml-3 font-regular">Replace file</Text>
             </TouchableOpacity>
 
-            {/* Option 2: View */}
             <TouchableOpacity
               className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
@@ -877,7 +1030,6 @@ export default function EditPetScreen() {
               <Text className="text-[14px] text-gray-700 ml-3 font-regular">View file</Text>
             </TouchableOpacity>
 
-            {/* Option 3: Delete */}
             <TouchableOpacity
               className="flex-row items-center px-2 py-3"
               activeOpacity={0.6}
@@ -895,7 +1047,7 @@ export default function EditPetScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* --- POPUP ADDRESS MODAL --- */}
+      {/* --- POPUP ADDRESS MODAL (ĐÃ ĐỒNG BỘ TỪ ADD-PET) --- */}
       <Modal visible={showAddressPopup} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center px-4">
           <View className="bg-white rounded-[24px] p-6 shadow-2xl max-h-[85%]">
@@ -911,23 +1063,11 @@ export default function EditPetScreen() {
                 options={cityOptions}
                 onSelect={(val) => {
                   setTempCity(val);
-                  setTempDistrict('');
-                  setTempWard('');
+                  setTempWard(''); // Cần reset Phường Xã khi đổi Tỉnh
                 }}
               />
 
-              <Label text="Quận / Huyện" required />
-              <CustomDropdown
-                placeholder="Chọn Quận/Huyện"
-                value={tempDistrict}
-                options={districtOptions}
-                onSelect={(val) => {
-                  setTempDistrict(val);
-                  setTempWard('');
-                }}
-              />
-
-              <Label text="Phường / Xã" required />
+              <Label text="Quận/Huyện & Phường/Xã" required />
               <CustomDropdown
                 placeholder="Chọn Phường/Xã"
                 value={tempWard}
@@ -935,7 +1075,7 @@ export default function EditPetScreen() {
                 onSelect={setTempWard}
               />
 
-              <Label text="Địa chỉ chi tiết" required />
+              <Label text="Địa chỉ chi tiết (Tùy chọn)" />
               <CustomInput
                 placeholder="Số nhà, tên ngõ, tên đường..."
                 value={tempDetail}

@@ -2,6 +2,7 @@
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { useImageUpload } from '@/hooks/useImageUpload';
+import { calculateAge } from '@/utils/dateHelper';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,7 +11,6 @@ import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { calculateAge } from '@/utils/dateHelper';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 

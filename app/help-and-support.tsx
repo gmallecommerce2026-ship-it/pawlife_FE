@@ -1,6 +1,6 @@
 // app/help-center.tsx
 import { Text } from '@/components/AppText';
-import { AntDesign, Feather } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Image, ScrollView, TouchableOpacity, View } from 'react-native';

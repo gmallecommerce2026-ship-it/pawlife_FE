@@ -1,19 +1,20 @@
 // app/favorite-pets.tsx
 import { Text } from '@/components/AppText';
-import { AntDesign, Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, TouchableOpacity, View, TextInput } from 'react-native';
+import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, Image, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  interpolate,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  interpolate,
-  interpolateColor
-} from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 // Đồng bộ chính xác margin/padding với màn hình Search (width - paddingX - gap) / 2
@@ -29,56 +30,85 @@ const AnimatedFeather = Animated.createAnimatedComponent(Feather);
 // 1. PURE COMPONENTS (Tối ưu render lại với memo)
 // =========================================================================
 
-const FavoritePetCard = memo(({ item, onPress, onUnfavorite }: { item: any; onPress: (item: any) => void; onUnfavorite: (id: string) => void }) => (
-  <TouchableOpacity
-    className="bg-transparent mb-[21px]"
-    style={{ width: COLUMN_WIDTH }}
-    activeOpacity={0.9}
-    onPress={() => onPress(item)}
-  >
-    <View className="relative">
-      <Image
-        source={{ uri: item.images?.[0]?.url || item.avatarUrl || 'https://via.placeholder.com/600' }}
-        className="w-full aspect-square rounded-[24px] bg-gray-100"
-        style={{ height: COLUMN_WIDTH }} // Backup cho aspect-square
-        resizeMode="cover"
-      />
+const FavoritePetCard = memo(({ item, onPress, onUnfavorite }: { item: any; onPress: (item: any) => void; onUnfavorite: (id: string) => void }) => {
+  
+  // 1. TÍNH TOÁN TUỔI TỪ NGÀY SINH (dob)
+  const petAge = useMemo(() => {
+    if (!item.dob) return 'Unknown age';
+    
+    const dob = new Date(item.dob);
+    const today = new Date();
+    
+    let years = today.getFullYear() - dob.getFullYear();
+    let months = today.getMonth() - dob.getMonth();
+    
+    if (months < 0 || (months === 0 && today.getDate() < dob.getDate())) {
+      years--;
+      months += 12;
+    }
 
-      {/* Sticker giống bên Search */}
-      {item.sticker && (
-        <View className="absolute top-1/2 left-1/2 -ml-8 -mt-4 opacity-90">
-          <MaterialCommunityIcons name="glasses" size={60} color="white" />
-        </View>
-      )}
+    if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
+    if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
+    
+    // Nếu dưới 1 tháng tuổi
+    const days = Math.floor((today.getTime() - dob.getTime()) / (1000 * 60 * 60 * 24));
+    return days > 0 ? `${days} day${days > 1 ? 's' : ''}` : 'Newborn';
+  }, [item.dob]);
 
-      {/* Nút Unfavorite (Trái tim) được thiết kế lại gọn gàng góc phải */}
-      <TouchableOpacity
-        onPress={() => onUnfavorite(item.id)}
-        className="absolute top-3 right-3 p-2 rounded-full z-10 shadow-sm"
-        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-      >
-        <AntDesign name="heart" size={16} color="#E89B5A" />
-      </TouchableOpacity>
-    </View>
+  // 2. CHUẨN HÓA GIỚI TÍNH (Đưa về IN HOA để khớp với DB Enum MALE/FEMALE)
+  const isMale = item.gender?.toUpperCase() === 'MALE';
 
-    <View className="pt-[12px]">
-      <Text className="text-gray-900 font-semibold text-[16px] mb-1" numberOfLines={1}>
-        {item.name}
-      </Text>
-      <View className="flex-row items-center">
+  return (
+    <TouchableOpacity
+      className="bg-transparent mb-[21px]"
+      style={{ width: COLUMN_WIDTH }}
+      activeOpacity={0.9}
+      onPress={() => onPress(item)}
+    >
+      <View className="relative">
         <Image
-          className=''
-          source={item.gender === 'male' ? require('../assets/icon/female.png') : require('../assets/icon/male.png')}
-          style={{ width: 10, height: 10 }}
+          source={{ uri: item.images?.[0]?.url || item.avatarUrl || 'https://via.placeholder.com/600' }}
+          className="w-full aspect-square rounded-[24px] bg-gray-100"
+          style={{ height: COLUMN_WIDTH }}
           resizeMode="cover"
         />
-        <Text className="text-gray-400 text-[12px] font-regular mt-0.5 ml-1.5" numberOfLines={1}>
-          {item.age || '2 years'} · {item.breed || 'Unknown'}
-        </Text>
+
+        {item.sticker && (
+          <View className="absolute top-1/2 left-1/2 -ml-8 -mt-4 opacity-90">
+            <MaterialCommunityIcons name="glasses" size={60} color="white" />
+          </View>
+        )}
+
+        <TouchableOpacity
+          onPress={() => onUnfavorite(item.id)}
+          className="absolute top-3 right-3 p-2 rounded-full z-10 shadow-sm"
+          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+        >
+          <AntDesign name="heart" size={16} color="#E89B5A" />
+        </TouchableOpacity>
       </View>
-    </View>
-  </TouchableOpacity>
-));
+
+      <View className="pt-[12px]">
+        <Text className="text-gray-900 font-semibold text-[16px] mb-1" numberOfLines={1}>
+          {item.name}
+        </Text>
+        <View className="flex-row items-center">
+          
+          <Image
+            source={isMale ? require('../assets/icon/male.png') : require('../assets/icon/female.png')}
+            style={{ width: 10, height: 10 }}
+            resizeMode="cover"
+          />
+          
+          <Text className="text-gray-400 text-[12px] font-regular mt-0.5 ml-1.5" numberOfLines={1}>
+            {petAge} · {item.breed || 'Unknown'}
+          </Text>
+          
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 const FilterTab = memo(({ title, isActive, onPress }: { title: TabType; isActive: boolean; onPress: (tab: TabType) => void }) => (
   <TouchableOpacity
@@ -100,8 +130,8 @@ const FilterTab = memo(({ title, isActive, onPress }: { title: TabType; isActive
 
 export default function FavoritePetsScreen() {
   const router = useRouter();
-  const [favorites, setFavorites] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [activeTab, setActiveTab] = useState<TabType>('All');
   // 1. State cho Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -171,73 +201,76 @@ export default function FavoritePetsScreen() {
     marginLeft: interpolate(searchAnimation.value, [0, 1], [0, 8]),
   }));
 
-  const fetchFavorites = useCallback(async () => {
-    try {
-      setLoading(true);
+  // 3. REACT QUERY: Fetch Favorites
+  const { data: favorites = [], isLoading: loading } = useQuery({
+    queryKey: ['favorite-pets'],
+    queryFn: async () => {
       const res = await petService.getFavorites();
-
       let favoritesArray = [];
       if (Array.isArray(res)) favoritesArray = res;
       else if (res?.data && Array.isArray(res.data)) favoritesArray = res.data;
       else if (res?.items && Array.isArray(res.items)) favoritesArray = res.items;
       else if (res?.favorites && Array.isArray(res.favorites)) favoritesArray = res.favorites;
-
-      setFavorites(favoritesArray);
-    } catch (error) {
-      console.error('Lỗi khi tải danh sách yêu thích:', error);
-      setFavorites([]);
-    } finally {
-      setLoading(false);
+      return favoritesArray;
     }
-  }, []);
+  });
 
-  useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
-
-  // Lọc dữ liệu Local thông qua useMemo (Tối ưu hiệu năng, không gọi lại logic lọc nếu data/tab không đổi)
-  const filteredFavorites = useMemo(() => {
-    if (activeTab === 'All') return favorites;
-    // Giả định API trả về field type là 'DOG' hoặc 'CAT'
-    return favorites.filter(pet => pet.type?.toUpperCase() === activeTab.toUpperCase());
-  }, [favorites, activeTab]);
-
+  // 4. Lọc dữ liệu
   const filteredPets = useMemo(() => {
-    return favorites.filter(pet => {
-      const matchesTab = activeTab === 'All' ? true : pet.species === activeTab;
-      const matchesSearch = pet.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
+    return favorites.filter((pet: any) => {
+      const matchesTab = activeTab === 'All' 
+        ? true 
+        : (pet.species || pet.type)?.toUpperCase() === activeTab.toUpperCase();
+      
+      const safeName = pet.name || '';
+      const matchesSearch = safeName.toLowerCase().includes(searchQuery.toLowerCase().trim());
+      
       return matchesTab && matchesSearch;
     });
   }, [favorites, activeTab, searchQuery]);
 
   // Sử dụng useCallback để tránh việc Card bị re-render không cần thiết
   const handlePetPress = useCallback((item: any) => {
-    router.push({ pathname: '/shelter-pet-detail', params: { id: item.id } });
+    router.push({ pathname: '/pet-detail-modal', params: { id: item.id } });
   }, [router]);
 
-  const handleUnfavorite = useCallback(async (petId: string) => {
-    // Cập nhật UI ngay lập tức (Optimistic UI Update)
-    setFavorites((prev) => {
-      const petExists = prev.find(p => p.id === petId);
-      if (!petExists) return prev;
+  // 5. REACT QUERY MUTATION: Handle Unfavorite
+  const unfavoriteMutation = useMutation({
+    mutationFn: (petId: string) => petService.unfavoritePet(petId),
+    onMutate: async (deletedId) => {
+      // Dừng các query đang fetch
+      await queryClient.cancelQueries({ queryKey: ['favorite-pets'] });
+      // Lưu lại cache cũ
+      const previousFavorites = queryClient.getQueryData(['favorite-pets']);
+      // Cập nhật Optimistic
+      queryClient.setQueryData(['favorite-pets'], (old: any[]) => 
+        old ? old.filter((pet) => pet.id !== deletedId) : []
+      );
+      return { previousFavorites };
+    },
+    onError: (err, variables, context) => {
+      // Rollback nếu có lỗi
+      console.error('Lỗi khi bỏ yêu thích:', err);
+      if (context?.previousFavorites) {
+        queryClient.setQueryData(['favorite-pets'], context.previousFavorites);
+      }
+    },
+    onSettled: () => {
+      // Sync lại với server sau khi kết thúc
+      queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
+    }
+  });
 
-      // Gọi API ngầm ở background
-      petService.unfavoritePet(petId).catch((error) => {
-        console.error('Lỗi khi bỏ yêu thích:', error);
-        // Nếu API lỗi, fetch lại data để đảm bảo tính đồng bộ
-        fetchFavorites();
-      });
-
-      return prev.filter((pet) => pet.id !== petId);
-    });
-  }, [fetchFavorites]);
+  const handleUnfavorite = useCallback((petId: string) => {
+    unfavoriteMutation.mutate(petId);
+  }, [unfavoriteMutation]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       {/* Header */}
       <View style={{ height: 44, justifyContent: 'center', marginBottom: 16, marginTop: 8 }}>
 
-        {/* 1. NÚT BACK (GIỮ NGUYÊN STYLE KÍNH MỜ CỦA BẠN) */}
+        {/* 1. NÚT BACK */}
         <Animated.View style={[backButtonStyle, { position: 'absolute', left: 20 }]}>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -273,8 +306,6 @@ export default function FavoritePetsScreen() {
         <Animated.View style={[headerTitleStyle, { position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }]}>
           <Text className="text-[20px] font-semibold text-black">Favorite Pets</Text>
         </Animated.View>
-
-        
 
       </View>
 
@@ -317,14 +348,13 @@ export default function FavoritePetsScreen() {
                   <TouchableOpacity
                     className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50"
                     activeOpacity={0.7}
-                    onPress={() => router.push('/')}
+                    onPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })}
                   >
                     <Text className="text-[#8E8E93] font-medium">Browse pets</Text>
                   </TouchableOpacity>
                 </View>
               );
             }
-
           }}
           renderItem={({ item }) => (
             <FavoritePetCard

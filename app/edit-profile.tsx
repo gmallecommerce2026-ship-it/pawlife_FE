@@ -21,9 +21,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // IMPORT CONTEXT AND HOOKS
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { disconnectSocket } from '@/utils/socket';
 import { AuthContext } from '../contexts/AuthContext';
 import { useImageUpload } from '../hooks/useImageUpload';
-import { disconnectSocket } from '@/utils/socket';
 
 // --- CONSTANTS ---
 const COUNTRY_CODES = [
@@ -192,7 +192,7 @@ export default function EditProfileScreen() {
                 // BỔ SUNG: Ngắt kết nối socket ngay lập tức
                 disconnectSocket();
                 
-                router.replace('/');
+                router.push('/');
               } catch (error) {
                 Alert.alert(t('Error'), t('Unable to log out. Please try again!'));
               }
@@ -274,7 +274,7 @@ export default function EditProfileScreen() {
               activeOpacity={0.8}
             >
               <Image
-                source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }}
+                source={{ uri: user?.avatarUrl || 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg' || '/assets/images/default-avatar.jpg' }}
                 className="w-[106px] h-[106px] rounded-[50px] border border-[#F3F4F6] bg-[#E5E7EB]"
                 resizeMode="cover"
               />

@@ -12,6 +12,7 @@ import { ActivityIndicator, Animated, Dimensions, Easing, StyleSheet, TouchableO
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, Mask, Rect } from 'react-native-svg';
 // 1. IMPORT CỦA BẠN VÀO ĐÂY
+import { QRGuideModal } from '@/components/QRGuideModal';
 import { useModalStore } from '@/store/useModalStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -28,6 +29,7 @@ export default function ScanScreen() {
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const isFocused = useIsFocused(); 
+  const [showGuideModal, setShowGuideModal] = useState(false);
   // 2. KHAI BÁO STATE GỌI MODAL
   const showModal = useModalStore((state) => state.showModal);
 
@@ -111,7 +113,7 @@ export default function ScanScreen() {
         // LUỒNG 1: THÊM PET MỚI
         if (isAddingPet) {
           setTimeout(() => {
-            router.push({
+            router.replace({
               pathname: '/add-pet',
               params: { tagId: finalTagId, rawQrData: data } 
             });
@@ -165,7 +167,7 @@ export default function ScanScreen() {
         // LUỒNG 4: QUÉT PET LẠC BÌNH THƯỜNG
         else {
           setTimeout(() => {
-            router.push({
+            router.replace({
               pathname: '/scanned-pet',
               params: { tagId: finalTagId } 
             });
@@ -263,7 +265,11 @@ export default function ScanScreen() {
         
         {/* Nút How to Scan (Đặt cách khung quét 64px) */}
         <View style={{ position: 'absolute', top: boxY - 64, left: 0, right: 0, alignItems: 'center' }}>
-          <TouchableOpacity className="px-6 py-2.5 flex-row items-center justify-center gap-2">
+          <TouchableOpacity 
+            activeOpacity={0.7}
+            onPress={() => setShowGuideModal(true)} // GẮN SỰ KIỆN Ở ĐÂY
+            className="px-6 py-2.5 flex-row items-center justify-center gap-2 bg-black/40 rounded-full border border-white/10" // Cải thiện chút UI cho nút nổi bật hơn trên nền camera
+          >
             <Feather 
                 name="alert-circle" 
                 size={16} 
@@ -316,8 +322,8 @@ export default function ScanScreen() {
 
         {/* Text hướng dẫn (Đặt phía dưới khung quét 40px) */}
         <View style={{ position: 'absolute', top: boxY + BOX_SIZE + 40, left: 0, right: 0, alignItems: 'center' }}>
-          <Text className="text-[#8E8E93] text-center text-[14px] font-regular leading-relaxed">
-            Move QR Code to the camera center{'\n'}for automatic scanning
+          <Text className="text-[#8E8E93] text-center text-[14px] font-regular leading-relaxed px-[90px]">
+            Move QR Code to the camera center for automatic scanning
           </Text>
         </View>
       </View>
@@ -354,6 +360,11 @@ export default function ScanScreen() {
 
         </View>
       </SafeAreaView>
+
+      <QRGuideModal 
+        visible={showGuideModal} 
+        onClose={() => setShowGuideModal(false)} 
+      />
     </View>
   );
 }

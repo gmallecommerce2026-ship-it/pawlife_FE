@@ -1,12 +1,14 @@
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, FontAwesome5, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, LayoutAnimation, Linking, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Image, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -37,7 +39,7 @@ const MOCK_PAW_HISTORY = [
     title: 'DHPP Vaccination',
     date: '01/01/2026',
     description: 'Vaccinated: hepatitis, rabies, parvo, and parainfluenza',
-    icon: 'user', // Bạn có thể đổi thành 'syringe' cho hợp ngữ cảnh y tế
+    icon: 'syringe', 
     color: '#5A90DA', // Xanh dương
     bgColor: '#E8F1FF'
   },
@@ -65,14 +67,13 @@ export default function PetProfileDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const petId = params.id as string;
+  const insets = useSafeAreaInsets();
 
   // --- STATE ---
   const [petData, setPetData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLostMode, setIsLostMode] = useState(false);
-  const [isAddressVisible, setIsAddressVisible] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
-  const [expandHistory, setExpandHistory] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingLostMode, setIsTogglingLostMode] = useState(false);
   const [showLostModeModal, setShowLostModeModal] = useState(false);
@@ -81,11 +82,30 @@ export default function PetProfileDetailScreen() {
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 28 });
   const { t } = useLanguage();
   const [selectedVaccineIndex, setSelectedVaccineIndex] = useState<number | null>(null);
-  const [isUploadingVaccine, setIsUploadingVaccine] = useState(false);
 
-  // THÊM ĐOẠN NÀY ĐỂ DÙNG CHUNG ẢNH FALLBACK
+  // State quản lý việc xem ảnh full màn hình trong App
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [currentImageToView, setCurrentImageToView] = useState<string | null>(null);
+
   const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop';
   const displayAvatar = petData?.avatarUrl || petData?.images?.[0]?.url || FALLBACK_AVATAR;
+  
+  const getHistoryUIConfig = (type: string) => {
+    switch(type) {
+      case 'BIRTH': 
+        return { icon: 'birthday-cake', color: '#F2A465', bgColor: '#FFF4EC' };
+      case 'CREATED': 
+        return { icon: 'paw', color: '#885BF2', bgColor: '#EAE7FB' };
+      case 'QR_LINKED': 
+        return { icon: 'qrcode', color: '#5A90DA', bgColor: '#E8F1FF' };
+      case 'TRANSFER': 
+        return { icon: 'home', color: '#77C582', bgColor: '#EBFFE2' };
+      case 'VACCINE': 
+        return { icon: 'syringe', color: '#EF4444', bgColor: '#FEE2E2' };
+      default: 
+        return { icon: 'history', color: '#8E8E93', bgColor: '#F5F5F5' };
+    }
+  };
 
   const handleRemovePet = () => {
     Alert.alert(
@@ -101,7 +121,7 @@ export default function PetProfileDetailScreen() {
               setIsDeleting(true);
               await petService.deletePet(petId);
               Alert.alert("Success", "Pet profile deleted successfully!");
-              router.replace('/(tabs)/my-pets');
+              router.push('/(tabs)/my-pets');
             } catch (error: any) {
               Alert.alert("Error", error.message || "Unable to delete pet at this time.");
               setIsDeleting(false);
@@ -161,29 +181,20 @@ export default function PetProfileDetailScreen() {
   // --- LOGIC HANDLERS ---
   const handleLostModeToggle = (value: boolean) => {
     if (value === true) {
-      // Ép kiểu 'as any' để bypass lỗi strict typing của Expo Router
       router.push({
         pathname: '/report-lost-pet' as any,
         params: {
           petId: petId,
           petName: petData?.name, 
-          petAvatar: displayAvatar, // ĐÃ SỬA Ở ĐÂY
-          petShelterName: petData?.contactName || ownerInfo?.name || 'Chưa cập nhật', // Thêm dấu ? cho an toàn
+          petAvatar: displayAvatar, 
+          petShelterName: petData?.contactName || ownerInfo?.name || 'Chưa cập nhật', 
           petShelterPhone: petData?.contactPhone || ownerInfo?.phone || 'Chưa cập nhật',
           petShelterAddress: petData?.contactAddress || ownerInfo?.address || 'Chưa cập nhật'
         }
       });
     } else {
-      // Khi tắt chế độ mất tích
       setPendingLostMode(false);
       setShowLostModeModal(true);
-    }
-  };
-
-  const handleViewQRCode = () => {
-    if (petData) {
-      // Chuyển hướng sang màn hình view-qr-code và truyền theo petId
-      router.push(`/view-qr-code?id=${petId}`);
     }
   };
 
@@ -193,10 +204,7 @@ export default function PetProfileDetailScreen() {
       setShowLostModeModal(false);
       setIsTogglingLostMode(true);
 
-      // SỬA DÒNG NÀY: Truyền vào một object
       await petService.toggleLostMode(petId, { isLost: isLost });
-      // Hoặc viết tắt: await petService.toggleLostMode(petId, { isLost });
-
       setIsLostMode(isLost);
     } catch (error: any) {
       Alert.alert(t('error.title'), error.message || t('error.toggleModeFailed'));
@@ -210,7 +218,6 @@ export default function PetProfileDetailScreen() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowHistory(!showHistory);
   };
-
 
   // --- SUB-COMPONENTS ---
   const InfoRow = ({ label1, value1, label2, value2 }: any) => (
@@ -250,44 +257,6 @@ export default function PetProfileDetailScreen() {
     </View>
   );
 
-  const TimelineItem = ({ item, isLast }: any) => {
-    const isHighlight = item.type === 'highlight';
-    let iconBg = 'bg-gray-100';
-    let iconBorder = 'border-gray-200';
-
-    if (item.variant === 'orange') { iconBg = 'bg-[#ffa053]'; iconBorder = 'border-[#ffa053]'; }
-    else if (item.variant === 'yellow') { iconBg = 'bg-[#FEF9C3]'; iconBorder = 'border-[#FEF9C3]'; }
-    else { iconBg = 'bg-white'; iconBorder = `border-[${item.color}]`; }
-
-    let contentContainerClass = "flex-1 ml-3 py-1";
-    if (item.variant === 'orange') contentContainerClass += " bg-[#FFF7ED] border border-orange-200 p-3 rounded-xl";
-    else if (item.variant === 'yellow') contentContainerClass += " bg-[#FEFCE8] border border-yellow-200 p-3 rounded-xl";
-
-    return (
-      <View className="flex-row">
-        <View className="items-center mr-0 w-8">
-          <View className={`w-8 h-8 rounded-full items-center justify-center z-10 border ${item.type === 'normal' ? 'border-2' : ''} ${iconBorder} ${iconBg}`}
-            style={item.type === 'normal' ? { borderColor: item.color } : {}}
-          >
-            {item.icon}
-          </View>
-          {!isLast && (
-            <View className="w-[2px] flex-1 bg-gray-200 my-1" />
-          )}
-        </View>
-        <View className={`flex-1 ml-3 mb-6 ${isHighlight ? '' : 'mt-1'}`}>
-          <View className={isHighlight ? contentContainerClass : "ml-1"}>
-            <View className="flex-row justify-between items-start">
-              <Text className="text-gray-900 font-bold text-sm mb-1">{item.title}</Text>
-              <Text className="text-gray-400 text-[10px] font-medium mt-0.5">{item.date}</Text>
-            </View>
-            <Text className="text-gray-600 text-xs leading-4">{item.desc}</Text>
-          </View>
-        </View>
-      </View>
-    )
-  };
-
   if (isLoading) {
     return (
       <View className="flex-1 justify-center items-center bg-[#FAFAFA]">
@@ -315,12 +284,36 @@ export default function PetProfileDetailScreen() {
   const displayContactPhone = petData.contactPhone || ownerInfo.phone || 'Chưa cập nhật';
   const displayContactAddress = petData.contactAddress || ownerInfo.address || 'Chưa cập nhật';
 
-  // Format ID hiển thị (cắt ngắn id gốc nếu quá dài)
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId.substring(0, 8).toUpperCase();
-
-  // KIỂM TRA TRẠNG THÁI QR CODE TỪ SCHEMA CỦA BẠN
   const hasValidQRCode = !!petData.qrCodeUrl && petData.qrVerificationStatus === 'VERIFIED';
-
+  const handleDownloadImage = async (url: string, fileName: string) => {
+  try {
+    // Tùy chọn hiển thị loading spinner ở đây
+    
+    // 1. Tạo đường dẫn lưu file tạm trong máy
+    const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+    
+    // 2. Tải file từ Cloudflare R2 / Server về máy
+    const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+    
+    // 3. Kiểm tra xem thiết bị có hỗ trợ chia sẻ không
+    const canShare = await Sharing.isAvailableAsync();
+    
+    if (canShare) {
+      // 4. Mở Share Sheet mặc định của iOS/Android
+      // Người dùng có thể chọn "Save Image" để lưu vào máy
+      await Sharing.shareAsync(downloadRes.uri, {
+        mimeType: 'image/jpeg', // Chỉnh sửa chuẩn theo loại file
+        dialogTitle: 'Tải xuống hình ảnh tiêm chủng',
+      });
+    } else {
+      Alert.alert('Lỗi', 'Thiết bị của bạn không hỗ trợ tính năng chia sẻ/lưu tệp.');
+    }
+  } catch (error) {
+    console.error("Lỗi tải file:", error);
+    Alert.alert('Lỗi', 'Không thể tải xuống tệp này lúc này.');
+  }
+};
   return (
     <View className="flex-1 bg-[#FFFFFF]">
       <StatusBar style="dark" />
@@ -357,7 +350,6 @@ export default function PetProfileDetailScreen() {
                 colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 locations={[0, 0.3, 1]}
-
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
               />
               <Feather name="chevron-left" size={20} color="#1F2937" />
@@ -366,7 +358,6 @@ export default function PetProfileDetailScreen() {
           <Text className="text-[18px] font-semibold text-[#000000]">{petData.name} Profile</Text>
           <View className="w-10" />
         </View>
-
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
 
@@ -389,17 +380,14 @@ export default function PetProfileDetailScreen() {
             </View>
           </View>
 
-
           {/* --- LOST MODE / QR REQUIRED SECTION --- */}
           {hasValidQRCode ? (
-
             <View>
               <View>
                 {petData?.needsQrReplacement && (
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => {
-                      // Truyền petId vào replacePetId để scan.tsx hiểu đây là luồng replace
                       router.push({ 
                         pathname: '/(tabs)/scan', 
                         params: { replacePetId: petId } 
@@ -433,29 +421,22 @@ export default function PetProfileDetailScreen() {
                     backgroundColor: isLostMode ? '#FEF2F2' : '#FFFFFF'
                   } : {}}
               >
-                {/* 2. INNER VIEW: Cắt góc overflow và xử lý màu nền */}
                 <View
                   className={`rounded-[20px] p-[18px] py-[21px] flex-row items-center justify-between overflow-hidden ${isLostMode
                     ? 'bg-[#FEF2F2] border border-[#FFE5E5]'
                     : 'bg-white border border-gray-200'
                     }`}
-
                 >
-
-                  {/* Nền Gradient khi bật Lost Mode */}
                   {isLostMode && (
                     <>
                       <LinearGradient
                         colors={['#FFF8F1', '#FFF8F1', '#FFEEF0']}
-                        // Ép bóng mờ đi rất nhanh ở đoạn 15% và biến mất hoàn toàn ở 35% của 24px
-                        // => Bóng thực tế chỉ mỏng khoảng 8px nhưng mượt mà ôm sát góc
                         locations={[0, 0.15, 0.35]}
                         start={{ x: 1, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={{
                           position: 'absolute',
                           top: 0, left: 0, right: 0,
-                          // BẮT BUỘC lớn hơn borderRadius (20) để đường cong được vẽ trọn vẹn
                           height: 3,
                           zIndex: 1,
                         }}
@@ -470,7 +451,6 @@ export default function PetProfileDetailScreen() {
                     </>
                   )}
 
-                  {/* KHỐI BÊN TRÁI: Icon và Text */}
                   <View className="flex-row items-start flex-1 mr-4 z-10">
                     {isLostMode && (
                       <View className="mt-[1px] mr-3">
@@ -491,7 +471,6 @@ export default function PetProfileDetailScreen() {
                     </View>
                   </View>
 
-                  {/* KHỐI BÊN PHẢI: Switch */}
                   <View className="justify-center z-10">
                     <Switch
                       disabled={isTogglingLostMode}
@@ -507,7 +486,6 @@ export default function PetProfileDetailScreen() {
               </View>
             </View>
           ) : (
-            // --- ĐÃ UPDATE ĐOẠN NÀY ĐỂ TRUYỀN linkPetId ---
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => router.push({ pathname: '/(tabs)/scan', params: { linkPetId: petId } })}
@@ -523,7 +501,7 @@ export default function PetProfileDetailScreen() {
               <View className="flex-1">
                 <Text className="text-[16px] font-bold text-[#AC8530] mb-1">QR Code Required</Text>
                 <Text className="text-[14px] text-[#AC8530] leading-5">
-                  Scan QR tag to enable <Text className="font-medium">PawHistory</Text> & <Text className="font-medium">Lost Pet</Text> functions.
+                  Scan QR tag to enable PawHistory & Lost Pet functions.
                 </Text>
               </View>
             </TouchableOpacity>
@@ -569,12 +547,10 @@ export default function PetProfileDetailScreen() {
 
           {/* --- OWNER / SHELTER INFORMATION CARD --- */}
           <View className="mx-[20px] mb-8">
-            {/* Tiêu đề Section */}
             <Text className="font-semibold text-[16px] text-black mb-3">
               {isShelter ? 'Shelter Information' : 'Owner Information'}
             </Text>
 
-            {/* White Card */}
             <View className="bg-white rounded-[20px] border border-gray-200 px-5">
               <OwnerRow
                 label="Name"
@@ -605,41 +581,38 @@ export default function PetProfileDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {showHistory && (
+            {showHistory && petData?.pawHistory && (
               <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
-                {MOCK_PAW_HISTORY.map((item, index) => {
-                  const isLastItem = index === MOCK_PAW_HISTORY.length - 1;
+                {petData.pawHistory.map((item: any, index: number) => {
+                  const isLastItem = index === petData.pawHistory.length - 1;
+                  const uiConfig = getHistoryUIConfig(item.type);
+                  const formattedDate = new Date(item.date).toLocaleDateString('en-GB');
 
                   return (
                     <View key={item.id} className="flex-row">
-                      {/* Cột trái: Chứa Icon và Line nối */}
                       <View className="items-center mr-4 w-[32px]">
-                        {/* Icon Container */}
                         <View
                           className="w-[32px] h-[32px] rounded-full items-center justify-center z-10"
-                          style={{ backgroundColor: item.bgColor }}
+                          style={{ backgroundColor: uiConfig.bgColor }}
                         >
-                          <FontAwesome5 name={item.icon} size={13} color={item.color} />
+                          <FontAwesome5 name={uiConfig.icon} size={13} color={uiConfig.color} />
                         </View>
 
-                        {/* Vertical Line nối xuống node tiếp theo */}
                         {!isLastItem && (
                           <View
                             className="w-[2px] flex-1 my-1"
-                            style={{ backgroundColor: item.color }}
+                            style={{ backgroundColor: uiConfig.color }}
                           />
                         )}
                       </View>
 
-                      {/* Cột phải: Chứa Text content */}
-                      {/* Thêm padding-bottom để tạo khoảng cách giữa các khối, trừ item cuối cùng */}
                       <View className={`flex-1 pt-1 ${!isLastItem ? 'pb-6' : ''}`}>
                         <View className="flex-row justify-between items-start">
                           <Text className="text-[16px] font-medium text-black">
                             {item.title}
                           </Text>
                           <Text className="text-[13px] text-[#8E8E93] font-regular">
-                            {item.date}
+                            {formattedDate}
                           </Text>
                         </View>
                         <Text className="text-[13px] text-[#8E8E93] mt-1 leading-[18px]">
@@ -650,57 +623,59 @@ export default function PetProfileDetailScreen() {
                   );
                 })}
 
+                {petData.pawHistory.length === 0 && (
+                  <Text className="text-center text-gray-400 py-4">No history available.</Text>
+                )}
+
                 <View className='flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px]'>
                   <Image
                     source={require('../assets/icon/lock.png')}
                     style={{ width: 12, height: 12 }}
                     resizeMode="cover"
                   />
-                  <Text className='font-regular text-[12px] text-[#8E8E93]'>This timeline is permanent and append-only.</Text>
+                  <Text className='font-regular text-[12px] text-[#8E8E93]'>This timeline is auto-generated and append-only.</Text>
                 </View>
               </View>
             )}
           </View>
 
-
           {/* ========================================================= */}
-          {/* --- VACCINATION RECORD SECTION --- */}
+          {/* --- VACCINATION RECORD SECTION (SỬA LẠI ICON FILE.PNG) --- */}
           {/* ========================================================= */}
           <View className="mx-[20px] mb-8">
             <Text className="font-semibold text-[16px] text-black mb-3">Vaccination Record</Text>
             
-            {/* KIỂM TRA MẢNG MỚI: vaccinationRecordUrls */}
             {petData?.vaccinationRecordUrls && petData.vaccinationRecordUrls.length > 0 ? (
               <View className="flex-col gap-3">
                 {petData.vaccinationRecordUrls.map((url: string, index: number) => (
                   <View key={index} className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
+                    
+                    {/* TRẢ LẠI ICON FILE NHƯ CŨ */}
                     <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+
                     <View className="flex-1 mx-3">
                       <View className="flex-row justify-between items-center">
-                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
-                          vaccination_record_{index + 1}.jpg
+                        <Text className="text-[14px] text-[#000000] font-medium leading-[16px]" numberOfLines={1}>
+                          Vaccination_Record_{index + 1}.jpg
                         </Text>
                         <TouchableOpacity
                           onPress={(e) => {
                             e.stopPropagation();
                             const { pageY } = e.nativeEvent;
                             setMenuPosition({ top: pageY + 10, right: 32 });
-                            setSelectedVaccineIndex(index); // <--- LƯU LẠI VỊ TRÍ FILE ĐƯỢC CHỌN
+                            setSelectedVaccineIndex(index); 
                             setShowVaccineMenu(true);
                           }}
                           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 14, height: 14 }} resizeMode="contain" />
                         </TouchableOpacity>
                       </View>
-                      <View className="flex-row items-center mt-1">
-                        <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">Completed • </Text>
-                        <View className="flex-row items-center">
-                          <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">
-                            {/* Bạn có thể dùng petData.createdAt để hiển thị ngày tải lên */}
-                            Submitted on {new Date(petData.createdAt || Date.now()).toLocaleDateString('en-GB')}
-                          </Text>
-                        </View>
+                      <View className="flex-row items-center mt-1.5">
+                        <Feather name="check-circle" size={12} color="#10B981" />
+                        <Text className="text-[11px] text-[#8E8E93] ml-1 tracking-[0.2px]">
+                          Submitted on {new Date(petData.createdAt || Date.now()).toLocaleDateString('en-GB')}
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -712,11 +687,10 @@ export default function PetProfileDetailScreen() {
                   <Image source={require('../assets/icon/file.png')} style={{ width: 17, height: 17 }} resizeMode="cover" />
                 </View>
                 <Text className="text-[16px] text-black font-medium mb-2">No vaccine records yet</Text>
-                <Text className="text-[14px] text-[#A9ACB4] font-regular">Records added to PawLife will be shown here.</Text>
               </View>
             )}
           </View>
-          {/* ========================================================= */}
+
           {/* --- ACTION BUTTONS --- */}
           <View className="mx-[20px] gap-3">
             <TouchableOpacity
@@ -731,7 +705,6 @@ export default function PetProfileDetailScreen() {
                 if (hasValidQRCode) {
                   router.push(`/view-qr-code?id=${petId}`);
                 } else {
-                  // --- ĐÃ UPDATE ĐOẠN NÀY ĐỂ TRUYỀN linkPetId ---
                   router.push({ pathname: '/(tabs)/scan', params: { linkPetId: petId } });
                 }
               }}
@@ -739,8 +712,7 @@ export default function PetProfileDetailScreen() {
               className="w-full py-5 rounded-[16px] items-center bg-white border border-[#FF9C56]"
             >
               <View className="flex-row items-center gap-2">
-                <Text className="font-medium text-[16px] text-[#E89B5A]"
-                >
+                <Text className="font-medium text-[16px] text-[#E89B5A]">
                   {hasValidQRCode ? "View QR Code" : "Scan QR Code"}
                 </Text>
               </View>
@@ -761,7 +733,6 @@ export default function PetProfileDetailScreen() {
 
         </ScrollView>
       </SafeAreaView>
-
 
       {/* --- LOST MODE TOGGLE MODAL --- */}
       <Modal
@@ -815,6 +786,7 @@ export default function PetProfileDetailScreen() {
         </View>
       </Modal>
 
+      {/* --- MENU MODAL --- */}
       <Modal
         visible={showVaccineMenu}
         animationType="fade"
@@ -838,97 +810,109 @@ export default function PetProfileDetailScreen() {
               shadowRadius: 10
             }}
           >
-            {/* Option 1: View */}
+            {/* View Image trong app */}
             <TouchableOpacity
-              className="flex-row items-center px-2 py-3"
+              className="flex-row items-center px-4 py-3"
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
-                
-                // Kiểm tra xem đã xác định được file đang chọn chưa
                 if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
                   const urlToView = petData.vaccinationRecordUrls[selectedVaccineIndex];
-                  
                   if (urlToView) {
-                    // Mở URL ảnh bằng trình duyệt / trình xem ảnh mặc định
-                    Linking.openURL(urlToView).catch(() => {
-                      Alert.alert("Error", "Unable to open this file.");
-                    });
+                    setCurrentImageToView(urlToView);
+                    setIsImageViewerVisible(true);
                   }
                 }
               }}
             >
-              <Text className="text-[14px] text-gray-700 ml-2 font-regular">View file</Text>
+              <Feather name="eye" size={16} color="#374151" />
+              <Text className="text-[14px] text-gray-700 ml-3 font-medium">View image</Text>
             </TouchableOpacity>
 
-            {/* Option 2: Download / Xem ảnh */}
+            {/* Download/Open external link */}
             <TouchableOpacity
-              className="flex-row items-center px-2 py-3"
-              activeOpacity={0.6}
-              onPress={() => {
-                setShowVaccineMenu(false);
-                if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
-                  const urlToDownload = petData.vaccinationRecordUrls[selectedVaccineIndex];
-                  if (urlToDownload) {
-                    // Dùng Linking để mở browser hoặc app xem ảnh mặc định
-                    Linking.openURL(urlToDownload).catch(() => {
-                      Alert.alert("Lỗi", "Không thể mở file này.");
-                    });
-                  }
-                }
-              }}
-            >
-              <Text className="text-[14px] text-gray-700 ml-2 font-regular">Download</Text>
-            </TouchableOpacity>
-
-            {/* Option 3: Delete */}
-            {/* <TouchableOpacity
-              className="flex-row items-center px-2 py-3"
-              activeOpacity={0.6}
-              onPress={() => {
-                setShowVaccineMenu(false);
-                setTimeout(() => {
-                  Alert.alert(
-                    "Delete Record",
-                    "Are you sure you want to delete this vaccination record?",
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      { 
-                        text: "Delete", 
-                        style: "destructive", 
-                        onPress: async () => {
-                          if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
-                            // Tạo mảng mới loại bỏ file đang chọn
-                            const newUrlsList = petData.vaccinationRecordUrls.filter(
-                              (_: string, i: number) => i !== selectedVaccineIndex
-                            );
-
-                            try {
-                              // Gọi API cập nhật Pet
-                              await petService.updatePet(petId, { vaccinationRecordUrls: newUrlsList });
-                              
-                              // Cập nhật State để UI render lại ngay lập tức
-                              setPetData((prev: any) => ({
-                                ...prev,
-                                vaccinationRecordUrls: newUrlsList
-                              }));
-                              
-                            } catch (error) {
-                              Alert.alert("Lỗi", "Không thể xóa file lúc này.");
-                            }
-                          }
-                        } 
-                      }
-                    ]
-                  );
-                }, 150);
-              }}
-            >
-              <Text className="text-[14px] text-[#FF3B30] ml-2 font-regular">Delete</Text>
-            </TouchableOpacity> */}
-            
+  className="flex-row items-center px-4 py-3 border-t border-gray-50"
+  activeOpacity={0.6}
+  onPress={async () => {
+    setShowVaccineMenu(false); 
+    
+    if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
+      const urlToDownload = petData.vaccinationRecordUrls[selectedVaccineIndex];
+      
+      if (urlToDownload) {
+        try {
+          // Ép kiểu "as any" để VS Code không báo lỗi TS 2339 / 2305 nữa
+          const FS = FileSystem as any;
+          
+          // Lấy thư mục cache (bộ nhớ tạm), nếu lỗi thì fallback về thư mục document
+          const directory = FS.cacheDirectory || FS.documentDirectory;
+          const fileName = `vaccination_record_${selectedVaccineIndex + 1}.jpg`;
+          const fileUri = `${directory}${fileName}`;
+          
+          // Tải file về máy
+          const downloadRes = await FS.downloadAsync(urlToDownload, fileUri);
+          
+          // Kiểm tra khả năng mở Share Sheet của máy
+          const canShare = await Sharing.isAvailableAsync();
+          if (canShare) {
+            await Sharing.shareAsync(downloadRes.uri, {
+              mimeType: 'image/jpeg',
+              dialogTitle: 'Lưu hoặc chia sẻ ảnh tiêm chủng',
+            });
+          } else {
+            Alert.alert("Thông báo", "Thiết bị không hỗ trợ chia sẻ file.");
+          }
+        } catch (error) {
+          console.error("Lỗi tải file:", error);
+          Alert.alert("Lỗi", "Không thể tải file lúc này. Vui lòng thử lại sau.");
+        }
+      }
+    }
+  }}
+>
+  <Feather name="download" size={16} color="#374151" />
+  <Text className="text-[14px] text-gray-700 ml-3 font-medium">Download</Text>
+</TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* IN-APP FULLSCREEN IMAGE VIEWER MODAL (CÓ USE SafeAreaInsets CỦA IOS) */}
+      {/* ========================================================= */}
+      <Modal 
+        visible={isImageViewerVisible} 
+        transparent={true} 
+        animationType="fade"
+        onRequestClose={() => setIsImageViewerVisible(false)}
+      >
+        <View className="flex-1 bg-black/95 justify-center items-center">
+          <View 
+            className="absolute top-0 w-full z-50 flex-row justify-between items-center px-4 pb-4"
+            style={{ 
+              paddingTop: Math.max(insets.top, 20), 
+              backgroundColor: 'rgba(0,0,0,0.3)' 
+            }}
+          >
+            <Text className="text-white font-medium text-lg drop-shadow-md">
+              Vaccination Record
+            </Text>
+            <TouchableOpacity
+              className="p-2.5 bg-white/20 rounded-full"
+              onPress={() => setIsImageViewerVisible(false)}
+            >
+              <Feather name="x" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          {currentImageToView && (
+            <Image
+              source={{ uri: currentImageToView }}
+              style={{ width: '100%', height: '80%' }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
       </Modal>
 
     </View>

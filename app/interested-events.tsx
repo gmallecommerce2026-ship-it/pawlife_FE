@@ -1,84 +1,111 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useContext, useEffect, useState, useRef, useMemo } from 'react';
-import { ActivityIndicator, FlatList, Image, TouchableOpacity, View, TextInput, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withTiming,
-    interpolate,
-    interpolateColor
-} from 'react-native-reanimated';
+// app/interested-events.tsx
+import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useContext, useMemo, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, Image, TouchableOpacity, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-import { eventService } from '../services/eventService';
 import Toast from 'react-native-toast-message';
+import { eventService } from '../services/eventService';
+// BỔ SUNG: Import React Query
+import { useEngagementStore } from '@/store/useEngagementStore';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 const AnimatedFeather = Animated.createAnimatedComponent(Feather);
 
 export default function InterestedEventsScreen() {
     const router = useRouter();
-    const { user } = useContext(AuthContext);
-    const [events, setEvents] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { user } = useContext<any>(AuthContext);
+    const queryClient = useQueryClient();
 
     // --- LOGIC SEARCH & ANIMATION ---
     const [searchQuery, setSearchQuery] = useState('');
 
-    // --- FETCH DATA ---
-    useEffect(() => {
-        const fetchInterestedEvents = async () => {
-            if (!user?.id) {
-                setLoading(false);
-                return;
-            }
-            try {
-                const res = await eventService.getInterestedEvents(user.id);
-                if (res.success) {
-                    setEvents(res.data);
-                }
-            } catch (error) {
-                console.error("Lỗi tải danh sách sự kiện quan tâm:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    // --- 1. DÙNG REACT QUERY ĐỂ FETCH DANH SÁCH ---
+    const { data: events = [], isLoading: loading, refetch } = useQuery({
+        queryKey: ['interested-events', user?.id],
+        queryFn: async () => {
+            if (!user?.id) return [];
+            const res = await eventService.getInterestedEvents(user.id);
+            return res.success ? res.data : [];
+        },
+        enabled: !!user?.id
+    });
 
-        fetchInterestedEvents();
-    }, [user?.id]);
+    // 3. THÊM ĐOẠN NÀY: Tự động Refetch khi back về từ màn hình Search
+    useFocusEffect(
+        useCallback(() => {
+            if (user?.id) {
+                refetch();
+            }
+        }, [refetch, user?.id])
+    );
 
     // --- LỌC DỮ LIỆU KHI TÌM KIẾM ---
     const filteredEvents = useMemo(() => {
         if (!searchQuery.trim()) return events;
-        return events.filter(event =>
+        return events.filter((event: any) =>
             (event.title || '').toLowerCase().includes(searchQuery.toLowerCase().trim())
         );
     }, [events, searchQuery]);
 
-    const handleRemoveInterest = async (eventId: string | number) => {
-        setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
-        const targetEvent = events.find(e => e.id === eventId);
-        const eventTitle = targetEvent?.title || 'This event';
-        try {
-            // await eventService.removeInterestedEvent(eventId); 
+    // --- 2. DÙNG MUTATION ĐỂ HUỶ QUAN TÂM ---
+    const removeInterestMutation = useMutation({
+        mutationFn: (eventId: string | number) => eventService.toggleInterest(String(eventId), user.id),
+        onMutate: async (eventId) => {
+            // Hủy query đang chạy để tránh đè dữ liệu
+            await queryClient.cancelQueries({ queryKey: ['interested-events', user?.id] });
+            
+            // Lấy dữ liệu cũ để chuẩn bị rollback nếu lỗi
+            const previousEvents = queryClient.getQueryData(['interested-events', user?.id]);
+            const targetEvent = (previousEvents as any[])?.find(e => e.id === eventId);
+            const eventTitle = targetEvent?.title || 'This event';
+
+            // Optimistic Update: Xóa item ngay lập tức trên UI
+            queryClient.setQueryData(['interested-events', user?.id], (old: any[]) => 
+                old ? old.filter(e => e.id !== eventId) : []
+            );
+
+            // <-- 4. THÊM DÒNG NÀY: Cập nhật Zustand để bên Search tab tắt icon Bookmark lập tức
+            useEngagementStore.getState().setInitialEventInterest(String(eventId), false);
+
+            return { previousEvents, eventTitle };
+        },
+        onSuccess: (data, eventId, context) => {
             Toast.show({
                 type: 'custom_badge',
                 position: 'bottom',
                 bottomOffset: 50,
                 props: {
-                    eventName: eventTitle,
+                    eventName: context?.eventTitle,
                     actionText: ' removed from Interested Event'
                 },
-                visibilityTime: 3000, // Ẩn sau 3 giây
+                visibilityTime: 3000,
                 autoHide: true,
             });
-        } catch (error) {
-            console.error("Lỗi khi hủy quan tâm event:", error);
+        },
+        onError: (err, eventId, context) => {
+            console.error("Lỗi khi hủy quan tâm event:", err);
+            // Rollback lại UI nếu API lỗi
+            if (context?.previousEvents) {
+                queryClient.setQueryData(['interested-events', user?.id], context.previousEvents);
+            }
+            useEngagementStore.getState().setInitialEventInterest(String(eventId), true);
+        },
+        onSettled: () => {
+            // Ép fetch lại ngầm để đảm bảo đồng bộ hoàn toàn
+            queryClient.invalidateQueries({ queryKey: ['interested-events', user?.id] });
         }
+    });
+
+    const handleRemoveInterest = (eventId: string | number) => {
+        removeInterestMutation.mutate(eventId);
     };
 
     const renderEventItem = ({ item }: { item: any }) => {
@@ -90,11 +117,6 @@ export default function InterestedEventsScreen() {
             const formattedTime = timePart.replace('am', 'a.m').replace('pm', 'p.m');
             displayDate = `${datePart} at ${formattedTime}`;
         }
-
-        const mockAvatars = [
-            'https://i.pravatar.cc/100?img=12',
-            'https://i.pravatar.cc/100?img=13'
-        ];
 
         return (
             <TouchableOpacity
@@ -147,8 +169,6 @@ export default function InterestedEventsScreen() {
                                 {displayDate}
                             </Text>
                         </View>
-
-
                     </View>
                 </View>
             </TouchableOpacity>
@@ -194,7 +214,7 @@ export default function InterestedEventsScreen() {
                     </View>
                 ) : (
                     <FlatList
-                        data={filteredEvents} // Chạy danh sách đã lọc
+                        data={filteredEvents}
                         keyExtractor={(item) => item.id.toString()}
                         renderItem={renderEventItem}
                         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 13, paddingBottom: 20 }}
@@ -214,7 +234,7 @@ export default function InterestedEventsScreen() {
                                         <TouchableOpacity
                                             className=" px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-2"
                                             activeOpacity={0.7}
-                                            onPress={() => router.push('/')}
+                                            onPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })}
                                         >
                                             <Text className="text-[#8E8E93] font-medium">Upcoming events</Text>
                                         </TouchableOpacity>

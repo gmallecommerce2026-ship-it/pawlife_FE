@@ -1,4 +1,4 @@
-// app/fill-profile.tsx
+// app/complete-social-profile.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useImageUpload } from '@/hooks/useImageUpload';
@@ -8,30 +8,37 @@ import { useRouter } from 'expo-router';
 import { User } from 'lucide-react-native';
 import React, { useContext, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ==========================================
-// 1. COMPONENT INPUT & DATA
+// 1. COMPONENT INPUT & DATA (Đồng bộ từ fill-profile)
 // ==========================================
 const COUNTRY_CODES = [
   { code: 'VN', dial_code: '+84', name: 'Vietnam', flag: '🇻🇳' },
   { code: 'US', dial_code: '+1', name: 'United States', flag: '🇺🇸' },
   { code: 'UK', dial_code: '+44', name: 'United Kingdom', flag: '🇬🇧' },
   { code: 'JP', dial_code: '+81', name: 'Japan', flag: '🇯🇵' },
+];
+
+// Map value cho Backend và label cho UI
+const GENDER_OPTIONS = [
+  { label: 'Male', value: 'MALE' },
+  { label: 'Female', value: 'FEMALE' },
+  { label: 'Other', value: 'OTHER' },
 ];
 
 const InputField = ({ 
@@ -67,27 +74,24 @@ const InputField = ({
 // ==========================================
 // 2. MAIN SCREEN
 // ==========================================
-export default function FillProfileScreen() {
+export default function CompleteSocialProfileScreen() {
   const router = useRouter();
-  
-  const { requestOtp } = useContext(AuthContext);
-  const { pickAndUploadImage, isUploading: isImageUploading, uploadError } = useImageUpload();
-  
-  // --- FORM STATES ---
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
 
+  const { updateUser, user: currentUser } = useContext(AuthContext) as any;
+  const { pickAndUploadImage, isUploading: isImageUploading, uploadError } = useImageUpload();
+
+  // --- FORM STATES ---
+  const [avatar, setAvatar] = useState<string | null>(currentUser?.avatarUrl || null);
+  const [name, setName] = useState(currentUser?.name || '');
+  const [phone, setPhone] = useState(currentUser?.phone || '');
+  
   // Gender
-  const [gender, setGender] = useState('');
+  const [gender, setGender] = useState<string>(currentUser?.gender !== 'UNKNOWN' ? currentUser?.gender : '');
   const [showGenderModal, setShowGenderModal] = useState(false);
-  const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 
   // DOB
-  const [dob, setDob] = useState(new Date()); 
-  const [hasSelectedDate, setHasSelectedDate] = useState(false);
+  const [dob, setDob] = useState<Date>(currentUser?.dob ? new Date(currentUser.dob) : new Date());
+  const [hasSelectedDate, setHasSelectedDate] = useState(!!currentUser?.dob);
   const [showPicker, setShowPicker] = useState(false);
 
   // Country Code
@@ -95,8 +99,13 @@ export default function FillProfileScreen() {
   const [showCountryModal, setShowCountryModal] = useState(false);
 
   // Status
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // Lấy label Gender để hiển thị trên UI
+  const getGenderLabel = () => {
+    const found = GENDER_OPTIONS.find(g => g.value === gender);
+    return found ? found.label : '';
+  };
 
   // --- HANDLERS ---
   const handleOpenDatePicker = () => setShowPicker(true);
@@ -107,7 +116,6 @@ export default function FillProfileScreen() {
     if (event.type === 'set' && selectedDate) {
       setDob(selectedDate);
       setHasSelectedDate(true);
-      setErrors({ ...errors, dob: '' });
     } else if (event.type === 'dismissed') {
       setShowPicker(false);
     }
@@ -125,73 +133,48 @@ export default function FillProfileScreen() {
     }
   };
 
-  const validateForm = () => {
-    let newErrors: Record<string, string> = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^(0?)(3|5|7|8|9)[0-9]{8}$/;
-
-    if (!name.trim()) newErrors.name = 'Please enter your full name/nickname.';
-    if (!gender) newErrors.gender = 'Please select your gender.';
-    if (!hasSelectedDate) newErrors.dob = 'Please select your date of birth.';
-    
-    if (!email.trim()) {
-      newErrors.email = 'Please enter your email.';
-    } else if (!emailRegex.test(email)) {
-      newErrors.email = 'Invalid email format.';
+  const handleSave = async () => {
+    if (!name || !phone || !gender) {
+      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ các thông tin bắt buộc.');
+      return;
     }
-
-    if (!password) {
-      newErrors.password = 'Please enter a password.';
-    } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters.';
-    }
-
-    if (!phone.trim()) {
-      newErrors.phone = 'Please enter your phone number.';
-    } else if (!phoneRegex.test(phone)) {
-      newErrors.phone = 'Invalid phone number format.';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleRegister = async () => {
-    if (!validateForm()) return;
 
     try {
       setIsLoading(true);
-      await requestOtp({
-        email: email,
-        type: 'SIGNUP' as any
-      });
+        const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
+        // Tránh duplicate mã quốc gia nếu user đã có sẵn trong DB
+        const fullPhone = phone.includes('+') ? phone : `${selectedCountry.dial_code}${formattedPhone}`;
+        const DEFAULT_AVATAR_URL = 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg';
+        await updateUser({
+        name,
+        phone: fullPhone,
+        gender, // Gửi lên BE dạng 'MALE', 'FEMALE', 'OTHER'
+        dob: dob.toISOString(),
+        avatarUrl: avatar || DEFAULT_AVATAR_URL || '/assets/images/default-avatar.jpg',
+        });
       
-      const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
-      const fullPhone = `${selectedCountry.dial_code}${formattedPhone}`;
-      const DEFAULT_AVATAR_URL = 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg'
-      // Chuyển hướng sang màn hình verify OTP và truyền dữ liệu đăng ký qua params
-      router.push({
-        pathname: '/verify-otp',
-        params: {
-          email,
-          password,
-          name,
-          phone: fullPhone,
-          gender,
-          dob: dob.toISOString(),
-          avatarUrl: avatar || DEFAULT_AVATAR_URL
-        }
-      });
+
+      // Định dạng số điện thoại giống với logic bên fill-profile
+
+      // Guard ở RootLayoutNavGuard sẽ tự động xử lý redirect
+      Alert.alert('Thành công', 'Hồ sơ đã được cập nhật!');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to send OTP email. Please try again.";
-      Alert.alert("Error", errorMessage);
+      Alert.alert('Lỗi', error.response?.data?.message || 'Có lỗi xảy ra khi lưu thông tin.');
     } finally {
       setIsLoading(false);
     }
   };
-
+  const getAvatarSource = (avatarUrl: string | null) => {
+    if (!avatarUrl || avatarUrl === '/assets/images/default-avatar.jpg') {
+        // Trả về require cục bộ của React Native nếu là ảnh mặc định
+        return require('@/assets/images/default-avatar.jpg');
+    }
+    // Trả về uri mạng nếu là ảnh người dùng upload lên đám mây
+    return { uri: avatarUrl };
+    };
   return (
     <SafeAreaView className="flex-1 bg-white">
+      {/* Header UI đồng bộ với fill-profile */}
       <View className="flex-row items-center px-4 py-3 mb-2">
         <TouchableOpacity onPress={() => router.back()} disabled={isLoading} className="p-2 -ml-2">
           <Feather name="chevron-left" size={35} color="#000000" />
@@ -206,7 +189,7 @@ export default function FillProfileScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            
+            {/* Avatar Upload */}
             <View className="items-center mb-6 mt-2">
               <TouchableOpacity 
                 onPress={handlePickImage} 
@@ -214,40 +197,39 @@ export default function FillProfileScreen() {
                 className="relative w-[118px] h-[118px] bg-[#FAFAFA] rounded-full items-center justify-center overflow-hidden"
                 disabled={isImageUploading || isLoading} 
               >
-                   {avatar ? (
-                     <Image source={{ uri: avatar }} className="w-full h-full rounded-full" resizeMode="cover" />
-                   ) : (
-                     <User size={40} color="#D1D5DB" />
-                   )}
+                {avatar ? (
+                  <Image source={getAvatarSource(avatar)} className="w-full h-full rounded-full" resizeMode="cover" />
+                ) : (
+                  <User size={40} color="#D1D5DB" />
+                )}
 
-                   {isImageUploading && (
-                     <View className="absolute inset-0 bg-black/30 items-center justify-center rounded-full">
-                       <ActivityIndicator color="#ffffff" size="large" />
-                     </View>
-                   )}
+                {isImageUploading && (
+                  <View className="absolute inset-0 bg-black/30 items-center justify-center rounded-full">
+                    <ActivityIndicator color="#ffffff" size="large" />
+                  </View>
+                )}
               </TouchableOpacity>
               
               {uploadError && <Text className="text-red-500 text-xs mt-3 text-center">{uploadError}</Text>}
-              {errors.form && <Text className="text-red-500 font-medium mt-3 text-center">{errors.form}</Text>}
             </View>
 
+            {/* Inputs đồng bộ layout với fill-profile */}
             <InputField 
               label="Your Name"
               placeholder="Enter your name" 
               value={name} 
-              onChangeText={(text: string) => { setName(text); setErrors({...errors, name: ''}) }} 
+              onChangeText={setName} 
               autoCapitalize="words"
-              error={errors.name}
             />
             
+            {/* Gender & DOB Row Layout */}
             <View className="flex-row justify-between mb-5">
               <View className="flex-1 mr-2">
                 <InputField 
                   label="Gender"
                   placeholder="Select Gender" 
-                  value={gender} 
+                  value={getGenderLabel()} 
                   onPress={() => setShowGenderModal(true)}
-                  error={errors.gender}
                   containerStyle=""
                 />
               </View>
@@ -258,30 +240,12 @@ export default function FillProfileScreen() {
                   placeholder="Select DOB" 
                   value={hasSelectedDate ? dob.toLocaleDateString('en-GB') : ''} 
                   onPress={handleOpenDatePicker}
-                  error={errors.dob}
                   containerStyle=""
                 />
               </View>
             </View>
 
-            <InputField 
-              label="Email"
-              placeholder="Enter your email" 
-              value={email} 
-              onChangeText={(text: string) => { setEmail(text); setErrors({...errors, email: ''}) }}
-              keyboardType="email-address"
-              error={errors.email}
-            />
-
-            <InputField 
-              label="Password"
-              placeholder="Enter your password" 
-              value={password} 
-              onChangeText={(text: string) => { setPassword(text); setErrors({...errors, password: ''}) }}
-              secureTextEntry={true}
-              error={errors.password}
-            />
-            
+            {/* Phone Number Layout */}
             <View className="mb-8">
               <Text className="text-[16px] font-medium text-gray-900 mb-2">Phone Number</Text>
               <View className="flex-row gap-3">
@@ -293,25 +257,25 @@ export default function FillProfileScreen() {
                     <Text className="font-regular text-gray-800 text-[15px]">{selectedCountry.dial_code}</Text>
                   </TouchableOpacity>
                   <View className="flex-1">
-                    <View className={`flex-row items-center bg-[#FAFAFA] px-5 py-4 rounded-2xl border ${errors.phone ? 'border-red-500' : 'border-gray-100'} h-[56px]`}>
+                    <View className="flex-row items-center bg-[#FAFAFA] px-5 py-4 rounded-2xl border border-gray-100 h-[56px]">
                       <TextInput 
                         placeholder="Phone Number" 
                         keyboardType="phone-pad"
                         style={{fontFamily: "Urbanist"}}
                         value={phone}
-                        onChangeText={(text) => { setPhone(text); setErrors({...errors, phone: ''}) }}
+                        onChangeText={setPhone}
                         className="flex-1 text-[16px] text-gray-800 p-0 m-0 leading-tight"
                         placeholderTextColor="#9CA3AF"
                       />
                     </View>
                   </View>
               </View>
-              {errors.phone && <Text className="text-red-500 text-xs mt-1.5 ml-1">{errors.phone}</Text>}
             </View>
             
+            {/* Save Button */}
             <TouchableOpacity 
               className={`w-full h-[56px] rounded-full flex-row justify-center items-center mt-4 mb-10 ${isLoading || isImageUploading ? 'bg-orange-300' : 'bg-[#E89B5A]'}`}
-              onPress={handleRegister}
+              onPress={handleSave}
               disabled={isLoading || isImageUploading} 
             >
               {isLoading && <ActivityIndicator color="white" className="mr-2" />}
@@ -324,10 +288,9 @@ export default function FillProfileScreen() {
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
 
-      {/* ================= MODALS & PICKERS ================= */}
+      {/* ================= MODALS & PICKERS (Copy y hệt từ fill-profile) ================= */}
       {Platform.OS === 'ios' ? (
         <Modal visible={showPicker} transparent animationType="fade">
-          {/* Giữ nguyên Picker cũ */}
           <TouchableWithoutFeedback onPress={() => setShowPicker(false)}>
             <View className="flex-1 bg-black/40 justify-center px-8">
               <TouchableWithoutFeedback>
@@ -368,6 +331,7 @@ export default function FillProfileScreen() {
         )
       )}
 
+      {/* Gender Modal */}
       <Modal visible={showGenderModal} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setShowGenderModal(false)}>
           <View className="flex-1 bg-black/40 justify-center px-8">
@@ -378,18 +342,17 @@ export default function FillProfileScreen() {
                 </View>
                 <FlatList
                   data={GENDER_OPTIONS}
-                  keyExtractor={(item) => item}
+                  keyExtractor={(item) => item.value}
                   renderItem={({ item }) => (
                     <TouchableOpacity 
                       className="py-4 px-6 border-b border-gray-50 active:bg-orange-50"
                       onPress={() => {
-                        setGender(item);
-                        setErrors({...errors, gender: ''});
+                        setGender(item.value);
                         setShowGenderModal(false);
                       }}
                     >
-                      <Text className={`text-center text-[16px] ${gender === item ? 'text-[#F97316] font-bold' : 'text-gray-700'}`}>
-                        {item}
+                      <Text className={`text-center text-[16px] ${gender === item.value ? 'text-[#F97316] font-bold' : 'text-gray-700'}`}>
+                        {item.label}
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -400,6 +363,7 @@ export default function FillProfileScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Country Code Modal */}
       <Modal visible={showCountryModal} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setShowCountryModal(false)}>
           <View className="flex-1 bg-black/40 justify-center px-8">

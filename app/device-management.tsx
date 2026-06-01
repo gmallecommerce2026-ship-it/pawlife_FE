@@ -1,6 +1,6 @@
 // app/device-management.tsx
 import { Text } from '@/components/AppText';
-import { AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
@@ -30,12 +30,20 @@ export default function DeviceManagementScreen() {
     try {
       setIsLoading(true);
       const response = await axiosClient.get('/auth/devices');
-      // Giả sử API trả về mảng trực tiếp, hoặc nằm trong response.data
-      const data = response.data?.data || response.data || [];
+      let data = response.data?.data || response.data || [];
+      
+      // Sắp xếp: Thiết bị hiện tại (isCurrentDevice = true) lên top, 
+      // sau đó ưu tiên thiết bị hoạt động gần nhất (lastActive)
+      data.sort((a: any, b: any) => {
+        if (a.isCurrentDevice) return -1;
+        if (b.isCurrentDevice) return 1;
+        return new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime();
+      });
+
       setDevices(data);
     } catch (error) {
       console.error("Lỗi lấy danh sách thiết bị:", error);
-      Alert.alert("Lỗi", "Không thể tải danh sách thiết bị lúc này. Vui lòng thử lại sau.");
+      Alert.alert("Lỗi", "Không thể tải danh sách thiết bị lúc này.");
     } finally {
       setIsLoading(false);
     }

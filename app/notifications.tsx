@@ -15,7 +15,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Image,
   LayoutAnimation,
   Modal,
   Platform,

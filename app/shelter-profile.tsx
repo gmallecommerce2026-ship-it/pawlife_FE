@@ -1,6 +1,11 @@
 // app/shelter-profile.tsx
+import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext'; // 1. IMPORT HOOK NGÔN NGỮ
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Keyboard, Linking, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import Animated, {
@@ -15,30 +20,28 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shelterService } from '../services/shelterService';
+import { useEngagementStore } from '../store/useEngagementStore';
 
-import { Text } from '@/components/AppText';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 const { width } = Dimensions.get('window');
-const COLUMN_WIDTH = (width - 40 - 13) / 2;
 
-const getAge = (dobString?: string) => {
-  if (!dobString) return 'Unknown';
+// 2. Truyền thêm hàm `t` vào getAge để dịch ngày tháng
+const getAge = (dobString?: string, t?: any) => {
+  if (!dobString) return t ? t('Unknown') : 'Unknown';
   const dob = new Date(dobString);
   const diff_ms = Date.now() - dob.getTime();
   const age_dt = new Date(diff_ms);
   const years = Math.abs(age_dt.getUTCFullYear() - 1970);
   const months = age_dt.getUTCMonth();
 
-  if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
-  if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
-  return 'Newborn';
+  if (years > 0) return `${years} ${years > 1 ? (t ? t('years') : 'years') : (t ? t('year') : 'year')}`;
+  if (months > 0) return `${months} ${months > 1 ? (t ? t('months') : 'months') : (t ? t('month') : 'month')}`;
+  return t ? t('Newborn') : 'Newborn';
 };
 
-const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) => string }) => {
+// 3. Truyền `t` vào PetCard
+const PetCard = ({ pet, formatBreed, t }: { pet: any, formatBreed: (breed: string) => string, t: any }) => {
   const router = useRouter();
 
-  // Xử lý dữ liệu
   const imageUrl = pet.images && pet.images.length > 0
     ? pet.images[0].url
     : 'https://via.placeholder.com/400';
@@ -49,7 +52,10 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
       className="bg-transparent mb-[14px]"
       style={{ width: '100%' }}
       activeOpacity={0.9}
-      onPress={() => router.push(`/shelter-pet-detail?id=${pet.id}`)}
+      onPress={() => router.push({
+        pathname: '/pet-detail-modal',
+        params: { id: pet.id }
+      })}
     >
       <View className="relative">
         <Image
@@ -68,7 +74,6 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
       <View className="pt-[12px]">
         <Text className="text-black font-semibold text-[16px] mb-1">{pet.name}</Text>
         <View className="flex-row items-start">
-          {/* Icon Giới tính */}
           <Image
             className='top-1'
             source={isFemale ? require('../assets/icon/female.png') : require('../assets/icon/male.png')}
@@ -80,8 +85,7 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
             className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
             numberOfLines={1}
           >
-            {/* Sử dụng hàm getAge thay cho '1 years' */}
-            {getAge(pet.dob)} · {formatBreed ? formatBreed(pet.breed) : (pet.breed || 'Unknown')}
+            {getAge(pet.dob, t)} · {formatBreed ? formatBreed(pet.breed) : (pet.breed || t('Unknown'))}
           </Text>
         </View>
       </View>
@@ -89,15 +93,15 @@ const PetCard = ({ pet, formatBreed }: { pet: any, formatBreed: (breed: string) 
   );
 };
 
-const SectionLabel = ({ title, optional }: { title: string, optional?: boolean }) => (
+// Đổi `optional` thành `optionalText` để truyền thẳng chuỗi đã dịch
+const SectionLabel = ({ title, optionalText }: { title: string, optionalText?: string }) => (
   <View className="flex-row items-baseline">
     <Text className="text-black font-semibold text-[14px] tracking-[0.06px]">
       {title}
     </Text>
-    {/* Nếu optional = true thì mới hiển thị chữ (Optional) */}
-    {optional && (
+    {optionalText && (
       <Text className="text-[#8E8E93] font-regular text-[14px] ml-1 tracking-[0.06px]">
-        (Optional)
+        {optionalText}
       </Text>
     )}
   </View>
@@ -111,46 +115,41 @@ const FilterChip = ({ label, selected, onPress, iconSource }: any) => {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.8}
-      // Thêm flex-row để ảnh và chữ nằm ngang, justify-center để luôn căn giữa thẻ
       className={`flex-1 py-2.5 border rounded-full flex-row items-center justify-center ${containerStyle}`}
     >
       {iconSource && (
         <Image
           source={iconSource}
-          className="w-[16px] h-[16px] mr-2" // mr-2 tạo khoảng cách với chữ
+          className="w-[16px] h-[16px] mr-2" 
           resizeMode="contain"
         />
       )}
-
       <Text className={`text-[14px] text-black font-regular`}>{label}</Text>
     </TouchableOpacity>
   );
 };
-
-// Sử dụng React.memo để tối ưu hóa, tránh render lại thẻ pet không cần thiết khi gõ phím tìm kiếm
 
 export default function ShelterProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const shelterId = params.id as string;
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  
+  // 4. LẤY HÀM TỪ HOOK
+  const { t } = useLanguage();
 
-  const [shelterInfo, setShelterInfo] = useState<any>(null);
-  const [pets, setPets] = useState<any[]>([]);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [isSearchActive, setIsSearchActive] = useState(false);
-
-  // === THÊM STATE CHO SEARCH TẠI ĐÂY ===
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(''); 
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
   const [activeTab, setActiveTab] = useState<'pets' | 'info'>('pets');
   const COLUMN_WIDTH = (width - 40 - 13) / 2;
 
   const scrollY = useSharedValue(0);
-  const HEADER_HEIGHT = insets.top + 60; // Chiều cao header
-  const SCROLL_THRESHOLD = 200; // Khoảng cách để header hiện ra hoàn toàn
+  const HEADER_HEIGHT = insets.top + 60; 
+  const SCROLL_THRESHOLD = 200; 
   const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
 
   const [selectedGender, setSelectedGender] = useState<string | null>(null);
@@ -164,23 +163,19 @@ export default function ShelterProfileScreen() {
     scrollY.value = event.contentOffset.y;
   });
 
-
-  // 1. Style cho thanh Header trắng (mờ ảo rồi hiện rõ)
   const headerBarStyle = useAnimatedStyle(() => {
     const opacity = interpolate(scrollY.value, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], [0, 1], Extrapolation.CLAMP);
     return { opacity, height: HEADER_HEIGHT, backgroundColor: 'white' };
   });
 
-  // 2. Style cho tên Shelter trong Header
   const headerTitleStyle = useAnimatedStyle(() => {
     const translateY = interpolate(scrollY.value, [SCROLL_THRESHOLD - 30, SCROLL_THRESHOLD], [10, 0], Extrapolation.CLAMP);
     const opacity = interpolate(scrollY.value, [SCROLL_THRESHOLD - 30, SCROLL_THRESHOLD], [0, 1], Extrapolation.CLAMP);
     return { opacity, transform: [{ translateY }] };
   });
 
-  // 3. Style biến đổi nút Back và Search (Mất viền tròn, mất nền trắng)
   const iconButtonStyle = useAnimatedStyle(() => {
-    const backgroundColor = interpolate(scrollY.value, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], [1, 0]); // 1 là bg-white/80, 0 là transparent
+    const backgroundColor = interpolate(scrollY.value, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], [1, 0]); 
     const borderWidth = interpolate(scrollY.value, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], [0.5, 0]);
 
     return {
@@ -196,9 +191,7 @@ export default function ShelterProfileScreen() {
   const handleOpenSearch = () => {
     setIsSearching(true);
     setIsSearchActive(true);
-    // Animation giãn nở thanh search mượt mà
     searchAnimation.value = withTiming(1, { duration: 300 });
-    // Focus sau khi animation chạy được một chút hoặc hoàn tất
     setTimeout(() => inputRef.current?.focus(), 300);
   };
 
@@ -210,7 +203,6 @@ export default function ShelterProfileScreen() {
     });
   };
 
-  // Hàm đóng search
   const handleCloseSearch = () => {
     searchAnimation.value = withTiming(0, { duration: 250 }, () => {
       runOnJS(setIsSearching)(false);
@@ -223,16 +215,13 @@ export default function ShelterProfileScreen() {
     transform: [{ scale: interpolate(searchAnimation.value, [0, 0.2], [1, 0.8]) }],
   }));
 
-  // 1. Style cho Container: Chuyển đổi màu nền và màu viền
   const glassSearchContainerStyle = useAnimatedStyle(() => {
-    // Chuyển từ trắng mờ (0.1) sang trắng đặc (#FFFFFF)
     const backgroundColor = interpolateColor(
       searchAnimation.value,
       [0, 1],
       ['rgba(255, 255, 255, 0.1)', '#F8F8F8']
     );
 
-    // Chuyển từ viền trắng mờ sang viền xám #EBEBEB
     const borderColor = interpolateColor(
       searchAnimation.value,
       [0, 1],
@@ -245,207 +234,120 @@ export default function ShelterProfileScreen() {
       borderColor,
       paddingLeft: interpolate(searchAnimation.value, [0, 1], [8.5, 12]),
       paddingRight: interpolate(searchAnimation.value, [0, 1], [0, 12]),
-      borderWidth: 1, // Để viền hiện rõ ở trạng thái search
+      borderWidth: 1, 
     };
   });
 
-  // 2. Style cho lớp Gradient: Biến mất khi thanh search mở ra
-  const gradientStyle = useAnimatedStyle(() => {
-    return {
-      opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
-    };
-  });
+  const gradientStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.5], [1, 0]),
+  }));
 
-  // 3. Style cho TextInput
-  const textInputStyle = useAnimatedStyle(() => {
-    return {
-      opacity: interpolate(searchAnimation.value, [0, 0.8, 1], [0, 0, 1]),
-      marginLeft: interpolate(searchAnimation.value, [0, 1], [0, 8]),
-    };
-  });
+  const textInputStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchAnimation.value, [0, 0.8, 1], [0, 0, 1]),
+    marginLeft: interpolate(searchAnimation.value, [0, 1], [0, 8]),
+  }));
 
-
-  // 1. Style cho Icon Search: Chuyển từ đen (trạng thái đóng) sang #8E8E93 (trạng thái mở)
   const searchIconStyle = useAnimatedStyle(() => {
-    const color = interpolateColor(
-      searchAnimation.value,
-      [0, 1],
-      ['#000000', '#8E8E93'] // Từ đen sang xám 8E8E93
-    );
+    const color = interpolateColor(searchAnimation.value, [0, 1], ['#000000', '#8E8E93']);
     return { color };
   });
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data: shelterInfo, isLoading: loading, isError: isNotFound } = useQuery({
+    queryKey: ['shelter-profile', shelterId, debouncedSearch],
+    queryFn: async () => {
+      const data = await shelterService.getShelterDetail(shelterId, debouncedSearch);
+      if (data.isFollowed !== undefined) {
+        useEngagementStore.getState().setInitialShelterFollow(shelterId, data.isFollowed);
+      }
+      return data;
+    },
+    enabled: !!shelterId && shelterId !== 'undefined' && shelterId !== 'null',
+    retry: false,
+  });
+
+  const pets = shelterInfo?.pets || [];
+  const globalIsFollowed = useEngagementStore(state => state.followedShelters[shelterId]);
+  const toggleShelterFollow = useEngagementStore(state => state.toggleShelterFollow);
+  
+  const isFollowing = globalIsFollowed ?? shelterInfo?.isFollowed ?? false;
+
   const filteredPets = useMemo(() => {
     if (!searchQuery.trim()) return pets;
-    return pets.filter(pet =>
+    return pets.filter((pet: any) =>
       pet.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [pets, searchQuery]);
 
+  const toggleFollowMutation = useMutation({
+    mutationFn: () => shelterService.toggleFollow(shelterId),
+    onMutate: async () => {
+      const previousState = isFollowing;
+      const newFollowingState = !isFollowing;
 
+      toggleShelterFollow(shelterId);
 
-  const [modalConfig, setModalConfig] = useState({
-    visible: false,
-    title: '',
-    content: '',
-    type: ''
-  });
+      queryClient.setQueryData(['shelter-profile', shelterId, debouncedSearch], (oldData: any) => {
+        if (!oldData) return oldData;
+        const currentFollowers = oldData?._count?.followers || 0;
+        return {
+          ...oldData,
+          isFollowed: newFollowingState,
+          _count: {
+            ...oldData._count,
+            followers: newFollowingState ? currentFollowers + 1 : Math.max(0, currentFollowers - 1)
+          }
+        };
+      });
 
-  // Gọi API mỗi khi có shelterId hoặc khi người dùng gõ tìm kiếm
-  const [isNotFound, setIsNotFound] = useState(false);
-
-  useEffect(() => {
-    const isValidId = shelterId &&
-      typeof shelterId === 'string' &&
-      shelterId !== 'undefined' &&
-      shelterId !== 'null';
-
-    if (!isValidId) {
-      setLoading(false);
-      setIsNotFound(true);
-      return;
-    }
-
-    const delayDebounceFn = setTimeout(() => {
-      fetchShelterDetail(searchQuery);
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [shelterId, searchQuery]);
-
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('SHELTER_FOLLOW_TOGGLED', (data) => {
-      // Thêm dòng này: Bỏ qua nếu sự kiện do chính màn hình này phát ra
-      if (data.source === 'SHELTER_PROFILE') return;
-
-      if (data.shelterId === shelterId && isFollowing !== data.isFollowed) {
-        setIsFollowing(data.isFollowed);
-        setShelterInfo((prev: any) => {
-          if (!prev) return prev;
-          const currentFollowers = prev?._count?.followers || 0;
+      return { previousState };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['followed-shelters'] });
+      DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', {
+        shelterId,
+        isFollowed: !isFollowing, 
+        source: 'SHELTER_PROFILE' 
+      });
+    },
+    onError: (err, variables, context) => {
+      console.error('Lỗi khi thay đổi trạng thái theo dõi:', err);
+      toggleShelterFollow(shelterId);
+      if (context) {
+        queryClient.setQueryData(['shelter-profile', shelterId, debouncedSearch], (oldData: any) => {
+          if (!oldData) return oldData;
+          const currentFollowers = oldData?._count?.followers || 0;
           return {
-            ...prev,
+            ...oldData,
+            isFollowed: context.previousState,
             _count: {
-              ...prev._count,
-              followers: data.isFollowed ? currentFollowers + 1 : Math.max(0, currentFollowers - 1),
-            },
+              ...oldData._count,
+              followers: context.previousState ? currentFollowers + 1 : Math.max(0, currentFollowers - 1)
+            }
           };
         });
       }
-    });
-    return () => subscription.remove();
-  }, [shelterId, isFollowing]);
-
-  const fetchShelterDetail = async (query = '') => {
-    try {
-      if (!shelterInfo) setLoading(true);
-      const data = await shelterService.getShelterDetail(shelterId, query);
-      setShelterInfo(data);
-      setPets(data.pets || []);
-      setIsFollowing(data.isFollowed || false);
-      setIsNotFound(false); // Reset lỗi nếu thành công
-    } catch (error: any) {
-      console.error('Lỗi khi tải chi tiết trạm:', error);
-      // 2. Bắt chính xác lỗi 404 từ backend
-      if (error?.statusCode === 404 || error?.message?.includes('404')) {
-        setIsNotFound(true);
-      }
-    } finally {
-      setLoading(false);
     }
-  };
+  });
 
-  const handleToggleFollow = async () => {
-    const prevFollowingState = isFollowing;
-    const newFollowingState = !isFollowing;
-
-    // Optimistic UI Update
-    setIsFollowing(newFollowingState);
-    setShelterInfo((prev: any) => {
-      const currentFollowers = prev?._count?.followers || 0;
-      return {
-        ...prev,
-        _count: {
-          ...(prev?._count || {}),
-          followers: newFollowingState
-            ? currentFollowers + 1
-            : Math.max(0, currentFollowers - 1),
-        },
-      };
-    });
-
-    const filteredPets = useMemo(() => {
-      if (!searchQuery.trim()) return pets;
-      return pets.filter(pet =>
-        pet.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }, [pets, searchQuery]);
-
-    // BẮN SỰ KIỆN ĐỒNG BỘ RA TOÀN APP (Kèm thêm source)
-    DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', {
-      shelterId,
-      isFollowed: newFollowingState,
-      source: 'SHELTER_PROFILE' // <-- Thêm cái này
-    });
-
-    try {
-      const response = await shelterService.toggleFollow(shelterId);
-      // Giữ nguyên logic cũ...
-    } catch (error) {
-      // Revert lại nếu lỗi API
-      setIsFollowing(prevFollowingState);
-      setShelterInfo((prev: any) => {
-        // ... logic revert cũ giữ nguyên ...
-      });
-      console.error('Lỗi khi thay đổi trạng thái theo dõi:', error);
-
-      // Bắn sự kiện rollback (Kèm thêm source)
-      DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', {
-        shelterId,
-        isFollowed: prevFollowingState,
-        source: 'SHELTER_PROFILE' // <-- Thêm cái này
-      });
-    }
+  const handleToggleFollow = () => {
+    toggleFollowMutation.mutate();
   };
 
   const formatBreed = (breed?: string) => {
     if (!breed) return '';
-
-    // Nếu dưới hoặc bằng 15 ký tự thì giữ nguyên toàn bộ
     if (breed.length <= 15) return breed;
-
-    // Nếu trên 15 ký tự, tiến hành tách từ dựa vào khoảng trắng
     const words = breed.split(' ');
-
-    // Nếu có từ 2 từ trở lên (VD: Golden Retriever)
     if (words.length > 1) {
-      // Lấy chữ cái đầu tiên của từ thứ nhất, cộng thêm dấu chấm, và ghép với các từ còn lại
       const firstLetter = words[0][0];
       const restOfWords = words.slice(1).join(' ');
-
       return `${firstLetter}. ${restOfWords}`;
     }
-
-    // Fallback: Trong trường hợp hiếm hoi tên chỉ có 1 từ viết liền dính vào nhau mà dài hơn 15 ký tự
     return `${breed.substring(0, 15)}...`;
-  };
-
-  const openPolicy = () => {
-    setModalConfig({
-      visible: true,
-      title: 'Adoption Policy',
-      content: shelterInfo?.policy || 'The shelter has not updated the adoption policy yet.',
-      type: 'policy'
-    });
-  };
-
-  const openContact = () => {
-    setModalConfig({
-      visible: true,
-      title: 'Contact Information',
-      content: `📞 Phone: ${shelterInfo?.contactInfo || 'Not provided'}\n\n📍 Address: ${shelterInfo?.address || 'Not provided'}`,
-      type: 'contact'
-    });
   };
 
   const handleCall = () => {
@@ -461,30 +363,32 @@ export default function ShelterProfileScreen() {
     </View>
   );
 
-  if (loading || !shelterInfo) {
-    return (
-      <SafeAreaView className="flex-1 bg-white justify-center items-center">
-        <ActivityIndicator size="large" color="#ffa053" />
-      </SafeAreaView>
-    );
-  }
-
   const formatDate = (dateString?: string | Date) => {
-    if (!dateString) return 'Pending';
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!dateString) return t('Pending');
+    return new Date(dateString).toLocaleDateString(t('en-US'), { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
 
   if (isNotFound) {
     return (
       <SafeAreaView className="flex-1 bg-[#FAFAFA] justify-center items-center">
         <MaterialCommunityIcons name="home-off" size={64} color="#E5E7EB" />
-        <Text className="text-gray-800 text-lg font-bold mt-4">Không tìm thấy trạm cứu hộ</Text>
+        {/* Dùng key tiếng Anh để bạn dễ map từ điển */}
+        <Text className="text-gray-800 text-lg font-bold mt-4">{t('Shelter not found')}</Text>
         <Text className="text-gray-500 text-sm mt-2 text-center px-6">
-          Dữ liệu trạm có thể đã bị xóa hoặc đường dẫn không chính xác.
+          {t('Shelter data might have been removed or the link is incorrect.')}
         </Text>
         <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-orange-100 px-6 py-3 rounded-full">
-          <Text className="text-orange-600 font-bold">Quay lại</Text>
+          <Text className="text-orange-600 font-bold">{t('Go back')}</Text>
         </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading || !shelterInfo) {
+    return (
+      <SafeAreaView className="flex-1 bg-white justify-center items-center">
+        <ActivityIndicator size="large" color="#ffa053" />
       </SafeAreaView>
     );
   }
@@ -499,7 +403,6 @@ export default function ShelterProfileScreen() {
           />
         </TouchableWithoutFeedback>
       )}
-      {/* --- STICKY HEADER (Luôn nằm trên cùng) --- */}
       <Animated.View
         style={[headerBarStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 20, paddingHorizontal: 20 }]}
       >
@@ -510,7 +413,6 @@ export default function ShelterProfileScreen() {
         </View>
       </Animated.View>
 
-      {/* --- NÚT BẤM ĐIỀU HƯỚNG --- */}
       <View style={{ top: insets.top + 10, zIndex: 110 }} className="absolute left-5 right-5 flex-row justify-between items-center">
         <View
           className="absolute left-1 right-1 flex-row justify-between z-30"
@@ -546,7 +448,6 @@ export default function ShelterProfileScreen() {
                   colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   locations={[0, 0.3, 1]}
-
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                 />
                 <Feather name="chevron-left" size={20} color="#00000" />
@@ -577,7 +478,6 @@ export default function ShelterProfileScreen() {
                   glassSearchContainerStyle
                 ]}
               >
-                {/* LỚP KÍNH MỜ CỦA BẠN: Sẽ biến mất dần khi trượt ra */}
                 <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, gradientStyle]}>
                   <LinearGradient
                     colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
@@ -587,25 +487,18 @@ export default function ShelterProfileScreen() {
                   />
                 </Animated.View>
 
-                {/* Icon Search */}
                 <AnimatedIonicons name="search" size={19} style={searchIconStyle} />
 
-                {/* TextInput và Nút X */}
                 <Animated.View style={[textInputStyle, { flexDirection: 'row', alignItems: 'center', flex: 1 }]}>
                   <TextInput
                     ref={inputRef}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    placeholder="Search pets..."
+                    placeholder={t("Search pets...")}
                     placeholderTextColor="#8E8E93"
                     className="flex-1 text-[14px] text-black"
                     style={{ fontFamily: 'Urbanist' }}
                   />
-                  {/* {isSearching && (
-                    <TouchableOpacity onPress={() => setIsFilterVisible(true)} className="ml-1 px-1">
-                      <Image className='ml-2' source={require('../assets/icon/sliders-gray.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                    </TouchableOpacity>
-                  )} */}
                 </Animated.View>
               </Animated.View>
             </TouchableOpacity>
@@ -613,16 +506,12 @@ export default function ShelterProfileScreen() {
         </View>
       </View>
 
-
-
-      {/* --- VÙNG CUỘN CHÍNH --- */}
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[]}
       >
-        {/* 1. Ảnh Cover (Kéo được) */}
         <Image
           source={{
             uri: shelterInfo?.coverUrl || shelterInfo?.avatarUrl || 'https://via.placeholder.com/400x300'
@@ -631,7 +520,6 @@ export default function ShelterProfileScreen() {
           resizeMode="cover"
         />
 
-        {/* 2. THẺ TRẮNG (Bắt đầu từ đây và kéo dài xuống hết pet list) */}
         <View className="bg-white rounded-t-[24px] bottom-[32px] pb-6 min-h-screen">
           <View className='flex-row items-center px-3 -top-[15px]'>
             <View className="bg-white p-1 rounded-full">
@@ -645,22 +533,22 @@ export default function ShelterProfileScreen() {
                 {shelterInfo?.name}
               </Text>
               <View className="flex-row items-center">
-                <StatItem value={shelterInfo._count?.pets || pets.length} label="pets" />
+                <StatItem value={shelterInfo._count?.pets || pets.length} label={t("pets")} />
                 <Text className='text-[12px] px-2 font-extrabold'>•</Text>
 
-                <StatItem value={shelterInfo._count?.followers || 0} label="followers" />
+                <StatItem value={shelterInfo._count?.followers || 0} label={t("followers")} />
                 <Text className='text-[12px] px-2 font-extrabold'>•</Text>
 
-                <StatItem value={shelterInfo.adoptedCount || 0} label="adopted" />
+                <StatItem value={shelterInfo.adoptedCount || 0} label={t("adopted")} />
               </View>
             </View>
           </View>
 
           <View className='mx-[20px]' style={{ top: -5 }}>
             <View className="mb-3">
-              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1 leading-4 tracking-[0.06px]">Animal Shelter & Rescue</Text>
+              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1 leading-4 tracking-[0.06px]">{t("Animal Shelter & Rescue")}</Text>
               <Text className="text-[14px] text-black font-regular leading-5 tracking-[0.06px]">
-                {shelterInfo?.description || "Saving lives and finding forever home 🐾"}
+                {shelterInfo?.description || t("Saving lives and finding forever home 🐾")}
               </Text>
               <View className="flex-row items-center mt-1">
                 <Image
@@ -681,11 +569,8 @@ export default function ShelterProfileScreen() {
               </View>
 
               <View className="flex-row items-center mt-2">
-
-                {/* --- 1. HIỆU ỨNG AVATAR STACK --- */}
                 <View className="flex-row items-center">
                   <View>
-                    {/* Avatar 1: Nằm dưới cùng, không có margin âm */}
                     <Image
                       source={{ uri: 'https://i.pravatar.cc/100?img=1' }}
                       className="w-4 h-4 rounded-full border-[1px] border-white z-10"
@@ -693,7 +578,6 @@ export default function ShelterProfileScreen() {
                   </View>
 
                   <View style={{ elevation: 2, marginLeft: -8 }}>
-                    {/* Avatar 2: Bị kéo lùi sang trái (-ml-2.5) để đè lên Avatar 1 */}
                     <Image
                       source={{ uri: 'https://i.pravatar.cc/100?img=2' }}
                       className="w-4 h-4 rounded-full border-[1px] border-white z-20"
@@ -701,7 +585,6 @@ export default function ShelterProfileScreen() {
                   </View>
 
                   <View style={{ elevation: 2, marginLeft: -8 }}>
-                    {/* Avatar 3: Tiếp tục kéo lùi sang trái đè lên Avatar 2 */}
                     <Image
                       source={{ uri: 'https://i.pravatar.cc/100?img=3' }}
                       className="w-4 h-4 rounded-full border-[1px] border-white z-30"
@@ -709,15 +592,12 @@ export default function ShelterProfileScreen() {
                   </View>
                 </View>
 
-                {/* --- 2. DÒNG TEXT TRỘN NHIỀU STYLE --- */}
-                {/* Thẻ Text cha bọc ngoài cùng sẽ định dạng màu xám mặc định */}
                 <Text className="ml-1 text-[12px] text-[#8E8E93] flex-1">
-                  Followed by{' '}
-                  {/* Các thẻ Text con lồng bên trong để bôi đen chữ */}
+                  {t('Followed by')}{' '}
                   <Text className="font-medium text-black">john doe</Text>,{' '}
                   <Text className="font-medium text-black">james doe</Text>,{' '}
-                  <Text className="font-medium text-black">jane doe</Text> and{' '}
-                  <Text className="font-medium text-black">79 others</Text>
+                  <Text className="font-medium text-black">jane doe</Text> {t('and')}{' '}
+                  <Text className="font-medium text-black">79 {t('others')}</Text>
                 </Text>
 
               </View>
@@ -729,7 +609,7 @@ export default function ShelterProfileScreen() {
                   }`}
               >
                 <Text className={`font-semibold text-[14px] ${isFollowing ? 'text-gray-700' : 'text-white'}`}>
-                  {isFollowing ? 'Following' : 'Follow'}
+                  {isFollowing ? t('Following') : t('Follow')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -739,7 +619,7 @@ export default function ShelterProfileScreen() {
               >
                 <Text className={`font-semibold text-[14px] ${activeTab === 'info' ? 'text-white' : 'text-gray-600'
                   }`}>
-                  {activeTab === 'pets' ? 'Contact' : 'View Pets'}
+                  {activeTab === 'pets' ? t('Contact') : t('View Pets')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -747,14 +627,12 @@ export default function ShelterProfileScreen() {
 
           {activeTab === 'info' ? (
             <View className="px-[20px]">
-              {/* About Shelter */}
-              <Text className="text-[16px] font-medium text-black mb-2">About Shelter</Text>
+              <Text className="text-[16px] font-medium text-black mb-2">{t("About Shelter")}</Text>
               <Text className="text-[14px] text-[#8E8E93] leading-5 mb-5">
                 {shelterInfo?.description || "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam"}
               </Text>
 
-              {/* Contact Info */}
-              <Text className="text-[16px] font-medium text-black mb-2">Contact Info</Text>
+              <Text className="text-[16px] font-medium text-black mb-2">{t("Contact Info")}</Text>
               <View className="gap-y-3 mb-5">
                 <View className="flex-row items-center gap-x-3">
                   <Image
@@ -762,7 +640,7 @@ export default function ShelterProfileScreen() {
                     style={{ width: 13, height: 13 }}
                     resizeMode="cover"
                   />
-                  <Text className="text-[14px] text-[#8E8E93]">Send message</Text>
+                  <Text className="text-[14px] text-[#8E8E93]">{t("Send message")}</Text>
                 </View>
                 <TouchableOpacity onPress={handleCall} className="flex-row items-center gap-x-3">
                   <Image
@@ -782,25 +660,21 @@ export default function ShelterProfileScreen() {
                 </View>
               </View>
 
-              {/* More Info */}
-              <Text className="text-[16px] font-medium text-black mb-2">More Info</Text>
+              <Text className="text-[16px] font-medium text-black mb-2">{t("More Info")}</Text>
               <View className="gap-y-3">
                 <View className="flex-row items-center gap-x-3">
                   <Image source={require('../assets/icon/earth.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
-                  {/* Sử dụng dữ liệu thật */}
-                  <Text className="text-[14px] text-[#8E8E93]">Based in {shelterInfo?.address || "Vietnam"}</Text>
+                  <Text className="text-[14px] text-[#8E8E93]">{t("Based in")} {shelterInfo?.address || "Vietnam"}</Text>
                 </View>
                 <View className="flex-row items-center gap-x-3">
                   <Image source={require('../assets/icon/info.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
-                  {/* Sử dụng ngày tạo thật từ DB */}
-                  <Text className="text-[14px] text-[#8E8E93]">Joined {formatDate(shelterInfo?.createdAt)}</Text>
+                  <Text className="text-[14px] text-[#8E8E93]">{t("Joined")} {formatDate(shelterInfo?.createdAt)}</Text>
                 </View>
 
-                {/* Render theo trạng thái verified */}
                 {shelterInfo?.isVerified && (
                   <View className="flex-row items-center gap-x-3">
                     <Image source={require('../assets/icon/real-tick.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
-                    <Text className="text-[14px] text-[#8E8E93]">Verified {formatDate(shelterInfo?.verifiedAt)}</Text>
+                    <Text className="text-[14px] text-[#8E8E93]">{t("Verified")} {formatDate(shelterInfo?.verifiedAt)}</Text>
                   </View>
                 )}
               </View>
@@ -817,15 +691,14 @@ export default function ShelterProfileScreen() {
               }}
             >
               {filteredPets.length > 0 ? (
-                filteredPets.map((pet) => (
-                  /* Bọc PetCard vào 1 thẻ View có độ rộng COLUMN_WIDTH đã tính toán */
+                filteredPets.map((pet: any) => (
                   <View key={pet.id} style={{ width: COLUMN_WIDTH }}>
-                    <PetCard pet={pet} formatBreed={formatBreed} />
+                    <PetCard pet={pet} formatBreed={formatBreed} t={t} />
                   </View>
                 ))
               ) : (
                 <View className="flex-1 items-center justify-center py-10">
-                  <Text className="text-gray-500">No pets found</Text>
+                  <Text className="text-gray-500">{t("No pets found")}</Text>
                 </View>
               )}
             </View>
@@ -836,7 +709,7 @@ export default function ShelterProfileScreen() {
       <Modal
         animationType="fade"
         transparent={true}
-        visible = {isfilterVisible}
+        visible={isfilterVisible}
       >
         <TouchableOpacity
           activeOpacity={1}
@@ -847,31 +720,29 @@ export default function ShelterProfileScreen() {
             <View className="bg-white w-full rounded-[32px] overflow-hidden max-h-[80%] shadow-2xl pt-8">
 
               <View className='mx-[20px]'>
-                {/* Ô hiển thị vị trí tự động cập nhật */}
                 <View className="">
                   <View className="flex-row items-center justify-between">
-                  <SectionLabel title="Pet Type" />
+                  <SectionLabel title={t("Pet Type")} />
 
-                  {/* Nút X đóng modal */}
                   <TouchableOpacity onPress={() => setIsFilterVisible(false)} className="p-2.5 -mt-1 -mr-1">
                     <Feather name="x" size={16} color="#111827" />
                   </TouchableOpacity>
                 </View>
                   <View className="flex-row justify-between gap-3 mt-3">
                     <FilterChip
-                      label="All"
+                      label={t("All")}
                       selected={selectedType === 'all'}
                       onPress={() => setSelectedType('all')}
                       iconSource={require('../assets/icon/all-filter.png')}
                     />
                     <FilterChip
-                      label="Cat"
+                      label={t("Cat")}
                       selected={selectedType === 'cat'}
                       onPress={() => setSelectedType('cat')}
                       iconSource={require('../assets/icon/cat-filter.png')}
                     />
                     <FilterChip
-                      label="Dog"
+                      label={t("Dog")}
                       selected={selectedType === 'dog'}
                       onPress={() => setSelectedType('dog')}
                       iconSource={require('../assets/icon/dog-filter.png')}
@@ -880,16 +751,16 @@ export default function ShelterProfileScreen() {
                 </View>
 
                 <View className="mt-5">
-                  <SectionLabel title="Gender" optional />
+                  <SectionLabel title={t("Gender")} optionalText={t("(Optional)")} />
                   <View className="flex-row flex-wrap justify-between gap-3 mt-3">
                     <FilterChip
-                      label="Female"
+                      label={t("Female")}
                       selected={selectedGender === 'female'}
                       onPress={() => setSelectedGender('female')}
                       iconSource={require('../assets/icon/female-filter.png')}
                     />
                     <FilterChip
-                      label="Male"
+                      label={t("Male")}
                       selected={selectedGender === 'male'}
                       onPress={() => setSelectedGender('male')}
                       iconSource={require('../assets/icon/male-filter.png')}
@@ -898,15 +769,15 @@ export default function ShelterProfileScreen() {
                 </View>
 
                 <View className="mt-5">
-                  <SectionLabel title="Sterilized" optional />
+                  <SectionLabel title={t("Sterilized")} optionalText={t("(Optional)")} />
                   <View className="flex-row flex-wrap justify-between gap-3 mt-3">
                     <FilterChip
-                      label="Yes"
+                      label={t("Yes")}
                       selected={selectedSterilized === true}
                       onPress={() => setSelectedSterilized(true)}
                     />
                     <FilterChip
-                      label="No"
+                      label={t("No")}
                       selected={selectedSterilized === false}
                       onPress={() => setSelectedSterilized(false)}
                     />
@@ -914,45 +785,45 @@ export default function ShelterProfileScreen() {
                 </View>
 
                 <View className="mt-5">
-                  <SectionLabel title="Age" optional />
+                  <SectionLabel title={t("Age")} optionalText={t("(Optional)")} />
                   <View className="flex-row flex-wrap justify-between gap-3 mt-3">
                     <FilterChip
-                      label="Baby"
+                      label={t("Baby")}
                       selected={selectedAge === 'baby'}
                       onPress={() => setSelectedAge('baby')}
                     />
                     <FilterChip
-                      label="Young"
+                      label={t("Young")}
                       selected={selectedAge === 'young'}
                       onPress={() => setSelectedAge('young')}
                     />
                     <FilterChip
-                      label="Adult"
+                      label={t("Adult")}
                       selected={selectedAge === 'adult'}
                       onPress={() => setSelectedAge('adult')}
                     />
                     <FilterChip
-                      label="Senior"
+                      label={t("Senior")}
                       selected={selectedAge === 'senior'}
                       onPress={() => setSelectedAge('senior')}
                     />
                   </View>
                 </View>
                 <View className="mt-5">
-                  <SectionLabel title="Size" optional />
+                  <SectionLabel title={t("Size")} optionalText={t("(Optional)")} />
                   <View className="flex-row flex-wrap justify-between gap-3 mt-3">
                     <FilterChip
-                      label="Small"
+                      label={t("Small")}
                       selected={selectedSize === 'small'}
                       onPress={() => setSelectedSize('small')}
                     />
                     <FilterChip
-                      label="Medium"
+                      label={t("Medium")}
                       selected={selectedSize === 'medium'}
                       onPress={() => setSelectedSize('medium')}
                     />
                     <FilterChip
-                      label="Large"
+                      label={t("Large")}
                       selected={selectedSize === 'large'}
                       onPress={() => setSelectedSize('large')}
                     />
@@ -960,13 +831,12 @@ export default function ShelterProfileScreen() {
                 </View>
 
 
-                {/* --- BOTTOM BUTTONS (Reset & Apply) --- */}
                 <View className="flex-row items-center justify-between py-6">
                   <TouchableOpacity
                     onPress={()=> {}}
                     className="w-full bg-[#E89B5A] py-4 rounded-full items-center active:bg-[#D68A4A]"
                   >
-                    <Text className="text-white font-semibold text-[16px]">Apply</Text>
+                    <Text className="text-white font-semibold text-[16px]">{t("Apply")}</Text>
                   </TouchableOpacity>
                 </View>
               </View>

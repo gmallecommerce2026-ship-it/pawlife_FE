@@ -4,8 +4,8 @@ import { socket } from '@/utils/socket';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useActionState, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function TransferOwnershipScreen() {
@@ -123,7 +123,6 @@ export default function TransferOwnershipScreen() {
       setIsSubmitting(false);
       setIsPending(false)
     }
-
   };
 
   const handleCancelTransfer = async () => {
@@ -177,7 +176,7 @@ export default function TransferOwnershipScreen() {
     if (transferRole === 'sender') {
       router.back(); // Trở về Pet Profile
     } else {
-      router.replace('/(tabs)'); // Trở về Home Screen
+      router.push('/(tabs)'); // Trở về Home Screen
     }
   };
 
@@ -235,330 +234,337 @@ export default function TransferOwnershipScreen() {
             <Text className="text-[24px] font-semibold text-black">Transfer Ownership</Text>
           </View>
         </View>
-        <ScrollView
-          contentContainerStyle={{ alignItems: 'center', paddingTop: 10, backgroundColor: '#FFFFFF', paddingBottom: 40, paddingHorizontal: 20 }}
-          showsVerticalScrollIndicator={false}
-          className="flex-1 bg-white"
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }} 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // keyboardVerticalOffset={20} // Mở comment này nếu bàn phím vẫn hơi che mất 1 tí do SafeArea
         >
-          {/* Header */}
+          <ScrollView
+            contentContainerStyle={{ alignItems: 'center', paddingTop: 10, backgroundColor: '#FFFFFF', paddingBottom: 40, paddingHorizontal: 20 }}
+            showsVerticalScrollIndicator={false}
+            className="flex-1 bg-white"
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Header */}
 
-          {/* Pet Info Card (Giữ nguyên) */}
-          <View className='w-full'
-            style={{
-              shadowColor: '#000000',
-              shadowOffset: { width: 1, height: 1 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
-            }}>
-            <View className='rounded-[16px] mb-[24px] w-full overflow-hidden bg-white'>
-              <LinearGradient
-                colors={['rgba(251,240,246,0.6)', 'rgba(249,236,243,1)', 'rgba(248,232,241,1)']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                className="flex-row items-center w-full h-[92px] px-[14px] rounded-[16px] mb-[24px]"
-              >
-                <View className='flex-row w-full p-[14px] rounded-[16px]'>
-                  <Image source={{ uri: petInfo?.avatarUrl || defaultPetImage }} className="w-[64px] h-[64px] rounded-[12px]" />
-                  <View className="flex-1 flex-col justify-center ml-[12px] h-[64px]">
-                    <Text className="text-[16px] font-semibold text-black" numberOfLines={1}>{petInfo?.name || 'Unknown Name'}</Text>
-                    <Text className="text-[12px] font-regular text-[#8E8E93] mt-[6px] tracking-[0.5px]">{getAge(petInfo?.dob)} • {petInfo?.breed || 'Unknown Breed'}</Text>
-                    <Text className="text-[12px] font-regular text-[#8E8E93] mt-[2px] tracking-[0.5px]">ID: {petInfo?.id?.substring(0, 8).toUpperCase()}</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-            </View>
-          </View>
-
-          <View className='mt-[24px] w-full'>
-            <LinearGradient
-              colors={['#FFF9F0', '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-              style={{ borderRadius: 16 }} className="w-full rounded-[16px] border border-[#FFE4CC] mb-8"
-            >
-              {/* Top Row - Hiển thị Avatar */}
-              <View className="flex-row justify-between items-start w-full pb-[21px] px-[22px] pt-[30px] border-t border-l border-r rounded-t-[16px] border-[#FFE4CC]">
-                <View className="items-center w-[80px]">
-                  <Image
-                    source={{ uri: ownerInfo?.avatarUrl || defaultAvatar }}
-                    className="w-[68px] h-[68px] rounded-full border-[2px] border-[#FF9F5A] mb-2"
-                  />
-                  <Text className="text-[14px] font-medium text-black text-center" numberOfLines={1}>{ownerInfo?.name || 'Current Owner'}</Text>
-                  <Text className="text-[12px] text-[#8E8E93] text-center mt-0.5 tracking-[0.06px] ">Current Owner</Text>
-                </View>
-
-                <View className="flex-1 items-center justify-center px-2 mt-6">
-                  <View className="w-full h-[2px] bg-[#FFE4CC] absolute top-[11px]" >
-                    <LinearGradient
-                      colors={[isTransferUnsuccessful ? '#FE7D66' : '#FFA562', '#E5E5E5']}
-                      locations={[0, 0.8]}
-                      start={{ x: 0.0, y: 0.5 }}
-                      end={{ x: 1.0, y: 0.5 }}
-                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '100%', justifyContent: 'flex-end' }}
-                    ></LinearGradient>
-                  </View>
-                  <View className={`justify-center items-center w-[24px] h-[24px] rounded-full z-10 ${isTransferUnsuccessful ? 'bg-[#FE7D66]' : 'bg-[#FEA766]'}`}>
-                    {isPending ? (
-                      <Image
-                        source={require('../assets/icon/pause-white.png')}
-                        className="w-[11px] h-[11px]"
-                      />
-                    ) : (
-                      <Image
-                        source={isTransferUnsuccessful ? require('../assets/icon/close-white.png') : require('../assets/icon/arrow-right-white.png')}
-                        className="w-[11px] h-[11px]"
-                      />
-                    )}
-                  </View>
-
-                  {/* 3. THAY ĐỔI TEXT THEO ĐÚNG ROLE */}
-                  <Text className={`text-[12px] font-semibold text-center mt-1 tracking-[0.06px] ${isTransferUnsuccessful ? 'text-[#FF4D4D]' : 'text-[#FEA766]'}`}>
-                    {isTransferUnsuccessful ? 'Canceled' : (
-                      transferRole === 'none' ? 'Pending...' :
-                        transferRole === 'sender' ? 'Transferring' : 'Confirming'
-                    )}
-                  </Text>
-                </View>
-
-                <View className="items-center w-[80px]">
-                  {petInfo?.receiver ? (
-                    <Image
-                      source={{ uri: petInfo.receiver.avatarUrl || defaultAvatar }}
-                      className={`w-[60px] h-[60px] rounded-full border-[2px] border-dashed mb-2 ${isTransferUnsuccessful ? 'border-[#FF4D4D]' : 'border-[#FF9F5A]'}`}
-                    />
-                  ) : (
-                    <View className="w-[68px] h-[68px] rounded-full border-[2px] border-dashed border-[#757575] bg-[#E5E5E5] justify-center items-center mb-2">
-                      <Ionicons name="person" size={24} color="#757575" />
+            {/* Pet Info Card (Giữ nguyên) */}
+            <View className='w-full'
+              style={{
+                shadowColor: '#000000',
+                shadowOffset: { width: 1, height: 1 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+                elevation: 5,
+              }}>
+              <View className='rounded-[16px] mb-[24px] w-full overflow-hidden bg-white'>
+                <LinearGradient
+                  colors={['rgba(251,240,246,0.6)', 'rgba(249,236,243,1)', 'rgba(248,232,241,1)']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  className="flex-row items-center w-full h-[92px] px-[14px] rounded-[16px] mb-[24px]"
+                >
+                  <View className='flex-row w-full p-[14px] rounded-[16px]'>
+                    <Image source={{ uri: petInfo?.avatarUrl || defaultPetImage }} className="w-[64px] h-[64px] rounded-[12px]" />
+                    <View className="flex-1 flex-col justify-center ml-[12px] h-[64px]">
+                      <Text className="text-[16px] font-semibold text-black" numberOfLines={1}>{petInfo?.name || 'Unknown Name'}</Text>
+                      <Text className="text-[12px] font-regular text-[#8E8E93] mt-[6px] tracking-[0.5px]">{getAge(petInfo?.dob)} • {petInfo?.breed || 'Unknown Breed'}</Text>
+                      <Text className="text-[12px] font-regular text-[#8E8E93] mt-[2px] tracking-[0.5px]">ID: {petInfo?.id?.substring(0, 8).toUpperCase()}</Text>
                     </View>
-                  )}
-                  <Text className="text-[14px] font-medium text-black text-center" numberOfLines={1}>
-                    {receiverName}
-                  </Text>
-                  <Text className="text-[11px] text-[#8E8E93] text-center mt-0.5">
-                    {isTransferUnsuccessful ? 'Rejected' : (transferRole === 'none' ? 'Awaiting' : 'Confirming')}
-                  </Text>
-                </View>
-              </View>
-
-              <View className='w-full h-[1px]'>
-                <View className='mx-[22px] h-full items-center justify-center bg-[#FFE4CC]'></View>
-              </View>
-
-              {/* LUỒNG UI KHI THẤT BẠI (CANCEL/REJECT) */}
-              {isTransferUnsuccessful ? (
-                <>
-                  <View className="flex-row items-center pt-[21px] px-[22px] border-l border-r border-[#FFE4CC]">
-                    <Ionicons
-                      name="close"
-                      size={18}
-                      color="#FE7D66"
-                    />
-                    <Text className="text-[16px] font-semibold text-[#FF4D4D] ml-1">Transfer unsuccessful</Text>
                   </View>
-                  <View className="w-full px-[30px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[16px] pb-[30px] items-center">
-                    <Text className="text-[12px] text-[#8E8E93] leading-[16px] tracking-[0.06px] ml-3">
-                      I acknowledge this transfer is permanent and all {petInfo?.name}'s profile will be transferred to {receiverName}
+                </LinearGradient>
+              </View>
+            </View>
+
+            <View className='mt-[24px] w-full'>
+              <LinearGradient
+                colors={['#FFF9F0', '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                style={{ borderRadius: 16 }} className="w-full rounded-[16px] border border-[#FFE4CC] mb-8"
+              >
+                {/* Top Row - Hiển thị Avatar */}
+                <View className="flex-row justify-between items-start w-full pb-[21px] px-[22px] pt-[30px] border-t border-l border-r rounded-t-[16px] border-[#FFE4CC]">
+                  <View className="items-center w-[80px]">
+                    <Image
+                      source={{ uri: ownerInfo?.avatarUrl || defaultAvatar }}
+                      className="w-[68px] h-[68px] rounded-full border-[2px] border-[#FF9F5A] mb-2"
+                    />
+                    <Text className="text-[14px] font-medium text-black text-center" numberOfLines={1}>{ownerInfo?.name || 'Current Owner'}</Text>
+                    <Text className="text-[12px] text-[#8E8E93] text-center mt-0.5 tracking-[0.06px] ">Current Owner</Text>
+                  </View>
+
+                  <View className="flex-1 items-center justify-center px-2 mt-6">
+                    <View className="w-full h-[2px] bg-[#FFE4CC] absolute top-[11px]" >
+                      <LinearGradient
+                        colors={[isTransferUnsuccessful ? '#FE7D66' : '#FFA562', '#E5E5E5']}
+                        locations={[0, 0.8]}
+                        start={{ x: 0.0, y: 0.5 }}
+                        end={{ x: 1.0, y: 0.5 }}
+                        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '100%', justifyContent: 'flex-end' }}
+                      ></LinearGradient>
+                    </View>
+                    <View className={`justify-center items-center w-[24px] h-[24px] rounded-full z-10 ${isTransferUnsuccessful ? 'bg-[#FE7D66]' : 'bg-[#FEA766]'}`}>
+                      {isPending ? (
+                        <Image
+                          source={require('../assets/icon/pause-white.png')}
+                          className="w-[11px] h-[11px]"
+                        />
+                      ) : (
+                        <Image
+                          source={isTransferUnsuccessful ? require('../assets/icon/close-white.png') : require('../assets/icon/arrow-right-white.png')}
+                          className="w-[11px] h-[11px]"
+                        />
+                      )}
+                    </View>
+
+                    {/* 3. THAY ĐỔI TEXT THEO ĐÚNG ROLE */}
+                    <Text className={`text-[12px] font-semibold text-center mt-1 tracking-[0.06px] ${isTransferUnsuccessful ? 'text-[#FF4D4D]' : 'text-[#FEA766]'}`}>
+                      {isTransferUnsuccessful ? 'Canceled' : (
+                        transferRole === 'none' ? 'Pending...' :
+                          transferRole === 'sender' ? 'Transferring' : 'Confirming'
+                      )}
                     </Text>
                   </View>
-                </>
-              ) : (
-                /* Content bình thường khi chưa thất bại */
-                <>
-                  {transferRole === 'none' && (
-                    <>
-                      <View className="flex-row items-center pt-[21px] px-[22px] border-l border-r border-[#FFE4CC]">
-                        <Image
-                          source={require('../assets/icon/user.png')}
-                          style={{ width: 16, height: 16 }} // Sửa thành style nội tuyến
-                          resizeMode="cover"
-                          className='mr-2'
-                        />
-                        <Text className="text-[16px] font-semibold text-[#FEA766]">New Owner Contact</Text>
+
+                  <View className="items-center w-[80px]">
+                    {petInfo?.receiver ? (
+                      <Image
+                        source={{ uri: petInfo.receiver.avatarUrl || defaultAvatar }}
+                        className={`w-[60px] h-[60px] rounded-full border-[2px] border-dashed mb-2 ${isTransferUnsuccessful ? 'border-[#FF4D4D]' : 'border-[#FF9F5A]'}`}
+                      />
+                    ) : (
+                      <View className="w-[68px] h-[68px] rounded-full border-[2px] border-dashed border-[#757575] bg-[#E5E5E5] justify-center items-center mb-2">
+                        <Ionicons name="person" size={24} color="#757575" />
                       </View>
+                    )}
+                    <Text className="text-[14px] font-medium text-black text-center" numberOfLines={1}>
+                      {receiverName}
+                    </Text>
+                    <Text className="text-[11px] text-[#8E8E93] text-center mt-0.5">
+                      {isTransferUnsuccessful ? 'Rejected' : (transferRole === 'none' ? 'Awaiting' : 'Confirming')}
+                    </Text>
+                  </View>
+                </View>
 
-                      <View className="w-full px-[22px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pb-[30px] pt-[16px]">
+                <View className='w-full h-[1px]'>
+                  <View className='mx-[22px] h-full items-center justify-center bg-[#FFE4CC]'></View>
+                </View>
 
-                        {/* 1. THANH CHUYỂN ĐỔI (SEGMENTED CONTROL) */}
-                        <View className="flex-row bg-[#787880]/10 p-1 rounded-[12px] w-full h-[44px] items-center mb-[16px]">
-                          {/* Tab Email */}
-                          <TouchableOpacity
-                            activeOpacity={0.8}
-                            onPress={() => {
-                              setInputType('email');
-                              setContactValue(''); // (Tuỳ chọn) Reset input khi đổi tab
-                            }}
-                            className={`flex-1 h-full flex-row justify-center items-center rounded-[7px] ${inputType === 'email' ? 'bg-white' : 'bg-transparent'
-                              }`}
-                            style={inputType === 'email' ? { elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } } : {}}
-                          >
-                            <Image
-                              source={
-                                inputType === 'email'
-                                  ? require('../assets/icon/mail-black.png') // Ảnh màu Active
-                                  : require('../assets/icon/mail-gray.png') // Ảnh màu Inactive
-                              }
-                              style={{ width: 16, height: 16 }}
-                              resizeMode="cover"
-                              className="mr-2" // Khoảng cách giữa Icon và Chữ
-                            />
-                            <Text className={`text-[14px] ${inputType === 'email' ? 'text-black font-semibold' : 'text-[#8E8E93] font-regular'}`}>
-                              Email
-                            </Text>
-                          </TouchableOpacity>
-
-                          {/* Tab Phone Number */}
-                          <TouchableOpacity
-                            activeOpacity={0.8}
-                            onPress={() => {
-                              setInputType('phone');
-                              setContactValue('');
-                            }}
-                            className={`flex-1 h-full flex-row justify-center items-center rounded-[10px] ${inputType === 'phone' ? 'bg-white' : 'bg-transparent'
-                              }`}
-                            style={inputType === 'phone' ? { elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } } : {}}
-                          >
-                            <Image
-                              source={
-                                inputType === 'phone'
-                                  ? require('../assets/icon/phone-black.png') // Ảnh màu Active
-                                  : require('../assets/icon/phone-gray-icon.png') // Ảnh màu Inactive
-                              }
-                              style={{ width: 16, height: 16 }}
-                              resizeMode="cover"
-                              className="mr-2" // Khoảng cách giữa Icon và Chữ
-                            />
-                            <Text className={`text-[14px] ${inputType === 'phone' ? 'text-black font-semibold' : 'text-[#8E8E93] font-regular'}`}>
-                              Phone
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        <Text className="text-[12px] font-medium text-black mb-3">New Owner’s {inputType === 'phone' ? 'Phone' : 'Email Address'}</Text>
-
-                        {/* 2. Ô NHẬP LIỆU (TEXT INPUT) */}
-                        <View className="bg-white justify-center w-full h-[48px] rounded-[16px] border border-[#E5E5E5] px-4">
-                          <TextInput
-                            className="text-[14px] text-black w-full"
-                            placeholder={inputType === 'email' ? "Newowner@email.com" : "0987654321"}
-                            value={contactValue}
-                            onChangeText={setContactValue}
-                            placeholderTextColor="#B8B8B8"
-                            autoCapitalize="none"
-                            keyboardType={inputType === 'email' ? "email-address" : "phone-pad"}
+                {/* LUỒNG UI KHI THẤT BẠI (CANCEL/REJECT) */}
+                {isTransferUnsuccessful ? (
+                  <>
+                    <View className="flex-row items-center pt-[21px] px-[22px] border-l border-r border-[#FFE4CC]">
+                      <Ionicons
+                        name="close"
+                        size={18}
+                        color="#FE7D66"
+                      />
+                      <Text className="text-[16px] font-semibold text-[#FF4D4D] ml-1">Transfer unsuccessful</Text>
+                    </View>
+                    <View className="w-full px-[30px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[16px] pb-[30px] items-center">
+                      <Text className="text-[12px] text-[#8E8E93] leading-[16px] tracking-[0.06px] ml-3">
+                        I acknowledge this transfer is permanent and all {petInfo?.name}'s profile will be transferred to {receiverName}
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  /* Content bình thường khi chưa thất bại */
+                  <>
+                    {transferRole === 'none' && (
+                      <>
+                        <View className="flex-row items-center pt-[21px] px-[22px] border-l border-r border-[#FFE4CC]">
+                          <Image
+                            source={require('../assets/icon/user.png')}
+                            style={{ width: 16, height: 16 }} // Sửa thành style nội tuyến
+                            resizeMode="cover"
+                            className='mr-2'
                           />
+                          <Text className="text-[16px] font-semibold text-[#FEA766]">New Owner Contact</Text>
                         </View>
-                      </View>
-                    </>
-                  )}
 
-                  {transferRole === 'sender' && (
-                    <>
-                      <View className="flex-row items-center pt-[21px] px-[22px] border-l border-r border-[#FFE4CC]">
-                        <ActivityIndicator color="#FEA766" className='mr-2' />
-                        <Text className="text-[16px] font-semibold text-[#FEA766]">Waiting for confirmation</Text>
-                      </View>
-                      <View className="w-full px-[30px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[27px] pb-[30px] items-center">
-                        <Text className="text-[12px] text-[#8E8E93] font-regular text-center leading-[22px]">
-                          A confirmation request has been sent to{'\n'}
-                          <Text className="font-medium text-black">{contactValue}</Text>.{'\n'}
-                          Waiting for them to accept the transfer.
-                        </Text>
-                      </View>
-                    </>
-                  )}
+                        <View className="w-full px-[22px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pb-[30px] pt-[16px]">
 
-                  {transferRole === 'receiver' && (
-                    <>
-                      <View className="flex-row items-center pt-[21px] px-[22px] border-l border-r border-[#FFE4CC]">
-                        <Image
-                          source={require('../assets/icon/check-circle.png')}
-                          className="w-[13px] h-[13px]"
-                        />
-                        <Text className="text-[16px] font-semibold text-[#FEA766] ml-2">Confirm Transfer Ownership</Text>
-                      </View>
-                      <View className="w-full flex-row px-[22px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[16px] pb-[30px]">
-                        <Image
-                          source={require('../assets/icon/check-square.png')}
-                          className="w-[13px] h-[13px] mr-2"
-                        />
-                        <Text className="text-[12px] text-[#8E8E93] leading-[16px] italic ">
-                          I acknowledge this transfer is permanent and all {petInfo?.name}'sprofile will be transferred to {receiverName}.
-                        </Text>
-                      </View>
-                    </>
-                  )}
-                </>
-              )}
-            </LinearGradient>
-          </View>
+                          {/* 1. THANH CHUYỂN ĐỔI (SEGMENTED CONTROL) */}
+                          <View className="flex-row bg-[#787880]/10 p-1 rounded-[12px] w-full h-[44px] items-center mb-[16px]">
+                            {/* Tab Email */}
+                            <TouchableOpacity
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                setInputType('email');
+                                setContactValue(''); // (Tuỳ chọn) Reset input khi đổi tab
+                              }}
+                              className={`flex-1 h-full flex-row justify-center items-center rounded-[7px] ${inputType === 'email' ? 'bg-white' : 'bg-transparent'
+                                }`}
+                              style={inputType === 'email' ? { elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } } : {}}
+                            >
+                              <Image
+                                source={
+                                  inputType === 'email'
+                                    ? require('../assets/icon/mail-black.png') // Ảnh màu Active
+                                    : require('../assets/icon/mail-gray.png') // Ảnh màu Inactive
+                                }
+                                style={{ width: 16, height: 16 }}
+                                resizeMode="cover"
+                                className="mr-2" // Khoảng cách giữa Icon và Chữ
+                              />
+                              <Text className={`text-[14px] ${inputType === 'email' ? 'text-black font-semibold' : 'text-[#8E8E93] font-regular'}`}>
+                                Email
+                              </Text>
+                            </TouchableOpacity>
 
-          {/* Button Actions */}
-          <View className="w-full mt-[38px] mb-[20px]">
-            {/* Nút Action khi Canceled/Rejected */}
-            {isTransferUnsuccessful && (
-              <TouchableOpacity
-                className="w-full h-[52px] rounded-[16px] flex-row justify-center items-center"
-                onPress={handleBackNavigation}
-              >
-                <Text className="text-[16px] font-medium text-[#8E8E93]">
-                  {transferRole === 'sender' ? 'Back to pet profile' : 'Back to home screen'}
-                </Text>
-              </TouchableOpacity>
-            )}
+                            {/* Tab Phone Number */}
+                            <TouchableOpacity
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                setInputType('phone');
+                                setContactValue('');
+                              }}
+                              className={`flex-1 h-full flex-row justify-center items-center rounded-[10px] ${inputType === 'phone' ? 'bg-white' : 'bg-transparent'
+                                }`}
+                              style={inputType === 'phone' ? { elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } } : {}}
+                            >
+                              <Image
+                                source={
+                                  inputType === 'phone'
+                                    ? require('../assets/icon/phone-black.png') // Ảnh màu Active
+                                    : require('../assets/icon/phone-gray-icon.png') // Ảnh màu Inactive
+                                }
+                                style={{ width: 16, height: 16 }}
+                                resizeMode="cover"
+                                className="mr-2" // Khoảng cách giữa Icon và Chữ
+                              />
+                              <Text className={`text-[14px] ${inputType === 'phone' ? 'text-black font-semibold' : 'text-[#8E8E93] font-regular'}`}>
+                                Phone
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
 
-            {/* Các nút hiện tại (chỉ hiện khi chưa thất bại) */}
-            {!isTransferUnsuccessful && transferRole === 'none' && (
-              <TouchableOpacity
-                className="bg-[#FEA766] w-full h-[52px] rounded-[16px] flex-row justify-center items-center shadow-sm"
-                onPress={handleSendConfirmation} disabled={isSubmitting}
-              >
-                {isSubmitting ? <ActivityIndicator color="white" /> : (
-                  <>
-                    <Image
-                      source={require('../assets/icon/send-confirm-icon.png')}
-                      style={{ width: 16, height: 16 }} // Sửa thành style nội tuyến
-                      resizeMode="cover"
-                    />
-                    <Text className="text-[16px] font-bold text-white ml-2">Send Confirmation</Text>
+                          <Text className="text-[12px] font-medium text-black mb-3">New Owner’s {inputType === 'phone' ? 'Phone' : 'Email Address'}</Text>
+
+                          {/* 2. Ô NHẬP LIỆU (TEXT INPUT) */}
+                          <View className="bg-white justify-center w-full h-[48px] rounded-[16px] border border-[#E5E5E5] px-4">
+                            <TextInput
+                              className="text-[14px] text-black w-full"
+                              placeholder={inputType === 'email' ? "Newowner@email.com" : "0987654321"}
+                              value={contactValue}
+                              onChangeText={setContactValue}
+                              placeholderTextColor="#B8B8B8"
+                              autoCapitalize="none"
+                              keyboardType={inputType === 'email' ? "email-address" : "phone-pad"}
+                            />
+                          </View>
+                        </View>
+                      </>
+                    )}
+
+                    {transferRole === 'sender' && (
+                      <>
+                        <View className="flex-row items-center pt-[21px] px-[22px] border-l border-r border-[#FFE4CC]">
+                          <ActivityIndicator color="#FEA766" className='mr-2' />
+                          <Text className="text-[16px] font-semibold text-[#FEA766]">Waiting for confirmation</Text>
+                        </View>
+                        <View className="w-full px-[30px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[27px] pb-[30px] items-center">
+                          <Text className="text-[12px] text-[#8E8E93] font-regular text-center leading-[22px]">
+                            A confirmation request has been sent to{'\n'}
+                            <Text className="font-medium text-black">{contactValue}</Text>.{'\n'}
+                            Waiting for them to accept the transfer.
+                          </Text>
+                        </View>
+                      </>
+                    )}
+
+                    {transferRole === 'receiver' && (
+                      <>
+                        <View className="flex-row items-center pt-[21px] px-[22px] border-l border-r border-[#FFE4CC]">
+                          <Image
+                            source={require('../assets/icon/check-circle.png')}
+                            className="w-[13px] h-[13px]"
+                          />
+                          <Text className="text-[16px] font-semibold text-[#FEA766] ml-2">Confirm Transfer Ownership</Text>
+                        </View>
+                        <View className="w-full flex-row px-[22px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[16px] pb-[30px]">
+                          <Image
+                            source={require('../assets/icon/check-square.png')}
+                            className="w-[13px] h-[13px] mr-2"
+                          />
+                          <Text className="text-[12px] text-[#8E8E93] leading-[16px] italic ">
+                            I acknowledge this transfer is permanent and all {petInfo?.name}'sprofile will be transferred to {receiverName}.
+                          </Text>
+                        </View>
+                      </>
+                    )}
                   </>
                 )}
-              </TouchableOpacity>
-            )}
+              </LinearGradient>
+            </View>
 
-            {!isTransferUnsuccessful && transferRole === 'sender' && (
-              <TouchableOpacity
-                className="bg-white w-full h-[52px] rounded-[16px] flex-row justify-center items-center border border-[#E5E5E5]"
-                onPress={handleCancelTransfer} disabled={isSubmitting}
-              >
-                {isSubmitting ? <ActivityIndicator color="white" /> : (
-                  <>
-                    <Text className="text-[16px] font-medium text-[#8E8E93]">Cancel</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-
-            {!isTransferUnsuccessful && transferRole === 'receiver' && (
-              <>
+            {/* Button Actions */}
+            <View className="w-full mt-[38px] mb-[20px]">
+              {/* Nút Action khi Canceled/Rejected */}
+              {isTransferUnsuccessful && (
                 <TouchableOpacity
-                  className="bg-[#FEA766] w-full h-[52px] rounded-[16px] flex-row justify-center items-center mb-3"
-                  onPress={handleConfirmTransfer} disabled={isSubmitting}
+                  className="w-full h-[52px] rounded-[16px] flex-row justify-center items-center"
+                  onPress={handleBackNavigation}
+                >
+                  <Text className="text-[16px] font-medium text-[#8E8E93]">
+                    {transferRole === 'sender' ? 'Back to pet profile' : 'Back to home screen'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Các nút hiện tại (chỉ hiện khi chưa thất bại) */}
+              {!isTransferUnsuccessful && transferRole === 'none' && (
+                <TouchableOpacity
+                  className="bg-[#FEA766] w-full h-[52px] rounded-[16px] flex-row justify-center items-center shadow-sm"
+                  onPress={handleSendConfirmation} disabled={isSubmitting}
                 >
                   {isSubmitting ? <ActivityIndicator color="white" /> : (
                     <>
-                      <Text className="text-[16px] font-semibold text-white ml-2">Complete Transfer Ownership</Text>
+                      <Image
+                        source={require('../assets/icon/send-confirm-icon.png')}
+                        style={{ width: 16, height: 16 }} // Sửa thành style nội tuyến
+                        resizeMode="cover"
+                      />
+                      <Text className="text-[16px] font-bold text-white ml-2">Send Confirmation</Text>
                     </>
                   )}
                 </TouchableOpacity>
+              )}
 
+              {!isTransferUnsuccessful && transferRole === 'sender' && (
                 <TouchableOpacity
-                  className="bg-white border border-[#E5E5E5] w-full h-[52px] rounded-[16px] flex-row justify-center items-center"
+                  className="bg-white w-full h-[52px] rounded-[16px] flex-row justify-center items-center border border-[#E5E5E5]"
                   onPress={handleCancelTransfer} disabled={isSubmitting}
                 >
-                  <Text className="text-[16px] font-medium text-[#8E8E93]">Cancel</Text>
+                  {isSubmitting ? <ActivityIndicator color="white" /> : (
+                    <>
+                      <Text className="text-[16px] font-medium text-[#8E8E93]">Cancel</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </ScrollView>
+              )}
+
+              {!isTransferUnsuccessful && transferRole === 'receiver' && (
+                <>
+                  <TouchableOpacity
+                    className="bg-[#FEA766] w-full h-[52px] rounded-[16px] flex-row justify-center items-center mb-3"
+                    onPress={handleConfirmTransfer} disabled={isSubmitting}
+                  >
+                    {isSubmitting ? <ActivityIndicator color="white" /> : (
+                      <>
+                        <Text className="text-[16px] font-semibold text-white ml-2">Complete Transfer Ownership</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    className="bg-white border border-[#E5E5E5] w-full h-[52px] rounded-[16px] flex-row justify-center items-center"
+                    onPress={handleCancelTransfer} disabled={isSubmitting}
+                  >
+                    <Text className="text-[16px] font-medium text-[#8E8E93]">Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
         <Modal
           visible={isSuccessModalVisible}
           transparent={true}

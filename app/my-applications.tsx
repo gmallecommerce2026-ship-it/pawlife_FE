@@ -426,10 +426,14 @@ export default function MyApplicationsScreen() {
                   setIsOptionsVisible(false);
                   const selectedApp = applications.find(app => app.id === selectedAppId);
                   if (selectedApp?.pet?.id) {
-                    router.push(`/shelter-pet-detail?id=${selectedApp.pet.id}`);
+                    router.push({
+                    pathname: '/pet-detail-modal',
+                    params: { id: selectedApp.pet.id }
+                  });
                   }
                 }}
               >
+               
                 <Feather name="twitter" size={16} color="#4B5563" />
                 <Text className="text-[13px] font-medium text-gray-700 ml-2 leading-5">Pet Profile</Text>
               </TouchableOpacity>

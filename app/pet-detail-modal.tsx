@@ -2,11 +2,12 @@
 import { Text } from '@/components/AppText';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Image, LayoutAnimation, Linking, Platform, TouchableOpacity, UIManager, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Image, LayoutAnimation, Platform, TouchableOpacity, UIManager, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue
@@ -32,12 +33,13 @@ const formatCapitalize = (str?: string) => {
   if (!str) return 'Unknown';
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
+
 export default function PetDetailModal() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const [pet, setPet] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient(); // Sử dụng QueryClient
+
   const [showHistory, setShowHistory] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const { width, height } = Dimensions.get('window');
@@ -54,15 +56,35 @@ export default function PetDetailModal() {
   const animatedImageStyle = useAnimatedStyle(() => {
     const overlapHeight = SCREEN_HEIGHT * 0.03;
     const minHeight = SCREEN_HEIGHT * 0.48;
-    // animatedPosition.value chính là khoảng trống từ trên cùng màn hình đến mép Bottom Sheet.
-    // VD: BottomSheet ở 25% (đáy) -> Tọa độ Y mép trên là 75% màn hình.
-    // Chúng ta chỉ cần cho chiều cao ảnh bằng đúng tọa độ Y này!
-    // Tuy nhiên, bạn muốn DỪNG co ảnh ở mốc 55% (tức là khi mép trên ở tọa độ 45% màn hình).
-
     return {
-      // Dùng Math.max để đảm bảo ảnh luôn co giãn theo Bottom Sheet, nhưng không bao giờ nhỏ hơn minHeight
       height: Math.max(animatedPosition.value + overlapHeight, minHeight),
     };
+  });
+
+  const getHistoryUIConfig = (type: string) => {
+    switch(type) {
+      case 'BIRTH': 
+        return { icon: 'birthday-cake', color: '#F2A465', bgColor: '#FFF4EC' };
+      case 'CREATED': 
+        return { icon: 'paw', color: '#885BF2', bgColor: '#EAE7FB' };
+      case 'QR_LINKED': 
+        return { icon: 'qrcode', color: '#5A90DA', bgColor: '#E8F1FF' };
+      case 'TRANSFER': 
+        return { icon: 'home', color: '#77C582', bgColor: '#EBFFE2' };
+      case 'VACCINE': 
+        return { icon: 'syringe', color: '#EF4444', bgColor: '#FEE2E2' };
+      default: 
+        return { icon: 'history', color: '#8E8E93', bgColor: '#F5F5F5' };
+    }
+  };
+
+  // 3. FETCH PET DETAIL VỚI USEQUERY
+  const { data: pet, isLoading } = useQuery({
+    queryKey: ['pet-detail', params.id],
+    queryFn: async () => {
+      const res = await petService.getPetById(params.id as string);
+      return res.data || res;
+    }
   });
 
   const displayImages = useMemo(() => {
@@ -71,66 +93,15 @@ export default function PetDetailModal() {
       : [pet?.avatarUrl || 'https://images.unsplash.com/photo-1600804340584-c7db2eacf0bf?q=80&w=800&auto=format&fit=crop'];
   }, [pet]);
   
-  const MOCK_PAW_HISTORY = [
-    {
-      id: '1',
-      title: 'Current Owner',
-      date: '01/01/2026',
-      description: 'Ownership transferred to Jane Doe',
-      icon: 'user',
-      color: '#F2A465', // Cam
-      bgColor: '#FFF4EC'
-    },
-    {
-      id: '2',
-      title: 'Annual Checkup',
-      date: '01/01/2026',
-      description: 'Health examination completed',
-      icon: 'check',
-      color: '#77C582', // Xanh lá
-      bgColor: '#EBFFE2'
-    },
-    {
-      id: '3',
-      title: 'DHPP Vaccination',
-      date: '01/01/2026',
-      description: 'Vaccinated: hepatitis, rabies, parvo, and parainfluenza',
-      icon: 'user', // Bạn có thể đổi thành 'syringe' cho hợp ngữ cảnh y tế
-      color: '#5A90DA', // Xanh dương
-      bgColor: '#E8F1FF'
-    },
-    {
-      id: '4',
-      title: 'QR Code Registered',
-      date: '01/01/2026',
-      description: 'PawLife QR tag activated and linked to Luna',
-      icon: 'expand',
-      color: '#885BF2', // Tím
-      bgColor: '#EAE7FB'
-    },
-    {
-      id: '5',
-      title: 'Date of Birth',
-      date: '01/01/2026',
-      description: 'Luna was born',
-      icon: 'user',
-      color: '#F2A465', // Vàng cam
-      bgColor: '#FFF4EC'
-    }
-  ];
-
-  // Cấu hình chiều cao ảnh nền (để đủ cover khoảng trống phía sau thẻ)
-  const IMAGE_HEIGHT = height * 0.55;
   const REQUIRED_TOP_INSET = insets.top + 44 + 21;
   // --- CẤU HÌNH BOTTOM SHEET ---
   const snapPoints = useMemo(() => {
-    // Mốc cao nhất: Dưới nút back 21px
     const highestSnapPoint = SCREEN_HEIGHT - REQUIRED_TOP_INSET;
-
     const lowestSnapPoint = headerHeight + BOTTOM_BAR_HEIGHT;
     const middleSnapPoint = SCREEN_HEIGHT / 2;
     return [lowestSnapPoint, middleSnapPoint, highestSnapPoint];
   }, [headerHeight, SCREEN_HEIGHT, insets.top]);
+
   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
@@ -141,57 +112,50 @@ export default function PetDetailModal() {
   };
 
   useEffect(() => {
-    const fetchDetail = async () => {
-      try {
-        const res = await petService.getPetById(params.id as string);
-        const petData = res.data || res;
-        setPet(petData);
-        // Giả sử API trả về field isFavorited (boolean) để biết user đã tim chưa
-        setIsFavourite(!!petData.isFavorited); 
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchDetail();
-  }, [params.id]);
+    if (pet) {
+      setIsFavourite(!!pet.isFavorited); 
+    }
+  }, [pet]);
 
-  // Áp dụng Optimistic UI cho nút tim
-  const handleFavourite = async () => {
-    const previousState = isFavourite;
-    // 1. Cập nhật UI ngay lập tức để tạo cảm giác mượt mà
-    setIsFavourite(!previousState);
-
-    try {
-      if (previousState) {
-        // Đang tim -> Bỏ tim
-        await petService.unfavoritePet(pet.id);
-        Toast.show({
-          type: 'custom_badge',
-          props: { petName: pet.name || 'This pet', actionText: ' has been removed from Favourite' },
-          visibilityTime: 2500, autoHide: true,
-        });
-      } else {
-        // Chưa tim -> Tim
-        await petService.favoritePet(pet.id);
-        Toast.show({
-          type: 'custom_badge',
-          props: { petName: pet.name || 'This pet', actionText: ' has been added to Favourite' },
-          visibilityTime: 2500, autoHide: true,
-        });
+  // 4. MUTATION XỬ LÝ NÚT THẢ TIM/BỎ TIM
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async (currentlyFavorited: boolean) => {
+      if (currentlyFavorited) {
+        return petService.unfavoritePet(pet.id);
       }
-    } catch (error) {
-      // 2. Nếu API lỗi, rollback lại trạng thái cũ
-      setIsFavourite(previousState);
+      return petService.favoritePet(pet.id);
+    },
+    onSuccess: (_, currentlyFavorited) => {
+      // HỦY CACHE DANH SÁCH FAVORITES: Sẽ tự động lấy data mới khi quay về tab kia
+      queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
+      
+      Toast.show({
+        type: 'custom_badge',
+        props: { 
+          petName: pet.name || 'This pet', 
+          actionText: currentlyFavorited ? ' has been removed from Favourite' : ' has been added to Favourite' 
+        },
+        visibilityTime: 2500, autoHide: true,
+      });
+    },
+    onError: () => {
+      // Rollback trạng thái UI nếu lỗi
+      setIsFavourite(prev => !prev);
       Toast.show({
         type: 'error',
         text1: 'Oops!',
         text2: 'Something went wrong. Please try again.',
         visibilityTime: 2500, autoHide: true,
       });
-      console.error("Lỗi thả tim:", error);
     }
+  });
+
+  const handleFavourite = () => {
+    const previousState = isFavourite;
+    // Cập nhật UI ngay lập tức
+    setIsFavourite(!previousState);
+    // Kích hoạt mutation
+    toggleFavoriteMutation.mutate(previousState);
   };
 
   if (isLoading || !pet) {
@@ -233,7 +197,7 @@ export default function PetDetailModal() {
             borderRightColor: 'transparent',
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+            backgroundColor: 'rgba(255, 255, 255, 0.1)', 
           }}>
           <LinearGradient
             colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
@@ -245,51 +209,6 @@ export default function PetDetailModal() {
           <Feather name="chevron-left" size={20} color="#00000" />
         </View>
       </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={() => router.back()}
-        activeOpacity={0.7}
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 5,
-          elevation: 3,
-          top: insets.top + 10, zIndex: 50
-        }}
-        className="absolute right-5 w-10 h-10 rounded-full items-center justify-center"
-      >
-        <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 28,
-            borderWidth: 0.5,
-            borderTopColor: 'white',
-            borderLeftColor: 'white',
-            borderBottomColor: 'transparent',
-            borderRightColor: 'transparent',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)', // Nền hơi mờ để bạn dễ nhìn thấy viền
-          }}>
-          <LinearGradient
-            colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            locations={[0, 0.3, 1]}
-
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
-          />
-          <Image
-            className=''
-            source={require('../assets/icon/share.png')}
-            style={{ width: 16, height: 16 }}
-            resizeMode="cover"
-          />
-        </View>
-      </TouchableOpacity>
-
-
 
       {/* --- LAYER 1: BACKGROUND TĨNH CỦA SLIDER ẢNH --- */}
       <Animated.View style={[{ width: SCREEN_WIDTH }, animatedImageStyle]}>
@@ -305,7 +224,6 @@ export default function PetDetailModal() {
             setActiveIndex(index);
           }}
           renderItem={({ item }) => (
-            // Dùng height: '100%' để ảnh tự khít với chiều cao của container khi co giãn
             <Image
               source={{ uri: item }}
               style={{ width: SCREEN_WIDTH, height: '100%' }}
@@ -313,12 +231,6 @@ export default function PetDetailModal() {
             />
           )}
         />
-
-        {/* Lớp phủ đen mờ phía dưới ảnh (giúp dễ nhìn nút hơn) */}
-        {/* <LinearGradient
-           colors={['transparent', 'rgba(0,0,0,0.5)']}
-           style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%' }}
-        /> */}
 
         {displayImages.length > 1 && (
           <View 
@@ -447,34 +359,6 @@ export default function PetDetailModal() {
               <View className="flex-row items-center gap-2">
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  className="w-[41px] h-[41px] rounded-full bg-[#FDF5EF] items-center justify-center"
-                  onPress={async () => {
-                    const phoneNumber = pet?.shelter?.phone;
-                    if (phoneNumber) {
-                      const webUrl = `https://zalo.me/${phoneNumber}`;
-                      const appUrl = Platform.OS === 'ios'
-                        ? `zalo://`
-                        : `intent://zalo.me/${phoneNumber}#Intent;package=com.zing.zalo;scheme=https;end`;
-                      try {
-                        const canOpenApp = await Linking.canOpenURL(Platform.OS === 'ios' ? 'zalo://' : appUrl);
-                        if (canOpenApp) {
-                          await Linking.openURL(Platform.OS === 'ios' ? webUrl : appUrl);
-                        } else {
-                          await Linking.openURL(webUrl);
-                        }
-                      } catch (error) {
-                        await Linking.openURL(webUrl);
-                      }
-                    } else {
-                      Alert.alert("Thông báo", "Trạm cứu hộ này chưa cung cấp số điện thoại Zalo.");
-                    }
-                  }}
-                >
-                  <Image source={require('../assets/icon/message.png')} style={{ width: 24, height: 24 }} resizeMode="cover" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
                   className="w-[36px] h-[36px] items-center justify-center"
                   onPress={() => router.push({ pathname: '/shelter-profile', params: { id: pet?.shelter?.id } })}
                 >
@@ -490,11 +374,9 @@ export default function PetDetailModal() {
               </Text>
               
               {/* Dynamic Traits List */}
-                {/* Đọc từ petData.traitsList (như db seed) hoặc fallback về petData.traits */}
                 {(pet?.traitsList?.length > 0 || pet?.traits?.length > 0) && (
                     <View className="flex-row flex-wrap gap-2 mt-[12px]">
                         {(pet?.traitsList || pet?.traits).map((traitItem: any, index: number) => {
-                            // Xử lý linh hoạt: Nếu là Object (từ DB) thì lấy .name, nếu là String thì lấy luôn
                             const traitName = typeof traitItem === 'string' ? traitItem : traitItem.name;
                             
                             if (!traitName) return null;
@@ -582,10 +464,15 @@ export default function PetDetailModal() {
                 </TouchableOpacity>
               </View>
 
-              {showHistory && (
+              {/* SỬ DỤNG DỮ LIỆU THỰC TỪ API */}
+              {showHistory && pet?.pawHistory && (
                 <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
-                  {MOCK_PAW_HISTORY.map((item, index) => {
-                    const isLastItem = index === MOCK_PAW_HISTORY.length - 1;
+                  {pet.pawHistory.map((item: any, index: number) => {
+                    const isLastItem = index === pet.pawHistory.length - 1;
+                    const uiConfig = getHistoryUIConfig(item.type);
+                    
+                    // Format ngày tháng từ chuỗi ISO của DB (vd: 01/01/2026)
+                    const formattedDate = new Date(item.date).toLocaleDateString('en-GB');
 
                     return (
                       <View key={item.id} className="flex-row">
@@ -594,29 +481,28 @@ export default function PetDetailModal() {
                           {/* Icon Container */}
                           <View
                             className="w-[32px] h-[32px] rounded-full items-center justify-center z-10"
-                            style={{ backgroundColor: item.bgColor }}
+                            style={{ backgroundColor: uiConfig.bgColor }}
                           >
-                            <FontAwesome5 name={item.icon} size={13} color={item.color} />
+                            <FontAwesome5 name={uiConfig.icon} size={13} color={uiConfig.color} />
                           </View>
 
                           {/* Vertical Line nối xuống node tiếp theo */}
                           {!isLastItem && (
                             <View
                               className="w-[2px] flex-1 my-1"
-                              style={{ backgroundColor: item.color }}
+                              style={{ backgroundColor: uiConfig.color }}
                             />
                           )}
                         </View>
 
                         {/* Cột phải: Chứa Text content */}
-                        {/* Thêm padding-bottom để tạo khoảng cách giữa các khối, trừ item cuối cùng */}
                         <View className={`flex-1 pt-1 ${!isLastItem ? 'pb-6' : ''}`}>
                           <View className="flex-row justify-between items-start">
                             <Text className="text-[16px] font-medium text-black">
                               {item.title}
                             </Text>
                             <Text className="text-[13px] text-[#8E8E93] font-regular">
-                              {item.date}
+                              {formattedDate}
                             </Text>
                           </View>
                           <Text className="text-[13px] text-[#8E8E93] mt-1 leading-[18px]">
@@ -627,13 +513,18 @@ export default function PetDetailModal() {
                     );
                   })}
 
+                  {/* Hiển thị khi mảng rỗng */}
+                  {pet.pawHistory.length === 0 && (
+                    <Text className="text-center text-gray-400 py-4 font-regular text-[13px]">No history available yet.</Text>
+                  )}
+
                   <View className='flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px]'>
                     <Image
                       source={require('../assets/icon/lock.png')}
                       style={{ width: 12, height: 12 }}
                       resizeMode="cover"
                     />
-                    <Text className='font-regular text-[12px] text-[#8E8E93]'>This timeline is permanent and append-only.</Text>
+                    <Text className='font-regular text-[12px] text-[#8E8E93]'>This timeline is auto-generated and append-only.</Text>
                   </View>
                 </View>
               )}

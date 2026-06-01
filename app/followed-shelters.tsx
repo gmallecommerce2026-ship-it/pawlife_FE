@@ -1,13 +1,15 @@
+// app/followed-shelters.tsx
 import { Text } from '@/components/AppText';
 import { shelterService } from '@/services/shelterService';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useEngagementStore } from '@/store/useEngagementStore';
+import { Feather } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, FlatList, Image, RefreshControl, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// 1. Mở rộng Type để khớp với data từ search.tsx (cần thêm số lượng pet và các field ảnh fallback)
+import Toast from 'react-native-toast-message';
 export interface FollowedShelter {
   id: string;
   name: string;
@@ -24,59 +26,85 @@ export interface FollowedShelter {
 
 export default function FollowedSheltersScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const [shelters, setShelters] = useState<FollowedShelter[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const fetchFollowedShelters = async () => {
-    try {
-      setIsLoading(true);
+  // 1. REACT QUERY: Fetch danh sách Shelters
+  const { data: shelters = [], isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['followed-shelters'],
+    queryFn: async () => {
       const response = await shelterService.getFollowedShelters();
-      const fetchedShelters = response?.data || response || [];
-      setShelters(fetchedShelters);
-    } catch (error) {
-      console.error('Failed to fetch followed shelters:', error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      return response?.data || response || [];
     }
-  };
-
-  useEffect(() => {
-    fetchFollowedShelters();
-  }, []);
+  });
 
   const onRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    fetchFollowedShelters();
-  }, []);
+    refetch();
+  }, [refetch]);
 
-  // Xử lý Unfollow và BẮT BUỘC phải emit event để tab Search cập nhật real-time
-  const handleUnfollow = async (id: string) => {
-    // 1. Optimistic Update cho UI hiện tại mượt mà
-    setShelters(prev => prev.filter(shelter => shelter.id !== id));
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
-    // 2. Bắn event báo cho hệ thống (tab Search) biết shelter này đã bị unfollow
-    DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', { shelterId: id, isFollowed: false });
+  // 2. REACT QUERY: Mutation xử lý Unfollow (Kèm Optimistic Update)
+  const unfollowMutation = useMutation({
+    mutationFn: (id: string) => shelterService.toggleFollow(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['followed-shelters'] });
+      
+      const previousShelters = queryClient.getQueryData<FollowedShelter[]>(['followed-shelters']);
+      const target = previousShelters?.find(s => s.id === id);
+      
+      // 1. Cập nhật cache React Query
+      queryClient.setQueryData(['followed-shelters'], (old: FollowedShelter[]) => 
+        old ? old.filter(s => s.id !== id) : []
+      );
 
-    try {
-      // Gọi API thực tế ở đây, ví dụ:
-      // await shelterService.toggleFollow(id);
-    } catch (error) {
-      console.error('Failed to unfollow:', error);
-      // Rollback UI nếu API lỗi
-      fetchFollowedShelters();
+      // 2. CẬP NHẬT TRỰC TIẾP VÀO ZUSTAND STORE 
+      // (Để bên Search UI tự động re-render thành 'Follow')
+      useEngagementStore.getState().setInitialShelterFollow(id, false);
+
+      return { previousShelters, targetName: target?.name || 'Shelter' };
+    },
+    onSuccess: (data, id, context) => {
+      Toast.show({
+          type: 'custom_badge',
+          position: 'bottom',
+          bottomOffset: 50,
+          props: {
+              eventName: context.targetName,
+              actionText: ' unfollowed successfully'
+          },
+          visibilityTime: 3000, 
+          autoHide: true,
+      });
+      // Vẫn giữ event cho search tab nếu cần thiết
+      DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', { shelterId: id, isFollowed: false });
+    },
+    onError: (err, id, context) => {
+      console.error('Failed to unfollow:', err);
+      if (context?.previousShelters) {
+        queryClient.setQueryData(['followed-shelters'], context.previousShelters);
+      }
+      // Rollback lại Zustand nếu API lỗi
+      useEngagementStore.getState().setInitialShelterFollow(id, true);
       DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', { shelterId: id, isFollowed: true });
+    },
+    onSettled: () => {
+      // Ép fetch lại ngầm để chắc chắn đúng dữ liệu
+      queryClient.invalidateQueries({ queryKey: ['followed-shelters'] });
     }
+  });
+
+  const handleUnfollow = (id: string) => {
+    unfollowMutation.mutate(id);
   };
 
-  // 2. Render UI giống HỆT ShelterCard bên search.tsx (Pixel-perfect)
   const renderShelterItem = ({ item }: { item: FollowedShelter }) => {
-    // Xử lý fallback data y hệt bên search
     const imageSource = item.imageUrl || item.avatarUrl || item.avatar || item.img || 'https://via.placeholder.com/200';
     const locationInfo = item.address || item.loc || 'Unknown location';
-    const petAmount = item.petCount || item.totalPets || 20; // Default 20 như logic cũ
+    const petAmount = item.petCount || item.totalPets || 20;
 
     return (
       <TouchableOpacity
@@ -100,7 +128,6 @@ export default function FollowedSheltersScreen() {
           </Text>
         </View>
 
-        {/* Nút có style của trạng thái "Đang Follow" - Bấm vào sẽ Unfollow */}
         <TouchableOpacity
           onPress={() => handleUnfollow(item.id)}
           className="px-5 py-[3.5px] rounded-full shadow-sm bg-[#F8F8F8] shadow-gray-100"
@@ -124,16 +151,13 @@ export default function FollowedSheltersScreen() {
           height: 242,
         }}
       />
-
       <Text className="text-black text-[16px] font-medium mt-8">A little empty here</Text>
       <Text className="text-[#8E8E93] text-[14px] text-center mt-2 mb-8">Look like we missing a paw...</Text>
-
       <TouchableOpacity
         className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50"
         activeOpacity={0.7}
-        onPress={() => router.push('/')}
+        onPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })}
       >
-
         <Text className="text-[#8E8E93] font-medium">Browse shelters</Text>
       </TouchableOpacity>
     </View>
@@ -194,7 +218,7 @@ export default function FollowedSheltersScreen() {
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
-                refreshing={isRefreshing}
+                refreshing={isFetching} // Cập nhật đúng cờ của react-query
                 onRefresh={onRefresh}
                 tintColor="#ffa053"
                 colors={['#ffa053']}

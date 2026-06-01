@@ -248,7 +248,7 @@ export default function ScannedPetScreen() {
           Mã QR này không hợp lệ hoặc vòng cổ chưa được đăng ký trên hệ thống.
         </Text>
         <TouchableOpacity
-          onPress={() => router.push('/')}
+          onPress={() => router.replace('/')}
           className="bg-gray-100 px-8 py-3 rounded-full"
         >
           <Text className="text-gray-700 font-bold">Quay lại</Text>
@@ -287,7 +287,7 @@ export default function ScannedPetScreen() {
 
       <View className="absolute top-12 right-6 z-40">
         <TouchableOpacity
-          onPress={() => router.push('/')}
+          onPress={() => router.replace('/')}
           className="w-8 h-8 items-center justify-center"
         >
           <Image
