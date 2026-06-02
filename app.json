@@ -72,21 +72,21 @@
           "faceIDPermission": "Ứng dụng cần sử dụng Face ID để bảo mật tài khoản của bạn."
         }
       ],
-      [
-        "react-native-fbsdk-next",
-        {
-          "appID": "1465556478529591",
-          "clientToken": "e53c55d304602fbdda9e9b910721eda0",
-          "displayName": "PawLife",
-          "scheme": "fb1465556478529591"
-        }
-      ],
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.725064672703-l61bog4iims28n57sspk6hokcf1l86c7"
-        }
-      ],
+      // [
+      //   "react-native-fbsdk-next",
+      //   {
+      //     "appID": "1465556478529591",
+      //     "clientToken": "e53c55d304602fbdda9e9b910721eda0",
+      //     "displayName": "PawLife",
+      //     "scheme": "fb1465556478529591"
+      //   }
+      // ],
+      // [
+      //   "@react-native-google-signin/google-signin",
+      //   {
+      //     "iosUrlScheme": "com.googleusercontent.apps.725064672703-l61bog4iims28n57sspk6hokcf1l86c7"
+      //   }
+      // ],
       "expo-apple-authentication",
       [
         "expo-location",
