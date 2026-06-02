@@ -221,28 +221,36 @@ export default function EventDetailScreen() {
 
     const mapLatitude = eventData.latitude || 21.028511;
     const mapLongitude = eventData.longitude || 105.804817;
-    const handleOpenMap = () => {
+    const handleOpenMap = async () => {
         const lat = mapLatitude;
         const lng = mapLongitude;
-        const label = eventData.locationName || eventData.address || "Event Location";
         
-        const url = Platform.select({
-            ios: `maps:0,0?q=${label}&ll=${lat},${lng}`,
-            android: `geo:0,0?q=${lat},${lng}(${label})`
-        });
-
+        const rawLabel = eventData.locationName || eventData.address || "Event Location";
+        const label = encodeURIComponent(rawLabel);
+        
+        // 1. URL Scheme gọi App Native
+        const iosUrl = `maps:0,0?q=${label}&ll=${lat},${lng}`;
+        const androidUrl = `geo:0,0?q=${lat},${lng}(${label})`;
+        
+        // 2. URL Fallback CHUẨN HTTPS (Sẽ mở trình duyệt web)
+        // Link chuẩn của Google Maps API:
         const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
-        if (url) {
-            Linking.canOpenURL(url).then((supported) => {
-                if (supported) {
-                    Linking.openURL(url);
-                } else {
-                    Linking.openURL(fallbackUrl);
-                }
-            }).catch(() => Linking.openURL(fallbackUrl));
-        } else {
-            Linking.openURL(fallbackUrl);
+        const url = Platform.OS === 'ios' ? iosUrl : androidUrl;
+
+        try {
+            const supported = await Linking.canOpenURL(url);
+            
+            if (supported) {
+                // Mở app Native (Google Maps/Apple Maps)
+                await Linking.openURL(url);
+            } else {
+                // Mở trình duyệt Web (Safari/Chrome) an toàn qua chuẩn HTTPS
+                await Linking.openURL(fallbackUrl);
+            }
+        } catch (error) {
+            console.warn("Lỗi khi mở bản đồ: ", error);
+            Alert.alert("Lỗi", "Không thể khởi chạy bản đồ trên thiết bị này.");
         }
     };
     

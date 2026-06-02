@@ -1422,15 +1422,15 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 
 
                                 <Text className="text-gray-800 text-lg font-bold mt-8">That's all for now</Text>
-                                <Text className="text-gray-400 text-center mt-2 mb-6">Adjust your filters to find discover more pets.</Text>
+                                {/* <Text className="text-gray-400 text-center mt-2 mb-6">Adjust your filters to find discover more pets.</Text> */}
 
-                                <TouchableOpacity
+                                {/* <TouchableOpacity
                                     className="w-full bg-white py-5 rounded-[24px] border border-dashed border-orange-300 flex-row justify-center items-center active:bg-orange-50 mt-2"
                                     activeOpacity={0.7}
                                     onPress={() => router.push('/')}
                                 >
                                     <Text className="text-[#F59E0B] font-thin text-base">Change filter</Text>
-                                </TouchableOpacity>
+                                </TouchableOpacity> */}
                             </View>
                         ) : null}
                         <PetDetailOverlay

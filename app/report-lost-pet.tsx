@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -205,6 +206,9 @@ export default function ReportLostPetScreen() {
 
   const {
     petId, petName, petAvatar, petBreed, petAge,
+    petShelterName, 
+    petShelterPhone, 
+    petShelterAddress,
     selectedMapAddress, // Địa chỉ chữ chữ map trả về
     selectedLatitude,
     selectedLongitude,
@@ -215,22 +219,50 @@ export default function ReportLostPetScreen() {
     petAvatar: string;
     petBreed?: string;
     petAge?: string;
+    petShelterName?: string;
+    petShelterPhone?: string;
+    petShelterAddress?: string;
     selectedMapAddress?: string;
     selectedLatitude?: string;
     selectedLongitude?: string;
     selectedRadius?: string;
   }>();
 
+  const [mapLat, setMapLat] = useState<number | null>(null);
+  const [mapLng, setMapLng] = useState<number | null>(null);
+  const [mapRadius, setMapRadius] = useState<number>(500);
+  const [mapAddress, setMapAddress] = useState<string>('');
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('onLocationSelected', (data) => {
+      if (data) {
+        setMapLat(data.latitude ? parseFloat(data.latitude) : null);
+        setMapLng(data.longitude ? parseFloat(data.longitude) : null);
+        setMapRadius(data.radius ? parseFloat(data.radius) : 500);
+        setMapAddress(data.address || '');
+        setLocation(data.address || ''); // Gắn luôn vào State location của Form để validate
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+  useEffect(() => {
+    if (petShelterName && petShelterName !== 'Chưa cập nhật') {
+      setOwnerName(petShelterName);
+    }
+    if (petShelterPhone && petShelterPhone !== 'Chưa cập nhật') {
+      setOwnerPhone(petShelterPhone);
+    }
+    if (petShelterAddress && petShelterAddress !== 'Chưa cập nhật') {
+      setOwnerAddress(petShelterAddress);
+    }
+  }, [petShelterName, petShelterPhone, petShelterAddress]);
+
   useEffect(() => {
     if (selectedMapAddress) {
       setLocation(selectedMapAddress);
     }
   }, [selectedMapAddress]);
-
-  const mapLat = selectedLatitude ? parseFloat(selectedLatitude) : null;
-  const mapLng = selectedLongitude ? parseFloat(selectedLongitude) : null;
-  const mapRadius = selectedRadius ? parseFloat(selectedRadius) : 500;
-  const mapAddress = selectedMapAddress as string;
 
   const [lostDate, setLostDate] = useState<Date>(new Date());
 
@@ -643,13 +675,30 @@ export default function ReportLostPetScreen() {
                   <View className='flex-row border-b border-[#E5E5E5] py-[13px] mx-4 items-center'>
                     <Image source={require('../assets/icon/user-form.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
                     <Text className="text-[14px] font-medium text-[#8E8E93] px-2">Name</Text>
-                    <TextInput value={ownerName} onChangeText={setOwnerName} placeholder="Sarah Johnson" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="flex-1 text-[13px] text-black p-0 text-right tracking-[0.06px]" />
+                    <TextInput 
+                      value={ownerName} 
+                      onChangeText={setOwnerName} 
+                      placeholder="Sarah Johnson" 
+                      placeholderTextColor="#9CA3AF" 
+                      style={{ fontFamily: "Urbanist" }} 
+                      className="flex-1 text-[13px] text-black p-0 text-right tracking-[0.06px]" 
+                      selectTextOnFocus={true} // BỔ SUNG DÒNG NÀY
+                    />
                   </View>
 
                   <View className='flex-row py-[13px] mx-4 border-b border-[#E5E5E5] items-center'>
                     <Image source={require('../assets/icon/phone-form.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
                     <Text className="text-[14px] font-medium text-[#8E8E93] px-2">Phone</Text>
-                    <TextInput value={ownerPhone} onChangeText={setOwnerPhone} placeholder="01234567890" placeholderTextColor="#9CA3AF" style={{ fontFamily: "Urbanist" }} className="flex-1 text-[13px] text-black p-0 text-right tracking-[0.06px]" keyboardType="phone-pad" />
+                    <TextInput 
+                      value={ownerPhone} 
+                      onChangeText={setOwnerPhone} 
+                      placeholder="01234567890" 
+                      placeholderTextColor="#9CA3AF" 
+                      style={{ fontFamily: "Urbanist" }} 
+                      className="flex-1 text-[13px] text-black p-0 text-right tracking-[0.06px]" 
+                      keyboardType="phone-pad" 
+                      selectTextOnFocus={true} // BỔ SUNG DÒNG NÀY
+                    />
                   </View>
 
                   {/* THAY THẾ NÚT NHẬP ĐỊA CHỈ TẠI ĐÂY */}

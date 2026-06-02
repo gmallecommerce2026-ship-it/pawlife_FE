@@ -1,35 +1,37 @@
 import { Text } from '@/components/AppText';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import ReportUGCModal from '@/components/ReportUGCModal';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { TouchableWithoutFeedback } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  withDelay,
-  Easing
-} from 'react-native-reanimated';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Image,
+  LayoutAnimation,
   Linking,
+  Modal,
   Platform,
   SafeAreaView,
+  Share,
   StatusBar,
   TouchableOpacity,
-  View,
-  Image,
-  Modal,
-  LayoutAnimation,
-  UIManager
+  UIManager,
+  View
 } from 'react-native';
 import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming
+} from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -37,7 +39,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Hàm giải mã Polyline của Google Maps
 const decodeGooglePolyline = (t: string) => {
   let n = 0, r = 0, o = 0, l = 0, i = 0, a = [];
   while (n < t.length) {
@@ -51,12 +52,10 @@ const decodeGooglePolyline = (t: string) => {
   return a;
 };
 
-// Hàm hỗ trợ rút gọn địa chỉ từ Google Geocoding API
 const getShortAddress = (geoData: any) => {
   if (geoData?.status === 'OK' && geoData.results?.[0]) {
     const formatted = geoData.results[0].formatted_address;
     const parts = formatted.split(', ');
-    // Lấy 2 thành phần đầu để có tên đường và phường/quận (VD: "123 Lê Lợi, Quận 1")
     return parts.slice(0, 2).join(', ');
   }
   return null;
@@ -78,7 +77,6 @@ export default function TagRouteDetailsScreen() {
   const radius = (rawRadius !== null && rawRadius !== undefined && !isNaN(parseFloat(rawRadius as string))) ? parseFloat(rawRadius as string) : 0;
   const shinePosition = useSharedValue(-0.5);
 
-  // CÁC TRẠNG THÁI KIỂM SOÁT TẢI DỮ LIỆU
   const [isGpsReady, setIsGpsReady] = useState(false);
   const [isFetchingRoute, setIsFetchingRoute] = useState(true);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -88,6 +86,30 @@ export default function TagRouteDetailsScreen() {
   const [realStats, setRealStats] = useState({ distance: '...', duration: 0 });
   const [addresses, setAddresses] = useState({ origin: 'Locating...', destination: 'Loading...' });
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isReportModalVisible, setIsReportModalVisible] = useState(false);
+
+  const handleShareLocation = () => {
+    setIsMenuVisible(false); 
+    
+    setTimeout(async () => {
+      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${targetLat},${targetLng}`;
+
+      try {
+        await Share.share({
+          message: Platform.OS === 'android' 
+            ? `Pet location scanned here:\n${mapUrl}` 
+            : `Pet location scanned here:`,
+          url: mapUrl,
+          title: 'Pet Location' 
+        }, {
+          dialogTitle: 'Share Pet Location',
+          subject: 'Pet Location'
+        });
+      } catch (error: any) {
+        Alert.alert("Error", "Unable to share location.");
+      }
+    }, 300);
+  };
 
   useEffect(() => {
     shinePosition.value = withRepeat(
@@ -140,7 +162,7 @@ export default function TagRouteDetailsScreen() {
               curLng = location.coords.longitude;
             }
           } catch (locationError) {
-            console.warn("Lỗi lấy GPS:", locationError);
+            console.warn("Error getting GPS:", locationError);
           }
         }
 
@@ -151,11 +173,11 @@ export default function TagRouteDetailsScreen() {
 
         const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
         if (!GOOGLE_API_KEY) {
-          console.warn("Thiếu EXPO_PUBLIC_GOOGLE_MAPS_API_KEY");
+          console.warn("Missing EXPO_PUBLIC_GOOGLE_MAPS_API_KEY");
         }
 
         const dirUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${curLat},${curLng}&destination=${targetLat},${targetLng}&key=${GOOGLE_API_KEY}`;
-        const geoUrl = (lat: number, lng: number) => `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_API_KEY}`; // Thêm language=vi
+        const geoUrl = (lat: number, lng: number) => `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GOOGLE_API_KEY}`; 
 
         const [dirRes, oriRes, destRes] = await Promise.all([
           fetch(dirUrl).catch(() => null),
@@ -178,7 +200,7 @@ export default function TagRouteDetailsScreen() {
               const coords = decodeGooglePolyline(route.overview_polyline.points);
               setRouteCoordinates(coords);
             } catch (err) {
-              console.error("Lỗi giải mã Polyline:", err);
+              console.error("Error decoding Polyline:", err);
             }
 
             setRealStats({
@@ -300,13 +322,12 @@ export default function TagRouteDetailsScreen() {
                     borderRightColor: 'transparent',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
                   }}>
                   <LinearGradient
                     colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     locations={[0, 0.3, 1]}
-
                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                   />
                   <Feather name="chevron-left" size={20} color="#1F2937" />
@@ -330,7 +351,6 @@ export default function TagRouteDetailsScreen() {
                   shadowRadius: 5,
                   elevation: 3,
                 }}
-
               >
                 <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
                   style={{
@@ -344,13 +364,12 @@ export default function TagRouteDetailsScreen() {
                     borderRightColor: 'transparent',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)', // Nền hơi mờ để bạn dễ nhìn thấy viền
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
                   }}>
                   <LinearGradient
                     colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     locations={[0, 0.3, 1]}
-
                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                   />
                   <Feather name="more-horizontal" size={20} color="#111827" />
@@ -377,7 +396,6 @@ export default function TagRouteDetailsScreen() {
             style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}
             provider={PROVIDER_GOOGLE}
             showsUserLocation={true}
-            // showsUserHeading={true}
             showsMyLocationButton={false}
             showsCompass={false}
             showsBuildings={true}
@@ -406,7 +424,7 @@ export default function TagRouteDetailsScreen() {
               </>
             )}
 
-            <Marker coordinate={{ latitude: targetLat, longitude: targetLng }} title="Điểm quét">
+            <Marker coordinate={{ latitude: targetLat, longitude: targetLng }} title="Scanned Point">
               <View style={{ alignItems: 'center', width: 80 }}>
                 <View className="bg-[#DA5A5A] px-3 py-1.5 rounded-lg items-center shadow-md w-full">
                   <Text className="text-white text-[10px] font-bold text-center">Tag Scanned</Text>
@@ -435,10 +453,10 @@ export default function TagRouteDetailsScreen() {
           onPress={centerMapToUser}
         >
           <Image
-                                source={require('../assets/icon/safari.png')}
-                                style={{ width: 22, height: 22 }}
-                                resizeMode="cover"
-                            />
+            source={require('../assets/icon/safari.png')}
+            style={{ width: 22, height: 22 }}
+            resizeMode="cover"
+          />
         </TouchableOpacity>
 
         {/* --- FLOATING CARD THÔNG TIN THẬT --- */}
@@ -457,7 +475,6 @@ export default function TagRouteDetailsScreen() {
             <View className="ml-3.5 flex-1 justify-center">
               <View className="flex-row items-center mb-2">
                 <Text className="text-[16px] font-medium text-[#1E1E1E] leading-[16px] ">{scannerName}</Text>
-                {/* <Image className='ml-2' source={require('../assets/icon/real-tick.png')} style={{ width: 12, height: 12 }} resizeMode="cover" /> */}
               </View>
               <Text className="text-[12px] text-[#8E8E93] tracking-[0.06px] leading-[13px]" numberOfLines={1}>
                 "{scannerMessage}"
@@ -529,22 +546,17 @@ export default function TagRouteDetailsScreen() {
             </View>
           )}
 
-
-
-
           <View className="w-full mt-6">
             <View style={{
               shadowColor: '#B45C11',
-              shadowOffset: {
-                width: 0,
-                height: 2
-              },
+              shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.25,
               shadowRadius: 5,
               elevation: 5,
             }}>
               <TouchableOpacity
                 activeOpacity={0.7}
+                onPress={handleContact}
                 className="w-full h-[52px] rounded-[16px] flex-row overflow-hidden items-center justify-center mb-3"
               >
                 <LinearGradient
@@ -552,54 +564,33 @@ export default function TagRouteDetailsScreen() {
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   locations={[0.3, 1]}
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-
                 />
-                <Image className='' source={require('../assets/icon/phone-white.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
+                <Image source={require('../assets/icon/phone-white.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
                 <Text className="text-[#ffffff] text-[16px] font-semibold ml-2.5 tracking-tight">Contact Now</Text>
-                <Animated.View
-                  style={[
-                    {
-                      position: 'absolute',
-                      top: 0,
-                      bottom: 0,
-                      width: 60, // Bề rộng của vệt sáng
-                      transform: [{ skewX: '-20deg' }], // Làm vệt sáng nghiêng đi 20 độ trông sẽ thật hơn
-                      zIndex: 10, // Đảm bảo đè lên trên màu nền
-                    },
-                    shineStyle,
-                  ]}
-                >
-                  <LinearGradient
-                    // Gradient: Trong suốt -> Trắng mờ -> Trong suốt
-                    colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={{ flex: 1 }}
-                  />
+                
+                <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, width: 60, transform: [{ skewX: '-20deg' }], zIndex: 10 }, shineStyle]}>
+                  <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1 }} />
                 </Animated.View>
               </TouchableOpacity>
-
             </View>
+
             <View style={{
               shadowColor: '#000000',
-              shadowOffset: {
-                width: 0,
-                height: 2
-              },
+              shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
               shadowRadius: 5,
               elevation: 5,
             }}>
               <TouchableOpacity
                 activeOpacity={0.85}
+                onPress={handleOpenMaps}
                 className="w-full bg-white h-[52px] rounded-[16px] flex-row items-center justify-center border border-gray-200"
               >
-                <Image className='' source={require('../assets/icon/location-gray.png')} style={{ width: 12, height: 17 }} resizeMode="cover" />
+                <Image source={require('../assets/icon/location-gray.png')} style={{ width: 12, height: 17 }} resizeMode="cover" />
                 <Text className="text-[#8E8E93] text-[16px] font-medium ml-2.5 tracking-tight">Open in Maps</Text>
               </TouchableOpacity>
             </View>
           </View>
-
         </View>
 
         <Animated.View
@@ -609,13 +600,12 @@ export default function TagRouteDetailsScreen() {
               bottom: 0,
               left: 0,
               right: 0,
-              pointerEvents: 'none', // Để không ngăn cản thao tác bấm vào nút bên dưới
+              pointerEvents: 'none',
             },
-            innerShadowStyle // Sử dụng style động đã tạo ở trên
+            innerShadowStyle 
           ]}
         >
           <LinearGradient
-            // Màu từ trong suốt sang màu xám/đen nhạt để giả lập bóng đổ ngược lên
             colors={['#FFFFFF', 'rgba(255,255,255,0)']}
             locations={[0, 0.9]}
             start={{ x: 0, y: 1 }}
@@ -647,29 +637,33 @@ export default function TagRouteDetailsScreen() {
                 }}
               >
                 <TouchableOpacity
-                  className="flex-row items-center px-4 py-3.5 border-b border-gray-100"
-                  onPress={() => {
-                    setIsMenuVisible(false);
-                    console.log("Xử lý Share Location...");
-                  }}
+                  className="flex-row items-center px-2 py-3.5 border-b border-gray-100"
+                  onPress={handleShareLocation}
                 >
-                  <Text className="ml-3 text-[12px] font-medium text-black">Share Location</Text>
+                  <Text className="ml-3 text-[13px] font-medium text-[#1C1C1E]">Share Location</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  className="flex-row items-center px-4 py-3.5"
+                  className="flex-row items-center px-2 py-3.5"
                   onPress={() => {
                     setIsMenuVisible(false);
-                    console.log("Xử lý Report");
+                    setTimeout(() => {
+                      setIsReportModalVisible(true);
+                    }, 200);
                   }}
                 >
-                  <Text className="ml-3 text-[12px] font-medium text-[#EF4444]">Report</Text>
+                  <Text className="ml-3 text-[13px] font-medium text-[#EF4444]">Report</Text>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
           </TouchableOpacity>
         </Modal>
       </View>
+      <ReportUGCModal 
+          isVisible={isReportModalVisible} 
+          onClose={() => setIsReportModalVisible(false)}
+          reportTargetName={scannerName}
+        />
     </View>
   );
 }

@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Keyboard, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Keyboard, TouchableOpacity, View } from 'react-native';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -96,16 +96,16 @@ export default function SelectLocationMapScreen() {
   };
 
   const handleConfirm = () => {
-    router.push({
-      pathname: '/report-lost-pet',
-      params: {
-        petId, petName, petAvatar, petBreed, petAge, lostDateStr,
-        selectedMapAddress: selectedAddress,
-        selectedLatitude: region.latitude,
-        selectedLongitude: region.longitude,
-        selectedRadius: radius.toString()
-      }
+    // Bắn dữ liệu về màn hình Form đang mở ở dưới nền
+    DeviceEventEmitter.emit('onLocationSelected', {
+      address: selectedAddress,
+      latitude: region.latitude,
+      longitude: region.longitude,
+      radius: radius
     });
+    
+    // Gọi back() để đóng trang Map, hiện lại trang Form với nguyên vẹn dữ liệu
+    router.back();
   };
 
   return (

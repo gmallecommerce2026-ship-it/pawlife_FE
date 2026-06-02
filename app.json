@@ -20,6 +20,10 @@
         "googleMapsApiKey": "AIzaSyDSiggtEz29dOMLPbALCl4YBAvxJTWKgAU"
       },
       "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "maps",
+          "comgooglemaps"
+        ],
         "SKAdNetworkItems": [
           { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
           { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" }
@@ -33,7 +37,7 @@
 
         "NSPhotoLibraryAddUsageDescription": "PawLife cần lưu QR code và hình ảnh thú cưng vào thư viện ảnh của bạn.",
 
-        "NSLocationWhenInUseUsageDescription": "PawLife cần quyền vị trí để gửi tọa độ hỗ trợ tìm kiếm thú cưng thất lạc và hiển thị nội dung phù hợp gần bạn.",
+        "NSLocationWhenInUseUsageDescription": "PawLife cần quyền vị trí để gửi tọa độ hỗ trợ tìm kiếm thú cưng thất lạc, hiển thị nội dung phù hợp gần bạn và tính toán khoảng cách, chỉ đường chính xác từ bạn đến nơi thú cưng vừa được quét mã.",
 
         "NSLocationAlwaysAndWhenInUseUsageDescription": "PawLife cần quyền vị trí để hỗ trợ các tính năng tìm kiếm thú cưng thất lạc ngay cả khi ứng dụng đang chạy nền.",
 

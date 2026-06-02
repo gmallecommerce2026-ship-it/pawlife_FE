@@ -118,6 +118,12 @@ export default function ScannedPetScreen() {
     return 'Less than 1 month old';
   };
 
+  const formatBirthday = (dob: string | Date | undefined | null): string => {
+    if (!dob) return 'Unknown';
+    const birthDate = new Date(dob);
+    if (isNaN(birthDate.getTime())) return 'Unknown';
+    return birthDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -135,22 +141,8 @@ export default function ScannedPetScreen() {
           
           const petData = response.data;
 
-          // DEBUG - xóa sau khi fix xong
-          console.log('=== PET DATA RAW ===', JSON.stringify(petData, null, 2));
-          console.log('=== DOB VALUE ===', petData?.dob);
-          console.log('=== AGE VALUE ===', petData?.age);
-          console.log('=== DOB TYPE ===', typeof petData?.dob);
-
           setPet(petData);
 
-
-          const isPetLost = petData.isLost || petData.status?.toUpperCase() === 'LOST';
-
-          if (isPetLost) {
-            setTimeout(() => {
-              if (isActive) setIsModalVisible(true);
-            }, 500);
-          }
         } catch (error: any) {
           if (isActive) setPet(null);
         } finally {
@@ -363,7 +355,8 @@ export default function ScannedPetScreen() {
                     {pet?.name?.toLowerCase() || 'pet'}
                   </Text>
                   <Text className="text-white text-[14px] font-regular text-center tracking-[0.5px]">
-                                        {displayAge !== 'Unknown' ? `${displayAge}` : 'Age unknown'} • {pet?.breed || 'Unknown breed'}
+                    {/* SỬA 'Unknown' THÀNH 'Unknown age' Ở DÒNG DƯỚI */}
+                    {displayAge !== 'Unknown age' ? `${displayAge}` : 'Age unknown'} • {pet?.breed || 'Unknown breed'}
                   </Text>
                 </View>
               </View>
@@ -494,7 +487,10 @@ export default function ScannedPetScreen() {
                   </View>
                   <View className="w-1/2">
                     <Text className="font-medium text-[16px] mb-[12.5px]" >Birthday</Text>
-                    <Text className="text-[#8E8E93] font-regular text-[14px]">July 12, 2020</Text>
+                    {/* SỬA DÒNG DƯỚI ĐÂY ĐỂ TRUYỀN rawDob VÀO THAY VÌ HARDCODE */}
+                    <Text className="text-[#8E8E93] font-regular text-[14px]">
+                      {formatBirthday(rawDob)}
+                    </Text>
                   </View>
                 </View >
               </View>

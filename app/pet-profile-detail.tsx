@@ -181,12 +181,35 @@ export default function PetProfileDetailScreen() {
   // --- LOGIC HANDLERS ---
   const handleLostModeToggle = (value: boolean) => {
     if (value === true) {
+      // 1. Tính toán tuổi chính xác từ ngày sinh (dob) trước khi truyền đi
+      let calculatedAge = petData?.age?.toString();
+      
+      if (petData?.dob) {
+        const birthDate = new Date(petData.dob);
+        const today = new Date();
+        let years = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        
+        // Trừ đi 1 năm nếu chưa đến tháng sinh, hoặc cùng tháng nhưng chưa đến ngày sinh
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          years--;
+        }
+        
+        // Nếu nhỏ hơn 1 tuổi thì để là '0'
+        calculatedAge = years > 0 ? years.toString() : '0';
+      }
+
       router.push({
         pathname: '/report-lost-pet' as any,
         params: {
           petId: petId,
           petName: petData?.name, 
           petAvatar: displayAvatar, 
+          
+          // 2. BỔ SUNG TRUYỀN THÊM petBreed VÀ petAge VÀO PARAMS
+          petBreed: petData?.breed,
+          petAge: calculatedAge,
+          
           petShelterName: petData?.contactName || ownerInfo?.name || 'Chưa cập nhật', 
           petShelterPhone: petData?.contactPhone || ownerInfo?.phone || 'Chưa cập nhật',
           petShelterAddress: petData?.contactAddress || ownerInfo?.address || 'Chưa cập nhật'
@@ -322,7 +345,7 @@ export default function PetProfileDetailScreen() {
         {/* --- HEADER --- */}
         <View className="flex-row items-center justify-between px-4 py-2 bg-[#FFFFFF]">
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => router.replace('/(tabs)/my-pets')}
             activeOpacity={0.7}
             style={{
               shadowColor: '#000',
