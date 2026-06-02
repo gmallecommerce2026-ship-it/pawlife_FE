@@ -77,7 +77,7 @@ const PetCard = ({ pet, formatBreed, t }: { pet: any, formatBreed: (breed: strin
           <Image
             className='top-1'
             source={isFemale ? require('../assets/icon/female.png') : require('../assets/icon/male.png')}
-            style={{ width: 10, height: 10 }}
+            style={{ width: 12, height: 12 }}
             resizeMode="cover"
           />
 
@@ -149,7 +149,7 @@ export default function ShelterProfileScreen() {
 
   const scrollY = useSharedValue(0);
   const HEADER_HEIGHT = insets.top + 60; 
-  const SCROLL_THRESHOLD = 200; 
+  const SCROLL_THRESHOLD = 100; 
   const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
 
   const [selectedGender, setSelectedGender] = useState<string | null>(null);
@@ -499,6 +499,12 @@ export default function ShelterProfileScreen() {
                     className="flex-1 text-[14px] text-black"
                     style={{ fontFamily: 'Urbanist' }}
                   />
+                  {/* Icon Filter Search */}
+                  {/* {isSearching && (
+                    <TouchableOpacity onPress={() => setIsFilterVisible(true)} className="ml-1 px-1">
+                      <Image className='ml-2' source={require('../assets/icon/sliders-gray.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                    </TouchableOpacity>
+                  )} */}
                 </Animated.View>
               </Animated.View>
             </TouchableOpacity>
