@@ -21,9 +21,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // IMPORT CONTEXT AND HOOKS
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { disconnectSocket } from '@/utils/socket';
 import { AuthContext } from '../contexts/AuthContext';
 import { useImageUpload } from '../hooks/useImageUpload';
+import { disconnectSocket } from '@/utils/socket';
 
 // --- CONSTANTS ---
 const COUNTRY_CODES = [
@@ -61,17 +61,18 @@ const ProfileItem = ({
 
   return (
     <TouchableOpacity
-      className={`flex-row items-center justify-between py-[6px] px-4 bg-white ${isEditing ? 'bg-[#FFF7ED]' : ''}`}
+      className={`flex-row items-center justify-between py-[6px] bg-white ${isEditing ? 'bg-[#FFF7ED]' : ''}`}
       onPress={onPressRow}
       disabled={!editable}
       activeOpacity={0.7}
     >
-      <View className="flex-row items-center">
-        <View className="w-[36px] h-[36px] rounded-[10px] items-center justify-center">
-          {/* CỐ ĐỊNH MÀU XÁM CHO ICON TRÁI */}
-          <Feather name={icon} size={20} color="#111827" />
+      <View className="flex-row items-center py-2">
+        <View className="w-8 items-start justify-center">
+          {icon}
         </View>
-        <Text className="text-[16px] text-[#374151] font-medium px-2">{label}</Text>
+        <Text className="text-[16px] text-black font-regular">
+          {label}
+        </Text>
       </View>
 
       <View className="flex-row items-center flex-1 justify-end pl-4">
@@ -84,7 +85,7 @@ const ProfileItem = ({
             onChangeText={onChangeText}
             keyboardType={keyboardType}
             className="text-[16px] text-[#111827] text-right p-0 flex-1 font-thin"
-            style={{fontFamily: 'Urbanist-Regular'}}
+            style={{ fontFamily: 'Urbanist-Regular' }}
             placeholder={`Enter ${label.toLowerCase()}`}
             placeholderTextColor="#9CA3AF"
             returnKeyType="done"
@@ -187,12 +188,11 @@ export default function EditProfileScreen() {
             style: "destructive",
             onPress: async () => {
               try {
-                if (logout) await logout(); // Xóa auth data/token
+              if (logout) await logout();
                 
-                // BỔ SUNG: Ngắt kết nối socket ngay lập tức
                 disconnectSocket();
                 
-                router.push('/');
+              router.replace('/');
               } catch (error) {
                 Alert.alert(t('Error'), t('Unable to log out. Please try again!'));
               }
@@ -258,7 +258,7 @@ export default function EditProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} className="p-1 -ml-1">
           <Feather name="chevron-left" size={28} color="#111827" />
         </TouchableOpacity>
-        <Text className="text-[24px] font-semibold text-[#000000]">Edit Profile</Text>
+        <Text className="text-[20px] font-semibold text-[#000000]">Edit Profile</Text>
         <View className="w-[36px]" />
       </View>
 
@@ -274,7 +274,7 @@ export default function EditProfileScreen() {
               activeOpacity={0.8}
             >
               <Image
-                source={{ uri: user?.avatarUrl || 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg' || '/assets/images/default-avatar.jpg' }}
+                source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }}
                 className="w-[106px] h-[106px] rounded-[50px] border border-[#F3F4F6] bg-[#E5E7EB]"
                 resizeMode="cover"
               />
@@ -302,7 +302,7 @@ export default function EditProfileScreen() {
           <View className="px-5">
             {/* NHÓM 1: THÔNG TIN CÁ NHÂN */}
             <View 
-              className="bg-[#FFFFFF] rounded-[20px] overflow-hidden border border-[#F3F4F6]"
+              className="bg-[#FFFFFF] rounded-[20px] overflow-hidden border border-[#F3F4F6] px-[20px]"
               style={{
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 2 },
@@ -312,7 +312,12 @@ export default function EditProfileScreen() {
               }}
             >
               <ProfileItem 
-                icon="user" 
+                icon={<Image
+                  className=''
+                  source={require('../assets/icon/user-edit.png')}
+                  style={{ width: 17, height: 17 }}
+                  resizeMode="cover"
+                />}
                 label="Name" 
                 value={nickname}
                 isEditing={editingField === 'name'}
@@ -325,7 +330,12 @@ export default function EditProfileScreen() {
               <View className="h-[1px] bg-[#F3F4F6]" />
 
               <ProfileItem 
-                icon="phone" 
+                icon={<Image
+                  className=''
+                  source={require('../assets/icon/phone-edit.png')}
+                  style={{ width: 17, height: 17 }}
+                  resizeMode="cover"
+                />}
                 label="Phone" 
                 value={phoneOnly ? `${selectedCountry.dial_code} ${phoneOnly}` : ''}
                 isEditing={editingField === 'phone'}
@@ -336,7 +346,7 @@ export default function EditProfileScreen() {
                   <View className="flex-row items-center flex-1 justify-end">
                     <TouchableOpacity onPress={() => setShowCountryModal(true)} className="flex-row items-center mr-3 bg-[#F3F4F6] px-[10px] py-[6px] rounded-lg">
                       <Text className="text-[18px]">{selectedCountry.flag}</Text>
-                      <Feather name="chevron-down" size={14} color="#6B7280" style={{marginLeft: 4}}/>
+                      <Feather name="chevron-down" size={14} color="#6B7280" style={{ marginLeft: 4 }} />
                     </TouchableOpacity>
                     <TextInput 
                       value={phoneOnly}
@@ -354,7 +364,12 @@ export default function EditProfileScreen() {
               <View className="h-[1px] bg-[#F3F4F6]" />
 
               <ProfileItem 
-                icon="calendar" 
+                icon={<Image
+                  className=''
+                  source={require('../assets/icon/birthday-edit.png')}
+                  style={{ width: 17, height: 17 }}
+                  resizeMode="cover"
+                />}
                 label="Birthday" 
                 value={hasSelectedDate ? dob.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''} 
                 isEditing={editingField === 'dob'}
@@ -368,7 +383,12 @@ export default function EditProfileScreen() {
               <View className="h-[1px] bg-[#F3F4F6]" />
 
               <ProfileItem 
-                icon="users" 
+                icon={<Image
+                  className=''
+                  source={require('../assets/icon/gender-edit.png')}
+                  style={{ width: 17, height: 17 }}
+                  resizeMode="cover"
+                />}
                 label="Gender" 
                 value={gender} 
                 isEditing={editingField === 'gender'}
@@ -393,15 +413,20 @@ export default function EditProfileScreen() {
               }}
             >
               <TouchableOpacity
-                className="flex-row items-center justify-between py-2 px-4 bg-white"
+                className="flex-row items-center justify-between py-4 px-[20px] bg-white"
                 onPress={handleLogout}
                 activeOpacity={0.7}
               >
-                <View className="flex-row items-center">
-                  <View className="w-[36px] h-[36px] rounded-[10px] items-center justify-center mr-[14px]">
-                    <Feather name="log-out" size={20} color="#EF4444" />
+                <View className=" flex-row items-center">
+                  <View className="rounded-[10px] items-center justify-center mr-[9px]">
+                    <Image
+                  className=''
+                  source={require('../assets/icon/logout.png')}
+                  style={{ width: 17, height: 17 }}
+                  resizeMode="cover"
+                />
                   </View>
-                  <Text className="text-[16px] font-medium text-[#EF4444]">{t('Log Out')}</Text>
+                  <Text className="text-[16px] font-medium text-[#AC0000]">{t('Log Out')}</Text>
                 </View>
               </TouchableOpacity>
             </View>

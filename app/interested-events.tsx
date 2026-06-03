@@ -204,7 +204,7 @@ export default function InterestedEventsScreen() {
                         </View>
                     </TouchableOpacity>
                     <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
-                        <Text className="text-[24px] font-semibold text-black">Interested Events</Text>
+                        <Text className="text-[20px] font-semibold text-black">Interested Events</Text>
                     </View>
                 </View>
 

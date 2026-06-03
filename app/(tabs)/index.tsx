@@ -3,7 +3,7 @@ import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 // Đã tạm tắt hook useInfiniteSlider để khắc phục lỗi liệt cảm ứng do re-render loop
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 
 // Sử dụng components chuẩn của React Native để NativeWind (Tailwind) nhận diện được className
-import { ActivityIndicator, FlatList, Image, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, ScrollView, TouchableOpacity, View, PixelRatio } from 'react-native';
 
 import Animated, {
     Easing,
@@ -49,6 +49,7 @@ const SectionHeader = ({ title, onLinkPress }: { title: string, onLinkPress?: ()
 );
 
 export default function HomeScreen() {
+
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { user } = useContext(AuthContext);
@@ -62,6 +63,25 @@ export default function HomeScreen() {
     const [events, setEvents] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [hasUnread, setHasUnread] = useState(false);
+    const bounceY = useSharedValue(0);
+
+    useEffect(() => {
+        bounceY.value = withRepeat(
+            withSequence(
+                withDelay(
+                    5000,
+                    withTiming(-12, { duration: 120, easing: Easing.out(Easing.ease) })
+                ),
+                withTiming(0, { duration: 400, easing: Easing.bounce })
+            ),
+            -1,
+            false
+        );
+    }, []);
+
+    const bounceStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: bounceY.value }],
+    }));
 
     const HEADER_MAX_HEIGHT = 320;
     const CURVE_HEIGHT = 28;
@@ -86,10 +106,31 @@ export default function HomeScreen() {
         return { width: size, height: size, borderRadius: size / 2 };
     });
 
+    const targetY = PixelRatio.roundToNearestPixel(38);
+    const targetX = PixelRatio.roundToNearestPixel(50);
+
     const textContainerAnimatedStyle = useAnimatedStyle(() => {
-        const translateY = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, 38], Extrapolation.CLAMP);
-        const translateX = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, 50], Extrapolation.CLAMP);
-        const scale = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [1, 0.9], Extrapolation.CLAMP);
+        const translateY = interpolate(
+            scrollY.value,
+            [0, SCROLL_DISTANCE],
+            [0, targetY],
+            Extrapolation.CLAMP
+        );
+
+        const translateX = interpolate(
+            scrollY.value,
+            [0, SCROLL_DISTANCE],
+            [0, targetX],
+            Extrapolation.CLAMP
+        );
+
+        const scale = interpolate(
+            scrollY.value,
+            [0, SCROLL_DISTANCE],
+            [1, 0.9],
+            Extrapolation.CLAMP
+        );
+
         return { transform: [{ translateY }, { translateX }, { scale }] };
     });
 
@@ -217,37 +258,33 @@ export default function HomeScreen() {
             const addressParts = fullAddress.split(',');
             displayCity = addressParts[addressParts.length - 1].trim();
         }
-        
-        // Chuẩn hóa kiểm tra giới tính (Hỗ trợ cả chữ hoa, chữ thường từ NestJS API)
+
         const isFemale = pet.gender?.toUpperCase() === 'FEMALE' || pet.gender?.toUpperCase() === 'CÁ';
-        
-        // Xử lý hiển thị Tuổi động (Bỏ hardcode số '1')
+
         const displayAge = (() => {
-        // Fallback phòng trường hợp backend sau này có trả về trường age
-        if (pet.age) {
-            if (typeof pet.age === 'number' || !isNaN(Number(pet.age))) return `${pet.age}`;
-            return pet.age;
-        }
-        
-        // Logic tính tuổi từ trường dob
-        if (pet.dob) {
-            const birthDate = new Date(pet.dob);
-            const today = new Date();
-            let years = today.getFullYear() - birthDate.getFullYear();
-            let months = today.getMonth() - birthDate.getMonth();
-            
-            if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
-                years--;
-                months += 12;
+            if (pet.age) {
+                if (typeof pet.age === 'number' || !isNaN(Number(pet.age))) return `${pet.age}`;
+                return pet.age;
             }
-            
-            if (years > 0) return `${years}`; // Ví dụ: '2'
-            if (months > 0) return `${months}T`; // Ví dụ: '3T' (3 tháng) để fit với UI nhỏ
-            return '1T'; // Bé xíu (< 1 tháng)
-        }
-        
-        return 'N/A';
-    })();
+
+            if (pet.dob) {
+                const birthDate = new Date(pet.dob);
+                const today = new Date();
+                let years = today.getFullYear() - birthDate.getFullYear();
+                let months = today.getMonth() - birthDate.getMonth();
+
+                if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+                    years--;
+                    months += 12;
+                }
+
+                if (years > 0) return `${years}`; // Ví dụ: '2'
+                if (months > 0) return `${months}T`; // Ví dụ: '3T' (3 tháng) để fit với UI nhỏ
+                return '1T'; // Bé xíu (< 1 tháng)
+            }
+
+            return 'N/A';
+        })();
 
         return (
             <TouchableOpacity
@@ -257,10 +294,10 @@ export default function HomeScreen() {
                 onPress={() => router.push({
                     pathname: '/pet-detail-modal',
                     params: {
-                        id: pet.id, 
-                        name: pet.name, 
+                        id: pet.id,
+                        name: pet.name,
                         gender: pet.gender || 'male', // Truyền nguyên bản hoặc format chuẩn về detail modal
-                        distance: displayCity, 
+                        distance: displayCity,
                         image: petImageUrl,
                         age: displayAge, // Truyền tuổi đã xử lý động
                         breed: pet.breed || 'Unknown Breed'
@@ -276,7 +313,7 @@ export default function HomeScreen() {
                     >
                         <View className="flex-row items-center mb-1">
                             <Text className="text-white text-[17px] font-semibold tracking-tight shrink mb-0.5" numberOfLines={1}>{pet.name}</Text>
-                            
+
                             {/* KHẮC PHỤC LỖI HARDCODE TẠI ĐÂY */}
                             <View className="flex-row items-center ml-2 px-2 py-0.5 rounded-full shrink-0 border border-white/40 overflow-hidden bg-white/20 backdrop-blur-md">
                                 <Ionicons name={isFemale ? 'female' : 'male'} size={12} color="#ffffff" />
@@ -297,7 +334,7 @@ export default function HomeScreen() {
         return (
             <View className="flex-1 bg-white justify-center items-center">
                 <ActivityIndicator size="large" color="#FF8C42" />
-                <Text className="mt-4 text-gray-500 font-medium">Loading data...</Text>
+                <Text className="mt-4 text-gray-500 font-medium">Đang tải dữ liệu...</Text>
             </View>
         );
     }
@@ -320,37 +357,40 @@ export default function HomeScreen() {
                 <View className="bg-white pb-6">
                     <LinearGradient
                         colors={['#FFFFFF', '#FCF8ED']}
-                        start={{x: 0.5, y: 0}} end={{x: 0.5, y: 1}}
+                        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
                         className="pb-6"
                     >
                         <View className="px-6 mt-2">
-                            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/scan')}>
-                                <View
-                                    className="relative p-[20px] rounded-[32px] flex-row items-center bg-white/50"
-                                    style={{
-                                        shadowColor: '#E89B5A5D', shadowOffset: { width: 0, height: 0 },
-                                        shadowOpacity: 0.6, shadowRadius: 5, elevation: 4,
-                                    }}
-                                >
-                                    <LinearGradient
-                                        colors={['#FFFFFF', '#FCF8ED']} locations={[0.3, 0.8]}
-                                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 32 }}
-                                    />
-                                    <View className="w-16 h-16 rounded-2xl overflow-hidden items-center justify-center mr-5">
+                            <Animated.View style={[bounceStyle, {}]}>
+
+                                <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/scan')}>
+                                    <View
+                                        className="relative p-[20px] rounded-[32px] flex-row items-center bg-white/50"
+                                        style={{
+                                            shadowColor: '#E89B5A5D', shadowOffset: { width: 0, height: 0 },
+                                            shadowOpacity: 0.6, shadowRadius: 5, elevation: 4,
+                                        }}
+                                    >
                                         <LinearGradient
-                                            colors={['rgb(255, 244, 230)', 'rgba(255, 232, 204, 0.52)']}
+                                            colors={['#FFFFFF', '#FCF8ED']} locations={[0.3, 0.8]}
                                             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 32 }}
                                         />
-                                        <Image source={require('../../assets/icon/scan-index.png')} style={{ width: 21, height: 21 }} resizeMode="cover" />
+                                        <View className="w-16 h-16 rounded-2xl overflow-hidden items-center justify-center mr-5">
+                                            <LinearGradient
+                                                colors={['rgb(255, 244, 230)', 'rgba(255, 232, 204, 0.52)']}
+                                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                            />
+                                            <Image source={require('../../assets/icon/scan-index.png')} style={{ width: 21, height: 21 }} resizeMode="cover" />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="font-semibold text-gray-900 text-lg">Found A Lost Pet?</Text>
+                                            <Text className="text-gray-500 text-sm mt-1 leading-5">Scan to help them find a way home</Text>
+                                        </View>
                                     </View>
-                                    <View className="flex-1">
-                                        <Text className="font-semibold text-gray-900 text-lg">Found A Lost Pet?</Text>
-                                        <Text className="text-gray-500 text-sm mt-1 leading-5">Scan to help them find a way home</Text>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
+                                </TouchableOpacity>
+                            </Animated.View>
 
                             {/* PAWCARE */}
                             <View className="mt-[38px]">
@@ -381,7 +421,7 @@ export default function HomeScreen() {
                         <View className="mt-[38px]">
                             <SectionHeader title="Pets Near You" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })} />
                             {pets.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">No pets nearby</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có thú cưng nào gần đây</Text>
                             ) : (
                                 <FlatList
                                     horizontal
@@ -410,7 +450,7 @@ export default function HomeScreen() {
                         <View className="mt-[38px]">
                             <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} />
                             {shelters.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">No shelters available</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
                             ) : (
                                 <ScrollView
                                     horizontal
@@ -431,7 +471,7 @@ export default function HomeScreen() {
                                                     {shelter.name}
                                                 </Text>
                                                 <View className="flex-row items-center mt-2">
-                                                    <Ionicons name="location-outline" size={12} color="#9CA3AF" />
+                                                    <Image source={require('../../assets/icon/location-solid-gray.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
                                                     <Text className="text-[#8E8E93] font-regular text-[12px] ml-1 flex-1" numberOfLines={1}>{shelter.address || 'Đang cập nhật'}</Text>
                                                 </View>
                                             </View>
@@ -445,7 +485,7 @@ export default function HomeScreen() {
                         <View className="mt-[38px] mb-6">
                             <SectionHeader title="Upcoming Events" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })} />
                             {events.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">No upcoming events</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có sự kiện nào sắp tới</Text>
                             ) : (
                                 <ScrollView
                                     horizontal
@@ -458,15 +498,15 @@ export default function HomeScreen() {
                                         return (
                                             <TouchableOpacity
                                                 key={event.id}
-                                                className="w-[300px] h-[56px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98]"
+                                                className="w-[300px] h-[60px] mb-3 mt-1 bg-white rounded-[20px] active:scale-[0.98]"
                                                 style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 6 }}
                                                 activeOpacity={0.85}
                                                 onPress={() => router.push(`/event-detail?id=${event.id}`)}
                                             >
                                                 <View className="flex-1 flex-row rounded-[20px] overflow-hidden">
                                                     <Image source={{ uri: event.bannerUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=300&auto=format&fit=crop' }} className="w-[98px] h-full bg-gray-100" resizeMode="cover" />
-                                                    <View className="flex-1 flex-row items-center pl-6 pr-4 py-3">
-                                                        <View className="flex-1 justify-between h-full pr-2">
+                                                    <View className="flex-1 flex-row items-center pl-3 pr-4 py-3">
+                                                        <View className="flex-1 my-[15px] items-center justify-center h-full pr-3">
                                                             <View>
                                                                 <Text className="font-medium text-gray-800 text-[14px] leading-tight mb-0.5 tracking-[0.06px]" numberOfLines={1}>{event.title}</Text>
                                                                 <View className="flex-row items-center mt-1.5">
@@ -474,7 +514,7 @@ export default function HomeScreen() {
                                                                     <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>{event.locationName || event.address}</Text>
                                                                 </View>
                                                             </View>
-                                                            
+
                                                         </View>
                                                         <View className="items-center justify-center shrink-0 min-w-[32px]">
                                                             <Text className="text-[20px] font-semibold text-black leading-tight">{d.getDate().toString().padStart(2, '0')}</Text>
@@ -577,7 +617,7 @@ export default function HomeScreen() {
                                         }}
                                     >
                                         <Image
-                                            source={{ uri: user?.avatarUrl || 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg' || '/assets/images/default-avatar.jpg' }}
+                                            source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }}
                                             className="w-full h-full"
                                         />
                                     </View>
@@ -617,7 +657,7 @@ export default function HomeScreen() {
                         </Text>
                         <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium tracking-tight overflow-hidden">
                             <Text>
-                                Let's dive into your account
+                                Let’s dive into your account
                             </Text>
                         </Animated.Text>
                     </Animated.View>

@@ -131,7 +131,7 @@ export default function TagRouteDetailsScreen() {
 
   const innerShadowStyle = useAnimatedStyle(() => {
     return {
-      height: withTiming(isExpanded ? SCREEN_HEIGHT * 1 : SCREEN_HEIGHT*0.5),
+      height: withTiming(isExpanded ? SCREEN_HEIGHT * 1 : SCREEN_HEIGHT * 0.5),
     };
   });
 
@@ -492,35 +492,61 @@ export default function TagRouteDetailsScreen() {
           {isExpanded && (
             <View>
               <View className="h-[1px] bg-gray-100 w-full my-5" />
-
-              <View className="flex-row justify-between items-start mb-6">
-                <View>
-                  <Text className="text-[12px] font-regular text-[#757575] tracking-widest mb-1.5">
+              <View className="mb-6">
+                {/* --- HÀNG 1: Các tiêu đề nằm ngang nhau --- */}
+                <View className="flex-row justify-between items-end mb-2">
+                  <Text className="text-[12px] font-regular text-[#757575]">
                     Distance
                   </Text>
-                  <Text className="text-[40px] font-bold text-black">
-                    {realStats.distance} <Text className="text-[16px] font-medium text-black">km</Text>
+
+                  <Text className="text-[12px] font-regular text-[#757575] mr-7">
+                    Travel time: <Text className="text-[14px] font-bold text-black">{realStats.duration} min</Text>
                   </Text>
                 </View>
 
-                <View className="items-start mr-7">
-                  <Text className="text-[12px] font-regular text-[#757575] mb-7">Travel time: <Text className="text-[14px] font-bold text-black">{realStats.duration} min</Text></Text>
-                  <View className="flex-row">
+                {/* --- HÀNG 2: Các giá trị số nằm thẳng trên 1 dòng --- */}
+                {/* items-end giúp đáy của dòng chữ 40px và đáy của các icon căn bằng nhau */}
+                <View className="flex-row justify-between items-end">
+
+                  {/* Số khoảng cách */}
+                  <Text className="text-[40px] font-bold text-black leading-[40px]">
+                    {realStats.distance} <Text className="text-[16px] font-medium text-black">km</Text>
+                  </Text>
+
+                  {/* Các icon và thời gian */}
+                  <View className="flex-row items-center mr-7 pb-1">
+                    {/* pb-1 (padding-bottom) giúp đẩy phần này lên 1 chút xíu để chân chữ vừa khít với chân của số 40px */}
+
                     <View className="flex-row items-center">
-                      <Image className='' source={require('../assets/icon/drive-moto.png')} style={{ width: 10, height: 16 }} resizeMode="cover" />
-                      <Text className="text-[12px] font-regular ml-2 text-[#757575]">{realStats.duration} min</Text>
+                      <Image
+                        source={require('../assets/icon/drive-moto.png')}
+                        style={{ width: 10, height: 16 }}
+                        resizeMode="cover"
+                      />
+                      <Text className="text-[12px] font-regular ml-2 text-[#757575]">
+                        {realStats.duration} min
+                      </Text>
                     </View>
-                    <View className="flex-row items-center ml-3">
-                      <Image className='' source={require('../assets/icon/drive-car.png')} style={{ width: 20, height: 16 }} resizeMode="cover" />
-                      <Text className="text-[12px] font-regular ml-2 text-[#757575]">{Math.max(1, Math.round(realStats.duration * 0.7))} min</Text>
+
+                    <View className="flex-row items-center ml-4">
+                      <Image
+                        source={require('../assets/icon/drive-car.png')}
+                        style={{ width: 20, height: 16 }}
+                        resizeMode="cover"
+                      />
+                      <Text className="text-[12px] font-regular ml-2 text-[#757575]">
+                        {Math.max(1, Math.round(realStats.duration * 0.7))} min
+                      </Text>
                     </View>
+
                   </View>
+
                 </View>
               </View>
 
               <View className="pl-1">
 
-                <View className="flex-row items-start mb-[24px]">
+                <View className="flex-row items-start mb-[20px]">
                   <View className="items-center w-4 mr-3.5 relative">
                     <View className="w-[18px] h-[18px] rounded-full border-[3px] border-[#D7E5FF] bg-[#3478F5] z-10 mt-1" />
                     <View className="w-[1.5px] h-[27px] bg-gray-200 absolute top-[20px] mt-1.5" />
@@ -532,7 +558,7 @@ export default function TagRouteDetailsScreen() {
                 </View>
 
                 <View className="flex-row items-start">
-                  <View className="items-center w-4 mr-3.5 mt-1">
+                  <View className="items-center w-4 mr-3.5 mt-2">
                     <View className="w-4 h-4 rounded-full bg-red-50 items-center justify-center z-10">
                       <View className="w-[18px] h-[18px] rounded-full border-[3px] border-[#FFECDB] bg-[#E89B5A]" />
                     </View>

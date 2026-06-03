@@ -673,7 +673,7 @@ export default function ShelterProfileScreen() {
 
                 {shelterInfo?.isVerified && (
                   <View className="flex-row items-center gap-x-3">
-                    <Image source={require('../assets/icon/real-tick.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
+                    <Image source={require('../assets/icon/verified.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
                     <Text className="text-[14px] text-[#8E8E93]">{t("Verified")} {formatDate(shelterInfo?.verifiedAt)}</Text>
                   </View>
                 )}
