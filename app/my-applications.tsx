@@ -125,7 +125,7 @@ const StatusBadge = ({ status }: { status: string }) => {
           border: 'border border-[#D1D1D6]/50',
           text: 'text-[#8E8E93] tracking-[0.5px]',
           label: 'Closed',
-          iconSource: require('../assets/icon/refresh.png')
+          iconSource: require('../assets/icon/closed-icon.png')
         };
       default:
         const fallbackLabel = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());

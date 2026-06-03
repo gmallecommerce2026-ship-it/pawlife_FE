@@ -165,7 +165,8 @@ export default function TagReportDetailScreen() {
 
   const snapPoints = useMemo(() => {
     const highestSnapPoint = SCREEN_HEIGHT - REQUIRED_TOP_INSET;
-    const lowestSnapPoint = headerHeight;
+
+    const lowestSnapPoint = headerHeight + insets.bottom;;
     const middleSnapPoint = SCREEN_HEIGHT / 2;
     return [lowestSnapPoint, middleSnapPoint, highestSnapPoint];
   }, [headerHeight, SCREEN_HEIGHT, insets.top]);
@@ -434,20 +435,21 @@ export default function TagReportDetailScreen() {
         snapPoints={snapPoints}
         enableOverDrag={false}
         animatedPosition={animatedPosition}
+        enablePanDownToClose={false}
         topInset={REQUIRED_TOP_INSET}
         backgroundStyle={{ backgroundColor: 'white', borderRadius: 26 }}
         handleIndicatorStyle={{ backgroundColor: '#E5E5EA', width: 48, height: 6 }}
       >
-        <BottomSheetView className="pt-[12px] bg-white z-10 mb-2"
+        <BottomSheetView className="pt-[12px] bg-white z-10"
           onLayout={(event) => {
             const { height } = event.nativeEvent.layout;
             if (height > 0) {
-              setHeaderHeight(height); 
+              setHeaderHeight(height);
             }
           }}
         >
           <Animated.View style={headerAnimatedStyle}>
-            <View className="flex-row items-center justify-between flex-1 mx-[20px] pb-[24px]">
+            <View className="flex-row items-center justify-between flex-1 mx-[20px] pb-[12px]">
               <Image source={{ uri: petImage }} className="rounded-full mr-4" style={{ width: 60, height: 60 }} />
               <View className="flex-1">
                 <View className="flex-row justify-between items-center">
@@ -459,14 +461,12 @@ export default function TagReportDetailScreen() {
                       </Text>
                     </View>
                   </View>
-                  
-                  {/* Nút 3 chấm Options Menu (từ code cũ) */}
-                  <TouchableOpacity 
-                    className='p-2 -mr-2' 
-                    onPress={() => setIsOptionsVisible(true)}
-                  >
-                    <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 18, height: 18 }} resizeMode="cover" />
-                  </TouchableOpacity>
+                  {/* <TouchableOpacity onPress={() => { }}>
+                    <View className='flex-row items-center'>
+                      <Image className='bottom-1 mr-1' source={require('../assets/icon/pen.png')} style={{ width: 7, height: 8 }} resizeMode="cover" />
+                      <Text className="text-[10px] text-[#8E8E93] mb-2 underline tracking-[0.06px]">Edit pet information</Text>
+                    </View>
+                  </TouchableOpacity> */}
                 </View>
                 
                 <Text className="text-[12px] text-[#757575] font-regular mb-2">
@@ -540,27 +540,9 @@ export default function TagReportDetailScreen() {
             ))}
           </View>
 
-          {/* Logic hiển thị nút Mark As Found từ code cũ */}
-          {reportData.status === 'PENDING' ? (
-            <TouchableOpacity 
-              onPress={handleMarkAsFound}
-              disabled={isSubmitting}
-              className='items-center justify-center border border-[#E89B5A] bg-[#E89B5A] py-4 rounded-[16px] mb-4 shadow-sm shadow-orange-200'
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text className='font-semibold text-[16px] text-[#FFFF]'>Mark {pet.name || 'Pet'} as Found</Text>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View className='flex-row items-center justify-center bg-[#ECFDF5] border border-[#6EE7B7] py-4 rounded-[16px] mb-4'>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-              <Text className='font-semibold text-[15px] text-[#10B981] ml-2'>
-                This report has been resolved
-              </Text>
-            </View>
-          )}
+          {/* <TouchableOpacity className='items-center justify-center border border-[#E89B5A] bg-[#E89B5A] py-4 rounded-[16px] mb-4'>
+            <Text className='font-semibold text-[16px] text-[#FFFF]'>Mark {pet.name || 'Pet'} as Found</Text>
+          </TouchableOpacity> */}
         </BottomSheetScrollView>
       </BottomSheet>
 

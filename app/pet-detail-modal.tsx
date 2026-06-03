@@ -376,7 +376,7 @@ export default function PetDetailModal() {
         <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
           onScroll={handleScroll}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 50 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 70 }}
         >
           <View className="bg-white px-[25px]">
             <View className="flex-row justify-between mt-6 gap-[10px]">
@@ -467,7 +467,7 @@ export default function PetDetailModal() {
                     <View className="flex-row items-start">
                       <View className="flex-row items-center mr-1 mt-[2px]">
                         <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                        <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium w-[90px]">Good with:</Text>
+                        <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">Good with:</Text>
                       </View>
                       <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
                         {Array.isArray(pet?.goodWith)
@@ -481,7 +481,7 @@ export default function PetDetailModal() {
                     <View className="flex-row items-start">
                       <View className="flex-row items-center mr-1 mt-[2px]">
                         <Image source={require('../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                        <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium w-[90px]">Not suitable:</Text>
+                        <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">Not suitable:</Text>
                       </View>
                       <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
                         {Array.isArray(pet?.badWith)

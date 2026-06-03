@@ -593,7 +593,7 @@ export default function PetProfileDetailScreen() {
 
           <View className="mx-[20px] mb-8">
             <View className="flex-row justify-between items-center mb-5">
-              <Text className="text-[16px] font-medium text-black">Paw History</Text>
+              <Text className="text-[16px] font-semibold text-black">Paw History</Text>
               <TouchableOpacity
                 onPress={toggleHistory}
                 activeOpacity={0.6}
@@ -678,7 +678,7 @@ export default function PetProfileDetailScreen() {
 
                     <View className="flex-1 mx-3">
                       <View className="flex-row justify-between items-center">
-                        <Text className="text-[14px] text-[#000000] font-medium leading-[16px]" numberOfLines={1}>
+                        <Text className="text-[12px] text-[#000000] font-medium leading-[16px]" numberOfLines={1}>
                           Vaccination_Record_{index + 1}.jpg
                         </Text>
                         <TouchableOpacity
@@ -691,12 +691,11 @@ export default function PetProfileDetailScreen() {
                           }}
                           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 14, height: 14 }} resizeMode="contain" />
+                          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
                         </TouchableOpacity>
                       </View>
                       <View className="flex-row items-center mt-1.5">
-                        <Feather name="check-circle" size={12} color="#10B981" />
-                        <Text className="text-[11px] text-[#8E8E93] ml-1 tracking-[0.2px]">
+                        <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">
                           Submitted on {new Date(petData.createdAt || Date.now()).toLocaleDateString('en-GB')}
                         </Text>
                       </View>
@@ -710,6 +709,7 @@ export default function PetProfileDetailScreen() {
                   <Image source={require('../assets/icon/file.png')} style={{ width: 17, height: 17 }} resizeMode="cover" />
                 </View>
                 <Text className="text-[16px] text-black font-medium mb-2">No vaccine records yet</Text>
+                <Text className="text-[14px] text-[#A9ACB4] font-regular">Records added to PawLife will be shown here.</Text>
               </View>
             )}
           </View>

@@ -18,6 +18,7 @@ import {
 import LostModeShareModal, { FormData } from '@/components/LostModeShareModal';
 import ReportIssueModal from '@/components/ReportIssueModal';
 import { LinearGradient } from 'expo-linear-gradient';
+import ShelterContactModal from '@/components/ShelterContactModal';
 
 const { width } = Dimensions.get('window');
 
@@ -57,8 +58,9 @@ export default function ScannedPetScreen() {
   const [hasReported, setHasReported] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReportVisible, setIsReportVisible] = useState(false);
-  
+  const [shelterData, setShelterData] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isContactModalVisible, setIsContactModalVisible] = useState(false);
 
   const displayImages = React.useMemo(() => {
     // 1. Kiểm tra nếu pet chưa load xong
@@ -93,26 +95,26 @@ export default function ScannedPetScreen() {
     }
 
     // 5. Fallback cuối cùng
-    return images.length > 0 
-      ? images 
+    return images.length > 0
+      ? images
       : ['https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop'];
   }, [pet]);
   const calculateAgeDisplay = (dob: string | Date | undefined | null): string => {
     if (!dob) return 'Unknown age';
-    
+
     const birthDate = new Date(dob);
     // Validate date hợp lệ
     if (isNaN(birthDate.getTime())) return 'Unknown age';
-    
+
     const today = new Date();
     let years = today.getFullYear() - birthDate.getFullYear();
     let months = today.getMonth() - birthDate.getMonth();
-    
+
     if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
       years--;
       months += 12;
     }
-    
+
     if (years > 0) return `${years} year${years > 1 ? 's' : ''} old`;
     if (months > 0) return `${months} month${months > 1 ? 's' : ''} old`;
     return 'Less than 1 month old';
@@ -133,14 +135,22 @@ export default function ScannedPetScreen() {
         try {
           setLoading(true);
           setHasReported(false);
-          setCurrentImageIndex(0); 
-          
+          setCurrentImageIndex(0);
+
           const response = await axiosClient.get(`/tags/${tagId}/scan?t=${Date.now()}`);
-          
+
           if (!isActive) return;
-          
+
           const petData = response.data;
 
+          // DEBUG - xóa sau khi fix xong
+          console.log('=== PET DATA RAW ===', JSON.stringify(petData, null, 2));
+          console.log('=== DOB VALUE ===', petData?.dob);
+          console.log('=== AGE VALUE ===', petData?.age);
+          console.log('=== DOB TYPE ===', typeof petData?.dob);
+          console.log(petData.owner);
+
+          setShelterData(petData.owner);
           setPet(petData);
 
         } catch (error: any) {
@@ -158,7 +168,7 @@ export default function ScannedPetScreen() {
     }, [tagId])
   );
 
-  
+
   const handleShareLocation = async (location: any, formData: FormData, isSkipped: boolean) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -167,7 +177,7 @@ export default function ScannedPetScreen() {
       const finalTagId = Array.isArray(tagId) ? tagId[0] : tagId;
       const lat = location?.latitude || null;
       const lng = location?.longitude || null;
-      const radius = location?.radius || null; 
+      const radius = location?.radius || null;
 
       const payload = isSkipped ? {
         tagId: finalTagId,
@@ -250,11 +260,11 @@ export default function ScannedPetScreen() {
   }
 
   const isLost = pet.isLost || pet.status?.toUpperCase() === 'LOST';
-  const rawDob = pet?.dob 
-  ?? pet?.birthDate 
-  ?? pet?.birthday 
-  ?? pet?.dateOfBirth 
-  ?? null;
+  const rawDob = pet?.dob
+    ?? pet?.birthDate
+    ?? pet?.birthday
+    ?? pet?.dateOfBirth
+    ?? null;
 
   const displayAge = calculateAgeDisplay(rawDob);
 
@@ -265,13 +275,13 @@ export default function ScannedPetScreen() {
   const displayOwnerAddress = pet?.lostInfo?.ownerAddress || pet?.ownerAddress || pet?.owner?.address || 'No address provided';
   const displayNote = pet?.lostInfo?.note || pet?.note || "Please contact me ASAP";
 
-  
-  
-  
 
 
-  const lostImageWidth = width - 40; 
-  const safeImageWidth = width - 48; 
+
+
+
+  const lostImageWidth = width - 40;
+  const safeImageWidth = width - 48;
 
   return (
     <View className="flex-1 bg-white">
@@ -309,7 +319,7 @@ export default function ScannedPetScreen() {
                 height: 210, shadowColor: '#000', shadowOffset: { width: 10, height: 10 },
                 shadowOpacity: 0.6, shadowRadius: 15, elevation: 4,
               }}>
-                
+
                 {/* --- SLIDER ẢNH --- */}
                 <ScrollView
                   horizontal
@@ -355,8 +365,7 @@ export default function ScannedPetScreen() {
                     {pet?.name?.toLowerCase() || 'pet'}
                   </Text>
                   <Text className="text-white text-[14px] font-regular text-center tracking-[0.5px]">
-                    {/* SỬA 'Unknown' THÀNH 'Unknown age' Ở DÒNG DƯỚI */}
-                    {displayAge !== 'Unknown age' ? `${displayAge}` : 'Age unknown'} • {pet?.breed || 'Unknown breed'}
+                    {displayAge !== 'Unknown' ? `${displayAge}` : 'Age unknown'} • {pet?.breed || 'Unknown breed'}
                   </Text>
                 </View>
               </View>
@@ -508,7 +517,7 @@ export default function ScannedPetScreen() {
             {isLost ? (
               <View className="gap-3">
                 <TouchableOpacity
-                  onPress={handleCallOwner}
+                  onPress={() => setIsContactModalVisible(true)}
                   className="w-full bg-[#E89B5A] py-4 rounded-2xl flex-row justify-center items-center"
                 >
                   <Image
@@ -551,6 +560,12 @@ export default function ScannedPetScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <ShelterContactModal
+        isVisible={isContactModalVisible}
+        onClose={() => setIsContactModalVisible(false)}
+        shelterData={shelterData}
+      />
 
       <ReportIssueModal
         isVisible={isReportVisible}

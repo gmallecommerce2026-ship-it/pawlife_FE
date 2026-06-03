@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import axios from 'axios';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -16,7 +17,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView,
   Platform,
-  ScrollView, TextInput, TouchableOpacity, View
+  ScrollView, TextInput, TouchableOpacity, View, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // GoogleSignin.configure({
@@ -37,7 +38,7 @@ const InputField = ({
 
   return (
     <View className="mb-[18px]">
-      <Text className='mb-[12px] font-semibold font-[16px]'>{title}</Text>
+      <Text className='text-[16px] mb-[12px] font-semibold'>{title}</Text>
       <View 
         className={`flex-row items-center bg-[#FAFAFA] px-5 py-4 rounded-[16px] border-[1.5px] ${
           error ? 'border-red-500 bg-red-50' : isFocused ? 'border-[#E5E5E5]' : 'border-[#E5E5E5]'
@@ -58,7 +59,15 @@ const InputField = ({
         />
         {isPassword && (
           <TouchableOpacity onPress={() => setIsSecure(!isSecure)} className="ml-2 p-1" activeOpacity={0.7}>
-            {isSecure ? <EyeOff size={22} color={isFocused ? "#E89B5A" : "#9CA3AF"} /> : <Eye size={22} color={isFocused ? "#E89B5A" : "#9CA3AF"} />}
+            {isSecure ? <Image
+            source={require('../assets/icon/eye-off.png')}
+            style={{ width: 20, height: 20 }}
+            resizeMode="cover"
+          /> : <Image
+            source={require('../assets/icon/eye-gray.png')}
+            style={{ width: 20, height: 20 }}
+            resizeMode="cover"
+          /> }
           </TouchableOpacity>
         )}
       </View>
@@ -68,12 +77,16 @@ const InputField = ({
 };
 
 const SocialButton = ({ icon, title, onPress, bgClass = "bg-white", textClass = "text-gray-700", borderClass = "border border-[#E5E5E5]", disabled }: any) => (
-  <TouchableOpacity 
+  <TouchableOpacity
     onPress={onPress} activeOpacity={0.8} disabled={disabled}
     className={`flex-row items-center justify-center w-full py-[16px] rounded-[16px] mb-[12px] ${bgClass} ${borderClass}`}
     style={{ opacity: disabled ? 0.5 : 1 }}
   >
-    {icon}
+    <Image
+      source={icon}
+      style={{ width: 21, height: 21 }}
+      resizeMode="cover"
+    />
     <Text className={`ml-3 font-semibold text-[14px] ${textClass}`}>{title}</Text>
   </TouchableOpacity>
 );
@@ -390,9 +403,9 @@ export default function SignInScreen() {
 
   const renderLogin = () => (
     <>
-      <View className="mb-[58px]">
-        <Text className="text-[30px] font-semibold text-gray-900 mb-2.5 tracking-tight">Welcome back! 👋</Text>
-        <Text className="text-gray-500 font-medium text-[16px] leading-6">Let’s continue the journey with your furry friends.</Text>
+      <View className="mb-[35px] mt-3">
+        <Text className="text-[30px] font-semibold text-black mb-[26px] tracking-[0.06px]">Welcome back! 👋</Text>
+        <Text className="text-[#8E8E93] font-medium text-[16px] tracking-[0.06px]">Let’s continue the journey with your furry friends.</Text>
       </View>
 
       <InputField 
@@ -407,10 +420,10 @@ export default function SignInScreen() {
       <View className="flex-row justify-between items-center mb-[2px] mt-[-8px]">
         <TouchableOpacity className="flex-row items-center py-2" onPress={() => setIsRememberMe(!isRememberMe)} activeOpacity={0.7}>
           <MaterialCommunityIcons name={isRememberMe ? "checkbox-marked" : "checkbox-blank-outline"} size={22} color={isRememberMe ? "#E89B5A" : "#9CA3AF"} />
-          <Text className="text-gray-600 font-medium ml-2 text-[14px]">Remember me</Text>
+          <Text className="text-black font-medium ml-2 text-[14px] tracking-[0.06px]">Remember me</Text>
         </TouchableOpacity>
         <TouchableOpacity className="py-2" onPress={() => { setErrors({}); setCurrentView('FORGOT_PASSWORD'); }}>
-          <Text className="text-[#E89B5A] font-bold text-[14px]">Forgot password?</Text>
+          <Text className="text-[#E89B5A] font-medium text-[14px] tracking-[0.06px]">Forgot password?</Text>
         </TouchableOpacity>
       </View>
 
@@ -429,12 +442,16 @@ export default function SignInScreen() {
           {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">Log In</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleBiometricAuth} disabled={isLoading} activeOpacity={0.7}
           className="h-[64px] aspect-square items-center justify-center ml-1"
-          style={{ borderColor: 'rgba(232, 155, 90, 0.3)' }}
+
         >
-            <MaterialCommunityIcons name="face-recognition" size={28} color="#61e250" />
+          <Image
+            source={require('../assets/icon/face-id.png')}
+            style={{ width: 43, height: 43 }}
+            resizeMode="cover"
+          />
         </TouchableOpacity>
       </View>
 
@@ -446,18 +463,18 @@ export default function SignInScreen() {
 
       <View className="w-full mb-8">
           <SocialButton 
-            icon={<AntDesign name="google" size={24} color="#DB4437" />} title="Continue with Google" 
+            icon={require('../assets/icon/google.png')} title="Continue with Google"
             // onPress={handleGoogleLogin} disabled={isLoading}
           />
           {Platform.OS === 'ios' && (
               <SocialButton
-                icon={<AntDesign name="apple" size={24} color="black" />} title="Continue with Apple"
+                icon={require('../assets/icon/apple.png')} title="Continue with Apple"
                 disabled={isLoading}
                 onPress={handleAppleLogin}
               />
           )}
           {/* <SocialButton 
-            icon={<FontAwesome5 name="facebook" size={24} color="#4267B2" />} title="Continue with Facebook" 
+            icon={require('../assets/icon/facebook.png')} title="Continue with Facebook" 
             onPress={() => Alert.alert("Notice", "Feature is under development")} disabled={isLoading}
           /> */}
       </View>
@@ -466,16 +483,23 @@ export default function SignInScreen() {
 
   const renderForgotPassword = () => (
     <>
-      <View className="mb-10 mt-4">
-        <Text className="text-[30px] font-semibold text-gray-900 mb-2.5 tracking-tight">Forgot Password?</Text>
-        <Text className="text-gray-500 text-[16px] font-medium leading-6">Enter your registered email. We’ll send an OTP code for the next step.</Text>
+      <View className="mb-[35px] mt-3">
+        <View className='flex-row items-center mb-[26px]'>
+          <Text className="text-[30px] font-semibold text-black tracking-[0.06px]">Forgot Password?</Text>
+          <Image
+            source={require('../assets/icon/forgot-pass.png')}
+            style={{ width: 28, height: 28 }}
+            resizeMode="cover"
+          />
+        </View>
+        <Text className="text-[#8E8E93] text-[16px] font-medium">Enter your registered email. We’ll send an OTP code for the next step.</Text>
       </View>
       <InputField 
         placeholder="Enter registered email" value={email} keyboardType="email-address" error={errors.email} title={"Your Registered Email"}
         onChangeText={(text: string) => { setEmail(text); setErrors({...errors, email: ''}) }} icon={<Mail size={22} />} 
       />
       {errors.form && <Text className="text-red-500 font-medium mb-6 text-center">{errors.form}</Text>}
-      <View className="mt-auto pb-8">
+      <View className="mt-auto">
         <TouchableOpacity 
           className="w-full py-[21px] rounded-[100px] items-center bg-[#E89B5A]"
           onPress={handleRequestOtp} disabled={isLoading} activeOpacity={0.8}
@@ -514,18 +538,25 @@ export default function SignInScreen() {
           isEmpty ? 'bg-transparent' : 'bg-[#F5F5F5]'
         }`}
       >
-        {icon ? icon : <Text className="text-[24px] font-regular text-[#6B7280]">{label}</Text>}
+        {icon ? icon : <Text className="text-[24px] font-regular text-[#8E8E93]">{label}</Text>}
       </TouchableOpacity>
     );
   };
 
   const renderVerifyOtp = () => (
-    <View className="flex-1 mt-4">
-      <View className="mb-10">
-        <Text className="text-[32px] font-bold text-black mb-4 flex-row items-center">
-          Enter OTP Code 🔐
-        </Text>
-        <Text className="text-[15px] text-[#9CA3AF] leading-6 font-regular">
+    <View className="flex-1 mt-3">
+      <View className="mb-[35px]">
+        <View className='mb-[26px] flex-row'>
+          <Text className="text-[32px] font-semibold text-black flex-row items-center mr-2">
+            Enter OTP Code
+          </Text>
+          <Image
+            source={require('../assets/icon/otp.png')}
+            style={{ width: 28, height: 28 }}
+            resizeMode="cover"
+          />
+        </View>
+        <Text className="text-[16px] text-[#9CA3AF] leading-6 font-medium">
           Email has been sent to <Text className="text-black font-semibold">{email}</Text>. Please enter the one-time verification code below.
         </Text>
       </View>
@@ -556,10 +587,10 @@ export default function SignInScreen() {
         {isLoading ? (
           <View className="flex-row items-center">
             <ActivityIndicator size="small" color="#E89B5A" className="mr-2" />
-            <Text className="text-[#9CA3AF] text-[15px] font-regular">Sending...</Text>
+            <Text className="text-[#8E8E93] text-[16px] font-regular">Sending...</Text>
           </View>
         ) : otpTimer > 0 ? (
-          <Text className="text-[#9CA3AF] text-[15px] font-regular">
+          <Text className="text-[#8E8E93] text-[16px] font-regular">
             Resend New Code <Text className="font-semibold text-black">{formatTime(otpTimer)}</Text>
           </Text>
         ) : (
@@ -591,9 +622,16 @@ export default function SignInScreen() {
 
   const renderResetPassword = () => (
     <>
-      <View className="mb-10 mt-4">
-        <Text className="text-[32px] font-extrabold text-gray-900 mb-2.5 tracking-tight">New Password</Text>
-        <Text className="text-gray-500 text-[16px] leading-6">Create a strong and memorable new password.</Text>
+      <View className="mb-10 mt-3">
+        <View className='flex-row'>
+          <Text className="text-[30px] font-semibold text-black mb-2.5 tracking-[0.06px]">Secure Your Account</Text>
+          <Image
+            source={require('../assets/icon/secure.png')}
+            style={{ width: 28, height: 28 }}
+            resizeMode="cover"
+          />
+        </View>
+        <Text className="text-[#8E8E93] text-[16px] leading-6">Create a new password for your PawLife account. Remember to use a strong and unique password.</Text>
       </View>
       <InputField 
         placeholder="Enter new password" value={newPassword} isPassword={true} error={errors.newPassword}
@@ -605,7 +643,7 @@ export default function SignInScreen() {
         onPress={handleResetPassword} disabled={isLoading} activeOpacity={0.8}
         style={{ opacity: isLoading ? 0.7 : 1 }}
       >
-        {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">Update Password</Text>}
+        {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">Submit</Text>}
       </TouchableOpacity>
     </>
   );
@@ -643,9 +681,41 @@ export default function SignInScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center px-4 py-3">
-        <TouchableOpacity onPress={handleBack} disabled={isLoading} className="p-2 -ml-2 rounded-full active:bg-gray-100">
-          <Feather name="chevron-left" size={35} color="#000000" />
+      <View className="flex-row items-center px-4 py-3 mb-[20px]">
+        <TouchableOpacity
+          onPress={handleBack}
+          activeOpacity={0.7}
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 5,
+            elevation: 3,
+          }}
+          className="w-10 h-10 rounded-full items-center justify-center"
+        >
+          <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 28,
+              borderWidth: 0.5,
+              borderTopColor: 'white',
+              borderLeftColor: 'white',
+              borderBottomColor: 'transparent',
+              borderRightColor: 'transparent',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            }}>
+            <LinearGradient
+              colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              locations={[0, 0.3, 1]}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+            />
+            <Feather name="chevron-left" size={20} color="#000000" />
+          </View>
         </TouchableOpacity>
       </View>
 

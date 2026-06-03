@@ -119,7 +119,7 @@ export default function OrganizerProfileScreen() {
     const [loading, setLoading] = useState(true);
     const [isFollowing, setIsFollowing] = useState(false);
 
-    const SCROLL_THRESHOLD = 200;
+    const SCROLL_THRESHOLD = 90;
     const HEADER_HEIGHT = insets.top + 50; // Chiều cao header
     const scrollY = useSharedValue(0);
     const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -156,8 +156,6 @@ export default function OrganizerProfileScreen() {
                 Alert.alert("Lỗi", "Không thể tải thông tin ban tổ chức lúc này.");
             } finally {
                 setLoading(false);
-                console.log(organizer);
-                
             }
         };
 
@@ -218,7 +216,7 @@ export default function OrganizerProfileScreen() {
     return (
         <View className="flex-1 bg-white">
             <Animated.View
-                style={[headerBarStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 60, paddingHorizontal: 20 }]}
+                style={[headerBarStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 10, paddingHorizontal: 20 }]}
             >
                 <View className="flex-1 items-center">
                     <Animated.Text style={headerTitleStyle} className="text-[20px] font-semibold text-black tracking-[0.5px]">
@@ -368,9 +366,10 @@ export default function OrganizerProfileScreen() {
                         </View>
 
                         {activeTab === 'Contact' ? (
+                           
                             <View className="mt-[21px]">
                                 {/* About Shelter */}
-                                <Text className="text-[16px] font-medium text-black mb-2">About Organizer</Text>
+                                <Text className="text-[16px] font-medium text-black mb-2">About Shelter</Text>
                                 <Text className="text-[14px] text-[#8E8E93] leading-5 mb-5">
                                     {organizer.about || "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam"}
                                 </Text>
@@ -410,7 +409,7 @@ export default function OrganizerProfileScreen() {
                                     <View className="flex-row items-center gap-x-3">
                                         <Image source={require('../assets/icon/earth.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
                                         {/* Sử dụng dữ liệu thật */}
-                                        <Text className="text-[14px] text-[#8E8E93]">Based in Vietnam</Text>
+                                        <Text className="text-[14px] text-[#8E8E93]">Based in Vietnam"</Text>
                                     </View>
                                     <View className="flex-row items-center gap-x-3">
                                         <Image source={require('../assets/icon/info.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />

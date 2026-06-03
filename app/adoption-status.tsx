@@ -94,13 +94,13 @@ export default function AdoptionStatusScreen() {
         steps.push({ id: '2', title: 'Under Review', state: 'active', date: updatedDate, description: 'Shelter đang xem xét hồ sơ và thông tin của bạn.' });
         break;
       case 'NEED_MORE_INFO':
-        steps.push({ 
-          id: '2', 
-          title: 'Need More Information', 
-          state: 'alert', 
+        steps.push({
+          id: '2',
+          title: 'Need More Information',
+          state: 'alert',
           date: updatedDate,
           description: 'Shelter needs a bit more information to verify.',
-          actionRequired: 'Photos of your living space' 
+          actionRequired: 'Photos of your living space'
         });
         break;
       case 'INTERVIEW_SCHEDULED':
@@ -189,10 +189,10 @@ export default function AdoptionStatusScreen() {
 
   const pet = applicationData.pet;
   const isClosed = applicationData.status === 'CLOSED';
-  
+
   // DÙNG HÀM TẠO TIMELINE ĐỘNG DỰA VÀO DỮ LIỆU BACKEND
   const timelineSteps = generateTimelineSteps(applicationData.status, applicationData.createdAt, applicationData.updatedAt);
-  
+
   const commitments = applicationData.commitments || {};
 
   const submittedDate = new Date(applicationData.createdAt).toLocaleDateString('en-US', {
@@ -204,12 +204,10 @@ export default function AdoptionStatusScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* 1. HEADER */}
-      <View className="flex-row items-center justify-between px-5 py-4 bg-white">
-
-        {/* 1. Nút Back bên trái */}
+      <View className="flex-row items-center justify-between px-4 py-3 bg-white z-10 relative">
         <TouchableOpacity
           onPress={() => router.back()}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
           style={{
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
@@ -217,6 +215,7 @@ export default function AdoptionStatusScreen() {
             shadowRadius: 5,
             elevation: 3,
           }}
+          className="w-10 h-10 rounded-full items-center justify-center"
         >
           <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
             style={{
@@ -233,63 +232,56 @@ export default function AdoptionStatusScreen() {
               backgroundColor: 'rgba(255, 255, 255, 0.1)',
             }}>
             <LinearGradient
-              colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
+              colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               locations={[0, 0.3, 1]}
-
               style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
             />
-            <Feather name="chevron-left" size={20} color="#00000" />
+            <Feather name="chevron-left" size={20} color="#000000" />
           </View>
         </TouchableOpacity>
-
-        {/* 2. Tiêu đề "Adoption Status" nằm chính giữa */}
-        <Text className="text-[20px] font-semibold text-black tracking-tight">
-          Adoption Status
-        </Text>
-
-        {/* 3. SỬA Ở ĐÂY: Thay thế ô trống cũ bằng NÚT THÊM MỚI (+) */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={{
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 5,
-            elevation: 3,
-          }}
-        >
-          {/* Sử dụng icon plus từ thư viện Feather */}
-          <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 28,
-              borderWidth: 0.5,
-              borderTopColor: 'white',
-              borderLeftColor: 'white',
-              borderBottomColor: 'transparent',
-              borderRightColor: 'transparent',
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            }}>
-            <LinearGradient
-              colors={['rgba(221, 221, 221, 0.5)', 'rgba(247, 247, 247, 0.8)', '#FFFFFF']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              locations={[0, 0.3, 1]}
-
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
-            />
-            <Image
-              className=''
-              source={require('../assets/icon/share.png')}
-              style={{ width: 16, height: 16 }}
-              resizeMode="cover"
-            />
-          </View>
-        </TouchableOpacity>
-
+        <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
+          <Text className="text-[20px] font-bold text-gray-900 tracking-tight">Application Status</Text>
+        </View>
+        {/* <TouchableOpacity
+                  onPress={() => console.log("Share")}
+                  activeOpacity={0.7}
+                  style={{
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 5,
+                    elevation: 3,
+                  }}
+                  className="w-10 h-10 rounded-full items-center justify-center"
+                >
+                  <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 28,
+                      borderWidth: 0.5,
+                      borderTopColor: 'white',
+                      borderLeftColor: 'white',
+                      borderBottomColor: 'transparent',
+                      borderRightColor: 'transparent',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    }}>
+                    <LinearGradient
+                      colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      locations={[0, 0.3, 1]}
+                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                    />
+                  <Image
+                    source={require('../assets/icon/share.png')}
+                      style={{ width: 16, height: 16 }}
+                    resizeMode="cover"
+                  />
+                  </View>
+                </TouchableOpacity> */}
       </View>
 
       <View
@@ -333,7 +325,7 @@ export default function AdoptionStatusScreen() {
             resizeMode="cover"
           />
 
-          <View className="flex-1 mb-2 ml-[10px] justify-center pointer-events-none"> 
+          <View className="flex-1 mb-2 ml-[10px] justify-center pointer-events-none">
             {/* Thêm pointer-events-none để text không chặn bấm */}
             <Text className="text-[16px] font-medium text-black leading-tight" numberOfLines={1}>
               {pet?.name}
@@ -346,12 +338,12 @@ export default function AdoptionStatusScreen() {
           </View>
 
           {/* Sửa lại nút bấm Shelter: Bọc riêng ra góc để không conflict vùng bấm */}
-          <View className="absolute bottom-0 right-0 z-20"> 
+          <View className="absolute bottom-0 right-0 z-20">
             <TouchableOpacity
               activeOpacity={0.6}
               hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
               onPress={(e) => {
-                e.stopPropagation(); 
+                e.stopPropagation();
                 const shelterId = pet?.shelter?.id || pet?.shelterId;
                 if (shelterId) {
                   router.push(`/shelter-profile?id=${shelterId}`);
@@ -484,11 +476,11 @@ export default function AdoptionStatusScreen() {
             <View className="w-12 h-12 bg-gray-50 rounded-full items-center justify-center self-center mb-3">
               <Feather name="search" size={20} color="#9CA3AF" />
             </View>
-            <Text className="text-[17px] font-bold text-gray-900 text-center mb-2 tracking-tight">Keep Looking</Text>
+            <Text className="text-[16px] font-semibold text-gray-900 text-center mb-2 tracking-tight">Keep Looking</Text>
             <Text className="text-[14px] text-gray-500 text-center mb-6 leading-5 px-2">There are many other wonderful pets waiting for a home. We've found some similar pets you might like.</Text>
 
             <TouchableOpacity
-              className="bg-[#ffa053] rounded-[14px] py-4 items-center shadow-sm shadow-orange-200"
+              className="bg-[#E89B5A] rounded-[14px] py-4 items-center shadow-sm shadow-orange-200"
               activeOpacity={0.8}
               onPress={() => router.push('/matching')}
             >
@@ -564,7 +556,7 @@ export default function AdoptionStatusScreen() {
           tint="dark"
           style={StyleSheet.absoluteFill}
           className="flex-1 justify-center items-center"
-        />       
+        />
         <View className="flex-1 justify-center bg-black/50">
           <View className="bg-white rounded-[24px] mx-[20px] mt-[60px] flex-1 shadow-2xl overflow-hidden max-h-[75%]" style={{ height: SCREEN_HEIGHT * 0.75 }}>
 

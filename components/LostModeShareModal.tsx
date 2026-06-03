@@ -4,6 +4,7 @@ import { Slider } from '@miblanchard/react-native-slider';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import Svg, { Rect } from 'react-native-svg';
 import {
@@ -77,14 +78,28 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
   });
 
   const handleAddPhoto = async () => {
-    if (photos.length >= 5) return;
-    const imageUrl = await pickAndUploadImage({
-      folder: 'lost-pets',
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    if (imageUrl) {
-      setPhotos((prev) => [...prev, imageUrl]);
+    const remainingSlots = 4 - photos.length;
+
+    if (remainingSlots <= 0) {
+      Alert.alert("Giới hạn ảnh", "Bạn chỉ có thể chọn tối đa 5 ảnh.");
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit: remainingSlots,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newUris = result.assets.map(asset => asset.uri);
+        setPhotos((prev) => [...prev, ...newUris]);
+      }
+    } catch (error) {
+      console.error("Lỗi khi chọn ảnh: ", error);
+      Alert.alert("Lỗi", "Không thể mở thư viện ảnh.");
     }
   };
 
