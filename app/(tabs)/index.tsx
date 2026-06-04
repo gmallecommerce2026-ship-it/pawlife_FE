@@ -3,16 +3,16 @@ import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 // Đã tạm tắt hook useInfiniteSlider để khắc phục lỗi liệt cảm ứng do re-render loop
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useLanguage } from '@/contexts/LanguageContext';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-
 // Sử dụng components chuẩn của React Native để NativeWind (Tailwind) nhận diện được className
-import { ActivityIndicator, FlatList, Image, ScrollView, TouchableOpacity, View, PixelRatio } from 'react-native';
-
+import * as Haptics from 'expo-haptics';
+import { ActivityIndicator, FlatList, Image, PixelRatio, ScrollView, TouchableOpacity, View } from 'react-native';
 import Animated, {
     Easing,
     Extrapolation,
@@ -39,17 +39,17 @@ const CATEGORIES = [
     { id: 4, label: 'Beauty', icon: require('../../assets/images/beauty-icon.png') },
 ];
 
-const SectionHeader = ({ title, onLinkPress }: { title: string, onLinkPress?: () => void }) => (
+const SectionHeader = ({ title, onLinkPress, t }: { title: string, onLinkPress?: () => void, t: any }) => (
     <View className="flex-row justify-between items-center mb-4 px-6">
-        <Text className="text-[16px] font-semibold text-black ">{title}</Text>
+        <Text className="text-[16px] font-semibold text-black">{t(title)}</Text>
         <TouchableOpacity onPress={onLinkPress} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text className="text-[#E89B5A] text-sm font-extralight text-[14px]">View all</Text>
+            <Text className="text-[#E89B5A] text-sm font-extralight text-[14px]">{t('View all')}</Text>
         </TouchableOpacity>
     </View>
 );
 
 export default function HomeScreen() {
-
+    const { t } = useLanguage();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { user } = useContext(AuthContext);
@@ -64,7 +64,11 @@ export default function HomeScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasUnread, setHasUnread] = useState(false);
     const bounceY = useSharedValue(0);
-
+    const handleScanPress = () => {
+        // Rung mức độ Medium để tạo cảm giác chạm dứt khoát
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        router.push('/scan');
+    };
     useEffect(() => {
         bounceY.value = withRepeat(
             withSequence(
@@ -253,7 +257,7 @@ export default function HomeScreen() {
     const renderPetItem = useCallback(({ item: pet }: { item: any }) => {
         const petImageUrl = (pet.images && pet.images.length > 0) ? pet.images[0]?.url : 'https://via.placeholder.com/200x300.png?text=No+Image';
         const fullAddress = pet.location || pet.shelter?.address;
-        let displayCity = 'Chưa cập nhật';
+        let displayCity = 'not updated';
         if (fullAddress) {
             const addressParts = fullAddress.split(',');
             displayCity = addressParts[addressParts.length - 1].trim();
@@ -334,7 +338,7 @@ export default function HomeScreen() {
         return (
             <View className="flex-1 bg-white justify-center items-center">
                 <ActivityIndicator size="large" color="#FF8C42" />
-                <Text className="mt-4 text-gray-500 font-medium">Đang tải dữ liệu...</Text>
+                <Text className="mt-4 text-gray-500 font-medium">{t('Loading data...')}</Text>
             </View>
         );
     }
@@ -363,7 +367,7 @@ export default function HomeScreen() {
                         <View className="px-6 mt-2">
                             <Animated.View style={[bounceStyle, {}]}>
 
-                                <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/scan')}>
+                                <TouchableOpacity activeOpacity={0.8} onPress={handleScanPress}>
                                     <View
                                         className="relative p-[20px] rounded-[32px] flex-row items-center bg-white/50"
                                         style={{
@@ -385,8 +389,8 @@ export default function HomeScreen() {
                                             <Image source={require('../../assets/icon/scan-index.png')} style={{ width: 21, height: 21 }} resizeMode="cover" />
                                         </View>
                                         <View className="flex-1">
-                                            <Text className="font-semibold text-gray-900 text-lg">Found A Lost Pet?</Text>
-                                            <Text className="text-gray-500 text-sm mt-1 leading-5">Scan to help them find a way home</Text>
+                                            <Text className="font-semibold text-gray-900 text-lg">{t('Found A Lost Pet?')}</Text>
+                                            <Text className="text-gray-500 text-sm mt-1 leading-5">{t('Scan to help them find a way home')}</Text>
                                         </View>
                                     </View>
                                 </TouchableOpacity>
@@ -394,7 +398,7 @@ export default function HomeScreen() {
 
                             {/* PAWCARE */}
                             <View className="mt-[38px]">
-                                <Text className="text-[16px] font-semibold text-gray-900 mb-4">Pawcare</Text>
+                                <Text className="text-[16px] font-semibold text-gray-900 mb-4">{t('Pawcare')}</Text>
                                 <View className="flex-row justify-between">
                                     {CATEGORIES.map((cat) => (
                                         <TouchableOpacity
@@ -410,7 +414,7 @@ export default function HomeScreen() {
                                             >
                                                 <Image source={cat.icon} className="w-11 h-11" />
                                             </View>
-                                            <Text className="text-gray-500 text-xs font-medium">{cat.label}</Text>
+                                            <Text className="text-gray-500 text-xs font-medium">{t(cat.label)}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
@@ -419,7 +423,7 @@ export default function HomeScreen() {
 
                         {/* --- PETS NEAR YOU TỪ API --- */}
                         <View className="mt-[38px]">
-                            <SectionHeader title="Pets Near You" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })} />
+                            <SectionHeader title="Pets Near You" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })} t={t} />
                             {pets.length === 0 ? (
                                 <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có thú cưng nào gần đây</Text>
                             ) : (
@@ -448,8 +452,7 @@ export default function HomeScreen() {
 
                         {/* --- ADOPTION SHELTERS TỪ API --- */}
                         <View className="mt-[38px]">
-                            <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} />
-                            {shelters.length === 0 ? (
+                                <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} t={t} />                            {shelters.length === 0 ? (
                                 <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
                             ) : (
                                 <ScrollView
@@ -483,7 +486,7 @@ export default function HomeScreen() {
 
                         {/* --- UPCOMING EVENTS TỪ API --- */}
                         <View className="mt-[38px] mb-6">
-                            <SectionHeader title="Upcoming Events" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })} />
+                            <SectionHeader title="Upcoming Events" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })} t={t} />
                             {events.length === 0 ? (
                                 <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có sự kiện nào sắp tới</Text>
                             ) : (
@@ -653,11 +656,11 @@ export default function HomeScreen() {
                         className={'-ml-1'}
                     >
                         <Text className="text-white font-semibold text-[20px] shadow-black/10" style={{ transformOrigin: 'left center' }}>
-                            Hello, {user?.name || 'Người dùng'}!
+                            {t('Hello,')} {user?.name || t('User')}!
                         </Text>
                         <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium tracking-tight overflow-hidden">
                             <Text>
-                                Let’s dive into your account
+                                {t('Let’s dive into your account')}
                             </Text>
                         </Animated.Text>
                     </Animated.View>

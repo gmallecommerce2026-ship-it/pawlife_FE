@@ -2,6 +2,8 @@ import { Text } from '@/components/AppText';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { petService } from '@/services/petService';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +28,7 @@ import {
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useModalStore } from '../store/useModalStore';
 interface LocItem {
   code: number;
   name: string;
@@ -113,7 +116,8 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
 export default function ReportLostPetScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-
+  const queryClient = useQueryClient();
+  const showModal = useModalStore((state) => state.showModal);
   // --- API State ---
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { pickAndUploadImage, isUploading } = useImageUpload();
@@ -147,21 +151,19 @@ export default function ReportLostPetScreen() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          const hanoi = data.find((p: any) => p.codename === 'ha_noi');
-          const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
-          
-          const remainingProvinces = data.filter(
-            (p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh'
-          );
+          const formattedProvinces = data
+            .map((p: any) => ({
+              ...p,
+              // Xóa chữ "Thành phố " hoặc "Tỉnh " ở đầu chuỗi
+              name: p.name.replace(/^(Thành phố |Tỉnh )/i, '')
+            }))
+            // Sort alphabet chuẩn theo tiếng Việt
+            .sort((a: any, b: any) => a.name.localeCompare(b.name, 'vi'));
 
-          const priorityProvinces = [];
-          if (hanoi) priorityProvinces.push(hanoi);
-          if (hcm) priorityProvinces.push(hcm);
-
-          setProvinces([...priorityProvinces, ...remainingProvinces]);
+          setProvinces(formattedProvinces);
         }
       })
-      .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
+      .catch(e => console.error("Lỗi fetch tỉnh/thành phố:", e));
   }, []);
 
   const cityOptions = provinces.map((c: any) => c.name);
@@ -247,13 +249,13 @@ export default function ReportLostPetScreen() {
     return () => subscription.remove();
   }, []);
   useEffect(() => {
-    if (petShelterName && petShelterName !== 'Chưa cập nhật') {
+    if (petShelterName && petShelterName !== 'not updated') {
       setOwnerName(petShelterName);
     }
-    if (petShelterPhone && petShelterPhone !== 'Chưa cập nhật') {
+    if (petShelterPhone && petShelterPhone !== 'not updated') {
       setOwnerPhone(petShelterPhone);
     }
-    if (petShelterAddress && petShelterAddress !== 'Chưa cập nhật') {
+    if (petShelterAddress && petShelterAddress !== 'not updated') {
       setOwnerAddress(petShelterAddress);
     }
   }, [petShelterName, petShelterPhone, petShelterAddress]);
@@ -344,6 +346,8 @@ export default function ReportLostPetScreen() {
   const handleActivateLostMode = async () => {
     if (!petId) return;
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
     setIsSubmitting(true);
     try {
       await petService.toggleLostMode(petId, {
@@ -358,10 +362,29 @@ export default function ReportLostPetScreen() {
         photos: photos || [],
       });
 
+      // 🔴 BỎ DÒNG NÀY VÌ DETAIL SCREEN KHÔNG DÙNG USEQUERY:
+      // queryClient.invalidateQueries({ queryKey: ['pet-detail', petId] });
+
+      // ✅ THÊM DÒNG NÀY: Bắn event để màn hình Detail cập nhật ngay lập tức
+      DeviceEventEmitter.emit('LOST_MODE_ACTIVATED', { petId });
+
       Alert.alert(
         'Báo lạc thành công',
         `Đã kích hoạt chế độ báo lạc cho ${petName || 'thú cưng'}.`,
-        [{ text: 'OK', onPress: () => handleClose() }]
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // Bắn event ngay khoảnh khắc user bấm OK (chuẩn bị back)
+              DeviceEventEmitter.emit('LOST_MODE_ACTIVATED', { petId });
+              
+              // Delay nhẹ 1 chút (100ms) để BE kịp commit transaction vào DB
+              setTimeout(() => {
+                router.back(); 
+              }, 100);
+            }
+          }
+        ]
       );
     } catch (error: any) {
       const errorMsg = error?.message || 'Lỗi hệ thống, vui lòng thử lại.';

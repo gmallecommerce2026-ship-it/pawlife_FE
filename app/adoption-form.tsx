@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { petService } from '@/services/petService';
 import { calculateAge } from '@/utils/dateHelper';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
 import {
@@ -347,24 +348,23 @@ export default function AdoptionFormScreen() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          const hanoi = data.find((p: any) => p.codename === 'ha_noi');
-          const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
-          
-          const remainingProvinces = data.filter(
-            (p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh'
-          );
+          // Xóa tiền tố "Tỉnh " và "Thành phố " và tạo thêm trường cleanName
+          const processedProvinces = data.map((p: any) => {
+            const cleanName = p.name.replace(/^(Tỉnh|Thành phố)\s+/i, '').trim();
+            return { ...p, cleanName };
+          });
 
-          const priorityProvinces = [];
-          if (hanoi) priorityProvinces.push(hanoi);
-          if (hcm) priorityProvinces.push(hcm);
+          // Sắp xếp alphabet (không ghim HN/HCM)
+          processedProvinces.sort((a, b) => a.cleanName.localeCompare(b.cleanName, 'vi'));
 
-          setProvinces([...priorityProvinces, ...remainingProvinces]);
+          setProvinces(processedProvinces);
         }
       })
       .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
   }, []);
 
-  const cityOptions = provinces.map((c: any) => c.name);
+  // Đổi mapping để lấy cleanName thay vì name gốc có chứa tiền tố
+  const cityOptions = provinces.map((c: any) => c.cleanName);
 
   // 2. Fetch danh sách Phường/Xã khi chọn Tỉnh
   useEffect(() => {
@@ -373,15 +373,20 @@ export default function AdoptionFormScreen() {
       return;
     }
 
-    const selectedProvince = provinces.find((p: any) => p.name === tempCity);
+    // Tìm province theo tên đã được làm sạch (cleanName)
+    const selectedProvince = provinces.find((p: any) => p.cleanName === tempCity);
     
     if (selectedProvince && selectedProvince.code) {
       fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
-            const allWards = data.map((ward: any) => ward.name);
-            setWardOptions(allWards);
+            // Lấy name và sắp xếp alphabet theo tiếng Việt
+            const sortedWards = data
+              .map((ward: any) => ward.name)
+              .sort((a, b) => a.localeCompare(b, 'vi'));
+            
+            setWardOptions(sortedWards);
           }
         })
         .catch(e => console.error("Lỗi fetch chi tiết phường/xã:", e));
@@ -445,6 +450,7 @@ export default function AdoptionFormScreen() {
       Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin liên lạc và địa chỉ cư trú.');
       return;
     }
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
       setIsLoading(true);
@@ -489,7 +495,14 @@ export default function AdoptionFormScreen() {
         }
       });
     } catch (error: any) {
-      Alert.alert('Gửi đơn thất bại', error.response?.data?.message || 'Đã có lỗi xảy ra.');
+      // Lấy message từ backend trả về
+      const serverMsg = error.response?.data?.message;
+      
+      // Nếu backend trả về 1 mảng lỗi (từ ValidationPipe), nối chúng lại bằng dấu xuống dòng
+      const displayMsg = Array.isArray(serverMsg) ? serverMsg.join('\n') : serverMsg;
+      
+      Alert.alert('Gửi đơn thất bại', displayMsg || 'Đã có lỗi xảy ra. Vui lòng thử lại sau.');
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsLoading(false);
     }

@@ -258,9 +258,11 @@ export default function ShelterProfileScreen() {
   }, [searchQuery]);
 
   const { data: shelterInfo, isLoading: loading, isError: isNotFound } = useQuery({
-    queryKey: ['shelter-profile', shelterId, debouncedSearch],
+    // Xóa debouncedSearch khỏi mảng này, chỉ phụ thuộc vào shelterId
+    queryKey: ['shelter-profile', shelterId], 
     queryFn: async () => {
-      const data = await shelterService.getShelterDetail(shelterId, debouncedSearch);
+      // Chỉ lấy data 1 lần duy nhất khi mount
+      const data = await shelterService.getShelterDetail(shelterId); 
       if (data.isFollowed !== undefined) {
         useEngagementStore.getState().setInitialShelterFollow(shelterId, data.isFollowed);
       }

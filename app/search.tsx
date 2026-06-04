@@ -581,7 +581,6 @@ export default function SearchScreen() {
                     <Feather name="search" size={18} color="#8E8E93" />
                     <TextInput
                         className="flex-1 ml-3 text-[14px] text-gray-800 font-regular"
-                        // Mẹo thêm: Bạn cũng có thể bọc t() vào placeholder cho thanh tìm kiếm
                         placeholder={t('Search shelters, pets...')} 
                         placeholderTextColor="#8E8E93"
                         value={searchInput}
@@ -591,12 +590,12 @@ export default function SearchScreen() {
                         onFocus={handleFocus}
                         onBlur={handleBlur}
                     />
-                    {/* <TouchableOpacity onPress={() => setIsFilterVisible(true)} activeOpacity={0.6} className="p-1">
-                        <Image
-                            source={require('../assets/icon/sliders-gray.png')}
-                            className="w-[16px] h-[16px]"
-                        />
-                    </TouchableOpacity> */}
+                    {/* Hiển thị nút xoá text khi có chữ trong input */}
+                    {searchInput.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchInput('')} activeOpacity={0.6} className="p-1 ml-2">
+                            <Feather name="x-circle" size={16} color="#8E8E93" />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
             <View className='px-[20px] mb-[6px]'>
@@ -612,11 +611,6 @@ export default function SearchScreen() {
                 {activeTab === 'Shelter' && <SheltersSection searchQuery={debouncedSearchQuery} onProfilePress={handleShelterPress} />}
                 {activeTab === 'Event' && <EventsSection searchQuery={debouncedSearchQuery} onEventPress={handleEventPress} />}
             </View>
-
-            {/* <FilterModal 
-                visible={isFilterVisible} 
-                onClose={() => setIsFilterVisible(false)} 
-            /> */}
         </SafeAreaView>
     );
 }

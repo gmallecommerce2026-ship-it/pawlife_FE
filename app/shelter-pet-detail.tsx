@@ -233,7 +233,7 @@ export default function PetProfileDetailScreen() {
                             {petData?.shelter?.name || 'Private Owner'} 
                         </Text>
                         <Text className="text-[13px] text-[#8E8E93] font-normal mt-0.5" numberOfLines={1}>
-                            {petData?.shelter?.address || 'Chưa cập nhật địa chỉ'}
+                            {petData?.shelter?.address || 'not updated địa chỉ'}
                         </Text>
                     </View>
                 </View>

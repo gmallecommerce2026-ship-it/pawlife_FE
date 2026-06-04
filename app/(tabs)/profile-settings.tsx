@@ -184,7 +184,10 @@ export default function ProfileSettingsScreen() {
 
                             {/* Nút Thêm Thú Cưng */}
                             <TouchableOpacity
-                                onPress={() => router.push('/add-pet')}
+                                onPress={() => router.push({ 
+                                    pathname: '/(tabs)/scan', 
+                                    params: { isAddingPet: 'true' } 
+                                })}
                                 style={{ width: itemWidth }}
                                 className="items-center justify-start"
                             >

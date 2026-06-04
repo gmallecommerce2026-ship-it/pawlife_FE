@@ -2,29 +2,32 @@
 import axiosClient, { BASE_URL, setCachedAccessToken } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { connectSocket } from '@/utils/socket';
-import { AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import axios from 'axios';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
+import { Lock, Mail } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView,
+  ActivityIndicator, Alert,
+  Image,
+  KeyboardAvoidingView,
   Platform,
-  ScrollView, TextInput, TouchableOpacity, View, Image
+  ScrollView, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-// GoogleSignin.configure({
-//   webClientId: '725064672703-i8cmlg934i6m5v8ssi69577vf9d3k7hc.apps.googleusercontent.com', 
-//   iosClientId: '725064672703-l61bog4iims28n57sspk6hokcf1l86c7.apps.googleusercontent.com',
-//   offlineAccess: true,
-// });
+GoogleSignin.configure({
+  webClientId: '725064672703-i8cmlg934i6m5v8ssi69577vf9d3k7hc.apps.googleusercontent.com', 
+  iosClientId: '725064672703-l61bog4iims28n57sspk6hokcf1l86c7.apps.googleusercontent.com',
+  offlineAccess: true,
+});
 // BỔ SUNG: Hằng số thời gian đếm ngược 120 giây (2 phút)
 const RESEND_OTP_TIME = 120;
 
@@ -71,7 +74,8 @@ const InputField = ({
           </TouchableOpacity>
         )}
       </View>
-      {error && <Text className="text-red-500 text-[13px] font-regular mt-1.5 ml-2">{error}</Text>}
+      {/* ĐÃ FIX: Thay && bằng ? : null */}
+      {error ? <Text className="text-red-500 text-[13px] font-regular mt-1.5 ml-2">{error}</Text> : null}
     </View>
   );
 };
@@ -96,7 +100,8 @@ type AuthView = 'LOGIN' | 'FORGOT_PASSWORD' | 'VERIFY_OTP' | 'RESET_PASSWORD' | 
 export default function SignInScreen() {
   const router = useRouter();
   const { login, requestOtp, setAuth } = useContext(AuthContext) as any;
-
+  const { t } = useLanguage();
+  const params = useLocalSearchParams();
   const [currentView, setCurrentView] = useState<AuthView>('LOGIN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -110,10 +115,13 @@ export default function SignInScreen() {
   const [isBiometricReady, setIsBiometricReady] = useState(false);
   const [isRememberMe, setIsRememberMe] = useState(false);
 
-  // BỔ SUNG: State quản lý đếm ngược OTP
   const [otpTimer, setOtpTimer] = useState<number>(RESEND_OTP_TIME);
 
   useEffect(() => {
+      if (params.prefillEmail) {
+        setEmail(params.prefillEmail as string);
+        setErrors({});
+      }
       const checkSetup = async () => {
         const isEnabled = await AsyncStorage.getItem('isFaceIdEnabled');
         const savedSecureEmail = await SecureStore.getItemAsync('secure_email');
@@ -125,13 +133,13 @@ export default function SignInScreen() {
         const isRemember = await AsyncStorage.getItem('isRememberMe');
       if (isRemember === 'true') {
         const rememberedEmail = await AsyncStorage.getItem('remembered_email');
-        const savedPass = await SecureStore.getItemAsync('secure_password'); // THÊM DÒNG NÀY
+        const savedPass = await SecureStore.getItemAsync('secure_password'); 
         
         if (rememberedEmail) {
           setEmail(rememberedEmail);
         }
         if (savedPass) {
-          setPassword(savedPass); // THÊM DÒNG NÀY: Tự động điền mật khẩu
+          setPassword(savedPass);
         }
         setIsRememberMe(true);
       }
@@ -139,7 +147,6 @@ export default function SignInScreen() {
     checkSetup();
   }, []);
 
-  // BỔ SUNG: Logic đếm ngược OTP an toàn, chỉ chạy khi đang ở màn Verify OTP
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (currentView === 'VERIFY_OTP' && otpTimer > 0) {
@@ -148,31 +155,29 @@ export default function SignInScreen() {
     return () => { if (interval) clearInterval(interval); };
   }, [currentView, otpTimer]);
 
-  // BỔ SUNG: Hàm format thời gian MM:SS
   const formatTime = useCallback((totalSeconds: number) => {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, []);
 
-  // const handleGoogleLogin = async () => {
-  //   try {
-  //     setErrors({});
-  //     await GoogleSignin.hasPlayServices();
-  //     const response = await GoogleSignin.signIn();
+  const handleGoogleLogin = async () => {
+    try {
+      setErrors({});
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
       
-  //     if (response.type === 'success' && response.data?.idToken) {
-  //       await executeSocialLogin('GOOGLE', response.data.idToken);
-  //     }
-  //   } catch (error: any) {
-  //     if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== '12501') {
-  //        console.error("Google Login Error:", error);
-  //        setErrors({ form: "Không thể kết nối với Google lúc này." });
-  //     }
-  //   }
-  // };
+      if (response.type === 'success' && response.data?.idToken) {
+        await executeSocialLogin('GOOGLE', response.data.idToken);
+      }
+    } catch (error: any) {
+      if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== '12501') {
+         console.error("Google Login Error:", error);
+         setErrors({ form: "Không thể kết nối với Google lúc này." });
+      }
+    }
+  };
 
-  // --- BỔ SUNG: XỬ LÝ ĐĂNG NHẬP APPLE ---
   const handleAppleLogin = async () => {
     try {
       setErrors({});
@@ -211,7 +216,6 @@ export default function SignInScreen() {
         await setAuth(accessToken, user);
         axiosClient.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
         
-        // <-- 2. BỔ SUNG: CẬP NHẬT RAM CACHE -->
         setCachedAccessToken(accessToken); 
         
         connectSocket(accessToken); 
@@ -262,7 +266,6 @@ export default function SignInScreen() {
           await setAuth(response.data.accessToken, response.data.user);
           axiosClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
           
-          // <-- 3. BỔ SUNG: CẬP NHẬT RAM CACHE -->
           setCachedAccessToken(response.data.accessToken);
           
           connectSocket(response.data.accessToken); 
@@ -289,17 +292,16 @@ export default function SignInScreen() {
   const handleLogin = () => {
     let newErrors: Record<string, string> = {};
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = 'Please enter a valid email address.';
+      newErrors.email = t('Please enter a valid email address.'); 
     }
     if (!password || password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters.';
+      newErrors.password = t('Password must be at least 6 characters.'); 
     }
     
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
-    
     setErrors({}); 
     executeLogin(email, password); 
   };
@@ -351,7 +353,6 @@ export default function SignInScreen() {
         await setAuth(response.data.accessToken, response.data.user);
         axiosClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
         
-        // <-- 4. BỔ SUNG: CẬP NHẬT RAM CACHE -->
         setCachedAccessToken(response.data.accessToken);
         
         connectSocket(response.data.accessToken); 
@@ -370,7 +371,6 @@ export default function SignInScreen() {
       await requestOtp({ email, type: 'FORGOT_PASSWORD' });
       setCurrentView('VERIFY_OTP'); 
       setErrors({});
-      // BỔ SUNG: Reset lại thời gian 120s mỗi khi gọi hàm này thành công
       setOtpTimer(RESEND_OTP_TIME);
     } catch (error: any) {
       setErrors({ form: error.response?.data?.message || 'Failed to send OTP. Please try again.' });
@@ -404,42 +404,42 @@ export default function SignInScreen() {
   const renderLogin = () => (
     <>
       <View className="mb-[35px] mt-3">
-        <Text className="text-[30px] font-semibold text-black mb-[26px] tracking-[0.06px]">Welcome back! 👋</Text>
-        <Text className="text-[#8E8E93] font-medium text-[16px] tracking-[0.06px]">Let’s continue the journey with your furry friends.</Text>
+        <Text className="text-[30px] font-semibold text-black mb-[26px] tracking-[0.06px]">{t('Welcome back! 👋')}</Text>
+        <Text className="text-[#8E8E93] font-medium text-[16px] tracking-[0.06px]">{t('Let’s continue the journey with your furry friends.')}</Text>
       </View>
 
       <InputField 
-        placeholder="Email" value={email} onChangeText={(t: string) => { setEmail(t); setErrors({...errors, email: ''}) }}
-        icon={<Mail size={22} />} keyboardType="email-address" error={errors.email} title={"Email"}
+        placeholder={t('Email')} value={email} onChangeText={(t: string) => { setEmail(t); setErrors({...errors, email: ''}) }}
+        icon={<Mail size={22} />} keyboardType="email-address" error={errors.email} title={t('Email')}
       />
       <InputField 
-        placeholder="Password" value={password} onChangeText={(t: string) => { setPassword(t); setErrors({...errors, password: ''}) }}
-        isPassword={true} icon={<Lock size={22} />} error={errors.password} title={"Password"}
+        placeholder={t('Password')} value={password} onChangeText={(t: string) => { setPassword(t); setErrors({...errors, password: ''}) }}
+        isPassword={true} icon={<Lock size={22} />} error={errors.password} title={t('Password')}
       />
 
       <View className="flex-row justify-between items-center mb-[2px] mt-[-8px]">
         <TouchableOpacity className="flex-row items-center py-2" onPress={() => setIsRememberMe(!isRememberMe)} activeOpacity={0.7}>
           <MaterialCommunityIcons name={isRememberMe ? "checkbox-marked" : "checkbox-blank-outline"} size={22} color={isRememberMe ? "#E89B5A" : "#9CA3AF"} />
-          <Text className="text-black font-medium ml-2 text-[14px] tracking-[0.06px]">Remember me</Text>
+          <Text className="text-black font-medium ml-2 text-[14px] tracking-[0.06px]">{t('Remember me')}</Text>
         </TouchableOpacity>
         <TouchableOpacity className="py-2" onPress={() => { setErrors({}); setCurrentView('FORGOT_PASSWORD'); }}>
-          <Text className="text-[#E89B5A] font-medium text-[14px] tracking-[0.06px]">Forgot password?</Text>
+          <Text className="text-[#E89B5A] font-medium text-[14px] tracking-[0.06px]">{t('Forgot password?')}</Text>
         </TouchableOpacity>
       </View>
 
-      {errors.form && (
+      {/* ĐÃ FIX: Thay && bằng ? : null */}
+      {errors.form ? (
         <View className="bg-red-50 p-3 rounded-xl mb-4 border border-red-100">
             <Text className="text-red-500 font-medium text-center text-[14px]">{errors.form}</Text>
         </View>
-      )}
+      ) : null}
 
       <View className="flex-row items-center w-full mb-4">
         <TouchableOpacity 
           className="flex-1 py-[15px] rounded-[100px] shadow-sm items-center bg-[#E89B5A]"
           onPress={handleLogin} disabled={isLoading} activeOpacity={0.8}
-          style={{ opacity: isLoading ? 0.7 : 1 }}
         >
-          {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">Log In</Text>}
+          {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">{t('Log In')}</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -463,8 +463,8 @@ export default function SignInScreen() {
 
       <View className="w-full mb-8">
           <SocialButton 
-            icon={require('../assets/icon/google.png')} title="Continue with Google"
-            // onPress={handleGoogleLogin} disabled={isLoading}
+            icon={require('../assets/icon/google.png')} title={t('Continue with Google')}
+            onPress={handleGoogleLogin} disabled={isLoading}
           />
           {Platform.OS === 'ios' && (
               <SocialButton
@@ -473,10 +473,6 @@ export default function SignInScreen() {
                 onPress={handleAppleLogin}
               />
           )}
-          {/* <SocialButton 
-            icon={require('../assets/icon/facebook.png')} title="Continue with Facebook" 
-            onPress={() => Alert.alert("Notice", "Feature is under development")} disabled={isLoading}
-          /> */}
       </View>
     </>
   );
@@ -498,7 +494,8 @@ export default function SignInScreen() {
         placeholder="Enter registered email" value={email} keyboardType="email-address" error={errors.email} title={"Your Registered Email"}
         onChangeText={(text: string) => { setEmail(text); setErrors({...errors, email: ''}) }} icon={<Mail size={22} />} 
       />
-      {errors.form && <Text className="text-red-500 font-medium mb-6 text-center">{errors.form}</Text>}
+      {/* ĐÃ FIX: Thay && bằng ? : null */}
+      {errors.form ? <Text className="text-red-500 font-medium mb-6 text-center">{errors.form}</Text> : null}
       <View className="mt-auto">
         <TouchableOpacity 
           className="w-full py-[21px] rounded-[100px] items-center bg-[#E89B5A]"
@@ -579,10 +576,10 @@ export default function SignInScreen() {
         })}
       </View>
 
-      {errors.otp && <Text className="text-red-500 text-[14px] text-center font-medium mb-2">{errors.otp}</Text>}
-      {errors.form && <Text className="text-red-500 font-medium text-center mb-2">{errors.form}</Text>}
+      {/* ĐÃ FIX: Thay && bằng ? : null */}
+      {errors.otp ? <Text className="text-red-500 text-[14px] text-center font-medium mb-2">{errors.otp}</Text> : null}
+      {errors.form ? <Text className="text-red-500 font-medium text-center mb-2">{errors.form}</Text> : null}
 
-      {/* BỔ SUNG: UI hiển thị đếm ngược và nút gửi lại OTP */}
       <View className="items-center mb-6 h-[24px] justify-center">
         {isLoading ? (
           <View className="flex-row items-center">
@@ -637,7 +634,8 @@ export default function SignInScreen() {
         placeholder="Enter new password" value={newPassword} isPassword={true} error={errors.newPassword}
         onChangeText={(text: string) => { setNewPassword(text); setErrors({...errors, newPassword: ''}) }} icon={<Lock size={22} />} 
       />
-      {errors.form && <Text className="text-red-500 font-medium mb-6 text-center">{errors.form}</Text>}
+      {/* ĐÃ FIX: Thay && bằng ? : null */}
+      {errors.form ? <Text className="text-red-500 font-medium mb-6 text-center">{errors.form}</Text> : null}
       <TouchableOpacity 
         className="w-full py-[21px] mt-2 rounded-[100px] items-center bg-[#E89B5A]"
         onPress={handleResetPassword} disabled={isLoading} activeOpacity={0.8}
@@ -660,8 +658,9 @@ export default function SignInScreen() {
         onChangeText={(text) => { setTwoFaCode(text); setErrors({...errors, twoFaCode: ''}) }}
         className={`bg-[#F9FAFB] px-4 py-5 rounded-[20px] border-[1.5px] text-center text-[28px] tracking-[12px] font-extrabold text-gray-800 ${errors.twoFaCode ? 'border-red-500' : 'border-[#E89B5A]'}`}
       />
-      {errors.twoFaCode && <Text className="text-red-500 text-[14px] mt-3 text-center font-medium">{errors.twoFaCode}</Text>}
-      {errors.form && <Text className="text-red-500 font-medium mt-4 text-center">{errors.form}</Text>}
+      {/* ĐÃ FIX: Thay && bằng ? : null */}
+      {errors.twoFaCode ? <Text className="text-red-500 text-[14px] mt-3 text-center font-medium">{errors.twoFaCode}</Text> : null}
+      {errors.form ? <Text className="text-red-500 font-medium mt-4 text-center">{errors.form}</Text> : null}
       <TouchableOpacity 
         className="w-full py-[21px] mt-8 rounded-[100px] items-center bg-[#E89B5A]"
         onPress={handleVerify2FAAndSubmit} disabled={isLoading} activeOpacity={0.8}

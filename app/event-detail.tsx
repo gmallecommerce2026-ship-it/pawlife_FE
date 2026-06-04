@@ -504,7 +504,7 @@ export default function EventDetailScreen() {
                                         </Text>
                                     </View>
 
-                                      <TouchableOpacity
+                                      {/* <TouchableOpacity
                                         activeOpacity={0.7}
                                         className="w-[36px] h-[36px] items-center justify-center ml-2"
                                         onPress={() => router.push({
@@ -513,7 +513,7 @@ export default function EventDetailScreen() {
                                         })}
                                     >
                                         <Feather name="chevron-right" size={18} color="black" />
-                                    </TouchableOpacity>
+                                    </TouchableOpacity> */}
                                 </View>
                             </View>
                         )}

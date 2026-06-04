@@ -226,24 +226,26 @@ export default function AddPetScreen() {
   const [tempWard, setTempWard] = useState('');
   const [tempDetail, setTempDetail] = useState('');
 
+  const cleanAdminPrefix = (name: string) => {
+    if (!name) return '';
+    // Xóa các từ khóa ở đầu chuỗi (không phân biệt hoa thường) và trim khoảng trắng
+    return name.replace(/^(Thành phố|Tỉnh|Quận|Huyện|Thị xã|Phường|Xã|Thị trấn)\s+/i, '').trim();
+  };
   // 1. Fetch danh sách Tỉnh/Thành (API v2)
   useEffect(() => {
     fetch('https://provinces.open-api.vn/api/v2/p/')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          const hanoi = data.find((p: any) => p.codename === 'ha_noi');
-          const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
-          
-          const remainingProvinces = data.filter(
-            (p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh'
-          );
+          // Chuẩn hóa tên (bỏ chữ Tỉnh/Thành phố) và sắp xếp Alphabet (locale tiếng Việt)
+          const formattedProvinces = data
+            .map((p: any) => ({
+              ...p,
+              name: cleanAdminPrefix(p.name)
+            }))
+            .sort((a: any, b: any) => a.name.localeCompare(b.name, 'vi'));
 
-          const priorityProvinces = [];
-          if (hanoi) priorityProvinces.push(hanoi);
-          if (hcm) priorityProvinces.push(hcm);
-
-          setProvinces([...priorityProvinces, ...remainingProvinces]);
+          setProvinces([...formattedProvinces]);
         }
       })
       .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
@@ -258,6 +260,8 @@ export default function AddPetScreen() {
       return;
     }
 
+    // tempCity lúc này đã là tên được chuẩn hóa (ví dụ: "Hà Nội" thay vì "Thành phố Hà Nội")
+    // Việc find() vẫn map chính xác vì object trong provinces array đã được cập nhật p.name ở effect trên.
     const selectedProvince = provinces.find((p: any) => p.name === tempCity);
     
     if (selectedProvince && selectedProvince.code) {
@@ -265,8 +269,12 @@ export default function AddPetScreen() {
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
-            const allWards = data.map((ward: any) => ward.name);
-            setWardOptions(allWards);
+            // Chuẩn hóa tên (bỏ chữ Phường/Xã) và sắp xếp Alphabet
+            const sortedWards = data
+              .map((ward: any) => cleanAdminPrefix(ward.name))
+              .sort((a: string, b: string) => a.localeCompare(b, 'vi'));
+              
+            setWardOptions(sortedWards);
           }
         })
         .catch(e => console.error("Lỗi fetch chi tiết phường/xã:", e));

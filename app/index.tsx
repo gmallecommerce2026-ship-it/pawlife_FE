@@ -3,7 +3,7 @@ import axiosClient, { setCachedAccessToken } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 import { AntDesign } from '@expo/vector-icons';
-// import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Href, useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
@@ -20,14 +20,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const { height } = Dimensions.get('window');
 
 // 1. CẤU HÌNH GOOGLE SIGN IN
-// GoogleSignin.configure({
-//   // BẮT BUỘC: Bạn phải tạo một Client ID loại "Web application" trên Google Cloud Console và dán vào đây
-//   // Backend NestJS sẽ dùng Web Client ID này để verify idToken.
-//   webClientId: '725064672703-i8cmlg934i6m5v8ssi69577vf9d3k7hc.apps.googleusercontent.com', 
-//   // Lấy từ file app.json của bạn:
-//   iosClientId: '725064672703-l61bog4iims28n57sspk6hokcf1l86c7.apps.googleusercontent.com',
-//   offlineAccess: true,
-// });
+GoogleSignin.configure({
+  // BẮT BUỘC: Bạn phải tạo một Client ID loại "Web application" trên Google Cloud Console và dán vào đây
+  // Backend NestJS sẽ dùng Web Client ID này để verify idToken.
+  webClientId: '725064672703-i8cmlg934i6m5v8ssi69577vf9d3k7hc.apps.googleusercontent.com', 
+  // Lấy từ file app.json của bạn:
+  iosClientId: '725064672703-l61bog4iims28n57sspk6hokcf1l86c7.apps.googleusercontent.com',
+  offlineAccess: true,
+});
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -92,29 +92,29 @@ export default function WelcomeScreen() {
   };
 
   // 2. XỬ LÝ ĐĂNG NHẬP GOOGLE
-  // const handleGoogleLogin = async () => {
-  //   try {
-  //     await GoogleSignin.hasPlayServices();
-  //     const response = await GoogleSignin.signIn();
+  const handleGoogleLogin = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
 
-  //     // API mới của thư viện google-signin (từ v11+)
-  //     if (response.type === 'success') {
-  //       // Truy cập idToken thông qua response.data
-  //       if (response.data?.idToken) {
-  //         await handleSocialLoginAPI('GOOGLE', response.data.idToken);
-  //       }
-  //     } else if (response.type === 'cancelled') {
-  //       // Người dùng chủ động đóng popup đăng nhập
-  //       return;
-  //     }
-  //   } catch (error: any) {
-  //     // Giữ nguyên block catch để bắt các lỗi kết nối hoặc Google Play Services
-  //     if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== '12501') {
-  //        console.error("Google Login Error:", error);
-  //        Alert.alert("Lỗi đăng nhập", "Không thể kết nối với Google lúc này.");
-  //     }
-  //   }
-  // };
+      // API mới của thư viện google-signin (từ v11+)
+      if (response.type === 'success') {
+        // Truy cập idToken thông qua response.data
+        if (response.data?.idToken) {
+          await handleSocialLoginAPI('GOOGLE', response.data.idToken);
+        }
+      } else if (response.type === 'cancelled') {
+        // Người dùng chủ động đóng popup đăng nhập
+        return;
+      }
+    } catch (error: any) {
+      // Giữ nguyên block catch để bắt các lỗi kết nối hoặc Google Play Services
+      if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== '12501') {
+         console.error("Google Login Error:", error);
+         Alert.alert("Lỗi đăng nhập", "Không thể kết nối với Google lúc này.");
+      }
+    }
+  };
 
   // 3. XỬ LÝ ĐĂNG NHẬP FACEBOOK
   // const handleFacebookLogin = async () => {
@@ -222,7 +222,7 @@ export default function WelcomeScreen() {
                 <SocialButton
                   icon={require('../assets/icon/google.png')}
                   title="Continue with Google"
-                // onPress={handleGoogleLogin}
+                  onPress={handleGoogleLogin}
                 />
               </Animated.View>
 

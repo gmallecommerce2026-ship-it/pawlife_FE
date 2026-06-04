@@ -1,15 +1,17 @@
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, FontAwesome5, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Image, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
+
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -69,10 +71,12 @@ export default function PetProfileDetailScreen() {
   const petId = params.id as string;
   const insets = useSafeAreaInsets();
 
+  const queryClient = useQueryClient();
   // --- STATE ---
   const [petData, setPetData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLostMode, setIsLostMode] = useState(false);
+  const lockLostStatusRef = useRef(false);
   const [showHistory, setShowHistory] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingLostMode, setIsTogglingLostMode] = useState(false);
@@ -132,25 +136,59 @@ export default function PetProfileDetailScreen() {
     );
   };
 
-  // --- FETCH DATA TỪ API ---
+  // 2. ✅ THÊM HOOK NÀY: Lắng nghe event từ màn hình Report
+  React.useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('LOST_MODE_ACTIVATED', (data) => {
+      if (data.petId === petId) {
+        // Bật khóa: Không cho phép API GET ghi đè trạng thái lost mode
+        lockLostStatusRef.current = true; 
+        
+        setIsLostMode(true); 
+        setPetData((prev: any) => 
+          prev ? { ...prev, status: 'LOST', isLost: true } : prev
+        );
+
+        // Tự động mở khóa sau 5 giây (Thời gian dư dả để Backend đồng bộ xong Cache/DB)
+        setTimeout(() => {
+          lockLostStatusRef.current = false;
+        }, 5000);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [petId]);
+
+  // 2. USEFOCUSEFFECT: Chỉ nhận trạng thái từ API nếu không bị khóa
   useFocusEffect(
     useCallback(() => {
       const fetchPetDetail = async () => {
         if (!petId) return;
         try {
-          setIsLoading(true);
+          // Tránh chớp màn hình nếu đã có data
+          setPetData((prev: any) => {
+            if (!prev) setIsLoading(true);
+            return prev;
+          });
+
           const data = await petService.getPetById(petId);
-          setPetData(data);
-
-          const isCurrentlyLost = data.tags?.some((tag: any) => tag.status === 'LOST');
-          setIsLostMode(!!isCurrentlyLost);
-
-          if (data.status === 'LOST') {
-            setIsLostMode(true);
+          
+          // NẾU ĐANG BỊ KHÓA (Vừa toggle xong): Giữ nguyên trạng thái Lost của Local, chỉ cập nhật data khác
+          if (lockLostStatusRef.current) {
+            setPetData({ ...data, status: 'LOST', isLost: true });
+            // Không set lại setIsLostMode vì local đang là true rồi
+          } 
+          // NẾU BÌNH THƯỜNG (Không bị khóa): Lấy trạng thái từ Backend trả về
+          else {
+            setPetData(data);
+            const isCurrentlyLost = 
+              data.tags?.some((tag: any) => tag.status === 'LOST') || 
+              data.status === 'LOST' || 
+              data.isLost === true; 
+              
+            setIsLostMode(!!isCurrentlyLost);
           }
         } catch (error) {
           console.error("Error when loading pet information:", error);
-          Alert.alert("Error", "Unable to load pet information. Please try again.");
         } finally {
           setIsLoading(false);
         }
@@ -210,9 +248,9 @@ export default function PetProfileDetailScreen() {
           petBreed: petData?.breed,
           petAge: calculatedAge,
           
-          petShelterName: petData?.contactName || ownerInfo?.name || 'Chưa cập nhật', 
-          petShelterPhone: petData?.contactPhone || ownerInfo?.phone || 'Chưa cập nhật',
-          petShelterAddress: petData?.contactAddress || ownerInfo?.address || 'Chưa cập nhật'
+          petShelterName: petData?.contactName || ownerInfo?.name || 'not updated', 
+          petShelterPhone: petData?.contactPhone || ownerInfo?.phone || 'not updated',
+          petShelterAddress: petData?.contactAddress || ownerInfo?.address || 'not updated'
         }
       });
     } else {
@@ -303,9 +341,9 @@ export default function PetProfileDetailScreen() {
 
   const ownerInfo = petData.shelter || petData.owner || {};
   const isShelter = !!petData.shelter;
-  const displayContactName = petData.contactName || ownerInfo.name || 'Chưa cập nhật';
-  const displayContactPhone = petData.contactPhone || ownerInfo.phone || 'Chưa cập nhật';
-  const displayContactAddress = petData.contactAddress || ownerInfo.address || 'Chưa cập nhật';
+  const displayContactName = petData.contactName || ownerInfo.name || 'not updated';
+  const displayContactPhone = petData.contactPhone || ownerInfo.phone || 'not updated';
+  const displayContactAddress = petData.contactAddress || ownerInfo.address || 'not updated';
 
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId.substring(0, 8).toUpperCase();
   const hasValidQRCode = !!petData.qrCodeUrl && petData.qrVerificationStatus === 'VERIFIED';
@@ -489,7 +527,7 @@ export default function PetProfileDetailScreen() {
                         Lost Pet Mode
                       </Text>
                       <Text className={`text-[14px] mt-0.5 font-light ${isLostMode ? 'text-[#8B3A3ACC]' : 'text-gray-400'}`}>
-                        {isLostMode ? "Active - See Pet's Activity" : "Inactive - Pet is safe"}
+                        {isLostMode ? "Active" : "Inactive - Pet is safe"}
                       </Text>
                     </View>
                   </View>
@@ -538,26 +576,26 @@ export default function PetProfileDetailScreen() {
             <View className='bg-white rounded-[24px] p-6 border border-gray-200'>
 
               <InfoRow
-                label1="Gender" value1={petData.gender || 'Chưa cập nhật'}
+                label1="Gender" value1={petData.gender || 'not updated'}
                 label2="Sterilized" value2={
                   petData.isSpayedNeutered === true ? 'Yes' : 
                   petData.isSpayedNeutered === false ? 'No' : 
-                  'Chưa cập nhật'
+                  'not updated'
                 }
               />
               <InfoRow
                 label1="Breed"
-                value1={petData.breed || 'Chưa cập nhật'}
-                label2="Color" value2={petData.color || 'Chưa cập nhật'}
+                value1={petData.breed || 'not updated'}
+                label2="Color" value2={petData.color || 'not updated'}
               />
               <InfoRow2
                 label1="Birthday"
                 value1={
                   petData.dob
                     ? new Date(petData.dob).toLocaleDateString('en-GB')
-                    : (petData.age ? `${petData.age} tuổi` : 'Chưa cập nhật')
+                    : (petData.age ? `${petData.age} tuổi` : 'not updated')
                 }
-                label2="Weight" value2={petData.weight + ' kg' || 'Chưa cập nhật'}
+                label2="Weight" value2={petData.weight != null ? `${petData.weight} kg` : 'not updated'}
               />
               <View className="h-[1px] bg-gray-200 w-full mb-5" />
               <Text className="text-black text-[16px] font-medium mb-2">Notes</Text>

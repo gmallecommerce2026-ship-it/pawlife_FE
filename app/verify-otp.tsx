@@ -1,19 +1,20 @@
 // app/verify-otp.tsx
 import { AuthContext } from '@/contexts/AuthContext';
+import { useModalStore } from '@/store/useModalStore';
 import { Feather } from '@expo/vector-icons';
-import { Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-
 // THÊM MỚI: Hằng số thời gian đếm ngược (2 phút = 120 giây)
 const RESEND_OTP_TIME = 120; 
 
 export default function VerifyOtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams(); 
+  const showModal = useModalStore((state) => state.showModal);
   // Lưu ý: Đảm bảo trong AuthContext của bạn có hàm xử lý gọi API gửi lại OTP (vd: resendOtp)
-  const { register } = useContext(AuthContext) as any; // Thay as any bằng type thật của bạn
+  const { register, requestOtp } = useContext(AuthContext) as any; // Thay as any bằng type thật của bạn
 
   const [code, setCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -55,20 +56,22 @@ export default function VerifyOtpScreen() {
 
   // THÊM MỚI: Hàm xử lý gửi lại OTP
   const handleResendOtp = async () => {
-    if (timer > 0 || isLoading) return; // Chặn spam click
+    if (timer > 0 || isLoading) return; 
 
     try {
       setIsLoading(true);
-      // Gọi API gửi lại OTP ở đây (Kết nối với NestJS)
-      // Ví dụ: await resendOtp({ email: params.email });
+      // Gọi lại API Send OTP với type SIGNUP
+      await requestOtp({ 
+        email: params.email as string, 
+        type: 'SIGNUP' 
+      });
       
-      console.log("Đã gọi API resend OTP cho:", params.email);
-      
-      // Reset lại bộ đếm về 2 phút
       setTimer(RESEND_OTP_TIME);
-      Alert.alert("Success", "Mã OTP mới đã được gửi đến email của bạn.");
+      Alert.alert("Thành công", "Mã OTP mới đã được gửi đến email của bạn.");
     } catch (error: any) {
-      Alert.alert("Lỗi", error.message || "Không thể gửi lại OTP lúc này.");
+      let errorMessage = error?.message || "Không thể gửi lại OTP lúc này.";
+      if (error?.statusCode === 429) errorMessage = "Vui lòng đợi 1 phút trước khi yêu cầu lại.";
+      Alert.alert("Lỗi", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -93,28 +96,40 @@ export default function VerifyOtpScreen() {
   const submitRegistration = async (otpCode: string) => {
     try {
       setIsLoading(true);
-      console.log("Dữ liệu gửi lên Backend:", { email: params.email, otp: otpCode });
-      await register({ 
-        email: params.email as string, 
-        password: params.password as string, 
-        name: params.name as string, 
-        phone: params.phone as string, 
-        gender: params.gender as string, 
-        dob: params.dob as string, 
-        avatarUrl: params.avatarUrl ? (params.avatarUrl as string) : undefined, 
+      
+      const payload = {
+        email: params.email as string,
+        password: params.password as string,
+        name: params.name as string,
+        phone: params.phone as string,
+        gender: params.gender as string,
+        dob: params.dob as string,
+        avatarUrl: params.avatarUrl as string,
         otp: otpCode 
+      };
+
+      await register(payload);
+
+      // 3. Sử dụng Global Modal khi thành công
+      showModal({
+        title: 'Success',
+        message: 'Tài khoản của bạn đã được đăng ký thành công! Hãy bắt đầu hành trình tại PawLife ngay.',
+        buttonText: 'Đăng nhập',
+        onConfirm: () => {
+          // Khi người dùng bấm OK, chuyển hướng về trang sign-in
+          router.replace({
+            pathname: '/sign-in',
+            params: { prefillEmail: params.email as string } 
+          });
+        }
       });
 
-      setShowSuccessModal(true);
-      setTimeout(() => {
-        setShowSuccessModal(false);
-        setTimeout(() => {
-          router.replace('/sign-in' as Href); 
-        }, 350); 
-      }, 1500);
-
     } catch (error: any) {
-      Alert.alert("Registration Failed", error.message || "Invalid or expired OTP!");
+      const errorMessage = Array.isArray(error?.message) 
+        ? error.message[0] 
+        : (error?.message || "OTP không hợp lệ hoặc đã hết hạn!");
+      
+      Alert.alert("Đăng ký thất bại", errorMessage);
       setCode(''); 
     } finally {
       setIsLoading(false);

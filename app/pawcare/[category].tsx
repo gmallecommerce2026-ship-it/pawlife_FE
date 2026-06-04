@@ -1,6 +1,7 @@
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Keyboard, LayoutAnimation, Linking, Modal, Platform, ScrollView, TextInput, TouchableOpacity, TouchableWithoutFeedback, UIManager, View } from 'react-native';
@@ -15,6 +16,7 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import axiosClient from '../../api/axiosClient';
+
 const { width } = Dimensions.get('window');
 const AnimatedFeather = Animated.createAnimatedComponent(Feather);
 
@@ -92,11 +94,9 @@ const VideosView = ({ data, category, loading, onPlayVideo, t }: any) => {
             </View>
             <View className="flex-1 ml-3 pr-2">
                 <View className="flex-row justify-between items-start">
-                    {/* Đã xóa nút 3 chấm ở đây */}
                     <Text className="text-gray-900 font-semibold text-[15px] leading-5 flex-1 mr-2" numberOfLines={2}>{item.title}</Text>
                 </View>
                 <View className="mt-1">
-                    {/* Đã bọc item.time bằng translateTime */}
                     <Text className="text-gray-400 text-xs font-medium">{item.category || category} • {item.views} • {translateTime(item.time, t)}</Text>
                 </View>
             </View>
@@ -152,7 +152,6 @@ const PlaylistsView = ({ playlists, loading, searchQuery, onPlayVideo, t }: { pl
             </View>
             <View className="flex-1 ml-3 pr-2">
                 <Text className="text-gray-900 font-semibold text-[14px] leading-5" numberOfLines={2}>{item.title}</Text>
-                {/* Dịch thời gian ở item video trong playlist */}
                 <Text className="text-gray-500 text-[11px] font-medium mt-1">{item.views} • {translateTime(item.time, t)}</Text>
             </View>
         </TouchableOpacity>
@@ -216,7 +215,6 @@ const PlaylistsView = ({ playlists, loading, searchQuery, onPlayVideo, t }: { pl
 const AboutView = () => {
     return (
         <ScrollView className="flex-1 bg-white" contentContainerStyle={{ padding: 24, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
-            {/* ... (Phần UI About giữ nguyên) ... */}
             <View className="items-center mb-8">
                 <View className="w-20 h-20 mb-4 rounded-full border border-gray-100 shadow-sm overflow-hidden bg-white">
                      <Image source={{ uri: ABOUT_DATA.logo }} className="w-full h-full" resizeMode="contain" />
@@ -229,21 +227,6 @@ const AboutView = () => {
                 <Text className="text-base font-bold text-gray-900 mb-3">Description</Text>
                 <Text className="text-gray-600 text-sm leading-6">{ABOUT_DATA.description}</Text>
             </View>
-
-            {/* <View className="mb-8">
-                <Text className="text-base font-bold text-gray-900 mb-4">Links</Text>
-                <View className="gap-5">
-                    {ABOUT_DATA.links.map((link) => (
-                        <TouchableOpacity key={link.id} className="flex-row items-center active:opacity-70" onPress={() => Linking.openURL(link.url)}>
-                            <View className="w-8 items-center mr-3">
-                                {link.label === 'Website' ? <MaterialCommunityIcons name="web" size={24} color={link.color} /> : <AntDesign name={link.icon as any} size={22} color={link.color} />}
-                            </View>
-                            <Text className="text-gray-800 text-[15px] font-medium flex-1">{link.label}</Text>
-                            <Feather name="external-link" size={16} color="#9CA3AF" />
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View> */}
         </ScrollView>
     );
 };
@@ -265,7 +248,6 @@ export default function PawcareCategoryScreen() {
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // STATE: Quản lý ID của video đang được phát in-app
@@ -299,11 +281,12 @@ export default function PawcareCategoryScreen() {
   };
 
   // --- ANIMATED STYLES ---
+  
   // Ẩn/hiện nút Back (scale nhỏ lại và mờ đi)
   const backButtonStyle = useAnimatedStyle(() => ({
     opacity: interpolate(searchAnimation.value, [0, 0.2], [1, 0]),
     transform: [{ scale: interpolate(searchAnimation.value, [0, 0.2], [1, 0.8]) }],
-    zIndex: searchAnimation.value > 0 ? -1 : 1, // Đẩy xuống dưới khi ẩn để không chặn click
+    zIndex: searchAnimation.value > 0 ? -1 : 10, // Đẩy xuống dưới khi ẩn để không chặn click
   }));
 
   // Ẩn/hiện Title ở giữa
@@ -313,27 +296,37 @@ export default function PawcareCategoryScreen() {
 
   // Container của thanh Search (kéo dài từ phải sang trái)
   const searchContainerStyle = useAnimatedStyle(() => {
-    // Chiều dài thay đổi từ 40 (chỉ hiện icon) sang full chiều rộng (trừ margin)
-    const containerWidth = interpolate(searchAnimation.value, [0, 1], [40, width - 32]);
+    // Chiều dài thay đổi từ 40 (chỉ hiện icon) sang full chiều rộng (trừ margin 24px x 2 = 48)
+    const containerWidth = interpolate(searchAnimation.value, [0, 1], [40, width - 48]);
     const backgroundColor = interpolateColor(
       searchAnimation.value,
       [0, 1],
-      ['transparent', '#F3F4F6'] // Từ trong suốt sang xám nhạt (bg-gray-100)
+      ['transparent', '#F8F8F8'] // Nền xám nhạt như search bar
     );
+    const borderColor = interpolateColor(
+      searchAnimation.value,
+      [0, 1],
+      ['transparent', '#EBEBEB'] // Viền đồng bộ
+    );
+    const borderWidth = interpolate(searchAnimation.value, [0, 1], [0, 1]);
 
     return {
       width: containerWidth,
       backgroundColor,
-      borderRadius: 20,
+      borderColor,
+      borderWidth,
+      borderRadius: 24, // Bo tròn chuẩn h-12 (48px)
       flexDirection: 'row',
       alignItems: 'center',
-      height: 40,
+      height: 48,
     };
   });
 
   const textInputStyle = useAnimatedStyle(() => ({
     opacity: interpolate(searchAnimation.value, [0, 0.8, 1], [0, 0, 1]),
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     display: searchAnimation.value === 0 ? 'none' : 'flex',
   }));
 
@@ -341,10 +334,11 @@ export default function PawcareCategoryScreen() {
     const color = interpolateColor(
       searchAnimation.value,
       [0, 1],
-      ['#1F2937', '#9CA3AF'] // Đen sậm sang Xám nhạt khi mở
+      ['#1F2937', '#8E8E93'] // Từ xám đen (khi đóng) sang xám nhạt (khi mở)
     );
     return { color };
   });
+
   const TABS = ['Videos', 'Playlists', 'About'];
 
   useEffect(() => {
@@ -398,7 +392,6 @@ export default function PawcareCategoryScreen() {
       if (ytId) {
           setPlayingVideoId(ytId); // Mở Modal phát video in-app
       } else {
-          // Fallback: Nếu không phải link youtube (vd link mp4, website khác), mở bằng trình duyệt
           Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
       }
   }, []);
@@ -414,12 +407,43 @@ export default function PawcareCategoryScreen() {
         )}
 
         {/* HEADER */}
-        <View className="flex-row items-center justify-between px-4 py-2 border-b border-gray-50 bg-white z-50 h-[56px] relative">
+        <View className="flex-row items-center justify-between px-6 border-b border-gray-50 bg-white z-50 h-[64px] relative">
         
-        {/* Nút Back (Bị ẩn khi Search) */}
-        <Animated.View style={[backButtonStyle, { position: 'absolute', left: 16 }]}>
-            <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 active:bg-gray-100 rounded-full">
-            <Feather name="chevron-left" size={20} color="#000000" />
+        {/* Nút Back (Bị ẩn khi Search, Design chuẩn từ trang Search) */}
+        <Animated.View style={[backButtonStyle, { position: 'absolute', left: 24, zIndex: 10 }]}>
+            <TouchableOpacity
+                onPress={() => router.back()}
+                activeOpacity={0.7}
+                style={{
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 5,
+                    elevation: 3,
+                }}
+            >
+                <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                    style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 28,
+                        borderWidth: 0.5,
+                        borderTopColor: 'white',
+                        borderLeftColor: 'white',
+                        borderBottomColor: 'transparent',
+                        borderRightColor: 'transparent',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    }}>
+                    <LinearGradient
+                        colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        locations={[0, 0.3, 1]}
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                    />
+                    <Feather name="chevron-left" size={20} color="#1F2937" />
+                </View>
             </TouchableOpacity>
         </Animated.View>
 
@@ -428,36 +452,37 @@ export default function PawcareCategoryScreen() {
             <Text className="text-lg font-bold text-gray-900 tracking-tight">{categoryTitle}</Text>
         </Animated.View>
 
-        {/* Cụm Search Bar (Nằm bên phải và dãn ra) */}
-        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            {/* Chỉ hiển thị Search cụm này nếu KHÔNG PHẢI tab About */}
+        {/* Cụm Search Bar (Nằm bên phải và dãn sang trái) */}
+        <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
             {activeTab !== 'About' && (
             <Animated.View style={searchContainerStyle}>
                 
                 {/* Nút kính lúp */}
                 <TouchableOpacity 
-                onPress={isSearchActive ? undefined : handleOpenSearch} 
-                activeOpacity={isSearchActive ? 1 : 0.7}
-                className="w-[40px] h-[40px] items-center justify-center rounded-full"
+                    onPress={isSearchActive ? undefined : handleOpenSearch} 
+                    activeOpacity={isSearchActive ? 1 : 0.7}
+                    className="items-center justify-center"
+                    style={{ width: 40, height: 48 }}
                 >
-                <AnimatedFeather name="search" size={22} style={searchIconStyle} />
+                    <AnimatedFeather name="search" size={18} style={searchIconStyle} />
                 </TouchableOpacity>
 
                 {/* Ô Input (Hiện ra khi animate) */}
                 <Animated.View style={[textInputStyle, { paddingRight: 12 }]}>
-                <TextInput
-                    ref={inputRef}
-                    className="flex-1 text-gray-900 text-[15px] py-0 h-full"
-                    placeholder={t("Search videos...")} 
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholderTextColor="#9CA3AF"
-                />
-                {searchQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
-                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                    </TouchableOpacity>
-                )}
+                    <TextInput
+                        ref={inputRef}
+                        className="flex-1 text-[14px] text-gray-800 font-regular h-full"
+                        style={{ fontFamily: "Urbanist" }}
+                        placeholder={t("Search videos...")} 
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholderTextColor="#8E8E93"
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.6} className="p-1 ml-2">
+                            <Feather name="x-circle" size={16} color="#8E8E93" />
+                        </TouchableOpacity>
+                    )}
                 </Animated.View>
 
             </Animated.View>
@@ -493,25 +518,21 @@ export default function PawcareCategoryScreen() {
             animationType="slide"
             onRequestClose={() => setPlayingVideoId(null)}
         >
-            {/* Thay SafeAreaView bằng View và dùng padding top linh động */}
             <View 
                 className="flex-1 bg-black" 
                 style={{ paddingTop: insets.top }} 
             >
-                {/* Header chứa nút đóng */}
                 <View className="flex-row justify-end px-4 py-2 mt-2">
                     <TouchableOpacity 
                         className="w-10 h-10 bg-white/20 rounded-full items-center justify-center"
                         onPress={() => setPlayingVideoId(null)}
                         activeOpacity={0.7}
-                        // hitSlop giúp mở rộng vùng bấm thêm 15px ra xung quanh mà không làm to nút
                         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} 
                     >
                         <Ionicons name="close" size={24} color="white" />
                     </TouchableOpacity>
                 </View>
 
-                {/* Container căn giữa Video */}
                 <View className="flex-1 justify-center pb-20"> 
                     {playingVideoId && (
                         <YoutubePlayer

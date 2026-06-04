@@ -1,7 +1,7 @@
 // app/my-applications.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
-import { calculateAge } from '@/utils/dateHelper';
+import { useLanguage } from '@/contexts/LanguageContext'; // BỔ SUNG HOOK
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
@@ -27,38 +27,34 @@ interface ApplicationRecord {
   };
 }
 
-// Hàm gán trọng số cho từng trạng thái để sắp xếp
-// Số càng nhỏ thì đơn đó càng được đẩy lên trên cùng
 const getStatusWeight = (status: string) => {
   const normalizedStatus = status.toUpperCase().replace(/\s+/g, '_');
   switch (normalizedStatus) {
-    case 'INTERVIEW_SCHEDULED': return 1; // Cần chú ý nhất (lịch phỏng vấn)
-    case 'NEED_MORE_INFO': return 2;      // Cần bổ sung thông tin
-    case 'PENDING': return 3;             // Đang chờ duyệt
-    case 'SUBMITTED': return 4;           // Vừa nộp
-    case 'APPROVED': return 5;            // Đã duyệt (Chờ nhận nuôi)
-    case 'ADOPTION_COMPLETED': return 6;  // Đã hoàn thành nhận nuôi
-    case 'CLOSED': return 7;              // Withdraw / Bị từ chối (LUÔN Ở CUỐI CÙNG)
+    case 'INTERVIEW_SCHEDULED': return 1; 
+    case 'NEED_MORE_INFO': return 2;      
+    case 'PENDING': return 3;             
+    case 'SUBMITTED': return 4;           
+    case 'APPROVED': return 5;            
+    case 'ADOPTION_COMPLETED': return 6;  
+    case 'CLOSED': return 7;              
     default: return 99; 
   }
 };
 
-// Hàm sắp xếp ứng dụng (Theo trọng số trạng thái -> Thời gian tạo mới nhất)
 const sortApplications = (apps: ApplicationRecord[]) => {
   return [...apps].sort((a, b) => {
     const weightA = getStatusWeight(a.status);
     const weightB = getStatusWeight(b.status);
     
     if (weightA !== weightB) {
-      return weightA - weightB; // Ưu tiên xếp theo trạng thái trước
+      return weightA - weightB; 
     }
-    
-    // Nếu cùng trạng thái, cái nào mới nộp thì xếp trên
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 };
 
-const StatusBadge = ({ status }: { status: string }) => {
+// SỬA: Truyền thêm t vào StatusBadge để dịch text label
+const StatusBadge = ({ status, t }: { status: string, t: any }) => {
   const getStyle = () => {
     const normalizedStatus = status.toUpperCase().replace(/\s+/g, '_');
 
@@ -149,7 +145,7 @@ const StatusBadge = ({ status }: { status: string }) => {
         resizeMode="contain"
       />
       <Text className={`${style.text} text-[12px] font-regular tracking-widest ml-1.5`}>
-        {style.label}
+        {t(style.label)} {/* GỌI HÀM DỊCH Ở ĐÂY */}
       </Text>
     </View>
   );
@@ -157,6 +153,8 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export default function MyApplicationsScreen() {
   const router = useRouter();
+  const { t } = useLanguage(); // GỌI HOOK DỊCH THUẬT
+
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
@@ -174,6 +172,24 @@ export default function MyApplicationsScreen() {
 
   const progressPercentage = (currentApplications / maxApplications) * 100;
 
+  // BỔ SUNG: HÀM TÍNH TUỔI VÀ DỊCH CỤC BỘ
+  const getDisplayAge = (dob: string | undefined) => {
+    if (!dob) return t('Unknown');
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+
+    if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+      years--;
+      months += 12;
+    }
+
+    if (years > 0) return `${years} ${t('years')}`;
+    if (months > 0) return `${months} ${t('months')}`;
+    return `< 1 ${t('months')}`;
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchMyApplications();
@@ -185,7 +201,6 @@ export default function MyApplicationsScreen() {
       setIsLoading(true);
       const response = await axiosClient.get('/applications/my-applications');
       
-      // Sắp xếp dữ liệu ngay khi lấy từ API về
       const sortedData = sortApplications(response.data.data);
       setApplications(sortedData);
     } catch (error) {
@@ -202,7 +217,6 @@ export default function MyApplicationsScreen() {
       setIsWithdrawing(true);
       await axiosClient.patch(`/applications/${selectedAppId}/withdraw`);
       
-      // Update UI Lập tức + Tự động Sort lại để đẩy Item xuống cuối danh sách
       setApplications(prevApps => {
         const updatedApps = prevApps.map(app => 
           app.id === selectedAppId ? { ...app, status: 'CLOSED' } : app
@@ -213,7 +227,7 @@ export default function MyApplicationsScreen() {
       setIsWithdrawVisible(false);
     } catch (error: any) {
       console.error('Error withdrawing application:', error);
-      Alert.alert("Lỗi", error?.response?.data?.message || "Không thể thu hồi đơn đăng ký lúc này.");
+      Alert.alert(t("Error"), error?.response?.data?.message || t("Cannot turn off 2FA at this time.")); // Dùng tạm key lỗi chung hoặc fix sau
     } finally {
       setIsWithdrawing(false);
       setSelectedAppId(null);
@@ -222,9 +236,13 @@ export default function MyApplicationsScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric'
-    });
+    const day = date.getDate().toString().padStart(2, '0');
+    // Lấy tên viết tắt của tháng (ví dụ: "Jan", "Feb"...)
+    const monthKey = date.toLocaleDateString('en-US', { month: 'short' }); 
+    const year = date.getFullYear();
+
+    // Trả về dạng: "04 Tháng 6, 2026" (hoặc format bạn muốn)
+    return `${day} ${t(monthKey)}, ${year}`;
   };
 
   const renderHeader = () => {
@@ -238,14 +256,14 @@ export default function MyApplicationsScreen() {
           <View className="flex-row justify-between items-end mb-2.5">
             <View>
               <Text className="text-[#A9ACB4] font-semibold text-[12px] mb-1">
-                APPLICATION LIMIT
+                {t('APPLICATION LIMIT')}
               </Text>
               <View className="flex-row items-baseline">
                 <Text className={`${activeTextColor} font-bold text-[22px]`}>
                   {currentApplications}
                 </Text>
                 <Text className="text-[#B5B5B5] font-bold text-[16px]">
-                  /{maxApplications} active
+                  /{maxApplications} {t('active')}
                 </Text>
               </View>
             </View>
@@ -303,7 +321,7 @@ export default function MyApplicationsScreen() {
             </View>
           </TouchableOpacity>
           <Text className="text-[20px] font-semibold text-black flex-1 text-center mr-6">
-            My Applications
+            {t('My Applications')}
           </Text>
         </View>
 
@@ -320,14 +338,16 @@ export default function MyApplicationsScreen() {
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View className="items-center justify-center mt-10">
-                <Text className="text-gray-500 font-medium">You haven't applied for any pets yet.</Text>
+                <Text className="text-gray-500 font-medium">{t("You haven't applied for any pets yet.")}</Text>
               </View>
             }
             renderItem={({ item }) => {
               const isNeedMoreInfo = item.status.toLowerCase().replace(/\s+/g, '_') === 'need_more_info';
               const petImage = item.pet.images?.[0]?.url || 'https://via.placeholder.com/150';
-              const computedAge = calculateAge(item.pet.dob) || 'Unknown Age'; // Thêm fallback ở đây
-              const ageAndBreed = [computedAge, item.pet.breed].filter(Boolean).join(' • ');
+              
+              // SỬ DỤNG HÀM TÍNH TUỔI MỚI THAY VÌ CALCULATEAGE
+              const computedAge = getDisplayAge(item.pet.dob);
+              const ageAndBreed = [computedAge, item.pet.breed || t('Unknown')].filter(Boolean).join(' • ');
 
               return (
                 <TouchableOpacity
@@ -380,7 +400,7 @@ export default function MyApplicationsScreen() {
                   </View>
 
                   <View className={`flex-row justify-between items-center py-3 border-t ${isNeedMoreInfo ? 'border-[#E89B5A] bg-[#FFF5EE]' : 'border-[#E5E5E5] bg-[#F6F6F6]'}  -mx-[14px] px-[14px] rounded-b-[13px]`}>
-                    <StatusBadge status={item.status} />
+                    <StatusBadge status={item.status} t={t} /> {/* TRUYỀN T VÀO ĐÂY */}
 
                     <View className="flex-row items-center">
                       <Text className={`${isNeedMoreInfo ? 'text-[#E89B5A]' : 'text-[#8E8E93]'} text-[12px] font-regular tracking-[0.5px] ml-1.5`}>
@@ -435,7 +455,7 @@ export default function MyApplicationsScreen() {
               >
                
                 <Feather name="twitter" size={16} color="#4B5563" />
-                <Text className="text-[13px] font-medium text-gray-700 ml-2 leading-5">Pet Profile</Text>
+                <Text className="text-[13px] font-medium text-gray-700 ml-2 leading-5">{t('Pet Profile')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -449,7 +469,7 @@ export default function MyApplicationsScreen() {
                 }}
               >
                 <Feather name="file-text" size={16} color="#4B5563" />
-                <Text className="text-[13px] font-medium text-gray-700 ml-2 leading-5">Application Status</Text>
+                <Text className="text-[13px] font-medium text-gray-700 ml-2 leading-5">{t('Application Status')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -463,12 +483,12 @@ export default function MyApplicationsScreen() {
                   if (shelterId) {
                     router.push(`/shelter-profile?id=${shelterId}`);
                   } else {
-                    Alert.alert("Thông báo", "Thú cưng này hiện không có thông tin trạm cứu hộ liên kết.");
+                    Alert.alert(t("Notice"), t("This pet currently has no linked shelter information."));
                   }
                 }}
               >
                 <Feather name="home" size={16} color="#4B5563" />
-                <Text className="text-[13px] font-medium text-gray-700 ml-2 leading-5">Shelter Info</Text>
+                <Text className="text-[13px] font-medium text-gray-700 ml-2 leading-5">{t('Shelter Info')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -479,7 +499,7 @@ export default function MyApplicationsScreen() {
                   const selectedApp = applications.find(app => app.id === selectedAppId);
                   
                   if (selectedApp && ['CLOSED', 'ADOPTION_COMPLETED'].includes(selectedApp.status)) {
-                     Alert.alert("Không hợp lệ", "Đơn này đã đóng hoặc đã hoàn tất, không thể thu hồi.");
+                     Alert.alert(t("Invalid"), t("This application is closed or completed, cannot be withdrawn."));
                      return;
                   }
 
@@ -487,7 +507,7 @@ export default function MyApplicationsScreen() {
                 }}
               >
                 <Feather name="x-circle" size={16} color="#EF4444" />
-                <Text className="text-[13px] font-medium text-[#EF4444] ml-2 leading-5">Withdraw</Text>
+                <Text className="text-[13px] font-medium text-[#EF4444] ml-2 leading-5">{t('Withdraw')}</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -507,10 +527,10 @@ export default function MyApplicationsScreen() {
               </View>
               
               <Text className="text-[18px] font-bold text-center text-gray-900 mb-2">
-                Withdraw Application?
+                {t('Withdraw Application?')}
               </Text>
               <Text className="text-[14px] font-regular text-center text-gray-500 mb-6">
-                Are you sure you want to withdraw this adoption application? This action cannot be undone and you will need to reapply if you change your mind.
+                {t('Are you sure you want to withdraw this adoption application? This action cannot be undone and you will need to reapply if you change your mind.')}
               </Text>
 
               <View className="flex-row w-full gap-3">
@@ -519,7 +539,7 @@ export default function MyApplicationsScreen() {
                   onPress={() => setIsWithdrawVisible(false)}
                   disabled={isWithdrawing}
                 >
-                  <Text className="text-gray-700 font-semibold text-[15px]">Cancel</Text>
+                  <Text className="text-gray-700 font-semibold text-[15px]">{t('common.cancel')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -530,7 +550,7 @@ export default function MyApplicationsScreen() {
                   {isWithdrawing ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text className="text-white font-semibold text-[15px]">Withdraw</Text>
+                    <Text className="text-white font-semibold text-[15px]">{t('Withdraw')}</Text>
                   )}
                 </TouchableOpacity>
               </View>

@@ -1,22 +1,24 @@
 import { Text } from '@/components/AppText';
 import { Feather } from '@expo/vector-icons';
 import dayjs from 'dayjs';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
-  AlertTriangle, Calendar, ChevronLeft,
-  Eye,
+  AlertTriangle, Calendar,
   Info, Lock,
-  ShieldCheck, Sparkles,
-  Trash2
+  ShieldCheck, Sparkles
 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Modal, RefreshControl, SectionList, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, LayoutAnimation, Modal, Platform, RefreshControl, SectionList, TouchableOpacity, TouchableWithoutFeedback, UIManager, View } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient';
 import { groupNotifications } from '../utils/dateUtils';
-import { LinearGradient } from 'expo-linear-gradient';
-
+// Bật thử nghiệm LayoutAnimation trên Android (Bắt buộc để hiệu ứng dồn lên hoạt động trên Android)
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 const getIconByType = (type: string) => {
   const props = { size: 22, color: "#4B5563", strokeWidth: 2 };
   switch (type) {
@@ -35,44 +37,78 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 
 // --- Component Item với hiệu ứng Swipe Premium, Parallax & Border Masking ---
 const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPress: any, onDelete: any, onView: any }) => {
-  const [dragXNode, setDragXNode] = useState<any>(null);
   const swipeableRef = useRef<Swipeable>(null);
-  const triggeredRef = useRef(false);
+  const slideOutAnim = useRef(new Animated.Value(0)).current;
 
-  const captureDragX = (dragX: any) => {
+  // Refs quản lý logic rung & hành động
+  const hapticTriggeredRight = useRef(false);
+  const hapticTriggeredLeft = useRef(false);
+  const isActionFired = useRef(false); 
+  
+  // Ref MỚI: Dùng để đảm bảo ta chỉ gắn listener đúng 1 lần duy nhất cho mỗi item
+  const dragXListenerAttached = useRef(false);
+  const [dragXNode, setDragXNode] = useState<any>(null);
+
+  // GẮN SỰ KIỆN TRỰC TIẾP KHÔNG QUA USEEFFECT
+  const attachGestureListener = (dragX: any) => {
+    // 1. Vẫn lưu dragX vào state để làm UI Opacity (chỉ chạy 1 lần)
     if (!dragXNode) {
       setTimeout(() => setDragXNode(dragX), 0);
     }
+
+    // 2. Gắn sự kiện lắng nghe ĐỒNG BỘ ngay lập tức
+    if (!dragXListenerAttached.current && dragX) {
+      dragXListenerAttached.current = true;
+      
+      dragX.addListener(({ value }: { value: number }) => {
+        // === VUỐT SANG PHẢI (NÚT XANH) ===
+        if (value >= 80 && !hapticTriggeredRight.current) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          hapticTriggeredRight.current = true;
+        } else if (value < 80 && hapticTriggeredRight.current) {
+          hapticTriggeredRight.current = false;
+        }
+
+        if (value > 110 && !isActionFired.current) {
+          isActionFired.current = true;
+          swipeableRef.current?.close(); 
+          setTimeout(() => { onView(item); }, 250);
+        }
+
+        // === VUỐT SANG TRÁI (NÚT ĐỎ) ===
+        if (value <= -80 && !hapticTriggeredLeft.current) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          hapticTriggeredLeft.current = true;
+        } else if (value > -80 && hapticTriggeredLeft.current) {
+          hapticTriggeredLeft.current = false;
+        }
+        
+        if (value < -160 && !isActionFired.current) {
+          isActionFired.current = true;
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
+          
+          Animated.timing(slideOutAnim, {
+            toValue: -500, 
+            duration: 150, 
+            useNativeDriver: true,
+          }).start(() => {
+            onDelete(item);
+          });
+        }
+
+        // === RESET ===
+        if (Math.abs(value) < 10) {
+          isActionFired.current = false;
+        }
+      });
+    }
   };
-
-  // Lắng nghe khoảng cách kéo để tự động kích hoạt hành động (Full Swipe)
-  useEffect(() => {
-    if (!dragXNode) return;
-    const listenerId = dragXNode.addListener(({ value }: { value: number }) => {
-      const threshold = 110; // Đã giảm xuống 110 để thao tác dứt khoát là kích hoạt ngay
-
-      if (value > threshold && !triggeredRef.current) {
-        // Full Swipe Right (Xem)
-    triggeredRef.current = true;
-      onView(item);
-        swipeableRef.current?.close();
-      } else if (value < -threshold && !triggeredRef.current) {
-        // Full Swipe Left (Xóa)
-        triggeredRef.current = true;
-        onDelete(item);
-        swipeableRef.current?.close();
-      } else if (Math.abs(value) < 80) {
-        // Reset trạng thái nếu nhả tay ở khấc hoặc kéo ngược lại
-        triggeredRef.current = false;
-      }
-    });
-
-    return () => dragXNode.removeListener(listenerId);
-  }, [dragXNode, item, onView, onDelete]);
 
   // NÚT XEM (XANH LÁ)
   const renderLeftActions = (progress: any, dragX: any) => {
-    captureDragX(dragX);
+    // Gọi thẳng hàm đính kèm sự kiện ngay khi render action
+    attachGestureListener(dragX);
+    
     const transX = dragX.interpolate({
       inputRange: [0, 80],
       outputRange: [-20, 0],
@@ -110,7 +146,9 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
 
   // NÚT XÓA (ĐỎ)
   const renderRightActions = (progress: any, dragX: any) => {
-    captureDragX(dragX);
+    // Gọi thẳng hàm đính kèm sự kiện ngay khi render action
+    attachGestureListener(dragX);
+    
     const transX = dragX.interpolate({
       inputRange: [-80, 0],
       outputRange: [0, 20],
@@ -122,8 +160,15 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
         <AnimatedTouchableOpacity
           activeOpacity={0.8}
           onPress={() => {
-            onDelete(item);
-            swipeableRef.current?.close();
+            // Khi bấm nút rác, chạy animation bay đi thay vì xoá ngay
+            isActionFired.current = true;
+            Animated.timing(slideOutAnim, {
+              toValue: -500,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(() => {
+              onDelete(item);
+            });
           }}
           style={{
             position: 'absolute', top: 0, bottom: 0, right: 0,
@@ -167,10 +212,14 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       renderRightActions={renderRightActions}
       overshootLeft={true}
       overshootRight={true}
-      friction={1} // Đã trả về 1 để vuốt nhẹ và mượt mà nhất
-      overshootFriction={1} // Không tạo lực ghì khi cố tình kéo dài
+      friction={1}
+      overshootFriction={1}
     >
-      <View style={{ position: 'relative' }}>
+      {/* ĐỔI VIEW NÀY THÀNH ANIMATED.VIEW VÀ THÊM TRANSFORM */}
+      <Animated.View style={{ 
+        position: 'relative', 
+        transform: [{ translateX: slideOutAnim }] 
+      }}>
         <Animated.View
           key={dragXNode ? 'left-active' : 'left-static'}
           style={{
@@ -219,7 +268,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
           </TouchableOpacity>
         </View>
 
-      </View>
+      </Animated.View>
     </Swipeable>
   );
 };
@@ -285,10 +334,16 @@ export default function NotificationsScreen() {
 
   const handleDeleteNotification = async (item: any) => {
     try {
+      // 1. Bật LayoutAnimation với preset mượt mà trước khi thay đổi State
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+      // 2. Thực hiện lọc bỏ item khỏi danh sách
       setSections(prevSections => prevSections.map(section => ({
         ...section,
         data: section.data.filter((note: any) => note.id !== item.id)
       })).filter(section => section.data.length > 0)); 
+      
+      // 3. Xoá ở database dưới nền
       await axiosClient.delete(`/notifications/${item.id}`);
     } catch (error) {
       console.error("Error deleting notification:", error);

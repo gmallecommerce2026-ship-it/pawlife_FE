@@ -1,10 +1,10 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
 import React from 'react';
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-
 // --- IMPORT THƯ VIỆN HỖ TRỢ ---
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,9 +12,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
 
 // --- CẤU HÌNH UI/UX ---
-const TAB_BAR_HEIGHT = 48;    // Tăng nhẹ để đảm bảo icon và text không bị khít
+const TAB_BAR_HEIGHT = 42;    // Tăng nhẹ thêm 4px để text có không gian thở tốt hơn
 const CURVE_HEIGHT = 15;     
-const BUTTON_RADIUS = 31;    
+const BUTTON_RADIUS = 29;    
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const router = useRouter();
@@ -58,12 +58,23 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
     return state.routes.findIndex((route: any) => route.name === name);
   };
 
+  const getRouteTitle = (routeName: string) => {
+    const route = state.routes.find((r: any) => r.name === routeName);
+    if (!route) return routeName;
+    const options = descriptors[route.key].options;
+    return options.title || route.name;
+  };
+
   const handleTabPress = (routeName: string) => {
+    // Tạo rung động cực nhẹ nhàng (chuẩn UX chuyển tab của iOS/Android)
+    Haptics.selectionAsync(); 
     navigation.navigate(routeName);
   };
 
-  const handleScanPressIn = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleScanPress = () => {
+    // Rung Medium tạo cảm giác bấm nút vật lý dứt khoát
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/scan');
   };
 
   return (
@@ -86,8 +97,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       ]}>
         <TouchableOpacity 
           activeOpacity={0.9}
-          onPressIn={handleScanPressIn} 
-          onPress={() => router.push('/scan')} 
+          onPress={handleScanPress} // Thay onPress và xoá onPressIn cũ
           style={styles.scanButton}
         >
           <LinearGradient 
@@ -106,26 +116,30 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         </TouchableOpacity>
       </View>
 
+      {/* FIXED: Thiết lập height bao gồm cả CURVE_HEIGHT để nội dung có không gian */}
       <View style={[
         styles.contentContainer, 
-        { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }
+        { 
+          height: TAB_BAR_HEIGHT + CURVE_HEIGHT + insets.bottom, 
+          paddingBottom: insets.bottom 
+        }
       ]}>
         
         {/* NHÓM TAB TRÁI */}
         <View style={styles.sideGroup}>
           <TabItem 
-            label="Home" 
-            icon="home-outline" 
-            activeIcon="home"
+            label={getRouteTitle('index')}
             isActive={state.index === getRouteIndex('index')}
             onPress={() => handleTabPress('index')} 
+            activeImage={require('../../assets/images/home_navbar_active.png')}
+            inactiveImage={require('../../assets/images/home_navbar_deactive.png')}
           />
           <TabItem 
-            label="Matching" 
-            icon="heart-outline" 
-            activeIcon="heart"
+            label={getRouteTitle('matching')}
             isActive={state.index === getRouteIndex('matching')}
             onPress={() => handleTabPress('matching')} 
+            activeImage={require('../../assets/images/match_navbar_active.png')}
+            inactiveImage={require('../../assets/images/match_navbar_deactive.png')} 
           />
         </View>
 
@@ -135,18 +149,18 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         {/* NHÓM TAB PHẢI */}
         <View style={styles.sideGroup}>
           <TabItem 
-            label="Pets" 
-            icon="paw-outline" 
-            activeIcon="paw"
+            label={getRouteTitle('my-pets')}
             isActive={state.index === getRouteIndex('my-pets')}
             onPress={() => handleTabPress('my-pets')} 
+            activeImage={require('../../assets/images/my_pet_navbar_active.png')}
+            inactiveImage={require('../../assets/images/my_pet_navbar_deactive.png')}
           />
           <TabItem 
-            label="Profile" 
-            icon="person-outline" 
-            activeIcon="person"
+            label={getRouteTitle('profile-settings')}
             isActive={state.index === getRouteIndex('profile-settings')}
             onPress={() => handleTabPress('profile-settings')} 
+            activeImage={require('../../assets/images/setting_navbar_active.png')}
+            inactiveImage={require('../../assets/images/setting_navbar_deactive.png')}
           />
         </View>
       </View>
@@ -154,25 +168,17 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   );
 };
 
-const TabItem = ({ label, icon, activeIcon, isActive, onPress, imageSource }: any) => {
+const TabItem = ({ label, isActive, onPress, activeImage, inactiveImage }: any) => {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.tabItem}>
       <View style={[styles.iconContainer, isActive && styles.activeIconContainer]}>
-        {imageSource ? (
-          <Image 
-            source={imageSource}
-            style={[styles.imageIcon, { tintColor: isActive ? "#F59E0B" : "#9CA3AF" }]}
-            resizeMode="contain"
-          />
-        ) : (
-          <Ionicons 
-            name={isActive ? activeIcon : icon} 
-            size={22} 
-            color={isActive ? "#F59E0B" : "#9CA3AF"} 
-          />
-        )}
+        <Image 
+          source={isActive ? activeImage : inactiveImage}
+          style={styles.imageIcon}
+          resizeMode="contain"
+        />
       </View>
-      <Text style={[styles.tabLabel, { color: isActive ? "#F59E0B" : "#9CA3AF", fontWeight: isActive ? '600' : '500' }]}>
+      <Text style={[styles.tabLabel, { color: isActive ? "#F59E0B" : "#8E8E93", fontSize: 9, fontWeight: isActive ? '500' : '400' }]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -180,15 +186,18 @@ const TabItem = ({ label, icon, activeIcon, isActive, onPress, imageSource }: an
 };
 
 export default function TabLayout() {
+  const { language, t } = useLanguage();
+  const isVi = language === 'vi';
+
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="matching" />
-      <Tabs.Screen name="my-pets" />
-      <Tabs.Screen name="profile-settings" />
+      <Tabs.Screen name="index" options={{ title: isVi ? 'Trang chủ' : 'Home' }} />
+      <Tabs.Screen name="matching" options={{ title: isVi ? 'Ghép đôi' : 'Pawdoption' }} />
+      <Tabs.Screen name="my-pets" options={{ title: isVi ? 'Thú cưng' : 'My Pets' }} />
+      <Tabs.Screen name="profile-settings" options={{ title: isVi ? 'Hồ sơ' : 'Profile' }} />
       
       {/* Ẩn các màn hình không thuộc thanh điều hướng */}
       <Tabs.Screen name="scan" options={{ href: null }} />
@@ -213,21 +222,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 10,
+    zIndex: 1, // Đảm bảo SVG nằm dưới
   },
   contentContainer: {
     position: 'absolute',
     bottom: 0,
     width: '100%',
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end', // Căn các item xuống cạnh dưới (ngay trên paddingBottom safe area)
     justifyContent: 'center',
     paddingHorizontal: 15,
+    zIndex: 15, // FIXED: Bắt buộc nội dung (icon, text) nằm đè lên SVG Background
+    elevation: 15,
   },
   sideGroup: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
+    height: TAB_BAR_HEIGHT, // Cố định chiều cao nhóm tab bằng phần viền thẳng của SVG
   },
   centerButtonContainer: {
     position: 'absolute',
@@ -253,19 +266,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 60,
-    paddingTop: 10,
+    height: TAB_BAR_HEIGHT, // Chiếm trọn vùng không gian cho phép
+    paddingTop: 25,
   },
   iconContainer: {
     marginBottom: 4,
   },
   imageIcon: {
-    width: 22,
-    height: 22,
+    width: 20, // Chỉnh to lên một xíu để nhìn rõ hơn
+    height: 20,
   },
   activeIconContainer: {
     transform: [{ scale: 1.1 }], 
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 8,
   }
 });

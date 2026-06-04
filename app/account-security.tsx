@@ -25,9 +25,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 // Tái sử dụng component cho dạng bật/tắt (Toggle)
-const SettingToggle = ({ label, value, onValueChange }: { label: string, value: boolean, onValueChange: (val: boolean) => void }) => (
+const SettingToggle = ({ label, value, onValueChange, t }: { label: string, value: boolean, onValueChange: (val: boolean) => void, t: any }) => (
   <View className="flex-row items-center justify-between py-2">
-    <Text className="text-[16px] font-semibold text-black">{label}</Text>
+    <Text className="text-[16px] font-semibold text-black">{t(label)}</Text>
     <Switch
       trackColor={{ false: '#D1D5DB', true: '#E89B5A' }}
       thumbColor={'#FFFFFF'}
@@ -40,18 +40,18 @@ const SettingToggle = ({ label, value, onValueChange }: { label: string, value: 
 );
 
 // Tái sử dụng component cho dạng chuyển hướng (Link)
-const SettingLink = ({ label, description, onPress, isLast = false }: { label: string, description?: string, onPress?: () => void, isLast?: boolean }) => (
+const SettingLink = ({ label, description, onPress, isLast = false, t }: { label: string, description?: string, onPress?: () => void, isLast?: boolean, t: any }) => (
   <TouchableOpacity
     activeOpacity={0.7}
     onPress={onPress}
     className={`py-4`}
   >
     <View className="flex-row items-center justify-between">
-      <Text className="text-[16px] font-semibold text-black">{label}</Text>
+      <Text className="text-[16px] font-semibold text-black">{t(label)}</Text>
       <Feather name="chevron-right" size={20} color="#000000" />
     </View>
     {description && (
-      <Text className="text-sm text-gray-500 mt-1.5 leading-5">{description}</Text>
+      <Text className="text-sm text-gray-500 mt-1.5 leading-5">{t(description)}</Text>
     )}
   </TouchableOpacity>
 );
@@ -59,6 +59,7 @@ const SettingLink = ({ label, description, onPress, isLast = false }: { label: s
 export default function AccountSecurityScreen() {
   const router = useRouter();
   const { logout, user, setAuth } = useContext(AuthContext) as any;
+  const { t } = useLanguage(); // Lấy hàm translate
 
   // States cho các mục Toggle
   const [useFaceId, setUseFaceId] = useState(false);
@@ -71,7 +72,7 @@ export default function AccountSecurityScreen() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [twoFaCode, setTwoFaCode] = useState('');
   const [isProcessing2FA, setIsProcessing2FA] = useState(false);
-  const { t } = useLanguage();
+
   const handleTwoFaCodeChange = (text: string) => {
     setTwoFaCode(text);
 
@@ -80,12 +81,12 @@ export default function AccountSecurityScreen() {
       Keyboard.dismiss();
     }
   };
+
   // Load trạng thái Face ID & 2FA khi vào màn hình
   useEffect(() => {
     const loadSettings = async () => {
       if (!user) return;
       try {
-        // ĐỔI TÊN KEY ĐỂ DÙNG CHUNG CHO MÀN LOGIN
         const faceIdSetting = await AsyncStorage.getItem('isFaceIdEnabled');
         setUseFaceId(faceIdSetting === 'true');
 
@@ -104,37 +105,34 @@ export default function AccountSecurityScreen() {
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
       if (!hasHardware || !isEnrolled) {
-        Alert.alert("Lỗi", "Thiết bị không hỗ trợ hoặc chưa thiết lập sinh trắc học (Face ID/Vân tay).");
+        Alert.alert(t("Error"), t("Device does not support or has not set up biometrics (Face ID/Touch ID)."));
         return;
       }
 
       // Yêu cầu xác thực ngay khi vừa gạt công tắc để đảm bảo chủ thiết bị
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Xác thực để bật Đăng nhập bằng Face ID',
-        cancelLabel: 'Hủy',
+        promptMessage: t('Authenticate to enable Face ID Login'),
+        cancelLabel: t('common.cancel'), // Dùng key chung
       });
 
       if (result.success) {
         // Kiểm tra xem đã có thông tin trong SecureStore chưa
         const savedEmail = await SecureStore.getItemAsync('secure_email');
         if (!savedEmail) {
-          Alert.alert("Lưu ý", "Vui lòng đăng xuất và đăng nhập lại bằng mật khẩu một lần để hệ thống lưu trữ khóa bảo mật.");
+          Alert.alert(t("Notice"), t("Please log out and log in again with a password once so the system can securely store your key."));
           return;
         }
 
         setUseFaceId(true);
         // LƯU CỜ GLOBAL ĐỂ MÀN SIGN IN NHẬN DIỆN ĐƯỢC
         await AsyncStorage.setItem('isFaceIdEnabled', 'true');
-        Alert.alert("Thành công", "Đã bật đăng nhập bằng Face ID/Sinh trắc học.");
+        Alert.alert(t("Success"), t("Face ID/Biometrics login enabled."));
       } else {
         setUseFaceId(false);
       }
     } else {
       setUseFaceId(false);
       await AsyncStorage.removeItem('isFaceIdEnabled');
-      // Tùy chọn: Xóa luôn thông tin trong SecureStore nếu muốn an toàn tuyệt đối khi tắt
-      // await SecureStore.deleteItemAsync('secure_email');
-      // await SecureStore.deleteItemAsync('secure_password');
     }
   };
 
@@ -146,16 +144,16 @@ export default function AccountSecurityScreen() {
         setQrCodeUrl(response.data.qrCodeUrl);
         set2FAModalVisible(true);
       } catch (error) {
-        Alert.alert("Lỗi", "Không thể tạo mã cấu hình 2FA.");
+        Alert.alert(t("Error"), t("Cannot generate 2FA configuration code."));
       }
     } else {
       Alert.alert(
-        "Tắt Google Authenticator",
-        "Bạn có chắc chắn muốn tắt bảo mật 2 lớp?",
+        t("Turn off Google Authenticator"),
+        t("Are you sure you want to turn off two-factor authentication?"),
         [
-          { text: "Hủy", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Tắt",
+            text: t("Turn off"),
             style: "destructive",
             onPress: async () => {
               try {
@@ -163,15 +161,14 @@ export default function AccountSecurityScreen() {
                 setUseGoogleAuth(false);
 
                 if (setAuth && user) {
-                  // FIX: Dùng SecureStore thay vì AsyncStorage
                   const currentToken = await SecureStore.getItemAsync('accessToken');
                   if (currentToken) {
                     await setAuth(currentToken, { ...user, isTwoFactorEnabled: false });
                   }
                 }
-                Alert.alert("Thành công", "Đã tắt Google Authenticator.");
+                Alert.alert(t("Success"), t("Google Authenticator has been turned off."));
               } catch (error) {
-                Alert.alert("Lỗi", "Không thể tắt 2FA lúc này.");
+                Alert.alert(t("Error"), t("Cannot turn off 2FA at this time."));
               }
             }
           }
@@ -183,7 +180,7 @@ export default function AccountSecurityScreen() {
   // Xác nhận bật 2FA
   const handleConfirm2FA = async () => {
     if (twoFaCode.length !== 6) {
-      Alert.alert("Lỗi", "Vui lòng nhập đúng 6 số từ ứng dụng.");
+      Alert.alert(t("Error"), t("Please enter exactly 6 digits from the app."));
       return;
     }
     try {
@@ -194,16 +191,15 @@ export default function AccountSecurityScreen() {
       setTwoFaCode('');
 
       if (setAuth && user) {
-        // FIX: Dùng SecureStore thay vì AsyncStorage
         const currentToken = await SecureStore.getItemAsync('accessToken');
         if (currentToken) {
           await setAuth(currentToken, { ...user, isTwoFactorEnabled: true });
         }
       }
 
-      Alert.alert("Thành công", "Đã bật bảo mật 2 lớp bằng Google Authenticator.");
+      Alert.alert(t("Success"), t("Two-factor authentication via Google Authenticator enabled."));
     } catch (error: any) {
-      Alert.alert("Lỗi", error.response?.data?.message || "Mã 2FA không chính xác.");
+      Alert.alert(t("Error"), error.response?.data?.message || t("Incorrect 2FA code."));
     } finally {
       setIsProcessing2FA(false);
     }
@@ -211,34 +207,34 @@ export default function AccountSecurityScreen() {
 
   const handleDeactivate = () => {
     Alert.alert(
-      "Deactivate Account",
-      "Are you sure you want to deactivate your account? You can reactivate it anytime by logging back in.",
+      t("Deactivate Account"),
+      t("Are you sure you want to deactivate your account? You can reactivate it anytime by logging back in."),
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Deactivate", style: "destructive", onPress: () => console.log("Deactivate triggered") }
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("Deactivate"), style: "destructive", onPress: () => console.log("Deactivate triggered") }
       ]
     );
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      "Delete Account",
-      "Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.",
+      t("Delete Account"),
+      t("Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently lost."),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Yes, delete it",
+          text: t("Yes, delete it"),
           style: "destructive",
           onPress: async () => {
             try {
               setIsDeleting(true);
               await axiosClient.delete('/auth/account');
               if (logout) await logout();
-              Alert.alert("Success", "Your account has been permanently deleted.");
+              Alert.alert(t("Success"), t("Your account has been permanently deleted."));
               router.push('/');
             } catch (error) {
               console.error("Delete Error:", error);
-              Alert.alert("Error", "Failed to delete account. Please try again later.");
+              Alert.alert(t("Error"), t("Failed to delete account. Please try again later."));
             } finally {
               setIsDeleting(false);
             }
@@ -258,7 +254,7 @@ export default function AccountSecurityScreen() {
             <Feather name="chevron-left" size={20} color="#000000" />
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            <Text className="text-[20px] font-semibold text-black">Account & Security</Text>
+            <Text className="text-[20px] font-semibold text-black">{t('Account & Security')}</Text>
           </View>
         </View>
 
@@ -270,11 +266,12 @@ export default function AccountSecurityScreen() {
               label="Face ID"
               value={useFaceId}
               onValueChange={handleToggleFaceId}
+              t={t} // Truyền t vào
             />
 
             {/* <View className="py-4">
               <View className="flex-row items-center justify-between">
-                <Text className="text-[16px] font-semibold text-black">Google Authenticator</Text>
+                <Text className="text-[16px] font-semibold text-black">{t('Google Authenticator')}</Text>
                 <Switch
                   trackColor={{ false: '#D1D5DB', true: '#E89B5A' }}
                   thumbColor={'#FFFFFF'}
@@ -291,11 +288,13 @@ export default function AccountSecurityScreen() {
           <View className="bg-white px-6 ">
             <SettingLink
               label="Change Password"
+              t={t} // Truyền t vào
               onPress={() => router.push('/change-password')}
             />
             <SettingLink
               label="Device Management"
               description="Manage your account on the various devices you own."
+              t={t} // Truyền t vào
               onPress={() => router.push('/device-management')}
               isLast={true}
             />
@@ -303,17 +302,6 @@ export default function AccountSecurityScreen() {
 
           {/* --- DANGER ZONE --- */}
           <View className="bg-white px-6 mt-6 ">
-            {/* <TouchableOpacity 
-                activeOpacity={0.7} 
-                onPress={handleDeactivate}
-                className="py-4 border-b border-gray-100"
-            >
-                <Text className="text-base font-semibold text-orange-500">Deactivate Account</Text>
-                <Text className="text-sm text-gray-500 mt-1.5 leading-5">
-                Temporarily deactivate your account. Easily reactivate when you're ready.
-                </Text>
-            </TouchableOpacity> */}
-
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleDeleteAccount}
@@ -323,14 +311,14 @@ export default function AccountSecurityScreen() {
               <View className='flex-row items-center justify-between'>
                 <View className="flex-row items-center">
                   <Text className="text-[16px] font-semibold text-red-500 mr-2">
-                    {isDeleting ? "Deleting Account..." : "Delete Account"}
+                    {isDeleting ? t("Deleting Account...") : t("Delete Account")}
                   </Text>
                   {isDeleting && <ActivityIndicator size="small" color="#EF4444" />}
                 </View>
                 <Feather name="chevron-right" size={20} color="#EB4824" />
               </View>
               <Text className="text-sm text-gray-500 mt-1.5 leading-5">
-                Permanently remove your account and data. Proceed with caution.
+                {t("Permanently remove your account and data. Proceed with caution.")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -341,9 +329,9 @@ export default function AccountSecurityScreen() {
         <Modal visible={is2FAModalVisible} animationType="slide" transparent={true}>
           <View className="flex-1 bg-black/50 justify-center items-center px-4">
             <View className="bg-white rounded-3xl p-6 w-full items-center">
-              <Text className="text-xl font-bold mb-2">Cài đặt 2FA</Text>
+              <Text className="text-xl font-bold mb-2">{t('2FA Setup')}</Text>
               <Text className="text-center text-gray-500 mb-4">
-                Sử dụng ứng dụng Google Authenticator để quét mã QR bên dưới.
+                {t('Use the Google Authenticator app to scan the QR code below.')}
               </Text>
 
               {qrCodeUrl ? (
@@ -353,7 +341,7 @@ export default function AccountSecurityScreen() {
               )}
 
               <TextInput
-                placeholder="Nhập mã 6 số từ ứng dụng"
+                placeholder={t('Enter 6-digit code from the app')}
                 keyboardType="number-pad"
                 maxLength={6}
                 value={twoFaCode}
@@ -368,7 +356,7 @@ export default function AccountSecurityScreen() {
                 {isProcessing2FA ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text className="text-center text-white font-bold text-lg">Xác nhận</Text>
+                  <Text className="text-center text-white font-bold text-lg">{t('Xác nhận')}</Text>
                 )}
               </TouchableOpacity>
 
@@ -377,7 +365,7 @@ export default function AccountSecurityScreen() {
                 className="py-2"
                 disabled={isProcessing2FA}
               >
-                <Text className="text-gray-500 font-medium text-base">Hủy</Text>
+                <Text className="text-gray-500 font-medium text-base">{t('common.cancel')}</Text>
               </TouchableOpacity>
             </View>
           </View>

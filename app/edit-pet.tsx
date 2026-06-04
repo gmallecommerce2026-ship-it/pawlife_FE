@@ -232,34 +232,43 @@ export default function EditPetScreen() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          const hanoi = data.find((p: any) => p.codename === 'ha_noi');
-          const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
-          const remainingProvinces = data.filter((p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh');
-          
-          const priorityProvinces = [];
-          if (hanoi) priorityProvinces.push(hanoi);
-          if (hcm) priorityProvinces.push(hcm);
-          setProvinces([...priorityProvinces, ...remainingProvinces]);
+          const formattedProvinces = data
+            .map((p: any) => ({
+              ...p,
+              // Xóa chữ "Thành phố " hoặc "Tỉnh " ở đầu chuỗi
+              name: p.name.replace(/^(Thành phố |Tỉnh )/i, '')
+            }))
+            // Sort alphabet chuẩn theo tiếng Việt
+            .sort((a: any, b: any) => a.name.localeCompare(b.name, 'vi'));
+
+          setProvinces(formattedProvinces);
         }
       })
-      .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
+      .catch(e => console.error("Lỗi fetch tỉnh/thành phố:", e));
   }, []);
 
   const cityOptions = provinces.map((c: any) => c.name);
 
-  // Fetch Phường/Xã
+  // Fetch Phường/Xã (Đã sort Alphabet)
   useEffect(() => {
     if (!tempCity) {
       setWardOptions([]);
       return;
     }
+    
+    // Tìm province code dựa trên tên đã được làm sạch
     const selectedProvince = provinces.find((p: any) => p.name === tempCity);
+    
     if (selectedProvince && selectedProvince.code) {
       fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
-            setWardOptions(data.map((ward: any) => ward.name));
+            const sortedWards = data
+              .sort((a: any, b: any) => a.name.localeCompare(b.name, 'vi'))
+              .map((ward: any) => ward.name);
+              
+            setWardOptions(sortedWards);
           }
         })
         .catch(e => console.error("Lỗi fetch phường/xã:", e));

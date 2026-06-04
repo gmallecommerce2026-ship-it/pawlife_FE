@@ -168,52 +168,52 @@ export default function ReportIssueModal({ isVisible, onClose }: Props) {
 
     // 1. Fetch Tỉnh/Thành (Tối ưu: chỉ fetch khi modal Report mở và chưa có data)
     useEffect(() => {
-        if (isVisible && provinces.length === 0) {
-            fetch('https://provinces.open-api.vn/api/v2/p/')
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) {
-                        const hanoi = data.find((p: any) => p.codename === 'ha_noi');
-                        const hcm = data.find((p: any) => p.codename === 'ho_chi_minh');
-                        
-                        const remainingProvinces = data.filter(
-                            (p: any) => p.codename !== 'ha_noi' && p.codename !== 'ho_chi_minh'
-                        );
+    fetch('https://provinces.open-api.vn/api/v2/p/')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const formattedProvinces = data
+            .map((p: any) => ({
+              ...p,
+              // Xóa chữ "Thành phố " hoặc "Tỉnh " ở đầu chuỗi
+              name: p.name.replace(/^(Thành phố |Tỉnh )/i, '')
+            }))
+            // Sort alphabet chuẩn theo tiếng Việt
+            .sort((a: any, b: any) => a.name.localeCompare(b.name, 'vi'));
 
-                        const priorityProvinces = [];
-                        if (hanoi) priorityProvinces.push(hanoi);
-                        if (hcm) priorityProvinces.push(hcm);
-
-                        setProvinces([...priorityProvinces, ...remainingProvinces]);
-                    }
-                })
-                .catch(e => console.error("Lỗi fetch tỉnh/thành:", e));
+          setProvinces(formattedProvinces);
         }
-    }, [isVisible]); // Phụ thuộc vào isVisible
+      })
+      .catch(e => console.error("Lỗi fetch tỉnh/thành phố:", e));
+  }, []);
 
-    const cityOptions = provinces.map((c: any) => c.name);
+  const cityOptions = provinces.map((c: any) => c.name);
 
-    // 2. Fetch danh sách Phường/Xã khi chọn Tỉnh
-    useEffect(() => {
-        if (!tempCity) {
-            setWardOptions([]);
-            return;
-        }
-
-        const selectedProvince = provinces.find((p: any) => p.name === tempCity);
-        
-        if (selectedProvince && selectedProvince.code) {
-            fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) {
-                        const allWards = data.map((ward: any) => ward.name);
-                        setWardOptions(allWards);
-                    }
-                })
-                .catch(e => console.error("Lỗi fetch chi tiết phường/xã:", e));
-        }
-    }, [tempCity, provinces]);
+  // Fetch Phường/Xã (Đã sort Alphabet)
+  useEffect(() => {
+    if (!tempCity) {
+      setWardOptions([]);
+      return;
+    }
+    
+    // Tìm province code dựa trên tên đã được làm sạch
+    const selectedProvince = provinces.find((p: any) => p.name === tempCity);
+    
+    if (selectedProvince && selectedProvince.code) {
+      fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            const sortedWards = data
+              .sort((a: any, b: any) => a.name.localeCompare(b.name, 'vi'))
+              .map((ward: any) => ward.name);
+              
+            setWardOptions(sortedWards);
+          }
+        })
+        .catch(e => console.error("Lỗi fetch phường/xã:", e));
+    }
+  }, [tempCity, provinces]);
 
     const handleConfirmAddress = () => {
         if (!tempCity || !tempWard) {

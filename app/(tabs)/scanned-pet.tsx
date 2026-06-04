@@ -17,8 +17,8 @@ import {
 
 import LostModeShareModal, { FormData } from '@/components/LostModeShareModal';
 import ReportIssueModal from '@/components/ReportIssueModal';
-import { LinearGradient } from 'expo-linear-gradient';
 import ShelterContactModal from '@/components/ShelterContactModal';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -561,11 +561,13 @@ export default function ScannedPetScreen() {
         </View>
       </ScrollView>
 
-      <ShelterContactModal
-        isVisible={isContactModalVisible}
-        onClose={() => setIsContactModalVisible(false)}
-        shelterData={shelterData}
-      />
+      {shelterData && (
+        <ShelterContactModal
+          isVisible={isContactModalVisible}
+          onClose={() => setIsContactModalVisible(false)}
+          shelterData={shelterData}
+        />
+      )}
 
       <ReportIssueModal
         isVisible={isReportVisible}

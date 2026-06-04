@@ -334,7 +334,17 @@ export default function ScanScreen() {
           
           {/* Nút Back - Nằm bên trái */}
           <TouchableOpacity 
-            onPress={() => router.back()}
+            onPress={() => {
+              // Ép điều hướng về lại màn Detail nếu đang ở luồng gán/thay mã QR
+              if (linkPetId) {
+                router.replace(`/pet-profile-detail?id=${linkPetId}`);
+              } else if (replacePetId) {
+                router.replace(`/pet-profile-detail?id=${replacePetId}`);
+              } else {
+                // Giữ nguyên back bình thường cho các luồng quét gốc (như quét pet lạc, add pet)
+                router.back();
+              }
+            }}
             className="w-12 h-12 bg-[#2A2A2A]/80 rounded-full items-center justify-center z-20"
           >
             <ChevronLeft size={24} color="white" />

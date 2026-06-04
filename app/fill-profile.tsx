@@ -224,31 +224,39 @@ export default function FillProfileScreen() {
 
     try {
       setIsLoading(true);
+      // 1. Gọi API gửi OTP (Backend sẽ đẩy vào BullMQ chạy ngầm như bạn đã code)
       await requestOtp({
         email: email,
-        type: 'SIGNUP' as any
+        type: 'SIGNUP' 
       });
 
+      // 2. Format dữ liệu chuẩn trước khi parse sang params
       const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
       const fullPhone = `${selectedCountry.dial_code}${formattedPhone}`;
-      const DEFAULT_AVATAR_URL = 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg'
+      const DEFAULT_AVATAR_URL = 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg';
 
-      // Chuyển hướng sang màn hình verify OTP và truyền dữ liệu đăng ký qua params
+      // 3. Chuyển hướng sang màn hình verify OTP kèm theo toàn bộ Payload
       router.push({
         pathname: '/verify-otp',
         params: {
-          email,
+          email: email.trim(),
           password,
-          name,
+          name: name.trim(),
           phone: fullPhone,
           gender,
-          dob: dob.toISOString(),
+          dob: dob.toISOString(), // Ép kiểu Date thành ISO String để an toàn qua Params
           avatarUrl: avatar || DEFAULT_AVATAR_URL
         }
       });
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to send OTP email. Please try again.";
-      Alert.alert("Error", errorMessage);
+      // Xử lý lỗi chuẩn: Backend trả về chuỗi hoặc mảng message, hoặc lỗi 429 Throttle
+      let errorMessage = "Không thể gửi mã OTP. Vui lòng thử lại sau.";
+      if (error?.message) {
+        errorMessage = Array.isArray(error.message) ? error.message[0] : error.message;
+      } else if (error?.statusCode === 429) {
+        errorMessage = "Bạn đã yêu cầu quá nhiều lần. Vui lòng đợi 1 phút.";
+      }
+      Alert.alert("Lỗi", errorMessage);
     } finally {
       setIsLoading(false);
     }

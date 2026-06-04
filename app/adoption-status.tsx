@@ -1,15 +1,15 @@
 // app/adoption-status.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext'; // IMPORT HOOK
 import { useImageUpload } from '@/hooks/useImageUpload';
-import { calculateAge } from '@/utils/dateHelper';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -29,6 +29,7 @@ interface TimelineStep {
 export default function AdoptionStatusScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { t } = useLanguage(); // GỌI HOOK DỊCH THUẬT
 
   const [applicationData, setApplicationData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,13 +40,35 @@ export default function AdoptionStatusScreen() {
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
 
   const { width } = useWindowDimensions();
-  const imageSize = (width - 40 - 48) / 5;
+  const imageSize = (width - 116 - 32) / 5;
   const { pickAndUploadImage, isUploading } = useImageUpload();
+  
+  const getDisplayAge = (dob: string | undefined) => {
+    if (!dob) return t('Unknown');
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+
+    if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+      years--;
+      months += 12;
+    }
+
+    if (years > 0) return `${years} ${t('years')}`;
+    if (months > 0) return `${months} ${t('months')}`;
+    return `< 1 ${t('months')}`;
+  };
+
   const handleRemovePhoto = (index: number) => {
     setPhotos(photos.filter((_, i) => i !== index));
+    setHasUnsavedPhotos(true); // Đánh dấu là có sự thay đổi
   };
 
   const [photos, setPhotos] = useState<string[]>([]);
+  const [hasUnsavedPhotos, setHasUnsavedPhotos] = useState(false); // Check xem đã chọn ảnh mới chưa để enable nút
+  const [isSubmittingPhotos, setIsSubmittingPhotos] = useState(false); // Trạng thái loading của nút
+  
   useEffect(() => {
     if (id) {
       fetchApplicationDetails();
@@ -83,46 +106,46 @@ export default function AdoptionStatusScreen() {
     const updatedDate = new Date(updatedAt || createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     const steps: TimelineStep[] = [
-      { id: '1', title: 'Application Submitted', state: 'completed', date: createdDate, description: 'Đơn đăng ký nhận nuôi của bạn đã được gửi thành công đến Shelter.' }
+      { id: '1', title: t('Application Submitted'), state: 'completed', date: createdDate, description: t('Your adoption application has been successfully sent to the shelter.') }
     ];
 
     switch (status) {
       case 'SUBMITTED':
-        steps.push({ id: '2', title: 'Pending Review', state: 'active', description: 'Shelter đang chuẩn bị xem xét hồ sơ của bạn.' });
+        steps.push({ id: '2', title: t('Pending Review'), state: 'active', description: t('The shelter is preparing to review your application.') });
         break;
       case 'PENDING':
-        steps.push({ id: '2', title: 'Under Review', state: 'active', date: updatedDate, description: 'Shelter đang xem xét hồ sơ và thông tin của bạn.' });
+        steps.push({ id: '2', title: t('Under Review'), state: 'active', date: updatedDate, description: t('The shelter is reviewing your application and information.') });
         break;
       case 'NEED_MORE_INFO':
         steps.push({
           id: '2',
-          title: 'Need More Information',
+          title: t('Need More Information'),
           state: 'alert',
           date: updatedDate,
-          description: 'Shelter needs a bit more information to verify.',
-          actionRequired: 'Photos of your living space'
+          description: t('The shelter needs a bit more information to verify.'),
+          actionRequired: t('Photos of your living space')
         });
         break;
       case 'INTERVIEW_SCHEDULED':
-        steps.push({ id: '2', title: 'Reviewed', state: 'completed' });
-        steps.push({ id: '3', title: 'Interview Scheduled', state: 'active', date: updatedDate, description: 'Shelter đã lên lịch phỏng vấn với bạn. Vui lòng kiểm tra tin nhắn.' });
+        steps.push({ id: '2', title: t('Reviewed'), state: 'completed' });
+        steps.push({ id: '3', title: t('Interview Scheduled'), state: 'active', date: updatedDate, description: t('The shelter has scheduled an interview with you. Please check your messages.') });
         break;
       case 'APPROVED':
-        steps.push({ id: '2', title: 'Reviewed', state: 'completed' });
-        steps.push({ id: '3', title: 'Interviewed', state: 'completed' });
-        steps.push({ id: '4', title: 'Application Approved', state: 'active', date: updatedDate, description: 'Chúc mừng! Hồ sơ của bạn đã được duyệt. Hãy chuẩn bị đón bé về.' });
+        steps.push({ id: '2', title: t('Reviewed'), state: 'completed' });
+        steps.push({ id: '3', title: t('Interviewed'), state: 'completed' });
+        steps.push({ id: '4', title: t('Application Approved'), state: 'active', date: updatedDate, description: t('Congratulations! Your application has been approved. Get ready to welcome your pet.') });
         break;
       case 'ADOPTION_COMPLETED':
-        steps.push({ id: '2', title: 'Reviewed', state: 'completed' });
-        steps.push({ id: '3', title: 'Interviewed', state: 'completed' });
-        steps.push({ id: '4', title: 'Approved', state: 'completed' });
-        steps.push({ id: '5', title: 'Adoption Completed', state: 'success', date: updatedDate, description: 'Cảm ơn bạn đã nhận nuôi! 💛' });
+        steps.push({ id: '2', title: t('Reviewed'), state: 'completed' });
+        steps.push({ id: '3', title: t('Interviewed'), state: 'completed' });
+        steps.push({ id: '4', title: t('Approved'), state: 'completed' });
+        steps.push({ id: '5', title: t('Adoption Completed'), state: 'success', date: updatedDate, description: t('Thank you for adopting! 💛') });
         break;
       case 'CLOSED':
-        steps.push({ id: '2', title: 'Closed', state: 'error', date: updatedDate, description: 'Đơn đăng ký này đã bị đóng hoặc thu hồi.' });
+        steps.push({ id: '2', title: t('Closed'), state: 'error', date: updatedDate, description: t('This application has been closed or withdrawn.') });
         break;
       default:
-        steps.push({ id: '2', title: 'Processing', state: 'active', description: 'Đơn đang được xử lý.' });
+        steps.push({ id: '2', title: t('Processing'), state: 'active', description: t('Application is being processed.') });
         break;
     }
     return steps;
@@ -131,12 +154,38 @@ export default function AdoptionStatusScreen() {
   const handleAddPhoto = async () => {
     if (photos.length >= 5) return;
     const imageUrl = await pickAndUploadImage({
-      folder: 'lost-pets',
+      folder: 'lost-pets', // Hoặc đổi thành 'adoption-docs' nếu BE bạn cấu hình khác
       aspect: [4, 3],
       quality: 0.8,
     });
     if (imageUrl) {
       setPhotos((prev) => [...prev, imageUrl]);
+      setHasUnsavedPhotos(true); // Đánh dấu là có sự thay đổi
+    }
+  };
+
+  const handleSubmitPhotos = async () => {
+    setIsSubmittingPhotos(true);
+    try {
+      // 1. Gọi API gửi danh sách URLs (biến photos đang chứa các R2 URLs trả về từ hook)
+      await axiosClient.patch(`/applications/${id}/verification-photos`, { 
+        photos: photos 
+      });
+      
+      Alert.alert(t('Success'), t('Image uploaded successfully!'));
+      setHasUnsavedPhotos(false); // Disable nút submit
+      
+      // 2. Fetch lại data để UI cập nhật Timeline (Status lúc này sẽ là PENDING thay vì NEED_MORE_INFO)
+      fetchApplicationDetails();
+      
+    } catch (error: any) {
+      console.error('Lỗi khi gửi ảnh xác minh:', error);
+      Alert.alert(
+        t('Error'), 
+        error?.response?.data?.message || t('An error occurred while uploading the image.')
+      );
+    } finally {
+      setIsSubmittingPhotos(false);
     }
   };
 
@@ -241,47 +290,8 @@ export default function AdoptionStatusScreen() {
           </View>
         </TouchableOpacity>
         <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-          <Text className="text-[20px] font-bold text-gray-900 tracking-tight">Application Status</Text>
+          <Text className="text-[20px] font-bold text-gray-900 tracking-tight">{t('Application Status')}</Text>
         </View>
-        {/* <TouchableOpacity
-                  onPress={() => console.log("Share")}
-                  activeOpacity={0.7}
-                  style={{
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 5,
-                    elevation: 3,
-                  }}
-                  className="w-10 h-10 rounded-full items-center justify-center"
-                >
-                  <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 28,
-                      borderWidth: 0.5,
-                      borderTopColor: 'white',
-                      borderLeftColor: 'white',
-                      borderBottomColor: 'transparent',
-                      borderRightColor: 'transparent',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    }}>
-                    <LinearGradient
-                      colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      locations={[0, 0.3, 1]}
-                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
-                    />
-                  <Image
-                    source={require('../assets/icon/share.png')}
-                      style={{ width: 16, height: 16 }}
-                    resizeMode="cover"
-                  />
-                  </View>
-                </TouchableOpacity> */}
       </View>
 
       <View
@@ -313,7 +323,7 @@ export default function AdoptionStatusScreen() {
             if (pet?.id) {
               // Fix: Dùng Object navigation để tránh lỗi parse URL
               router.push({
-                pathname: '/shelter-pet-detail',
+                pathname: '/pet-detail-modal',
                 params: { id: pet.id }
               });
             }
@@ -333,7 +343,7 @@ export default function AdoptionStatusScreen() {
 
             {/* Fix: Tính toán tuổi từ DOB */}
             <Text className="text-[#8E8E93] text-[12px] font-regular mt-[7px]" numberOfLines={1}>
-              {calculateAge(pet?.dob) || 'Unknown'} • {pet?.breed || 'Unknown'}
+              {getDisplayAge(pet?.dob)} • {pet?.breed || t('Unknown')}
             </Text>
           </View>
 
@@ -373,7 +383,7 @@ export default function AdoptionStatusScreen() {
             onPress={() => setIsDetailsVisible(true)}
           >
             <Text className="text-[#8E8E93] text-[12px] font-regular">
-              View Application Details
+              {t('View Application Details')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -381,7 +391,7 @@ export default function AdoptionStatusScreen() {
 
       {/* 5. APPLICATION PROGRESS TIMELINE */}
       <View className="bg-white px-5 mt-[38px] pb-2 shadow-sm shadow-gray-50/50">
-        <Text className="text-[16px] font-semibold text-black mb-[21px] tracking-[0.06px]">Application Progress</Text>
+        <Text className="text-[16px] font-semibold text-black mb-[21px] tracking-[0.06px]">{t('Application Progress')}</Text>
         <View className="p-[17px] border rounded-[16px] border-[#E5E5E5]">
           {timelineSteps.map((step, index) => {
             const isLast = index === timelineSteps.length - 1;
@@ -397,62 +407,96 @@ export default function AdoptionStatusScreen() {
                   {step.date && <Text className="text-[12px] font-regular text-[#8E8E93] mt-1">{step.date}</Text>}
                   {isLast && step.description && <Text className="text-[12px] font-regular text-[#8E8E93] mt-2 leading-5">{step.description}</Text>}
                   {step.actionRequired && (
-                    <View className="flex-row flex-wrap gap-3 mt-2">
-                      {photos.length === 0 ? (
-                        <TouchableOpacity className="self-start mt-3.5 flex-row items-center bg-[#FFFFFF] border border-gray-100 rounded-xl p-3.5" activeOpacity={0.7} onPress={handleAddPhoto}>
-                          <Image
-                            className='mr-2 bottom-[1px]'
-                            source={require('../assets/icon/upload-gray.png')}
-                            style={{ width: 12, height: 12 }}
-                            resizeMode="cover"
-                          />
-                          <Text className="text-[14px] font-medium text-gray-800">{step.actionRequired}</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <>
-                          {photos.map((uri, index) => (
-                            <View key={index} className="relative" style={{ width: imageSize, height: imageSize }}>
-                              <Image
-                                source={{ uri }}
-                                className="w-full h-full rounded-[14px] bg-[#F3F4F6]"
-                              />
-                              <TouchableOpacity
-                                onPress={() => handleRemovePhoto(index)}
-                                activeOpacity={0.7}
-                                className="absolute -top-2 -right-2 w-6 h-6 rounded-full items-center justify-center"
-                                style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 }}
-                              >
-                                <LinearGradient
-                                  colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
-                                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                                  locations={[0, 0.3, 1]}
+                    <View className="flex-col mt-3 w-full">
+                      
+                      {/* HEADER HIỂN THỊ SỐ LƯỢNG ẢNH VÀ TIÊU ĐỀ */}
+                      <View className="flex-row justify-between items-center mb-3">
+                        <Text className="text-[14px] font-medium text-gray-800">
+                          {step.actionRequired}
+                        </Text>
+                        <Text className="text-[13px] font-regular text-[#9CA3AF]">
+                          {photos.length}/5
+                        </Text>
+                      </View>
 
-                                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
-                                />
-                                <X size={10} color="#000000" strokeWidth={3} />
-                              </TouchableOpacity>
-                            </View>
-                          ))}
-
-                          {photos.length < 4 && (
-                            <TouchableOpacity
-                              onPress={handleAddPhoto}
-                              activeOpacity={0.7}
-                              disabled={isUploading}
-                              className="bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center"
-                              style={{ width: imageSize, height: imageSize }}
-                            >
-                              {isUploading ? (
-                                <ActivityIndicator size="small" color="#9CA3AF" />
-                              ) : (
+                      {/* KHUNG CHỨA ẢNH - SỬ DỤNG gap-2 ĐỂ VỪA 5 ẢNH */}
+                      <View className="flex-row flex-wrap gap-2">
+                        {photos.length === 0 ? (
+                          <TouchableOpacity 
+                            className="w-full flex-row h-[60px] border-[1.5px] border-dashed border-[#D1D5DB] rounded-[16px] items-center justify-center" 
+                            activeOpacity={0.7} 
+                            onPress={handleAddPhoto}
+                          >
+                            <Image
+                              className='mr-2'
+                              source={require('../assets/icon/upload-gray.png')}
+                              style={{ width: 18, height: 18 }}
+                              resizeMode="cover"
+                            />
+                            <Text className="text-[14px] font-regular text-black">{t('Upload photos')}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <>
+                            {photos.map((uri, index) => (
+                              <View key={index} className="relative" style={{ width: imageSize, height: imageSize }}>
                                 <Image
-                                  source={require('../assets/icon/upload-gray.png')}
-                                  className="w-[18px] h-[18px]"
+                                  source={{ uri }}
+                                  className="w-full h-full rounded-[14px] bg-[#F3F4F6]"
                                 />
-                              )}
-                            </TouchableOpacity>
-                          )}
-                        </>
+                                <TouchableOpacity
+                                  onPress={() => handleRemovePhoto(index)}
+                                  activeOpacity={0.7}
+                                  className="absolute -top-2 -right-2 w-6 h-6 rounded-full items-center justify-center"
+                                  style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 }}
+                                >
+                                  <LinearGradient
+                                    colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                    locations={[0, 0.3, 1]}
+                                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                                  />
+                                  <X size={10} color="#000000" strokeWidth={3} />
+                                </TouchableOpacity>
+                              </View>
+                            ))}
+
+                            {/* CHỈNH THÀNH < 5 ĐỂ CHOP PHÉP UP TỐI ĐA 5 ẢNH */}
+                            {photos.length < 5 && (
+                              <TouchableOpacity
+                                onPress={handleAddPhoto}
+                                activeOpacity={0.7}
+                                disabled={isUploading}
+                                className="bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center"
+                                style={{ width: imageSize, height: imageSize }}
+                              >
+                                {isUploading ? (
+                                  <ActivityIndicator size="small" color="#9CA3AF" />
+                                ) : (
+                                  <Image
+                                    source={require('../assets/icon/upload-gray.png')}
+                                    className="w-[18px] h-[18px]"
+                                  />
+                                )}
+                              </TouchableOpacity>
+                            )}
+                          </>
+                        )}
+                      </View>
+
+                      {/* --- NÚT SUBMIT XUẤT HIỆN KHI ĐÃ CÓ ẢNH --- */}
+                      {photos.length > 0 && (
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          disabled={!hasUnsavedPhotos || isSubmittingPhotos}
+                          onPress={handleSubmitPhotos}
+                          className={`w-full mt-4 h-[44px] rounded-[14px] items-center justify-center flex-row ${hasUnsavedPhotos && !isSubmittingPhotos ? 'bg-[#E89B5A]' : 'bg-[#F9DCC5]'}`}
+                          style={hasUnsavedPhotos && !isSubmittingPhotos ? { shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 4 } : {}}
+                        >
+                          {isSubmittingPhotos && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />}
+                          <Text className="text-white font-semibold text-[14px] tracking-wide">
+                            {isSubmittingPhotos ? t('Sending...') : t('Send Verification Image')}
+                          </Text>
+                        </TouchableOpacity>
                       )}
                     </View>
                   )}
@@ -462,7 +506,7 @@ export default function AdoptionStatusScreen() {
           })}
         </View>
       </View>
-      {!isClosed && <Text className="text-center text-[13px] text-gray-400 mb-4 mt-[24px] font-regular tracking-[0.06px]">All adoption decisions are handled directly by the shelter.</Text>}
+      {!isClosed && <Text className="text-center text-[13px] text-gray-400 mb-4 mt-[24px] font-regular tracking-[0.06px]">{t('All adoption decisions are handled directly by the shelter.')}</Text>}
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
@@ -476,15 +520,15 @@ export default function AdoptionStatusScreen() {
             <View className="w-12 h-12 bg-gray-50 rounded-full items-center justify-center self-center mb-3">
               <Feather name="search" size={20} color="#9CA3AF" />
             </View>
-            <Text className="text-[16px] font-semibold text-gray-900 text-center mb-2 tracking-tight">Keep Looking</Text>
-            <Text className="text-[14px] text-gray-500 text-center mb-6 leading-5 px-2">There are many other wonderful pets waiting for a home. We've found some similar pets you might like.</Text>
+            <Text className="text-[16px] font-semibold text-gray-900 text-center mb-2 tracking-tight">{t('Keep Looking')}</Text>
+            <Text className="text-[14px] text-gray-500 text-center mb-6 leading-5 px-2">{t("There are many other wonderful pets waiting for a home. We've found some similar pets you might like.")}</Text>
 
             <TouchableOpacity
               className="bg-[#E89B5A] rounded-[14px] py-4 items-center shadow-sm shadow-orange-200"
               activeOpacity={0.8}
               onPress={() => router.push('/matching')}
             >
-              <Text className="text-white font-bold text-[15px] tracking-wide">Browse More Pets</Text>
+              <Text className="text-white font-bold text-[15px] tracking-wide">{t('Browse More Pets')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -493,7 +537,7 @@ export default function AdoptionStatusScreen() {
             activeOpacity={0.7}
             onPress={() => setIsWithdrawVisible(true)}
           >
-            <Text className="text-[16px] font-semibold text-[#B8B8B8]">Withdraw Application</Text>
+            <Text className="text-[16px] font-semibold text-[#B8B8B8]">{t('Withdraw Application')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -514,10 +558,10 @@ export default function AdoptionStatusScreen() {
               <Feather name="alert-triangle" size={26} color="#EF4444" />
             </View>
             <Text className="text-[20px] font-bold text-gray-900 text-center mb-3 tracking-tight">
-              Withdraw request?
+              {t('Withdraw request?')}
             </Text>
             <Text className="text-[15px] text-gray-500 text-center mb-8 leading-6 px-1">
-              The shelter will be notified that you've withdrawn your adoption request for <Text className="font-bold text-gray-800">{pet?.name}</Text>. This action cannot be undone.
+              {t('The shelter will be notified that you have withdrawn your adoption request for ')}<Text className="font-bold text-gray-800">{pet?.name}</Text>{t('. This action cannot be undone.')}
             </Text>
             <View className="w-full flex-col gap-3.5">
               <TouchableOpacity
@@ -529,7 +573,7 @@ export default function AdoptionStatusScreen() {
                 {isWithdrawing ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text className="text-white font-bold text-[15px] tracking-wide">Withdraw Request</Text>
+                  <Text className="text-white font-bold text-[15px] tracking-wide">{t('Withdraw Request')}</Text>
                 )}
               </TouchableOpacity>
 
@@ -539,7 +583,7 @@ export default function AdoptionStatusScreen() {
                 onPress={() => setIsWithdrawVisible(false)}
                 disabled={isWithdrawing}
               >
-                <Text className="text-gray-600 font-bold text-[15px]">Keep Application</Text>
+                <Text className="text-gray-600 font-bold text-[15px]">{t('Keep Application')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -563,7 +607,7 @@ export default function AdoptionStatusScreen() {
             <View className="flex-row items-center justify-center px-5 py-6 border-b border-gray-100 relative">
 
               <Text className="text-[20px] font-semibold text-gray-900 tracking-tight text-center">
-                Application Details
+                {t('Application Details')}
               </Text>
 
               {/* Nút X định vị tuyệt đối ở góc bên phải */}
@@ -580,53 +624,53 @@ export default function AdoptionStatusScreen() {
             {/* Nội dung chi tiết (Sử dụng dữ liệu applicationData có sẵn) */}
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30, paddingTop: 24 }}>
 
-              <SectionCard title="A - Contact Information">
-                <DetailRow label="Full Name" value={applicationData.fullName || 'N/A'} />
-                <DetailRow label="Phone" value={applicationData.phone || 'N/A'} />
-                <DetailRow label="Zalo/WhatsApp" value={applicationData.zalo || 'N/A'} />
-                <DetailRow label="Adopting For" value={applicationData.adoptFor || 'N/A'} isLast />
+              <SectionCard title={t('A - Contact Information')}>
+                <DetailRow label={t('Full Name')} value={applicationData.fullName || 'N/A'} />
+                <DetailRow label={t('Phone')} value={applicationData.phone || 'N/A'} />
+                <DetailRow label={t('Zalo/WhatsApp')} value={applicationData.zalo || 'N/A'} />
+                <DetailRow label={t('Adopting For')} value={applicationData.adoptFor || 'N/A'} isLast />
               </SectionCard>
 
-              <SectionCard title="B - Living Conditions">
-                <DetailRow label="Location" value={applicationData.location || 'N/A'} />
-                <DetailRow label="Housing Type" value={applicationData.housing || 'N/A'} />
-                <DetailRow label="Children" value={applicationData.children || 'N/A'} />
-                <DetailRow label="Cage Plans" value={applicationData.cage || 'N/A'} isLast />
+              <SectionCard title={t('B - Living Conditions')}>
+                <DetailRow label={t('Location')} value={applicationData.location || 'N/A'} />
+                <DetailRow label={t('Housing Type')} value={applicationData.housing || 'N/A'} />
+                <DetailRow label={t('Children')} value={applicationData.children || 'N/A'} />
+                <DetailRow label={t('Cage Plans')} value={applicationData.cage || 'N/A'} isLast />
               </SectionCard>
 
-              <SectionCard title="C - Pet Experience">
-                <DetailRow label="Previous Pet" value={applicationData.petExperience || 'N/A'} />
-                {applicationData.prevPetHistory && applicationData.prevPetHistory.trim() !== '' && (
-                  <DetailRow label="What Happened" value={`${applicationData.prevPetHistory}`} />
-                )}
+              <SectionCard title={t('C - Pet Experience')}>
+                <DetailRow label={t('Previous Pet')} value={applicationData.petExperience || 'N/A'} />
+                {applicationData.prevPetHistory ? (
+                  <DetailRow label={t('What Happened')} value={`${applicationData.prevPetHistory}`} />
+                ) : null}
               </SectionCard>
 
-              <SectionCard title="D - Employment & Personal">
-                <DetailRow label="Employment" value={applicationData.employmentStatus || 'N/A'} isLast />
+              <SectionCard title={t('D - Employment & Personal')}>
+                <DetailRow label={t('Employment')} value={applicationData.employmentStatus || 'N/A'} isLast />
               </SectionCard>
 
-              <SectionCard title="E - Adoption Commitment">
-                {/* <DetailRow label="Reason for Adoption" value={`"${applicationData.adoptionReason || 'N/A'}"`} isQuote isLast={Object.keys(commitments).length === 0} />
-                 */}
+              <SectionCard title={t('E - Adoption Commitment')}>
                 <View className="py-2 border-b border-[#E5E5E5]">
-                  <Text className="text-[14px] text-[#8E8E93] mt-0.5">Reason for Adoption</Text>
+                  <Text className="text-[14px] text-[#8E8E93] mt-0.5">{t('Reason for Adoption')}</Text>
                   <Text className="text-[15px] pt-[7px] pb-[15px]">
                     {`${applicationData.adoptionReason || 'N/A'}`}
                   </Text>
                 </View>
                 {Object.keys(commitments).length > 0 && (
                   <View className="pt-2 pb-1">
-                    {commitments.vaccine === 'Yes' && <CommitmentItem text="Yearly vaccinations" />}
-                    {commitments.medical === 'Yes' && <CommitmentItem text="Hospital treatment when needed" />}
-                    {commitments.expenses === 'Yes' && <CommitmentItem text="Cover pre-adoption expenses" />}
-                    {commitments.updateStatus === 'Yes' && <CommitmentItem text="Provide status updates" />}
-                    {commitments.homeVisit === 'Yes' && <CommitmentItem text="Allow home visits" />}
-                    {commitments.provideID === 'Yes' && <CommitmentItem text="Provide ID and address" />}
+                    {commitments.vaccine === 'Yes' && <CommitmentItem text={t('Yearly vaccinations')} />}
+                    {commitments.medical === 'Yes' && <CommitmentItem text={t('Hospital treatment when needed')} />}
+                    {commitments.expenses === 'Yes' && <CommitmentItem text={t('Cover pre-adoption expenses')} />}
+                    {commitments.updateStatus === 'Yes' && <CommitmentItem text={t('Provide status updates')} />}
+                    {commitments.homeVisit === 'Yes' && <CommitmentItem text={t('Allow home visits')} />}
+                    {commitments.provideID === 'Yes' && <CommitmentItem text={t('Provide ID and address')} />}
                   </View>
                 )}
               </SectionCard>
 
-              <Text className="text-center text-[13px] font-medium text-gray-400 ">Submitted on {submittedDate}</Text>
+              <Text className="text-center text-[13px] font-medium text-gray-400 ">
+                {t('Submitted on ')}{submittedDate}
+              </Text>
             </ScrollView>
           </View>
         </View>
