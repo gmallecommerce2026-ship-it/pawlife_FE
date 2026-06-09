@@ -360,6 +360,10 @@ export default function ReportLostPetScreen() {
         ownerAddress: ownerAddress || "",
         note: note || "",
         photos: photos || [],
+        latitude: mapLat,
+        longitude: mapLng,
+        radius: mapRadius > 0 ? mapRadius : 500,
+        lostDate: lostDate.toISOString(),
       });
 
       // 🔴 BỎ DÒNG NÀY VÌ DETAIL SCREEN KHÔNG DÙNG USEQUERY:
@@ -549,11 +553,20 @@ export default function ReportLostPetScreen() {
                   >
                     <Circle center={{ latitude: mapLat, longitude: mapLng }} radius={mapRadius} fillColor="rgba(232, 155, 90, 0.2)" strokeColor="rgba(232, 155, 90, 0.8)" strokeWidth={1} />
                     <Marker coordinate={{ latitude: mapLat, longitude: mapLng }}>
-                      <View className="items-center justify-center">
-                        <View className='bg-[#E89B5A] rounded-full border-2 z-10 border-[#E89B5A] ' style={{ width: 30, height: 30, borderRadius: 20, overflow: 'hidden', backgroundColor: '#E89B5A' }}>
-                          <Image source={petAvatar ? { uri: petAvatar as string } : require('../assets/icon/location-form.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      <View style={{ alignItems: 'center', width: 135 }}>
+                        <View className="bg-[#FFFFFF] px-3 py-1.5 rounded-lg shadow-md w-full">
+                          <Text className="text-black text-[13px] font-medium tracking-[0.06px] text-center">Reported as Lost</Text>
+                          <Text className="text-[#8E8E93] text-[11px] font-regular tracking-[0.06px] text-center">
+                            Selected Location
+                          </Text>
                         </View>
-                        <View className="w-2 h-2 bg-[#E89B5A] rotate-45 -mt-1 shadow-sm" />
+                        <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 6, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FFFFFF' }} />
+                        <View className="h-1.5" />
+                        <View style={{ borderColor: '#DA5A5A', borderWidth: 2.5 }} className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm">
+                          {/* Đổi icon thành alert-outline và dùng màu đỏ #DA5A5A */}
+                          <Ionicons name="alert-outline" size={20} color="#DA5A5A" />
+                        </View>
+                        <View style={{ width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#DA5A5A' }} />
                       </View>
                     </Marker>
                   </MapView>

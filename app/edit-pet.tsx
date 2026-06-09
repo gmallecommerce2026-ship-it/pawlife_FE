@@ -1,5 +1,6 @@
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useModalStore } from '@/store/useModalStore';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -90,16 +91,6 @@ const BREED_OPTIONS: Record<string, { label: string; value: string }[]> = {
   ]
 };
 
-const speciesData = [
-  { label: 'Dog', value: 'Dog' },
-  { label: 'Cat', value: 'Cat' },
-];
-
-const genderData = [
-  { label: 'Male', value: 'MALE' },
-  { label: 'Female', value: 'FEMALE' },
-  { label: 'Unknown', value: 'UNKNOWN' },
-];
 
 interface EditPetFormData {
   name: string;
@@ -198,12 +189,12 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
     </View>
   );
 };
-
 export default function EditPetScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const showModal = useModalStore((state) => state.showModal);
-
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
   const { pickAndUploadImage: pickQR, isUploading: isUploadingQR } = useImageUpload();
 
@@ -225,7 +216,17 @@ export default function EditPetScreen() {
   const [tempCity, setTempCity] = useState('');
   const [tempWard, setTempWard] = useState('');
   const [tempDetail, setTempDetail] = useState('');
+  
+  const speciesData = [
+      { label: isVi ? 'Chó' : 'Dog', value: 'Dog' },
+      { label: isVi ? 'Mèo' : 'Cat', value: 'Cat' },
+    ];
 
+  const genderData = [
+      { label: isVi ? 'Đực' : 'Male', value: 'MALE' },
+      { label: isVi ? 'Cái' : 'Female', value: 'FEMALE' },
+      { label: isVi ? 'Không rõ' : 'Unknown', value: 'UNKNOWN' },
+    ];
   // Fetch Tỉnh/Thành
   useEffect(() => {
     fetch('https://provinces.open-api.vn/api/v2/p/')
@@ -506,14 +507,9 @@ export default function EditPetScreen() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-white">
-        <ActivityIndicator size="large" color="#EFA062" />
-        <Text className="text-gray-500 mt-4 font-medium">Loading information...</Text>
-      </View>
-    );
-  }
+  // if (isLoading) {
+  //       return <CustomLoader text="Loading information..." />;
+  //   }
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -575,7 +571,7 @@ export default function EditPetScreen() {
                       className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
                       value={formData.name}
                       onChangeText={(text) => handleChange('name', text)}
-                      placeholder="Pet name"
+                      placeholder={isVi ? "Tên thú cưng" : "Pet name"}
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
@@ -591,7 +587,7 @@ export default function EditPetScreen() {
                       maxHeight={200}
                       labelField="label"
                       valueField="value"
-                      placeholder="Select type"
+                      placeholder={isVi ? 'Chọn loài' : 'Select type'}
                       value={formData.species}
                       onChange={(item) => {
                         handleChange('species', item.value);
@@ -615,7 +611,7 @@ export default function EditPetScreen() {
                       maxHeight={200}
                       labelField="label"
                       valueField="value"
-                      placeholder="Select gender"
+                      placeholder={isVi ? 'Chọn giới tính' : 'Select gender'}
                       value={formData.gender}
                       onChange={(item) => handleChange('gender', item.value)}
                     />
@@ -653,7 +649,7 @@ export default function EditPetScreen() {
                       maxHeight={250}
                       labelField="label"
                       valueField="value"
-                      placeholder="Select breed"
+                      placeholder={isVi ? 'Chọn giống' : 'Select breed'}
                       value={formData.breed}
                       onChange={(item) => handleChange('breed', item.value)}
                     />
@@ -665,7 +661,7 @@ export default function EditPetScreen() {
                       className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
                       value={formData.color}
                       onChangeText={(text) => handleChange('color', text)}
-                      placeholder="Color"
+                      placeholder={isVi ? "Màu sắc" : "Color"}
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
@@ -704,7 +700,7 @@ export default function EditPetScreen() {
                     className="border border-[#E5E5E5] rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
                     value={formData.description}
                     onChangeText={(text) => handleChange('description', text)}
-                    placeholder="Loves belly rubs and playing fetch..."
+                    placeholder={isVi ? "Thích được xoa bụng và chơi trò ném đồ vật cho chó nhặt lại..." : "Loves belly rubs and playing fetch..."}
                     placeholderTextColor="#A1A1AA"
                     multiline
                     textAlignVertical="top"
@@ -725,7 +721,7 @@ export default function EditPetScreen() {
                     className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
                     value={formData.contactName}
                     onChangeText={(text) => handleChange('contactName', text)}
-                    placeholder="Full Name"
+                    placeholder={isVi ? "Họ Và Tên" : "Full Name"}
                     placeholderTextColor="#A1A1AA"
                   />
                 </View>
@@ -738,7 +734,7 @@ export default function EditPetScreen() {
                     value={formData.contactPhone}
                     onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
                     keyboardType="phone-pad"
-                    placeholder="Phone Number"
+                    placeholder={isVi ? "Số Điện Thoại" : "Phone Number"}
                     placeholderTextColor="#A1A1AA"
                     maxLength={15}
                   />
@@ -752,7 +748,7 @@ export default function EditPetScreen() {
                       className={`text-right text-[14px] p-0 ${formData.contactAddress ? 'text-black' : 'text-[#A1A1AA]'}`} 
                       numberOfLines={1}
                     >
-                      {formData.contactAddress || "Street Address, District, City"}
+                      {formData.contactAddress || (isVi ? "Địa chỉ của bạn" : "Street Address, District, City")}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -762,7 +758,7 @@ export default function EditPetScreen() {
             {/* Vaccination Record Section */}
             <View className="mb-8">
               <Text className="text-[16px] font-semibold text-[#111827] mb-3">
-                Vaccination Record ({formData.vaccinationRecordUrls.length}/5)
+                {isVi ? 'Hồ sơ tiêm phòng' : 'Vaccination Record'} ({formData.vaccinationRecordUrls.length}/5)
               </Text>
 
               {formData.vaccinationRecordUrls.length < 5 && (

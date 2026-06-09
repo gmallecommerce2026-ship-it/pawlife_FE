@@ -6,7 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { connectSocket } from '@/utils/socket';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+// import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import axios from 'axios';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,11 +23,11 @@ import {
   ScrollView, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-GoogleSignin.configure({
-  webClientId: '725064672703-i8cmlg934i6m5v8ssi69577vf9d3k7hc.apps.googleusercontent.com', 
-  iosClientId: '725064672703-l61bog4iims28n57sspk6hokcf1l86c7.apps.googleusercontent.com',
-  offlineAccess: true,
-});
+// GoogleSignin.configure({
+//   webClientId: '725064672703-i8cmlg934i6m5v8ssi69577vf9d3k7hc.apps.googleusercontent.com', 
+//   iosClientId: '725064672703-l61bog4iims28n57sspk6hokcf1l86c7.apps.googleusercontent.com',
+//   offlineAccess: true,
+// });
 // BỔ SUNG: Hằng số thời gian đếm ngược 120 giây (2 phút)
 const RESEND_OTP_TIME = 120;
 
@@ -162,20 +162,20 @@ export default function SignInScreen() {
   }, []);
 
   const handleGoogleLogin = async () => {
-    try {
-      setErrors({});
-      await GoogleSignin.hasPlayServices();
-      const response = await GoogleSignin.signIn();
+    // try {
+    //   setErrors({});
+    //   await GoogleSignin.hasPlayServices();
+    //   const response = await GoogleSignin.signIn();
       
-      if (response.type === 'success' && response.data?.idToken) {
-        await executeSocialLogin('GOOGLE', response.data.idToken);
-      }
-    } catch (error: any) {
-      if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== '12501') {
-         console.error("Google Login Error:", error);
-         setErrors({ form: "Không thể kết nối với Google lúc này." });
-      }
-    }
+    //   if (response.type === 'success' && response.data?.idToken) {
+    //     await executeSocialLogin('GOOGLE', response.data.idToken);
+    //   }
+    // } catch (error: any) {
+    //   if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== '12501') {
+    //      console.error("Google Login Error:", error);
+    //      setErrors({ form: "Không thể kết nối với Google lúc này." });
+    //   }
+    // }
   };
 
   const handleAppleLogin = async () => {

@@ -211,7 +211,7 @@ export default function AccountSecurityScreen() {
       t("Are you sure you want to deactivate your account? You can reactivate it anytime by logging back in."),
       [
         { text: t("common.cancel"), style: "cancel" },
-        { text: t("Deactivate"), style: "destructive", onPress: () => console.log("Deactivate triggered") }
+        { text: t("Deactivate"), style: "destructive", onPress: () => {} }
       ]
     );
   };

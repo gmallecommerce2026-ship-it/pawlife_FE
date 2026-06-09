@@ -1,5 +1,6 @@
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { socket } from '@/utils/socket';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function TransferOwnershipScreen() {
   const router = useRouter();
   const { petId } = useLocalSearchParams<{ petId: string }>();
-
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const [contactValue, setContactValue] = useState('');
 
   const [petInfo, setPetInfo] = useState<any>(null);
@@ -180,12 +182,12 @@ export default function TransferOwnershipScreen() {
     }
   };
 
-  const getAge = (dob?: string) => {
-    if (!dob) return 'Unknown age';
+  const getAge = (dob?: string, isVi: boolean) => {
+    if (!dob) return isVi ? "Không rõ tuổi" : 'Unknown age';
     const birthDate = new Date(dob);
     const difference = Date.now() - birthDate.getTime();
     const years = Math.abs(new Date(difference).getUTCFullYear() - 1970);
-    return years > 0 ? `${years} years` : 'Under 1 year';
+    return years > 0 ? `${years} ${isVi ? "tuổi" : "years"}` : (isVi ? "Dưới 1 tuổi" : 'Under 1 year');
   };
 
   if (isFetchingData) {
@@ -266,7 +268,7 @@ export default function TransferOwnershipScreen() {
                     <Image source={{ uri: petInfo?.avatarUrl || defaultPetImage }} className="w-[64px] h-[64px] rounded-[12px]" />
                     <View className="flex-1 flex-col justify-center ml-[12px] h-[64px]">
                       <Text className="text-[16px] font-semibold text-black" numberOfLines={1}>{petInfo?.name || 'Unknown Name'}</Text>
-                      <Text className="text-[12px] font-regular text-[#8E8E93] mt-[6px] tracking-[0.5px]">{getAge(petInfo?.dob)} • {petInfo?.breed || 'Unknown Breed'}</Text>
+                      <Text className="text-[12px] font-regular text-[#8E8E93] mt-[6px] tracking-[0.5px]">{getAge(petInfo?.dob, isVi)} • {petInfo?.breed || 'Unknown Breed'}</Text>
                       <Text className="text-[12px] font-regular text-[#8E8E93] mt-[2px] tracking-[0.5px]">ID: {petInfo?.id?.substring(0, 8).toUpperCase()}</Text>
                     </View>
                   </View>
@@ -360,7 +362,10 @@ export default function TransferOwnershipScreen() {
                     </View>
                     <View className="w-full px-[30px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[16px] pb-[30px] items-center">
                       <Text className="text-[12px] text-[#8E8E93] leading-[16px] tracking-[0.06px] ml-3">
-                        I acknowledge this transfer is permanent and all {petInfo?.name}'s profile will be transferred to {receiverName}
+                        {isVi 
+                          ? `Tôi xác nhận việc chuyển nhượng này là vĩnh viễn và toàn bộ hồ sơ của ${petInfo?.name || 'thú cưng'} sẽ được giao cho ${receiverName}.`
+                          : `I acknowledge this transfer is permanent and all ${petInfo?.name || 'pet'}'s profile will be transferred to ${receiverName}.`
+                        }
                       </Text>
                     </View>
                   </>
@@ -436,7 +441,7 @@ export default function TransferOwnershipScreen() {
                             </TouchableOpacity>
                           </View>
 
-                          <Text className="text-[12px] font-medium text-black mb-3">New Owner’s {inputType === 'phone' ? 'Phone' : 'Email Address'}</Text>
+                          <Text className="text-[12px] font-medium text-black mb-3">{isVi ? "" : "New Owner’s"} {inputType === 'phone' ? (isVi ? "Điện thoại của chủ mới" : 'Phone') : (isVi ? "Email của chủ mới" : 'Email Address')}</Text>
 
                           {/* 2. Ô NHẬP LIỆU (TEXT INPUT) */}
                           <View className="bg-white justify-center w-full h-[48px] rounded-[16px] border border-[#E5E5E5] px-4">
@@ -461,10 +466,10 @@ export default function TransferOwnershipScreen() {
                           <Text className="text-[16px] font-semibold text-[#FEA766]">Waiting for confirmation</Text>
                         </View>
                         <View className="w-full px-[30px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[27px] pb-[30px] items-center">
-                          <Text className="text-[12px] text-[#8E8E93] font-regular text-center leading-[22px]">
-                            A confirmation request has been sent to{'\n'}
+                         <Text className="text-[12px] text-[#8E8E93] font-regular text-center leading-[22px]">
+                            {isVi ? 'Một yêu cầu xác nhận đã được gửi đến' : 'A confirmation request has been sent to'}{'\n'}
                             <Text className="font-medium text-black">{contactValue}</Text>.{'\n'}
-                            Waiting for them to accept the transfer.
+                            {isVi ? 'Đang chờ họ chấp nhận yêu cầu chuyển nhượng.' : 'Waiting for them to accept the transfer.'}
                           </Text>
                         </View>
                       </>
@@ -485,7 +490,10 @@ export default function TransferOwnershipScreen() {
                             className="w-[13px] h-[13px] mr-2"
                           />
                           <Text className="text-[12px] text-[#8E8E93] leading-[16px] italic ">
-                            I acknowledge this transfer is permanent and all {petInfo?.name}'sprofile will be transferred to {receiverName}.
+                            {isVi 
+                              ? `Tôi xác nhận việc chuyển nhượng này là vĩnh viễn và toàn bộ hồ sơ của ${petInfo?.name || 'thú cưng'} sẽ được giao cho ${receiverName}.`
+                              : `I acknowledge this transfer is permanent and all ${petInfo?.name || 'pet'}'s profile will be transferred to ${receiverName}.`
+                            }
                           </Text>
                         </View>
                       </>
@@ -601,7 +609,10 @@ export default function TransferOwnershipScreen() {
               <View className="w-full bg-white rounded-[24px] items-center px-[51px]">
 
                 <Text className="text-[14px] font-regular text-[#8E8E93] text-center tracking-[-0.08px] mb-[23px]">
-                  {ownerInfo?.name || 'Old Owner'} has transferred {petInfo?.name || 'Unknown Name'} to you
+                  {isVi 
+                    ? `${ownerInfo?.name || 'Chủ cũ'} đã chuyển nhượng ${petInfo?.name || 'thú cưng'} cho bạn.`
+                    : `${ownerInfo?.name || 'Old Owner'} has transferred ${petInfo?.name || 'Unknown Name'} to you.`
+                  }
                 </Text>
                 {/* 1. ICON CHECK THÀNH CÔNG (Màu cam/vàng theo tone app của bạn) */}
                 <View className="w-[104px] h-[104px] rounded-full justify-center items-center mb-2">
@@ -631,7 +642,10 @@ export default function TransferOwnershipScreen() {
                     className="text-[16px] font-semibold text-white"
                     style={{ fontFamily: 'Urbanist' }}
                   >
-                    View {petInfo?.name || 'New pet'} Profile
+                    {isVi 
+                      ? `Xem hồ sơ của ${petInfo?.name || 'thú cưng'}`
+                      : `View ${petInfo?.name || 'New pet'} Profile`
+                    }
                   </Text>
                   <Feather name="chevron-right" size={18} color="white" />
                 </TouchableOpacity>

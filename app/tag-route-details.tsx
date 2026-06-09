@@ -1,11 +1,15 @@
 import { Text } from '@/components/AppText';
+import CompassWidget from '@/components/CompassWidget';
 import ReportUGCModal from '@/components/ReportUGCModal';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import ShelterContactModal from '@/components/ShelterContactModal'; // 🌟 THÊM IMPORT NÀY
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatMinutes } from '@/utils/date.util';
+import { Feather } from '@expo/vector-icons';
 import { TouchableWithoutFeedback } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +24,7 @@ import {
   StatusBar,
   TouchableOpacity,
   UIManager,
-  View
+  View,
 } from 'react-native';
 import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Animated, {
@@ -64,36 +68,215 @@ const getShortAddress = (geoData: any) => {
 export default function TagRouteDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { language } = useLanguage();
+  const isVi = language === 'vi';
   const mapRef = useRef<MapView>(null);
-
   const targetLat = parseFloat(params.targetLat as string) || 10.772622;
   const targetLng = parseFloat(params.targetLng as string) || 106.670172;
-  const scannerName = (params.scannerName as string) || 'Anonymous';
-  const scannerMessage = (params.scannerMessage as string) || 'Scanned your pet tag';
+  const centerLat = parseFloat(params.centerLat as string) || targetLat;
+  const centerLng = parseFloat(params.centerLng as string) || targetLng;
+  const scannerName = (params.scannerName as string) || (isVi ? 'Ẩn danh' : 'Anonymous');
+  const scannerMessage = (params.scannerMessage as string) || (isVi ? 'Đã quét thẻ thú cưng của bạn' : 'Scanned your pet tag');
   const scannerPhone = params.scannerPhone as string;
-  const timeAgo = (params.timeAgo as string) || 'Recently';
+  const timeAgo = (params.timeAgo as string) || (isVi ? 'Gần đây' : 'Recently');
+  const pageTitle = (params.pageTitle as string) || 'Scanned Tag';
 
   const rawRadius = params.radius;
   const radius = (rawRadius !== null && rawRadius !== undefined && !isNaN(parseFloat(rawRadius as string))) ? parseFloat(rawRadius as string) : 0;
   const shinePosition = useSharedValue(-0.5);
-
+  const [currentRegion, setCurrentRegion] = useState({
+    latitude: targetLat,
+    longitude: targetLng,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
   const [isGpsReady, setIsGpsReady] = useState(false);
   const [isFetchingRoute, setIsFetchingRoute] = useState(true);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
 
+  // 🌟 THÊM STATE QUẢN LÝ MODAL LIÊN HỆ
+  const [isContactModalVisible, setIsContactModalVisible] = useState(false);
+  const [locationMode, setLocationMode] = useState<'NONE' | 'CENTERED' | 'COMPASS'>('NONE');
+  const [mapHeading, setMapHeading] = useState(0);
+  const [deviceHeading, setDeviceHeading] = useState(0);
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number, longitude: number }[]>([]);
   const [currentLoc, setCurrentLoc] = useState({ lat: targetLat, lng: targetLng });
   const [realStats, setRealStats] = useState({ distance: '...', duration: 0 });
   const [addresses, setAddresses] = useState({ origin: 'Locating...', destination: 'Loading...' });
   const [isExpanded, setIsExpanded] = useState(true);
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
+  const modeRef = useRef<'NONE' | 'CENTERED' | 'COMPASS'>('NONE');
+  const currentLocRef = useRef({ lat: targetLat, lng: targetLng });
+  const headingSubRef = useRef<Location.LocationSubscription | null>(null);
+  const handleRegionChangeComplete = async (region: any) => {
+    setCurrentRegion(region);
+    if (mapRef.current) {
+      try {
+        const camera = await mapRef.current.getCamera();
+        setMapHeading(camera.heading || 0);
+      } catch (e) {
+        console.warn("Lỗi đọc góc camera:", e);
+      }
+    }
+  };
 
+  const updateLocationMode = (mode: 'NONE' | 'CENTERED' | 'COMPASS') => {
+    modeRef.current = mode;
+    setLocationMode(mode);
+    if (mode !== 'COMPASS') stopHeadingWatch();
+  };
+
+  // Dừng đọc cảm biến la bàn
+  const stopHeadingWatch = () => {
+    if (headingSubRef.current) {
+      headingSubRef.current.remove();
+      headingSubRef.current = null;
+    }
+  };
+
+  // Bắt đầu đọc cảm biến la bàn
+  const startHeadingWatch = async () => {
+    if (headingSubRef.current) return;
+    
+    let lastHeading = 0;
+    headingSubRef.current = await Location.watchHeadingAsync((data) => {
+      // Dùng magHeading (hướng từ trường) và làm tròn để chống giật (jitter)
+      const currentHeading = Math.round(data.magHeading);
+      
+      if (Math.abs(currentHeading - lastHeading) > 1) {
+        lastHeading = currentHeading;
+        setDeviceHeading(currentHeading);
+        
+        // Nếu đang ở chế độ xoay theo la bàn -> Cập nhật camera map liên tục
+        if (modeRef.current === 'COMPASS' && mapRef.current) {
+          mapRef.current.setCamera({ 
+            heading: currentHeading,
+            center: { latitude: currentLocRef.current.lat, longitude: currentLocRef.current.lng }
+          });
+        }
+      }
+    });
+  };
+
+  // Đảm bảo tắt cảm biến khi thoát màn hình
+  useEffect(() => {
+    return () => stopHeadingWatch();
+  }, []);
+  // Logic 3 trạng thái chuẩn Google Maps
+  const handleMyLocationPress = async () => {
+    if (!mapRef.current || !currentLocRef.current.lat || !currentLocRef.current.lng) return;
+
+    try {
+      if (locationMode === 'NONE' || locationMode === 'COMPASS') {
+        // Trạng thái 1 -> 2: Zoom về, thẳng hướng Bắc
+        updateLocationMode('CENTERED');
+        setMapHeading(0);
+        
+        mapRef.current.animateCamera({
+          center: { latitude: currentLocRef.current.lat, longitude: currentLocRef.current.lng },
+          heading: 0,
+          pitch: 0,
+          zoom: 17
+        }, { duration: 800 });
+        
+      } else if (locationMode === 'CENTERED') {
+        // Trạng thái 2 -> 3: Bật La bàn xoay theo điện thoại
+        updateLocationMode('COMPASS');
+        
+        // 🌟 FIX LA BÀN GIẬT: Lấy góc ngay lập tức để đưa vào animation mượt
+        const currentH = await Location.getHeadingAsync();
+        const targetHeading = Math.round(currentH.magHeading);
+
+        mapRef.current.animateCamera({
+          center: { latitude: currentLocRef.current.lat, longitude: currentLocRef.current.lng },
+          pitch: 60, // Nghiêng góc 3D
+          heading: targetHeading, // Xoay mượt mà về hướng điện thoại
+          zoom: 18
+        }, { duration: 800 });
+
+        // Đợi 800ms cho animation chạy xong rồi mới kích hoạt cảm biến liên tục
+        setTimeout(() => {
+          if (modeRef.current === 'COMPASS') {
+            startHeadingWatch();
+          }
+        }, 800);
+      }
+    } catch (e) {
+      console.warn("Lỗi di chuyển camera:", e);
+    }
+  };
+  const arriveByTime = useMemo(() => {
+    if (!realStats.duration || realStats.duration === 0) return '...';
+    
+    // Lấy timestamp hiện tại và cộng thêm số phút di chuyển (quy đổi ra mili giây)
+    const arrivalDate = new Date(Date.now() + realStats.duration * 60 * 1000);
+    
+    // Định dạng hiển thị hh:mm AM/PM đồng bộ với chuẩn en-US của app hiện tại
+    return arrivalDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }, [realStats.duration]);
+
+  const handleZoom = async (isZoomIn: boolean) => {
+    if (!mapRef.current) return;
+    
+    try {
+      // 🌟 FIX LỖI ZOOM: Dùng getCamera để giữ nguyên độ nghiêng (pitch) và hướng (heading)
+      const camera = await mapRef.current.getCamera();
+      const currentZoom = camera.zoom || 15;
+      
+      mapRef.current.animateCamera({
+        zoom: isZoomIn ? currentZoom + 1 : currentZoom - 1
+      }, { duration: 300 });
+      
+    } catch (e) {
+      console.warn("Lỗi zoom:", e);
+    }
+  };
+  const displayLocation = useMemo(() => {
+    return { lat: targetLat, lng: targetLng };
+  }, [targetLat, targetLng]);
+
+  const dynamicMapPadding = React.useMemo(() => {
+    return {
+      top: Platform.OS === 'ios' ? 160 : 150,     
+      right: 20,
+      bottom: isExpanded ? 500 : 300,            
+      left: 20,
+    };
+  }, [isExpanded]);
+
+  useEffect(() => {
+    if (isGpsReady && mapRef.current) {
+      
+      // 🌟 FIX LỖI MODAL: Chặn không cho ép lại bản đồ 2D nếu đang ở chế độ Focus/La bàn
+      if (modeRef.current !== 'NONE') return;
+
+      const timeoutId = setTimeout(() => {
+        const coordinatesToFit = routeCoordinates.length > 0 
+          ? routeCoordinates 
+          : [
+              { latitude: currentLoc.lat, longitude: currentLoc.lng }, 
+              { latitude: targetLat, longitude: targetLng }            
+            ];
+
+        mapRef.current?.fitToCoordinates(coordinatesToFit, {
+          edgePadding: { top: 80, right: 40, bottom: 40, left: 40 }, 
+          animated: true,
+        });
+      }, 400);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isExpanded, currentLoc.lat, currentLoc.lng, isGpsReady, targetLat, targetLng, routeCoordinates.length]);
+  
   const handleShareLocation = () => {
     setIsMenuVisible(false); 
     
     setTimeout(async () => {
-      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${targetLat},${targetLng}`;
-
+      const mapUrl = `https://maps.google.com/?q=${displayLocation.lat},${displayLocation.lng}`;
       try {
         await Share.share({
           message: Platform.OS === 'android' 
@@ -144,22 +327,111 @@ export default function TagRouteDetailsScreen() {
     let locationSubscription: Location.LocationSubscription | null = null;
     let isMounted = true;
 
+    // Tách riêng hàm gọi API để tái sử dụng và xử lý lỗi đồng bộ
+    const fetchDirections = async (startLat: number, startLng: number) => {
+      const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (!GOOGLE_API_KEY) return;
+
+      const destLat = displayLocation.lat;
+      const destLng = displayLocation.lng;
+
+      const dirUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${startLat},${startLng}&destination=${destLat},${destLng}&key=${GOOGLE_API_KEY}`;
+      const geoUrl = (lat: number, lng: number) => `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GOOGLE_API_KEY}`;
+      
+      try {
+        const [dirRes, oriRes, destRes] = await Promise.all([
+          fetch(dirUrl).catch(() => null),
+          fetch(geoUrl(startLat, startLng)).catch(() => null),
+          fetch(geoUrl(destLat, destLng)).catch(() => null)
+        ]);
+
+        if (!isMounted) return;
+
+        const [dirData, oriData, destData] = await Promise.all([
+          dirRes ? await dirRes.json() : null,
+          oriRes ? await oriRes.json() : null,
+          destRes ? await destRes.json() : null
+        ]);
+
+        if (dirData?.status === 'OK' && dirData.routes?.[0]) {
+          const route = dirData.routes[0];
+          const leg = route.legs[0];
+
+          try {
+            // 🌟 FIX LỖI 1: KHÔNG CHẠM ĐÍCH HOÀN HẢO
+            // Dùng chi tiết từng bước (steps) thay vì đường tổng quan (overview_polyline)
+            let highResCoords: { latitude: number, longitude: number }[] = [];
+            
+            if (leg.steps && leg.steps.length > 0) {
+              leg.steps.forEach((step: any) => {
+                if (step.polyline && step.polyline.points) {
+                  highResCoords.push(...decodeGooglePolyline(step.polyline.points));
+                }
+              });
+            } else {
+              highResCoords = decodeGooglePolyline(route.overview_polyline.points);
+            }
+            
+            // Ép điểm đích tuyệt đối vào cuối mảng để nét vẽ chạm mốc 100%
+            setRouteCoordinates([
+              { latitude: startLat, longitude: startLng },
+              ...highResCoords,
+              { latitude: destLat, longitude: destLng } 
+            ]);
+          } catch (err) {
+            console.error("Error decoding Polyline:", err);
+          }
+
+          setRealStats({
+            distance: (leg.distance.value / 1000).toFixed(1),
+            duration: Math.round(leg.duration.value / 60)
+          });
+        }
+
+        setAddresses({
+          origin: getShortAddress(oriData) || 'Your Location',
+          destination: getShortAddress(destData) || 'Scanned Point'
+        });
+
+        setIsFetchingRoute(false);
+      } catch (e) {
+        if (isMounted) setIsFetchingRoute(false);
+      }
+    };
+
     const initializeDataAndMap = async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
-        let curLat = targetLat;
-        let curLng = targetLng;
+        
+        let curLat: number | null = null;
+        let curLng: number | null = null;
 
         if (status === 'granted') {
+          // BẬT WATCHER NGAY LẬP TỨC ĐỂ TRÁNH MẤT DỮ LIỆU GPS
+          locationSubscription = await Location.watchPositionAsync(
+            { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
+            (newLocation) => {
+              if (isMounted) {
+                currentLocRef.current = { lat: newLocation.coords.latitude, lng: newLocation.coords.longitude };
+                setCurrentLoc(currentLocRef.current);
+                
+                // 🌟 FIX LỖI 2: MẤT ĐƯỜNG ĐI (Do miss GPS ở lần đầu, sẽ fetch bù ở đây)
+                if (isFetchingRoute) {
+                  fetchDirections(newLocation.coords.latitude, newLocation.coords.longitude);
+                }
+              }
+            }
+          );
+
           try {
             let location = await Location.getLastKnownPositionAsync();
-            if (!location) {
-              location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            }
-
+            if (!location) location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            
             if (location) {
               curLat = location.coords.latitude;
               curLng = location.coords.longitude;
+              currentLocRef.current = { lat: curLat, lng: curLng };
+              setCurrentLoc(currentLocRef.current);
             }
           } catch (locationError) {
             console.warn("Error getting GPS:", locationError);
@@ -168,82 +440,16 @@ export default function TagRouteDetailsScreen() {
 
         if (!isMounted) return;
 
-        setCurrentLoc({ lat: curLat, lng: curLng });
-        setIsGpsReady(true);
-
-        const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-        if (!GOOGLE_API_KEY) {
-          console.warn("Missing EXPO_PUBLIC_GOOGLE_MAPS_API_KEY");
-        }
-
-        const dirUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${curLat},${curLng}&destination=${targetLat},${targetLng}&key=${GOOGLE_API_KEY}`;
-        const geoUrl = (lat: number, lng: number) => `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GOOGLE_API_KEY}`; 
-
-        const [dirRes, oriRes, destRes] = await Promise.all([
-          fetch(dirUrl).catch(() => null),
-          fetch(geoUrl(curLat, curLng)).catch(() => null),
-          fetch(geoUrl(targetLat, targetLng)).catch(() => null)
-        ]);
-
-        if (isMounted) {
-          const [dirData, oriData, destData] = await Promise.all([
-            dirRes ? dirRes.json() : null,
-            oriRes ? oriRes.json() : null,
-            destRes ? destRes.json() : null
-          ]);
-
-          if (dirData?.status === 'OK' && dirData.routes?.[0]) {
-            const route = dirData.routes[0];
-            const leg = route.legs[0];
-
-            try {
-              const coords = decodeGooglePolyline(route.overview_polyline.points);
-              setRouteCoordinates(coords);
-            } catch (err) {
-              console.error("Error decoding Polyline:", err);
-            }
-
-            setRealStats({
-              distance: (leg.distance.value / 1000).toFixed(1),
-              duration: Math.round(leg.duration.value / 60)
-            });
-
-            if (mapRef.current) {
-              setTimeout(() => {
-                mapRef.current?.fitToCoordinates(
-                  [{ latitude: curLat, longitude: curLng }, { latitude: targetLat, longitude: targetLng }],
-                  { edgePadding: { top: 150, right: 50, bottom: 450, left: 50 }, animated: true }
-                );
-              }, 500);
-            }
-          } else {
-            console.warn("Google Directions API Error:", dirData?.status, dirData?.error_message);
-          }
-
-          setAddresses({
-            origin: getShortAddress(oriData) || 'Your Location',
-            destination: getShortAddress(destData) || 'Scanned Point'
-          });
-
-          setIsFetchingRoute(false);
-        }
-
-        if (status === 'granted') {
-          locationSubscription = await Location.watchPositionAsync(
-            { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
-            (newLocation) => {
-              if (isMounted) {
-                setCurrentLoc({
-                  lat: newLocation.coords.latitude,
-                  lng: newLocation.coords.longitude,
-                });
-              }
-            }
-          );
+        if (curLat && curLng) {
+          // Nếu lấy được vị trí ngay lập tức, gọi fetch vẽ đường
+          setIsGpsReady(true);
+          await fetchDirections(curLat, curLng);
+        } else {
+          // Không return early như code cũ, giữ trạng thái isFetchingRoute=true để Watcher có thể fetch bù
+          setIsGpsReady(true);
         }
 
       } catch (error) {
-        console.error('Data fetch failed:', error);
         if (isMounted) {
           setIsGpsReady(true);
           setIsFetchingRoute(false);
@@ -259,9 +465,10 @@ export default function TagRouteDetailsScreen() {
     };
   }, [targetLat, targetLng]);
 
+  // 🌟 HÀM XỬ LÝ NÚT LIÊN HỆ ĐÃ ĐƯỢC SỬA LẠI ĐỂ MỞ MODAL
   const handleContact = () => {
     if (scannerPhone) {
-      Linking.openURL(`tel:${scannerPhone}`);
+      setIsContactModalVisible(true);
     } else {
       Alert.alert("Notice", "No phone number available for this contact.");
     }
@@ -269,25 +476,10 @@ export default function TagRouteDetailsScreen() {
 
   const handleOpenMaps = () => {
     const url = Platform.select({
-      ios: `maps://app?saddr=${currentLoc.lat},${currentLoc.lng}&daddr=${targetLat},${targetLng}`,
-      android: `google.navigation:q=${targetLat},${targetLng}`
+      ios: `maps://app?saddr=${currentLoc.lat},${currentLoc.lng}&daddr=${displayLocation.lat},${displayLocation.lng}`,
+      android: `google.navigation:q=${displayLocation.lat},${displayLocation.lng}`
     });
     Linking.openURL(url!);
-  };
-
-  const centerMapToUser = async () => {
-    let heading = 0;
-    try {
-      const headingData = await Location.getHeadingAsync();
-      heading = headingData.trueHeading || headingData.magHeading || 0;
-    } catch (e) { }
-
-    mapRef.current?.animateCamera({
-      center: { latitude: currentLoc.lat, longitude: currentLoc.lng },
-      pitch: 60,
-      zoom: 18,
-      heading: heading,
-    }, { duration: 1000 });
   };
 
   return (
@@ -335,7 +527,7 @@ export default function TagRouteDetailsScreen() {
               </TouchableOpacity>
 
               <View className="items-center">
-                <Text className="text-[20px] font-semibold text-black tracking-tight">Scanned Tag</Text>
+                <Text className="text-[20px] font-semibold text-black tracking-tight">{pageTitle}</Text>
                 <Text className="text-[12px] font-regular text-[#8E8E93] tracking-[0.06px] mt-0.5">
                   {timeAgo}
                 </Text>
@@ -399,7 +591,12 @@ export default function TagRouteDetailsScreen() {
             showsMyLocationButton={false}
             showsCompass={false}
             showsBuildings={true}
-            mapPadding={{ top: 120, right: 0, bottom: 420, left: 0 }}
+            mapPadding={dynamicMapPadding}
+            onRegionChangeComplete={handleRegionChangeComplete} 
+
+            // 🌟 THÊM DÒNG NÀY: Thoát trạng thái focus khi user tự vuốt bản đồ
+            onPanDrag={() => updateLocationMode('NONE')}
+            
             initialRegion={{
               latitude: currentLoc.lat,
               longitude: currentLoc.lng,
@@ -409,10 +606,10 @@ export default function TagRouteDetailsScreen() {
           >
             {radius > 0 && (
               <Circle
-                center={{ latitude: targetLat, longitude: targetLng }}
+                center={{ latitude: displayLocation.lat, longitude: displayLocation.lng }}
                 radius={radius}
-                fillColor="rgba(232, 155, 90, 0.25)"
-                strokeColor="rgba(232, 155, 90, 0.6)"
+                fillColor={pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.25)' : 'rgba(232, 155, 90, 0.25)'}
+                strokeColor={pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.6)' : 'rgba(232, 155, 90, 0.6)'}
                 strokeWidth={1.5}
               />
             )}
@@ -424,17 +621,23 @@ export default function TagRouteDetailsScreen() {
               </>
             )}
 
-            <Marker coordinate={{ latitude: targetLat, longitude: targetLng }} title="Scanned Point">
-              <View style={{ alignItems: 'center', width: 80 }}>
-                <View className="bg-[#DA5A5A] px-3 py-1.5 rounded-lg items-center shadow-md w-full">
-                  <Text className="text-white text-[10px] font-bold text-center">Tag Scanned</Text>
-                </View>
-                <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 6, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#DA5A5A' }} />
-                <View className="h-1.5" />
-                <View style={{ borderColor: '#DA5A5A', borderWidth: 2.5 }} className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm">
-                  <Ionicons name="scan-outline" size={20} color="#DA5A5A" />
-                </View>
-                <View style={{ width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#DA5A5A' }} />
+            <Marker 
+              coordinate={{ latitude: displayLocation.lat, longitude: displayLocation.lng }} 
+              title={pageTitle === 'Reported as Lost' ? 'Lost Location' : 'Scanned Point'} 
+              zIndex={50}
+            >
+              <View style={{ 
+                width: 48, height: 48, borderRadius: 24, 
+                backgroundColor: pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.25)' : 'rgba(232, 155, 90, 0.25)', 
+                justifyContent: 'center', alignItems: 'center' 
+              }}>
+                <View style={{ 
+                  width: 22, height: 22, borderRadius: 11, 
+                  backgroundColor: pageTitle === 'Reported as Lost' ? '#DA5A5A' : '#E89B5A', 
+                  borderWidth: 2, borderColor: '#FFFFFF',
+                  shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2, shadowRadius: 3, elevation: 4, 
+                }} />
               </View>
             </Marker>
           </MapView>
@@ -447,18 +650,99 @@ export default function TagRouteDetailsScreen() {
           </View>
         )}
 
+        {/* --- CỤM NÚT ĐIỀU KHIỂN BÊN PHẢI BẢN ĐỒ --- */}
+        <View 
+          className="absolute right-4 z-50 flex-col items-center" 
+          style={{ top: 140, gap: 16 }}
+        >
+          
+
+          {/* 2. CỤM NÚT ZOOM (+/-) */}
+          <View
+            className="bg-white rounded-[8px] overflow-hidden"
+            style={{ width: 42, shadowColor: '#000', shadowOffset: { width: 0, height: 1.5 }, shadowOpacity: 0.25, shadowRadius: 3, elevation: 4 }}
+          >
+            <TouchableOpacity activeOpacity={0.7} className="w-full h-[42px] items-center justify-center border-b border-gray-200" onPress={() => handleZoom(true)}>
+              <Feather name="plus" size={22} color="#666666" />
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7} className="w-full h-[42px] items-center justify-center" onPress={() => handleZoom(false)}>
+              <Feather name="minus" size={22} color="#666666" />
+            </TouchableOpacity>
+          </View>
+
+
+          {/* 1. LA BÀN THẬT (Hiển thị góc xoay chi tiết) */}
+          {(locationMode === 'COMPASS' || Math.abs(mapHeading) > 2) && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+              mapRef.current?.animateCamera({ heading: 0, pitch: 0 }, { duration: 500 });
+              setMapHeading(0);
+              updateLocationMode('NONE');
+            }}
+            style={{
+              width: 46, height: 46,
+              borderRadius: 23,
+              backgroundColor: '#FFFFFF',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+              elevation: 5,
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+            }}
+          >
+            <CompassWidget
+              heading={locationMode === 'COMPASS' ? deviceHeading : mapHeading}
+            />
+          </TouchableOpacity>
+        )}
+        </View>
+
         <TouchableOpacity
           activeOpacity={0.8}
-          className="absolute right-4 top-[140px] w-[50px] h-[50px] bg-white rounded-full items-center justify-center shadow-lg elevation-5 z-40"
-          onPress={centerMapToUser}
+          onPress={handleMyLocationPress}
+          className="absolute right-4 top-[305px] w-[42px] h-[42px] bg-white rounded-[8px] items-center justify-center z-40"
+          style={{
+            shadowColor: '#000', shadowOffset: { width: 0, height: 1.5 },
+            shadowOpacity: 0.25, shadowRadius: 3, elevation: 4,
+          }}
         >
-          <Image
-            source={require('../assets/icon/safari.png')}
-            style={{ width: 22, height: 22 }}
-            resizeMode="cover"
-          />
+           {/* Vẽ icon "Target" y hệt Google Maps bằng View thuần cực nét */}
+           <View className="w-[18px] h-[18px] rounded-full border-[2px] border-[#666666] items-center justify-center">
+              <View className="w-[8px] h-[8px] rounded-full bg-[#3B82F6]" />
+              <View className="absolute top-[-6px] w-[2px] h-[4px] bg-[#666666]" />
+              <View className="absolute bottom-[-6px] w-[2px] h-[4px] bg-[#666666]" />
+              <View className="absolute left-[-6px] w-[4px] h-[2px] bg-[#666666]" />
+              <View className="absolute right-[-6px] w-[4px] h-[2px] bg-[#666666]" />
+           </View>
         </TouchableOpacity>
 
+        {/* 🌟 THÊM 2: NÚT LA BÀN (Chỉ hiện khi bản đồ bị xoay lệch hướng Bắc) */}
+        {Math.abs(mapHeading) > 1 && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              mapRef.current?.animateCamera({ heading: 0, pitch: 0 }, { duration: 500 });
+              setMapHeading(0);
+            }}
+            className="absolute right-4 top-[145px] w-[42px] h-[42px] bg-white rounded-full items-center justify-center z-40"
+            style={{
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1.5 },
+              shadowOpacity: 0.25, shadowRadius: 3, elevation: 4,
+            }}
+          >
+            {/* Vòng quay của la bàn, sẽ phản chiếu nghịch với góc xoay của map */}
+            <View style={{ transform: [{ rotate: `${-mapHeading}deg` }], alignItems: 'center', justifyContent: 'center' }}>
+               {/* Kim Đỏ (Hướng Bắc) */}
+               <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 12, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#EF4444' }} />
+               {/* Kim Xám (Hướng Nam) */}
+               <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 12, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#9CA3AF' }} />
+            </View>
+          </TouchableOpacity>
+        )}
         {/* --- FLOATING CARD THÔNG TIN THẬT --- */}
         <View
           style={{
@@ -493,30 +777,23 @@ export default function TagRouteDetailsScreen() {
             <View>
               <View className="h-[1px] bg-gray-100 w-full my-5" />
               <View className="mb-6">
-                {/* --- HÀNG 1: Các tiêu đề nằm ngang nhau --- */}
                 <View className="flex-row justify-between items-end mb-2">
                   <Text className="text-[12px] font-regular text-[#757575]">
                     Distance
                   </Text>
 
                   <Text className="text-[12px] font-regular text-[#757575] mr-7">
-                    Travel time: <Text className="text-[14px] font-bold text-black">{realStats.duration} min</Text>
+                    {!isVi ? "Arrive by" : "Đến trước"} <Text className="text-[14px] font-bold text-black">{arriveByTime}</Text>
                   </Text>
                 </View>
 
-                {/* --- HÀNG 2: Các giá trị số nằm thẳng trên 1 dòng --- */}
-                {/* items-end giúp đáy của dòng chữ 40px và đáy của các icon căn bằng nhau */}
                 <View className="flex-row justify-between items-end">
 
-                  {/* Số khoảng cách */}
                   <Text className="text-[40px] font-bold text-black leading-[40px]">
-                    {realStats.distance} <Text className="text-[16px] font-medium text-black">km</Text>
+                    {realStats.distance}<Text className="text-[16px] font-medium text-black">km</Text>
                   </Text>
 
-                  {/* Các icon và thời gian */}
-                  <View className="flex-row items-center mr-7 pb-1">
-                    {/* pb-1 (padding-bottom) giúp đẩy phần này lên 1 chút xíu để chân chữ vừa khít với chân của số 40px */}
-
+                  <View className="flex-row items-center ml-3 mr-7 pb-1">
                     <View className="flex-row items-center">
                       <Image
                         source={require('../assets/icon/drive-moto.png')}
@@ -524,7 +801,7 @@ export default function TagRouteDetailsScreen() {
                         resizeMode="cover"
                       />
                       <Text className="text-[12px] font-regular ml-2 text-[#757575]">
-                        {realStats.duration} min
+                        {formatMinutes(realStats.duration, isVi)}
                       </Text>
                     </View>
 
@@ -535,7 +812,7 @@ export default function TagRouteDetailsScreen() {
                         resizeMode="cover"
                       />
                       <Text className="text-[12px] font-regular ml-2 text-[#757575]">
-                        {Math.max(1, Math.round(realStats.duration * 0.7))} min
+                        {formatMinutes(Math.max(1, Math.round(realStats.duration * 0.7)), isVi)}
                       </Text>
                     </View>
 
@@ -560,11 +837,13 @@ export default function TagRouteDetailsScreen() {
                 <View className="flex-row items-start">
                   <View className="items-center w-4 mr-3.5 mt-2">
                     <View className="w-4 h-4 rounded-full bg-red-50 items-center justify-center z-10">
-                      <View className="w-[18px] h-[18px] rounded-full border-[3px] border-[#FFECDB] bg-[#E89B5A]" />
+                      <View className={`w-[18px] h-[18px] rounded-full border-[3px] border-[#FFECDB] ${pageTitle === 'Reported as Lost' ? 'bg-[#DA5A5A]' : 'bg-[#E89B5A]'}`} />
                     </View>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[14px] font-bold text-black">Scanned Point</Text>
+                    <Text className="text-[14px] font-bold text-black">
+                      {pageTitle === 'Reported as Lost' ? 'Lost Location' : 'Scanned Point'}
+                    </Text>
                     <Text className="text-[12px] text-[#757575] font-regular mt-1">{addresses.destination}</Text>
                   </View>
                 </View>
@@ -689,6 +968,18 @@ export default function TagRouteDetailsScreen() {
           isVisible={isReportModalVisible} 
           onClose={() => setIsReportModalVisible(false)}
           reportTargetName={scannerName}
+        />
+        
+        {/* 🌟 THÊM MODAL LIÊN HỆ */}
+        <ShelterContactModal
+          isVisible={isContactModalVisible}
+          onClose={() => setIsContactModalVisible(false)}
+          shelterData={{ 
+            name: scannerName, 
+            phone: scannerPhone,
+            avatarUrl: 'https://ui-avatars.com/api/?name=' + scannerName + '&background=E89B5A&color=fff', // Fake avatar bằng chữ cái đầu
+            note: scannerMessage // Truyền thêm message quét thẻ vào làm note
+          }}
         />
     </View>
   );

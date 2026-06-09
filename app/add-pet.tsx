@@ -1,5 +1,6 @@
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { petService } from '@/services/petService';
 import { useModalStore } from '@/store/useModalStore';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
@@ -89,16 +90,7 @@ const BREED_OPTIONS = {
   ]
 };
 
-const speciesData = [
-  { label: 'Dog', value: 'Dog' },
-  { label: 'Cat', value: 'Cat' },
-];
 
-const genderData = [
-  { label: 'Male', value: 'MALE' },
-  { label: 'Female', value: 'FEMALE' },
-  { label: 'Unknown', value: 'UNKNOWN' },
-];
 
 interface AddPetFormData {
   name: string;
@@ -204,9 +196,19 @@ export default function AddPetScreen() {
   const params = useLocalSearchParams();
   const tagId = params.tagId as string;
   const rawQrData = params.rawQrData as string;
-
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const showModal = useModalStore((state) => state.showModal);
-  
+  const speciesData = [
+    { label: isVi ? 'Chó' : 'Dog', value: 'Dog' },
+    { label: isVi ? 'Mèo' : 'Cat', value: 'Cat' },
+  ];
+
+  const genderData = [
+    { label: isVi ? 'Đực' : 'Male', value: 'MALE' },
+    { label: isVi ? 'Cái' : 'Female', value: 'FEMALE' },
+    { label: isVi ? 'Không rõ' : 'Unknown', value: 'UNKNOWN' },
+  ];
   // Chỉ dùng hook này cho Avatar. Vaccine sẽ handle thủ công.
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
 
@@ -581,7 +583,7 @@ export default function AddPetScreen() {
                       className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
                       value={formData.name}
                       onChangeText={(text) => handleChange('name', text)}
-                      placeholder="Enter name"
+                      placeholder={isVi ? "Tên thú cưng" : "Pet name"}
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
@@ -616,7 +618,7 @@ export default function AddPetScreen() {
                       maxHeight={200}
                       labelField="label"
                       valueField="value"
-                      placeholder="Select type"
+                      placeholder={isVi ? 'Chọn loài' : 'Select type'}
                       value={formData.species}
                       onChange={(item) => {
                         handleChange('species', item.value);
@@ -658,7 +660,7 @@ export default function AddPetScreen() {
                       maxHeight={200}
                       labelField="label"
                       valueField="value"
-                      placeholder="Select gender"
+                      placeholder={isVi ? 'Chọn giới tính' : 'Select gender'}
                       value={formData.gender}
                       onChange={(item) => {
                         handleChange('gender', item.value);
@@ -739,7 +741,7 @@ export default function AddPetScreen() {
                       maxHeight={200}
                       labelField="label"
                       valueField="value"
-                      placeholder={formData.species ? "Select breed" : "Select type first"}
+                      placeholder={formData.species ? (isVi ? "Chọn Giống" : "Select breed") : (isVi ? "Hãy chọn loài trước" : "Select type first")}
                       value={formData.breed}
                       onChange={(item) => {
                         handleChange('breed', item.value);
@@ -753,7 +755,7 @@ export default function AddPetScreen() {
                       className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
                       value={formData.color}
                       onChangeText={(text) => handleChange('color', text)}
-                      placeholder="Color"
+                      placeholder={isVi ? "Màu sắc" : "Color"}
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
@@ -781,7 +783,7 @@ export default function AddPetScreen() {
                       value={formData.weight}
                       onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
                       keyboardType="decimal-pad"
-                      placeholder="Weight (kg)"
+                      placeholder={isVi ? "Cân nặng (kg)" : "Weight (kg)"}
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
@@ -798,7 +800,7 @@ export default function AddPetScreen() {
                     className="border border-[#E5E5E5] rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[59px]"
                     value={formData.description}
                     onChangeText={(text) => handleChange('description', text)}
-                    placeholder="Share a few things that make your pet special..."
+                    placeholder={isVi ? "Hãy chia sẻ một vài điều khiến thú cưng của bạn trở nên đặc biệt..." : "Share a few things that make your pet special..."}
                     placeholderTextColor="#A1A1AA"
                     multiline
                     textAlignVertical="top"
@@ -821,7 +823,7 @@ export default function AddPetScreen() {
                     className="flex-1 text-right text-[14px] text-black p-0"
                     value={formData.contactName}
                     onChangeText={(text) => handleChange('contactName', text)}
-                    placeholder="Full Name"
+                    placeholder={isVi ? "Họ Và Tên" : "Full Name"}
                     placeholderTextColor="#A1A1AA"
                   />
                 </View>
@@ -835,7 +837,7 @@ export default function AddPetScreen() {
                     value={formData.contactPhone}
                     onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
                     keyboardType="phone-pad"
-                    placeholder="Phone Number"
+                    placeholder={isVi ? "Số Điện Thoại" : "Phone Number"}
                     placeholderTextColor="#A1A1AA"
                     maxLength={15}
                   />
@@ -850,7 +852,7 @@ export default function AddPetScreen() {
                       className={`text-right text-[14px] p-0 ${formData.contactAddress ? 'text-black' : 'text-[#A1A1AA]'}`} 
                       numberOfLines={1}
                     >
-                      {formData.contactAddress || "Street Address, District, City"}
+                      {formData.contactAddress || (isVi ? "Địa chỉ của bạn" : "Street Address, District, City")}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -858,7 +860,7 @@ export default function AddPetScreen() {
             </View>
 
             <Text className="text-[16px] font-semibold text-[#111827] mb-[20px] tracking-[0.06px]">
-              Vaccination Record ({formData.vaccinationRecordUrls.length}/5)
+              {isVi ? 'Hồ sơ tiêm phòng' : 'Vaccination Record'} ({formData.vaccinationRecordUrls.length}/5)
             </Text>
             <View className="mb-[38px] flex-col gap-3">
               

@@ -143,12 +143,6 @@ export default function ScannedPetScreen() {
 
           const petData = response.data;
 
-          // DEBUG - xóa sau khi fix xong
-          console.log('=== PET DATA RAW ===', JSON.stringify(petData, null, 2));
-          console.log('=== DOB VALUE ===', petData?.dob);
-          console.log('=== AGE VALUE ===', petData?.age);
-          console.log('=== DOB TYPE ===', typeof petData?.dob);
-          console.log(petData.owner);
 
           setShelterData(petData.owner);
           setPet(petData);
@@ -192,6 +186,7 @@ export default function ScannedPetScreen() {
         latitude: lat,
         longitude: lng,
         radius: radius,
+        images: formData.images || undefined,
       };
 
       await axiosClient.post('/tags/report', payload);
@@ -236,7 +231,7 @@ export default function ScannedPetScreen() {
     return (
       <View className="flex-1 bg-white items-center justify-center">
         <ActivityIndicator size="large" color="#ffa053" />
-        <Text className="text-gray-500 font-medium mt-4">Đang kiểm tra vòng cổ...</Text>
+        <Text className="text-gray-500 font-medium mt-4">Loading...</Text>
       </View>
     );
   }

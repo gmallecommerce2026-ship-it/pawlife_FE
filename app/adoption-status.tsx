@@ -1,6 +1,7 @@
 // app/adoption-status.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { CustomLoader } from '@/components/CustomLoader';
 import { useLanguage } from '@/contexts/LanguageContext'; // IMPORT HOOK
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -200,14 +201,7 @@ export default function AdoptionStatusScreen() {
     }
   };
 
-  if (isLoading || !applicationData) {
-    return (
-      <SafeAreaView className="flex-1 bg-[#F9FAFB] justify-center items-center" edges={['top']}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator size="large" color="#ffa053" />
-      </SafeAreaView>
-    );
-  }
+ 
 
   const SectionCard = ({ title, children }: { title: string, children: React.ReactNode }) => (
     <View className="mb-[30px] px-[23px]">

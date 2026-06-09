@@ -454,8 +454,11 @@ export default function SearchScreen() {
     const [activeTab, setActiveTab] = useState<'Pet' | 'Shelter' | 'Event'>(initialTab);
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearchQuery = useDebounce(searchInput, 500);
-    // const [isFilterVisible, setIsFilterVisible] = useState(false);
-    const { t } = useLanguage();
+    
+    // Lấy thêm language để dùng song ngữ nội tuyến
+    const { t, language } = useLanguage();
+    const isVi = language === 'vi';
+    
     const [isFocused, setIsFocused] = useState(false);
     const handleFocus = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -515,6 +518,19 @@ export default function SearchScreen() {
     const TabButton = ({ title }: { title: 'Pet' | 'Shelter' | 'Event' }) => {
         const isActive = activeTab === title;
 
+        // Hàm xử lý tên hiển thị song ngữ trực tiếp
+        const getDisplayTitle = () => {
+            if (isVi) {
+                switch(title) {
+                    case 'Pet': return 'Thú cưng';
+                    case 'Shelter': return 'Trạm cứu hộ';
+                    case 'Event': return 'Sự kiện';
+                    default: return title;
+                }
+            }
+            return title;
+        };
+
         return (
             <TouchableOpacity
                 onPress={() => setActiveTab(title)}
@@ -524,8 +540,7 @@ export default function SearchScreen() {
                     className={`text-[16px]  ${isActive ? 'text-[#E89B5A] font-semibold' : 'text-[#8E8E93] font-regular'
                         }`}
                 >
-                    {/* 2. Dịch title ở đây, logic activeTab === title ở trên vẫn hoạt động bình thường */}
-                    {t(title)}
+                    {getDisplayTitle()}
                 </Text>
 
                 {isActive && (
@@ -581,7 +596,7 @@ export default function SearchScreen() {
                     <Feather name="search" size={18} color="#8E8E93" />
                     <TextInput
                         className="flex-1 ml-3 text-[14px] text-gray-800 font-regular"
-                        placeholder={t('Search shelters, pets...')} 
+                        placeholder={isVi ? 'Tìm kiếm trạm cứu hộ, thú cưng...' : 'Search shelters, pets...'} 
                         placeholderTextColor="#8E8E93"
                         value={searchInput}
                         style={{ fontFamily: "Urbanist" }}

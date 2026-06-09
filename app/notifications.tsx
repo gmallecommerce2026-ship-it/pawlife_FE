@@ -387,7 +387,8 @@ export default function NotificationsScreen() {
         router.push({
           pathname: '/tag-report-detail',
           params: {
-            reportId: item.referenceId
+            reportId: item.referenceId,
+            openFrom: 'notification'
           }
         });
         break;
@@ -403,7 +404,7 @@ export default function NotificationsScreen() {
         if (!item.referenceId) showCustomAlert("New Feature ✨", item.body, "feature", "Awesome"); break;
       case 'SYSTEM':
         showCustomAlert("System Notification", item.body, "system", "Got it"); break;
-      default: console.log("Pressed generic notification");
+      default: 
     }
   };
 

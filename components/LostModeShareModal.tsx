@@ -1,12 +1,15 @@
+import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { useImageUpload } from '@/hooks/useImageUpload';
 import { Feather } from '@expo/vector-icons';
 import { Slider } from '@miblanchard/react-native-slider';
 import { BlurView } from 'expo-blur';
+import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
+import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import Svg, { Rect } from 'react-native-svg';
 import {
   ActivityIndicator,
   Alert,
@@ -24,8 +27,7 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import { useImageUpload } from '@/hooks/useImageUpload';
-import { X } from 'lucide-react-native';
+import Svg, { Rect } from 'react-native-svg';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const MODAL_MAP_WIDTH = Math.round(SCREEN_WIDTH * 0.9 - 48);
@@ -44,6 +46,7 @@ export interface FormData {
   scannedBy: string;
   phoneNumber: string;
   message: string;
+  images?: string[];
 }
 
 // Bổ sung Type cho Location thay vì dùng `any`
@@ -163,7 +166,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
     };
   }, [isVisible]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     Keyboard.dismiss(); // Ẩn bàn phím trước khi xử lý
 
     // Validate dữ liệu đầu vào bắt buộc
@@ -180,11 +183,69 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
     if (isSubmitting) return; // Chặn spam click
 
     setIsSubmitting(true);
-    const locationData = { ...location, radius };
 
-    // Gọi callback, parent component (như Scan Screen) sẽ xử lý gọi API NestJS ở đây
-    onConfirm(locationData, formData, false);
-    setIsSubmitting(false);
+    try {
+      // 🌟 DUYỆT QUA MẢNG ẢNH ĐỂ UPLOAD LÊN CLOUDFLARE R2 BẰNG PRESIGNED URL
+      const uploadedImageUrls: string[] = [];
+
+      for (const uri of photos) {
+        if (uri.startsWith('http')) {
+          // Nếu đã là link web (do edit hoặc có sẵn) thì giữ nguyên
+          uploadedImageUrls.push(uri);
+        } else {
+          // 1. Chuẩn bị file name và file type
+          const fileName = uri.split('/').pop() || `scan-${Date.now()}.jpg`;
+          const match = /\.(\w+)$/.exec(fileName);
+          const ext = match ? match[1].toLowerCase() : 'jpg';
+          const fileType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+          // 2. Lấy Presigned URL từ Backend của bạn
+          const presignedRes = await axiosClient.post('/storage/presigned-url', {
+            fileName,
+            fileType,
+            folder: 'tag-reports', // Tên folder bạn muốn lưu trên R2
+          });
+          
+          const { uploadUrl, fileUrl } = presignedRes.data;
+
+          // 3. Đọc file local thành Blob
+          const response = await fetch(uri);
+          const blob = await response.blob();
+
+          // 4. Upload trực tiếp lên Cloudflare R2
+          const uploadRes = await FileSystem.uploadAsync(uploadUrl, uri, {
+            httpMethod: 'PUT',
+            headers: {
+              'Content-Type': fileType,
+            },
+          });
+
+          if (uploadRes.status !== 200 && uploadRes.status !== 201) {
+            throw new Error(`Upload to R2 failed: ${uploadRes.status}`);
+          }
+
+          // 5. Thêm link URL công khai vào mảng
+          uploadedImageUrls.push(fileUrl);
+        }
+      }
+
+      // 🌟 SAU KHI UPLOAD ẢNH XONG, GÓI DỮ LIỆU ĐỂ GỬI ĐI
+      const finalFormData: FormData = {
+        ...formData,
+        images: uploadedImageUrls, // Mảng này giờ toàn chứa link https://...
+      };
+
+      const locationData = { ...location, radius };
+
+      // Gọi callback để Scanned Pet Screen lưu vào Database
+      onConfirm(locationData, finalFormData, false);
+
+    } catch (error) {
+      console.error("Lỗi upload ảnh R2:", error);
+      Alert.alert("Lỗi", "Không thể tải ảnh lên hệ thống lưu trữ. Vui lòng thử lại.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSliderChange = (value: number | number[]) => {

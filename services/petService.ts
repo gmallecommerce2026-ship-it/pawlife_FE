@@ -126,6 +126,9 @@ export const petService = {
     ownerAddress?: string;
     note?: string;
     photos?: string[];
+    latitude?: number | null;  // Đảm bảo có lat
+    longitude?: number | null; // Đảm bảo có lng
+    radius?: number;
   }) => {
     try {
       // Truyền toàn bộ object data vào body của patch request

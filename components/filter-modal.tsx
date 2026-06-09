@@ -132,7 +132,6 @@ export default function FilterModal({ visible, onClose }: { visible: boolean, on
     };
 
     const handleApply = () => {
-        console.log("Filters applied:", { type: selectedType, gender: selectedGender, age: selectedAge, sterilized: selectedSterilized, size: selectedSize });
         onClose();
     };
 

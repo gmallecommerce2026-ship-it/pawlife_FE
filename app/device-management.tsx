@@ -1,5 +1,6 @@
 // app/device-management.tsx
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext'; // <--- Thêm import này
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -21,6 +22,9 @@ interface DeviceSession {
 
 export default function DeviceManagementScreen() {
   const router = useRouter();
+  const { language } = useLanguage(); // <--- Khởi tạo hook
+  const isVi = language === 'vi'; // <--- Check ngôn ngữ
+
   const [devices, setDevices] = useState<DeviceSession[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null); // Lưu ID thiết bị đang bị xóa
@@ -43,7 +47,10 @@ export default function DeviceManagementScreen() {
       setDevices(data);
     } catch (error) {
       console.error("Lỗi lấy danh sách thiết bị:", error);
-      Alert.alert("Lỗi", "Không thể tải danh sách thiết bị lúc này.");
+      Alert.alert(
+        isVi ? "Lỗi" : "Error", 
+        isVi ? "Không thể tải danh sách thiết bị lúc này." : "Unable to load device list at this time."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -56,12 +63,12 @@ export default function DeviceManagementScreen() {
   // --- 2. XỬ LÝ ĐĂNG XUẤT THIẾT BỊ KHÁC ---
   const handleLogoutDevice = (deviceId: string, deviceName: string) => {
     Alert.alert(
-      "Đăng xuất thiết bị",
-      `Bạn có chắc chắn muốn đăng xuất tài khoản khỏi ${deviceName}?`,
+      isVi ? "Đăng xuất thiết bị" : "Log out device",
+      isVi ? `Bạn có chắc chắn muốn đăng xuất tài khoản khỏi ${deviceName}?` : `Are you sure you want to log out of ${deviceName}?`,
       [
-        { text: "Hủy", style: "cancel" },
+        { text: isVi ? "Hủy" : "Cancel", style: "cancel" },
         {
-          text: "Đăng xuất",
+          text: isVi ? "Đăng xuất" : "Log Out",
           style: "destructive",
           onPress: async () => {
             try {
@@ -72,10 +79,16 @@ export default function DeviceManagementScreen() {
 
               // Cập nhật UI ngay lập tức bằng cách lọc thiết bị đã xóa ra khỏi mảng
               setDevices(prev => prev.filter(device => device.id !== deviceId));
-              Alert.alert("Thành công", `Đã đăng xuất khỏi ${deviceName}`);
+              Alert.alert(
+                isVi ? "Thành công" : "Success", 
+                isVi ? `Đã đăng xuất khỏi ${deviceName}` : `Logged out of ${deviceName}`
+              );
             } catch (error) {
               console.error("Lỗi đăng xuất thiết bị:", error);
-              Alert.alert("Lỗi", "Không thể đăng xuất thiết bị lúc này. Vui lòng kiểm tra lại kết nối mạng.");
+              Alert.alert(
+                isVi ? "Lỗi" : "Error", 
+                isVi ? "Không thể đăng xuất thiết bị lúc này. Vui lòng kiểm tra lại kết nối mạng." : "Unable to log out device. Please check your network connection."
+              );
             } finally {
               setIsProcessing(null);
             }
@@ -98,9 +111,9 @@ export default function DeviceManagementScreen() {
     }
   };
 
-  // Hàm helper để format thời gian (Tùy chọn: có thể dùng thư viện date-fns để format đẹp hơn)
+  // Hàm helper để format thời gian
   const formatTime = (isoString: string) => {
-    if (!isoString) return 'Không rõ thời gian';
+    if (!isoString) return isVi ? 'Không rõ thời gian' : 'Unknown time';
     try {
       const date = new Date(isoString);
       const hours = date.getHours().toString().padStart(2, '0');
@@ -111,7 +124,7 @@ export default function DeviceManagementScreen() {
 
       return `${hours}:${minutes} • ${day}/${month}/${year}`;
     } catch {
-      return 'Thời gian không hợp lệ';
+      return isVi ? 'Thời gian không hợp lệ' : 'Invalid time';
     }
   };
 
@@ -125,8 +138,9 @@ export default function DeviceManagementScreen() {
             <Feather name="chevron-left" size={20} color="#000000" />
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            {/* Thay text cứng bằng hàm t */}
-            <Text className="text-[20px] font-semibold text-black">Device Management</Text>
+            <Text className="text-[20px] font-semibold text-black">
+              {isVi ? 'Quản lý thiết bị' : 'Device Management'}
+            </Text>
           </View>
         </View>
 
@@ -134,7 +148,9 @@ export default function DeviceManagementScreen() {
 
           <View className="px-6 mb-6">
             <Text className="text-gray-500 text-sm leading-5">
-              This is a list of devices that have logged into the account. Log out of any device that shows unusual behavior.
+              {isVi 
+                ? 'Đây là danh sách các thiết bị đã đăng nhập vào tài khoản. Đăng xuất khỏi mọi thiết bị có biểu hiện bất thường.'
+                : 'This is a list of devices that have logged into the account. Log out of any device that shows unusual behavior.'}
             </Text>
           </View>
 
@@ -145,13 +161,17 @@ export default function DeviceManagementScreen() {
             {isLoading ? (
               <View className="py-8 items-center justify-center">
                 <ActivityIndicator size="large" color="#10B981" />
-                <Text className="text-gray-400 mt-4 text-sm">Đang tải danh sách thiết bị...</Text>
+                <Text className="text-gray-400 mt-4 text-sm">
+                  {isVi ? 'Đang tải danh sách thiết bị...' : 'Loading device list...'}
+                </Text>
               </View>
             ) : devices.length === 0 ? (
 
               /* TRẠNG THÁI TRỐNG (Phòng hờ) */
               <View className="py-8 items-center justify-center">
-                <Text className="text-gray-400 text-sm">Không tìm thấy dữ liệu thiết bị.</Text>
+                <Text className="text-gray-400 text-sm">
+                  {isVi ? 'Không tìm thấy dữ liệu thiết bị.' : 'No device data found.'}
+                </Text>
               </View>
             ) : (
 
@@ -172,13 +192,17 @@ export default function DeviceManagementScreen() {
                       <Text className="text-base font-semibold text-gray-900">{device.name}</Text>
                       {device.isCurrentDevice && (
                         <View className="bg-emerald-50 px-2 py-0.5 rounded ml-2 border border-emerald-100">
-                          <Text className="text-emerald-600 text-[10px] font-semibold uppercase">Thiết bị này</Text>
+                          <Text className="text-emerald-600 text-[10px] font-semibold uppercase">
+                            {isVi ? 'Thiết bị này' : 'This device'}
+                          </Text>
                         </View>
                       )}
                     </View>
                     <Text className="text-sm text-gray-500 mb-0.5">{device.os} • {device.location}</Text>
                     <Text className={`text-xs ${device.isCurrentDevice ? 'text-emerald-500 font-medium' : 'text-gray-400'}`}>
-                      {device.isCurrentDevice ? 'Đang hoạt động' : formatTime(device.lastActive)}
+                      {device.isCurrentDevice 
+                        ? (isVi ? 'Đang hoạt động' : 'Active now') 
+                        : formatTime(device.lastActive)}
                     </Text>
                   </View>
 

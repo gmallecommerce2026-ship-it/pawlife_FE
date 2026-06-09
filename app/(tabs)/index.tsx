@@ -3,16 +3,17 @@ import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 // Đã tạm tắt hook useInfiniteSlider để khắc phục lỗi liệt cảm ứng do re-render loop
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useLanguage } from '@/contexts/LanguageContext';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-// Sử dụng components chuẩn của React Native để NativeWind (Tailwind) nhận diện được className
-import * as Haptics from 'expo-haptics';
-import { ActivityIndicator, FlatList, Image, PixelRatio, ScrollView, TouchableOpacity, View } from 'react-native';
+// THÊM: AppState để lắng nghe vòng đời ứng dụng
+import { CustomLoader } from '@/components/CustomLoader';
+import { AppState, FlatList, Image, PixelRatio, ScrollView, TouchableOpacity, View } from 'react-native';
 import Animated, {
     Easing,
     Extrapolation,
@@ -58,17 +59,47 @@ export default function HomeScreen() {
     const translateY = useSharedValue(0);
     const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
+    // --- LOGIC XỬ LÝ ẢNH HERO THEO THỜI GIAN SÁNG/TỐI ---
+    const [heroImage, setHeroImage] = useState(() => {
+        const hour = new Date().getHours();
+        // Từ 6h sáng đến trước 18h tối là ban ngày
+        return (hour >= 6 && hour < 18)
+            ? require('../../assets/images/home_hero_1.png')
+            : require('../../assets/images/home_hero_2.png');
+    });
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+            // Khi app được mở lên lại từ màn hình chính hoặc đa nhiệm
+            if (nextAppState === 'active') {
+                const hour = new Date().getHours();
+                const newImage = (hour >= 6 && hour < 18)
+                    ? require('../../assets/images/home_hero_1.png')
+                    : require('../../assets/images/home_hero_2.png');
+
+                // Chỉ cập nhật state nếu ảnh thực sự cần thay đổi để tránh re-render thừa
+                setHeroImage((currentImage: any) => currentImage !== newImage ? newImage : currentImage);
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, []);
+    // ----------------------------------------------------
+
     const [pets, setPets] = useState<any[]>([]);
     const [shelters, setShelters] = useState<any[]>([]);
     const [events, setEvents] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [hasUnread, setHasUnread] = useState(false);
     const bounceY = useSharedValue(0);
+
     const handleScanPress = () => {
-        // Rung mức độ Medium để tạo cảm giác chạm dứt khoát
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         router.push('/scan');
     };
+
     useEffect(() => {
         bounceY.value = withRepeat(
             withSequence(
@@ -155,7 +186,6 @@ export default function HomeScreen() {
         return { transform: [{ translateY }] };
     });
 
-
     useFocusEffect(
         useCallback(() => {
             const checkUnreadNotifications = async () => {
@@ -178,6 +208,7 @@ export default function HomeScreen() {
     const loadHomeData = async (currentLat?: number, currentLng?: number, isSilentRefresh = false) => {
         try {
             if (!isSilentRefresh) setIsLoading(true);
+            await new Promise(resolve => setTimeout(resolve, 2000));
             const [eventsRes, petsRes, sheltersRes] = await Promise.all([
                 eventService.getUpcomingEvents(5),
                 petService.getFeed(10, currentLat, currentLng),
@@ -239,7 +270,6 @@ export default function HomeScreen() {
             )), -1, false);
     }, []);
 
-
     const cornerOverlayAnimatedStyle = useAnimatedStyle(() => {
         const opacity = interpolate(
             scrollY.value,
@@ -282,9 +312,9 @@ export default function HomeScreen() {
                     months += 12;
                 }
 
-                if (years > 0) return `${years}`; // Ví dụ: '2'
-                if (months > 0) return `${months}T`; // Ví dụ: '3T' (3 tháng) để fit với UI nhỏ
-                return '1T'; // Bé xíu (< 1 tháng)
+                if (years > 0) return `${years}`;
+                if (months > 0) return `${months}T`;
+                return '1T';
             }
 
             return 'N/A';
@@ -300,10 +330,10 @@ export default function HomeScreen() {
                     params: {
                         id: pet.id,
                         name: pet.name,
-                        gender: pet.gender || 'male', // Truyền nguyên bản hoặc format chuẩn về detail modal
+                        gender: pet.gender || 'male',
                         distance: displayCity,
                         image: petImageUrl,
-                        age: displayAge, // Truyền tuổi đã xử lý động
+                        age: displayAge,
                         breed: pet.breed || 'Unknown Breed'
                     }
                 })}
@@ -317,8 +347,6 @@ export default function HomeScreen() {
                     >
                         <View className="flex-row items-center mb-1">
                             <Text className="text-white text-[17px] font-semibold tracking-tight shrink mb-0.5" numberOfLines={1}>{pet.name}</Text>
-
-                            {/* KHẮC PHỤC LỖI HARDCODE TẠI ĐÂY */}
                             <View className="flex-row items-center ml-2 px-2 py-0.5 rounded-full shrink-0 border border-white/40 overflow-hidden bg-white/20 backdrop-blur-md">
                                 <Ionicons name={isFemale ? 'female' : 'male'} size={12} color="#ffffff" />
                                 <Text className="text-white text-[11px] font-bold ml-1">{displayAge}</Text>
@@ -335,12 +363,7 @@ export default function HomeScreen() {
     }, [router]);
 
     if (isLoading) {
-        return (
-            <View className="flex-1 bg-white justify-center items-center">
-                <ActivityIndicator size="large" color="#FF8C42" />
-                <Text className="mt-4 text-gray-500 font-medium">{t('Loading data...')}</Text>
-            </View>
-        );
+        return <CustomLoader text="Loading data..." />;
     }
 
     return (
@@ -452,8 +475,8 @@ export default function HomeScreen() {
 
                         {/* --- ADOPTION SHELTERS TỪ API --- */}
                         <View className="mt-[38px]">
-                                <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} t={t} />                            {shelters.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
+                            <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} t={t} />
+                                {shelters.length === 0 ? (<Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
                             ) : (
                                 <ScrollView
                                     horizontal
@@ -536,7 +559,6 @@ export default function HomeScreen() {
 
             </Animated.ScrollView>
 
-            {/* SỬA LỖI: Header được trả về thuộc tính an toàn nhất */}
             <Animated.View style={[headerAnimatedStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: '#FFDDA2', overflow: 'hidden' }]} pointerEvents="box-none">
 
                 <Animated.View
@@ -546,9 +568,10 @@ export default function HomeScreen() {
                         backgroundImageAnimatedStyle
                     ]}
                 >
+                    {/* ĐÃ SỬA: Thay thế ảnh hardcode thành state heroImage */}
                     <Image
-                        source={require('../../assets/images/home-tab.png')}
-                        style={{ width: '100%', height: '100%' }} // Sửa thành style nội tuyến
+                        source={heroImage}
+                        style={{ width: '100%', height: '100%' }}
                         resizeMode="cover"
                     />
                 </Animated.View>
@@ -565,20 +588,17 @@ export default function HomeScreen() {
                             bottom: CURVE_HEIGHT + 14,
                             borderBottomLeftRadius: 40,
                             zIndex: 2,
-                            overflow: 'hidden', // Cực kỳ quan trọng để cắt gọt kính theo bo góc
+                            overflow: 'hidden',
                             borderWidth: 2.5,
                             borderColor: 'rgba(234, 164, 100, 0.5)',
                         }
                     ]}
                 >
-                    {/* Lớp 1: Kính mờ nguyên bản (KHÔNG cho màu vào đây) */}
                     <BlurView
                         tint="light"
                         intensity={7}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                     />
-
-                    {/* Lớp 2: Lớp phủ màu cam mờ đè lên trên tấm kính */}
                     <View
                         style={{
                             position: 'absolute',
@@ -591,24 +611,20 @@ export default function HomeScreen() {
                 <View className="px-6 w-full h-full" pointerEvents="box-none" style={{ paddingTop: insets.top + 10, zIndex: 10 }}>
                     <View className="flex-row justify-between content-center items-start z-20" pointerEvents="box-none">
                         <View className="flex-row items-center flex-1" pointerEvents="box-none">
-                            {/* AVATAR */}
                             <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/edit-profile')}>
                                 <Animated.View
                                     style={[
                                         avatarAnimatedStyle,
                                         {
-                                            // Shadow cho iOS
                                             shadowColor: '#000',
                                             shadowOffset: { width: 0, height: 4 },
                                             shadowOpacity: 0.1,
                                             shadowRadius: 1,
-                                            // Shadow cho Android
                                             elevation: 8,
                                             zIndex: 50,
                                         }
                                     ]}
                                 >
-                                    {/* View con xử lý clipping và border */}
                                     <View
                                         style={{
                                             flex: 1,
@@ -616,7 +632,7 @@ export default function HomeScreen() {
                                             overflow: 'hidden',
                                             borderWidth: 2.5,
                                             borderColor: '#FFFFFF',
-                                            borderRadius: 1000, // Đảm bảo luôn bo tròn theo kích thước của cha
+                                            borderRadius: 1000,
                                         }}
                                     >
                                         <Image
@@ -626,7 +642,6 @@ export default function HomeScreen() {
                                     </View>
                                 </Animated.View>
                             </TouchableOpacity>
-
                         </View>
 
                         <View className="flex-row gap-5 items-center mt-2" pointerEvents="box-none">

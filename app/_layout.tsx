@@ -32,6 +32,7 @@ import Toast from 'react-native-toast-message';
 import { SuccessModal } from '../components/SuccessModal';
 
 // BỔ SUNG: Import React Query
+import { LoadingProvider } from '@/contexts/LoadingContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 export { ErrorBoundary } from 'expo-router';
@@ -260,9 +261,11 @@ export default function RootLayout() {
         <AppProvider>
           <AuthProvider>
             <LanguageProvider>
-              <RootLayoutNavGuard />
-              <Toast config={toastConfig} position="top" topOffset={50} />
-              <SuccessModal />
+              <LoadingProvider>
+                <RootLayoutNavGuard />
+                <Toast config={toastConfig} position="top" topOffset={50} />
+                <SuccessModal />
+              </LoadingProvider>
             </LanguageProvider>
           </AuthProvider>
         </AppProvider>

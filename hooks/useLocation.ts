@@ -22,7 +22,6 @@ export const useLocation = () => {
           setLocation({ lat: parseFloat(savedLat), lng: parseFloat(savedLng) });
         }
       } catch (e) {
-        console.log("Lỗi khi load vị trí", e);
       } finally {
         // Đọc xong (dù có data hay null) thì đánh dấu là true
         setIsLocationLoaded(true); 

@@ -29,7 +29,7 @@ interface Pet {
 }
 
 // 2. CẬP NHẬT HÀM calculateAge NHẬN THÊM THAM SỐ t (hàm dịch)
-const calculateAge = (dobString: string | null | undefined, t: any): string => {
+const calculateAge = (dobString: string | null | undefined, t: any, isVi: boolean): string => {
   if (!dobString) return t('Unknown age');
 
   const dob = new Date(dobString);
@@ -44,9 +44,9 @@ const calculateAge = (dobString: string | null | undefined, t: any): string => {
   }
 
   if (years > 0) {
-    return `${years} ${t(years > 1 ? 'years old' : 'year old')}`;
+    return `${years} ${t(years > 1 ? (isVi ? 'tuổi' : 'years old') : (isVi ? 'tuổi' : 'year old'))}`;
   } else if (months > 0) {
-    return `${months} ${t(months > 1 ? 'months old' : 'month old')}`;
+    return `${months} ${t(months > 1 ? (isVi ? 'tháng tuổi' : 'months old') : (isVi ? 'tháng tuổi' : 'month old'))}`;
   } else {
     return t('Less than 1 month');
   }
@@ -56,8 +56,8 @@ export default function MyPetsScreen() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
   // 3. KHỞI TẠO HOOK
-  const { t } = useLanguage();
-
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const [pets, setPets] = useState<Pet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +159,7 @@ export default function MyPetsScreen() {
               className='bottom-[1px]'
             />
             <Text className="text-gray-500 text-sm ml-1.5">
-              {calculateAge(pet.dob, t)} {/* Truyền hàm t vào đây */}
+              {calculateAge(pet.dob, t, isVi)} {/* Truyền hàm t vào đây */}
             </Text>
           </View>
         </View>

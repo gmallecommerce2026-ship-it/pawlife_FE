@@ -82,7 +82,7 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
 
                 </View>
                 <View className="flex-row items-center opacity-90">
-                    <Image source={require('../../assets/icon/location_solid.png')} style={{ width: 13, height: 16 }} resizeMode="cover" />
+                    <Image source={require('../../assets/icon/location_solid.png')} style={{ width: 13, height: 16 }} contentFit="cover" />
                     <Text className="text-white ml-1 text-base">{data.location}  ·  {data.distance}</Text>
                 </View>
             </View>
@@ -94,11 +94,11 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
                     className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#4643FF] ${!canReload ? 'opacity-50' : 'opacity-100'}`}
                     onPress={() => onAction && onAction('reload')}
                 >
-                    <Image className='mr-3' source={require('../../assets/icon/reload-pawdoption.png')} style={{ width: 18, height: 18 }} resizeMode="cover" />
+                    <Image className='mr-3' source={require('../../assets/icon/reload-pawdoption.png')} style={{ width: 18, height: 18 }} contentFit="cover" />
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#FF4646]`} onPress={() => onAction && onAction('left')}>
-                    <Image className='mr-3' source={require('../../assets/icon/x-pawdoption.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
+                    <Image className='mr-3' source={require('../../assets/icon/x-pawdoption.png')} style={{ width: 15, height: 15 }} contentFit="cover" />
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#E89B5A]`} onPress={() => onAction && onAction('heart')}>
@@ -106,11 +106,11 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
                         isFavorited
                             ? require('../../assets/icon/heart-filled-pawdoption.png')
                             : require('../../assets/icon/heart-pawdoption.png')
-                    } style={{ width: 27, height: 27 }} resizeMode="cover" />
+                    } style={{ width: 27, height: 27 }} contentFit="cover" />
                 </TouchableOpacity>
 
                 <TouchableOpacity className={`${actionButtonClasses} w-14 h-14 border-[2px] border-[#77C852]`} onPress={() => onAction && onAction('right')}>
-                    <Image className='mr-3' source={require('../../assets/icon/tick-pawdoption.png')} style={{ width: 19, height: 13 }} resizeMode="cover" />
+                    <Image className='mr-3' source={require('../../assets/icon/tick-pawdoption.png')} style={{ width: 19, height: 13 }} contentFit="cover" />
                 </TouchableOpacity>
 
             </View>
@@ -325,7 +325,8 @@ const ProgressBar = ({ current }: { current: number }) => (
 );
 
 const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (filters: any) => void, onBack: () => void, initialFilters?: any }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+    const isVi = language === 'vi';
     const insets = useSafeAreaInsets();
     const { requestLocation, saveManualCity } = useLocation();
 
@@ -435,7 +436,6 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
                                         <TouchableOpacity
                                             key={age}
                                             activeOpacity={0.7}
-                                            // Vẫn lưu nguyên text tiếng anh để filter đúng
                                             onPress={() => setSelectedAge(age)}
                                             className={`p-[14px] rounded-[16px] border ${selectedAge === age ? 'border-[#E89B5A] bg-orange-50' : 'border-[#E5E5E5] bg-white'}`}
                                         >
@@ -491,7 +491,7 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
                                         <Image
                                             source={require('../../assets/icon/location_solid.png')}
                                             style={{ width: 18, height: 18 }}
-                                            resizeMode="cover"
+                                            contentFit="cover"
                                         />
                                     )}
                                     <Text className="ml-2 font-medium text-[16px] text-black">{t("Use Current Location")}</Text>
@@ -756,7 +756,6 @@ const TutorialScreen = ({ onComplete }: { onComplete: () => void }) => {
                 const imagesToPreload = TUTORIAL_DATA.map(item => item.image);
                 await Image.prefetch(imagesToPreload);
             } catch (error) {
-                console.log("Lỗi preload ảnh tutorial:", error);
             }
         };
         preloadTutorialImages();
@@ -937,7 +936,8 @@ const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], 
 // 4. MAIN SWIPE SCREEN (PURE UI)
 // ==================================================================
 const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any, onBack: () => void, onDetail: (item: any) => void, onAdopt: (item: any) => void }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+    const isVi = language === 'vi';
     const router = useRouter();
     const queryClient = useQueryClient();
     const [isViewerVisible, setIsViewerVisible] = useState(false);
@@ -1110,7 +1110,10 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 
                 Toast.show({
                     type: 'custom_badge',
-                    props: { petName: activeCard.name || t('This pet'), actionText: t(' has been removed from Saved Pet') },
+                    props: { 
+                        petName: activeCard.name || t('This pet'), 
+                        actionText: isVi ? ' đã được xóa khỏi Thú cưng đã lưu' : ' has been removed from Saved Pet'
+                    },
                     visibilityTime: 2500, autoHide: true,
                 });
             } else {
@@ -1122,7 +1125,10 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 
                 Toast.show({
                     type: 'custom_badge',
-                    props: { petName: activeCard.name || t('This pet'), actionText: t(' has been added to Saved Pet') },
+                    props: { 
+                        petName: activeCard.name || t('This pet'), 
+                        actionText: isVi ? ' đã được thêm vào Thú cưng đã lưu' : ' has been added to Saved Pet'
+                    },
                     visibilityTime: 2500, autoHide: true,
                 });
             }
@@ -1194,7 +1200,7 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                 <View className="flex-row items-center">
                     <Text className="text-3xl font-normal text-gray-900 tracking-tight">{t("Pawdoption")}</Text>
                     <TouchableOpacity onPress={onBack} className="px-2 pt-1">
-                        <Image className='top-[10px]' source={require('../../assets/icon/Sliders.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
+                        <Image className='top-[10px]' source={require('../../assets/icon/Sliders.png')} style={{ width: 14, height: 14 }} contentFit="cover" />
                     </TouchableOpacity>
                 </View>
 
@@ -1298,7 +1304,8 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 };
 
 const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVisible: boolean, onClose: () => void, onAdopt: (pet: any) => void }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+    const isVi = language === 'vi';
     const translateY = useSharedValue(height);
 
     const [fullPet, setFullPet] = useState<any>(null);
@@ -1396,7 +1403,9 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
                             <View className="flex-row items-center mt-1.5">
                                 <Feather name="map-pin" size={14} color="#F2A465" />
-                                <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">{currentPet.distance ? `${currentPet.distance} ${t('away')}` : t('Location not specified')}</Text>
+                                <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular">
+                                    {currentPet.distance ? (isVi ? `Cách đây ${currentPet.distance}` : `${currentPet.distance} away`) : t('Location not specified')}
+                                </Text>
                             </View>
 
                         </View>
@@ -1449,7 +1458,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
                         {/* Section: About */}
                         <View className="mb-4">
-                            <Text className="font-medium text-black text-[16px] mb-2">{t('About')} {currentPet.name}</Text>
+                            <Text className="font-medium text-black text-[16px] mb-2">{isVi ? `Về ${currentPet.name}` : `About ${currentPet.name}`}</Text>
                             <Text className="text-[#8E8E93] text-[14px] leading-6 mb-2">{description}</Text>
                             {(displayTraits.length > 0) && (
                                 <View className="flex-row gap-2 mt-[6px]">
@@ -1480,7 +1489,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                         </View>
 
                         <View className="mb-4">
-                            <Text className="font-medium text-black text-[16px] mb-2">{currentPet.name}{t("'s Behavior")}</Text>
+                            <Text className="font-medium text-black text-[16px] mb-2">{isVi ? `Thói quen của ${currentPet.name}` : `${currentPet.name}'s Behavior`}</Text>
 
                             {((fullPet?.goodWith || currentPet?.goodWith)?.length > 0 || (fullPet?.badWith || currentPet?.badWith)?.length > 0) ? (
                                 <View>
@@ -1488,7 +1497,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                     {(fullPet?.goodWith || currentPet?.goodWith)?.length > 0 && (
                                         <View className="flex-row items-start">
                                             <View className="flex-row items-center mr-1 mt-[2px]">
-                                                <Image source={require('../../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                                                <Image source={require('../../assets/icon/Check.png')} style={{ width: 12, height: 12 }} contentFit="cover" />
                                                 <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">{t("Good with:")}</Text>
                                             </View>
                                             <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
@@ -1503,7 +1512,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                     {(fullPet?.badWith || currentPet?.badWith)?.length > 0 && (
                                         <View className="flex-row items-start">
                                             <View className="flex-row items-center mr-1 mt-[2px]">
-                                                <Image source={require('../../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                                                <Image source={require('../../assets/icon/X.png')} style={{ width: 12, height: 12 }} contentFit="cover" />
                                                 <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">{t("Not suitable:")}</Text>
                                             </View>
                                             <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">

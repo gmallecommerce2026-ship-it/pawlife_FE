@@ -1,10 +1,11 @@
 // app/application-details.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { CustomLoader } from '@/components/CustomLoader';
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // --- TÁCH CÁC COMPONENT GIAO DIỆN SANG ĐÂY ---
@@ -61,12 +62,7 @@ export default function ApplicationDetailsScreen() {
   };
 
   if (isLoading || !applicationData) {
-    return (
-      <SafeAreaView className="flex-1 bg-white justify-center items-center">
-         <Stack.Screen options={{ headerShown: false }} />
-         <ActivityIndicator size="large" color="#ffa053" />
-      </SafeAreaView>
-    );
+      return <CustomLoader text="Loading..." />;
   }
 
   const commitments = applicationData.commitments || {};

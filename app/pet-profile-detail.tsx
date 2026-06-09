@@ -319,12 +319,12 @@ export default function PetProfileDetailScreen() {
   );
 
   if (isLoading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-[#FAFAFA]">
-        <ActivityIndicator size="large" color="#ffa053" />
-        <Text className="mt-4 text-gray-500">Loading pet information...</Text>
-      </View>
-    );
+      return (
+          <View className="flex-1 justify-center items-center bg-[#FAFAFA]">
+              <ActivityIndicator size="large" color="#E89B5A" />
+              <Text className="mt-4 text-gray-500 font-medium">Loading pet profile...</Text>
+          </View>
+      );
   }
 
   if (!petData) {
@@ -527,7 +527,35 @@ export default function PetProfileDetailScreen() {
                         Lost Pet Mode
                       </Text>
                       <Text className={`text-[14px] mt-0.5 font-light ${isLostMode ? 'text-[#8B3A3ACC]' : 'text-gray-400'}`}>
-                        {isLostMode ? "Active" : "Inactive - Pet is safe"}
+                        {isLostMode ? (
+                          <Text>
+                            Active -{' '}
+                            <Text 
+                              className="underline font-medium"
+                              onPress={() => {
+                                // Ưu tiên lấy reportId của lần quét gần nhất
+                                // Nếu chưa có ai quét (chỉ mới báo mất), thì backend của bạn CẦN TRẢ VỀ reportId của chính event báo mất đó
+                                const reportId = petData?.latestReportId || petData?.tags?.[0]?.latestReportId; 
+                                
+                                if (reportId) {
+                                  router.push({
+                                    pathname: '/tag-report-detail',
+                                    params: { 
+                                      reportId: reportId,
+                                      openFrom: 'profile' 
+                                    }
+                                  });
+                                } else {
+                                  Alert.alert("Notice", "Your pet hasn't been scanned by anyone yet. Keep your phone nearby for notifications!");
+                                }
+                              }}
+                            >
+                              See Pet's Activity
+                            </Text>
+                          </Text>
+                        ) : (
+                          "Inactive - Pet is safe"
+                        )}
                       </Text>
                     </View>
                   </View>

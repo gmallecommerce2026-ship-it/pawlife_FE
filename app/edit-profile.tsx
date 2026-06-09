@@ -21,9 +21,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // IMPORT CONTEXT AND HOOKS
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { disconnectSocket } from '@/utils/socket';
 import { AuthContext } from '../contexts/AuthContext';
 import { useImageUpload } from '../hooks/useImageUpload';
-import { disconnectSocket } from '@/utils/socket';
 
 // --- CONSTANTS ---
 const COUNTRY_CODES = [
@@ -370,8 +370,14 @@ export default function EditProfileScreen() {
                   style={{ width: 17, height: 17 }}
                   resizeMode="cover"
                 />}
-                label="Birthday" 
-                value={hasSelectedDate ? dob.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''} 
+                label={language === 'vi' ? "Ngày sinh" : "Birthday"} // Đổi tên nhãn nếu cần
+                value={hasSelectedDate 
+                  ? dob.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    }) 
+                  : ''} 
                 isEditing={editingField === 'dob'}
                 isLoading={savingField === 'dob'}
                 onPressRow={() => {

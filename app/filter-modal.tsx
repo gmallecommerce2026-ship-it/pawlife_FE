@@ -66,7 +66,6 @@ export default function FilterModal({ visible, onClose }: { visible: boolean, on
 
     const handleApply = () => {
         // Xử lý logic search ở đây, sau đó đóng modal
-        console.log("Applied Filters:", { gender, age });
         onClose();
     };
 

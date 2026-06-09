@@ -1,4 +1,4 @@
-// components/ReportUGCModal.tsx
+import { useLanguage } from '@/contexts/LanguageContext'; // Đảm bảo import đúng đường dẫn
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import React, { useState } from 'react';
@@ -22,7 +22,7 @@ interface Props {
     reportTargetName?: string;
 }
 
-const UGC_REPORT_OPTIONS = [
+const UGC_REPORT_OPTIONS_EN = [
     "Spam, advertising, or scams",
     "Harassment, threats, or hate speech",
     "Sensitive or inappropriate content",
@@ -31,25 +31,40 @@ const UGC_REPORT_OPTIONS = [
     "Other reasons",
 ];
 
+const UGC_REPORT_OPTIONS_VI = [
+    "Spam, quảng cáo, hoặc lừa đảo",
+    "Quấy rối, đe dọa, hoặc phát ngôn thù ghét",
+    "Nội dung nhạy cảm hoặc không phù hợp",
+    "Cố ý báo cáo địa điểm giả (Fake sighting)",
+    "Yêu cầu tiền chuộc thú cưng vô lý",
+    "Lý do khác",
+];
+
 export default function ReportUGCModal({ isVisible, onClose, reportTargetName = "this user" }: Props) {
+    const { language } = useLanguage();
+    const isVi = language === 'vi';
+    
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const [otherReason, setOtherReason] = useState('');
     const [isSuccessVisible, setIsSuccessVisible] = useState(false);
     const [submittedAt, setSubmittedAt] = useState<Date | null>(null);
 
+    const UGC_REPORT_OPTIONS = isVi ? UGC_REPORT_OPTIONS_VI : UGC_REPORT_OPTIONS_EN;
+
     const handleSubmit = async () => {
         try {
             // TODO: Tích hợp API gửi report ở đây
-            // await axiosClient.post('/reports/ugc', { reason: selectedOption === 'Other reasons' ? otherReason : selectedOption, ... });
-            
             setSubmittedAt(new Date());
-            onClose(); // Đóng modal hiện tại
+            onClose();
             
             setTimeout(() => {
                 setIsSuccessVisible(true);
             }, 350);
         } catch (e) {
-            Alert.alert('Error', 'Unable to send report. Please try again later.');
+            Alert.alert(
+                isVi ? 'Lỗi' : 'Error', 
+                isVi ? 'Không thể gửi báo cáo. Vui lòng thử lại sau.' : 'Unable to send report. Please try again later.'
+            );
         }
     };
 
@@ -70,14 +85,18 @@ export default function ReportUGCModal({ isVisible, onClose, reportTargetName = 
                                     
                                     {/* Header */}
                                     <View className="relative items-center justify-center mb-[20px] pt-2">
-                                        <Text className="text-[20px] font-semibold text-[#1C1C1E]">Report</Text>
+                                        <Text className="text-[20px] font-semibold text-[#1C1C1E]">
+                                            {isVi ? 'Báo cáo' : 'Report'}
+                                        </Text>
                                         <TouchableOpacity onPress={onClose} className="absolute right-0" style={{ padding: 4 }}>
                                             <Ionicons name="close" size={24} color="#8E8E93" />
                                         </TouchableOpacity>
                                     </View>
 
                                     <Text className="font-regular text-[#757575] text-center mb-[25px] text-[14px]">
-                                        Why do you want to report the messages/actions of {reportTargetName}?
+                                        {isVi 
+                                            ? `Tại sao bạn muốn báo cáo tin nhắn/hành động của ${reportTargetName}?` 
+                                            : `Why do you want to report the messages/actions of ${reportTargetName}?`}
                                     </Text>
 
                                     {/* Danh sách lý do */}
@@ -98,9 +117,9 @@ export default function ReportUGCModal({ isVisible, onClose, reportTargetName = 
                                                         </Text>
                                                     </TouchableOpacity>
 
-                                                    {isSelected && option === 'Other reasons' && (
+                                                    {isSelected && (option === 'Other reasons' || option === 'Lý do khác') && (
                                                         <TextInput
-                                                            placeholder="Please describe the issue in detail..."
+                                                            placeholder={isVi ? "Vui lòng mô tả chi tiết vấn đề..." : "Please describe the issue in detail..."}
                                                             placeholderTextColor="#9CA3AF"
                                                             value={otherReason}
                                                             onChangeText={setOtherReason}
@@ -119,20 +138,24 @@ export default function ReportUGCModal({ isVisible, onClose, reportTargetName = 
                                     <View className='w-full justify-center items-center mb-[12px]'>
                                         <TouchableOpacity
                                             onPress={handleSubmit}
-                                            disabled={!selectedOption || (selectedOption === 'Other reasons' && !otherReason.trim())}
+                                            disabled={!selectedOption || ((selectedOption === 'Other reasons' || selectedOption === 'Lý do khác') && !otherReason.trim())}
                                             className={`w-[80%] py-3.5 rounded-[16px] items-center justify-center ${
-                                                selectedOption && (selectedOption !== 'Other reasons' || otherReason.trim())
+                                                selectedOption && ((selectedOption !== 'Other reasons' && selectedOption !== 'Lý do khác') || otherReason.trim())
                                                     ? 'bg-[#E89B5A]'
                                                     : 'bg-gray-200'
                                             }`}
                                         >
-                                            <Text className="text-white font-bold text-[16px]">Submit Report</Text>
+                                            <Text className="text-white font-bold text-[16px]">
+                                                {isVi ? 'Gửi báo cáo' : 'Submit Report'}
+                                            </Text>
                                         </TouchableOpacity>
                                     </View>
 
                                     <View className='items-center justify-center'>
                                         <Text className='text-center text-[#8E8E93] text-[12px] leading-5 px-4 italic'>
-                                            Our moderation team will review this report confidentially to protect you and the community.
+                                            {isVi 
+                                                ? 'Đội ngũ kiểm duyệt sẽ xem xét báo cáo này một cách bảo mật để bảo vệ bạn và cộng đồng.' 
+                                                : 'Our moderation team will review this report confidentially to protect you and the community.'}
                                         </Text>
                                     </View>
                                 </View>
@@ -142,11 +165,10 @@ export default function ReportUGCModal({ isVisible, onClose, reportTargetName = 
                 </TouchableWithoutFeedback>
             </Modal>
 
-            {/* Gọi ReportSuccessModal */}
             <ReportSuccessModal
                 isVisible={isSuccessVisible}
                 onClose={handleSuccessClose}
-                reason={selectedOption === 'Other reasons' ? otherReason : selectedOption}
+                reason={selectedOption}
                 submittedAt={submittedAt}
             />
         </>
