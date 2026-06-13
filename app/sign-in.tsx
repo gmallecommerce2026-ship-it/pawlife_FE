@@ -100,7 +100,8 @@ type AuthView = 'LOGIN' | 'FORGOT_PASSWORD' | 'VERIFY_OTP' | 'RESET_PASSWORD' | 
 export default function SignInScreen() {
   const router = useRouter();
   const { login, requestOtp, setAuth } = useContext(AuthContext) as any;
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const params = useLocalSearchParams();
   const [currentView, setCurrentView] = useState<AuthView>('LOGIN');
   const [email, setEmail] = useState('');
@@ -488,7 +489,7 @@ export default function SignInScreen() {
             resizeMode="cover"
           />
         </View>
-        <Text className="text-[#8E8E93] text-[16px] font-medium">Enter your registered email. We’ll send an OTP code for the next step.</Text>
+        <Text className="text-[#8E8E93] text-[16px] font-medium">Enter your registered email. We'll send an OTP code for the next step.</Text>
       </View>
       <InputField 
         placeholder="Enter registered email" value={email} keyboardType="email-address" error={errors.email} title={"Your Registered Email"}
@@ -554,7 +555,9 @@ export default function SignInScreen() {
           />
         </View>
         <Text className="text-[16px] text-[#9CA3AF] leading-6 font-medium">
-          Email has been sent to <Text className="text-black font-semibold">{email}</Text>. Please enter the one-time verification code below.
+          {isVi ? 'Email đã được gửi đến ' : 'Email has been sent to '}
+          <Text className="text-black font-semibold">{email}</Text>
+          {isVi ? '. Vui lòng nhập mã xác minh một lần dưới đây.' : '. Please enter the one-time verification code below.'}
         </Text>
       </View>
 
@@ -588,12 +591,13 @@ export default function SignInScreen() {
           </View>
         ) : otpTimer > 0 ? (
           <Text className="text-[#8E8E93] text-[16px] font-regular">
-            Resend New Code <Text className="font-semibold text-black">{formatTime(otpTimer)}</Text>
+            {isVi ? 'Gửi lại mã sau ' : 'Resend New Code in '}
+            <Text className="font-semibold text-black">{formatTime(otpTimer)}</Text>
           </Text>
         ) : (
           <TouchableOpacity onPress={handleRequestOtp} activeOpacity={0.7}>
             <Text className="text-[#E89B5A] text-[16px] font-bold">
-              Resend New Code
+              {isVi ? 'Gửi lại mã mới' : 'Resend New Code'}
             </Text>
           </TouchableOpacity>
         )}
@@ -631,7 +635,7 @@ export default function SignInScreen() {
         <Text className="text-[#8E8E93] text-[16px] leading-6">Create a new password for your PawLife account. Remember to use a strong and unique password.</Text>
       </View>
       <InputField 
-        placeholder="Enter new password" value={newPassword} isPassword={true} error={errors.newPassword}
+        placeholder={isVi ? "Nhập mật khẩu mới" : "Enter new password"} value={newPassword} isPassword={true} error={errors.newPassword}
         onChangeText={(text: string) => { setNewPassword(text); setErrors({...errors, newPassword: ''}) }} icon={<Lock size={22} />} 
       />
       {/* ĐÃ FIX: Thay && bằng ? : null */}

@@ -627,7 +627,7 @@ export default function ShelterProfileScreen() {
               >
                 <Text className={`font-semibold text-[14px] ${activeTab === 'info' ? 'text-white' : 'text-gray-600'
                   }`}>
-                  {activeTab === 'pets' ? t('Contact') : t('View Pets')}
+                  {activeTab === 'pets' ? t('Contact') : t('View pets')}
                 </Text>
               </TouchableOpacity>
             </View>

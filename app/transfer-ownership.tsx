@@ -182,7 +182,7 @@ export default function TransferOwnershipScreen() {
     }
   };
 
-  const getAge = (dob?: string, isVi: boolean) => {
+  const getAge = (dob?: string, isVi?: boolean) => {
     if (!dob) return isVi ? "Không rõ tuổi" : 'Unknown age';
     const birthDate = new Date(dob);
     const difference = Date.now() - birthDate.getTime();

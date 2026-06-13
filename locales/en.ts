@@ -25,7 +25,7 @@ export const enDict: Record<string, string> = {
   'Continue with Google': 'Continue with Google',
   'Continue with Apple': 'Continue with Apple',
   'Forgot Password?': 'Forgot Password?',
-  'Enter your registered email. We’ll send an OTP code for the next step.': 'Enter your registered email. We’ll send an OTP code for the next step.',
+  "Enter your registered email. We'll send an OTP code for the next step.": "Enter your registered email. We'll send an OTP code for the next step.",
   'Your Registered Email': 'Your Registered Email',
   'Enter registered email': 'Enter registered email',
   'Send OTP Code': 'Send OTP Code',

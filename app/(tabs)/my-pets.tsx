@@ -1,7 +1,6 @@
 // app/(tabs)/my-pets.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-// 1. IMPORT USELANGUAGE HOOK
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +9,7 @@ import React, { useCallback, useContext, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  RefreshControl,
   ScrollView,
   TouchableOpacity,
   View
@@ -28,7 +28,6 @@ interface Pet {
   isLost?: boolean; 
 }
 
-// 2. CẬP NHẬT HÀM calculateAge NHẬN THÊM THAM SỐ t (hàm dịch)
 const calculateAge = (dobString: string | null | undefined, t: any, isVi: boolean): string => {
   if (!dobString) return t('Unknown age');
 
@@ -55,21 +54,27 @@ const calculateAge = (dobString: string | null | undefined, t: any, isVi: boolea
 export default function MyPetsScreen() {
   const router = useRouter();
   const { user } = useContext(AuthContext);
-  // 3. KHỞI TẠO HOOK
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  
   const [pets, setPets] = useState<Pet[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Đổi thành isInitialLoading để chỉ load lúc đầu
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMyPets = async () => {
+  const fetchMyPets = async (isSilentRefresh = false) => {
     if (!user) {
       setPets([]);
-      setIsLoading(false);
+      setIsInitialLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    // Chỉ bật skeleton/loader nếu chưa có dữ liệu nào (lần đầu tiên)
+    if (!isSilentRefresh && pets.length === 0) {
+      setIsInitialLoading(true);
+    }
+    
     setError(null);
     try {
       const data = await petService.getMyPets();
@@ -78,27 +83,31 @@ export default function MyPetsScreen() {
       if (err?.response?.status === 401) {
         setPets([]);
       } else {
-        // Dịch lỗi API
         setError(t('Failed to load pets. Please try again.'));
       }
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
-
       if (isActive) {
-        fetchMyPets();
+        // Luôn fetch dạng silent refresh khi user focus lại vào tab
+        fetchMyPets(true);
       }
-
       return () => {
         isActive = false; 
       };
-    }, [])
+    }, [user?.id]) 
   );
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchMyPets(true);
+  };
 
   const PetCard = ({ pet }: { pet: Pet }) => (
     <TouchableOpacity
@@ -133,7 +142,7 @@ export default function MyPetsScreen() {
           {pet.isLost && (
             <View className="bg-red-50 px-3 py-1 rounded-full border border-red-100">
               <Text className="text-red-500 text-[10px] uppercase font-bold tracking-wider">
-                {t('Lost')} {/* Dịch chữ Lost */}
+                {t('Lost')}
               </Text>
             </View>
           )}
@@ -147,7 +156,7 @@ export default function MyPetsScreen() {
               resizeMode="contain"
             />
             <Text className="text-gray-500 text-sm ml-1.5">
-              {pet.breed || t('Unknown breed')} {/* Dịch Unknown breed */}
+              {pet.breed || t('Unknown breed')}
             </Text>
           </View>
 
@@ -159,12 +168,11 @@ export default function MyPetsScreen() {
               className='bottom-[1px]'
             />
             <Text className="text-gray-500 text-sm ml-1.5">
-              {calculateAge(pet.dob, t, isVi)} {/* Truyền hàm t vào đây */}
+              {calculateAge(pet.dob, t, isVi)}
             </Text>
           </View>
         </View>
       </View>
-
     </TouchableOpacity>
   );
 
@@ -181,7 +189,6 @@ export default function MyPetsScreen() {
       {/* --- HEADER --- */}
       <View className="flex-row justify-between items-center px-6 pt-[28px] pb-[21px] z-10 bg-transparent">
         <View className="flex-row items-center">
-          {/* Dịch Header */}
           <Text className="text-[28px] font-normal text-black tracking-[0.06px]">{t('My Pet')}</Text>
         </View>
       </View>
@@ -189,20 +196,37 @@ export default function MyPetsScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={isRefreshing} 
+            onRefresh={onRefresh}
+            tintColor="#E89B5A"
+            colors={['#E89B5A']}
+          />
+        }
         contentContainerStyle={{
           paddingBottom: 100,
           paddingHorizontal: 24,
           flexGrow: 1,
-          justifyContent: (pets.length === 0 && !isLoading && !error) ? 'center' : 'flex-start'
+          justifyContent: (pets.length === 0 && !isInitialLoading && !error) ? 'center' : 'flex-start'
         }}
       >
-        {isLoading ? (
+        {isInitialLoading && pets.length === 0 ? (
           <View className="flex-1 justify-center items-center mt-10">
-            <ActivityIndicator size="large" color="#F59E0B" />
+            <View className="w-[84px] h-[84px] bg-white rounded-full items-center justify-center shadow-lg shadow-orange-100 mb-6 border border-orange-50">
+               <ActivityIndicator size="large" color="#E89B5A" />
+            </View>
+            <Text className="text-gray-500 font-medium text-lg">{t("Loading your pets...")}</Text>
           </View>
         ) : error ? (
           <View className="flex-1 justify-center items-center mt-10">
             <Text className="text-red-500">{error}</Text>
+            <TouchableOpacity 
+              onPress={() => fetchMyPets()}
+              className="mt-4 px-6 py-2 bg-white border border-gray-200 rounded-full"
+            >
+              <Text className="text-gray-600">{t("Try again")}</Text>
+            </TouchableOpacity>
           </View>
         ) : pets.length > 0 ? (
           <View>
@@ -227,20 +251,22 @@ export default function MyPetsScreen() {
           </View>
         )}
 
-        {/* NÚT THÊM THÚ CƯNG */}
-        <TouchableOpacity
-          className="w-full bg-white py-5 rounded-[24px] border border-dashed border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-2"
-          activeOpacity={0.7}
-          onPress={() => router.push({ 
-            pathname: '/(tabs)/scan', 
-            params: { isAddingPet: 'true' } 
-          })}
-        >
-          <View className=" rounded-full mr-2">
-            <Ionicons name="add" size={20} color="#8E8E93" />
-          </View>
-          <Text className="text-[#8E8E93] font-thin text-base">{t('Add New Pet')}</Text>
-        </TouchableOpacity>
+        {/* NÚT THÊM THÚ CƯNG - Chỉ hiện khi đã load xong */}
+        {!isInitialLoading && (
+          <TouchableOpacity
+            className="w-full bg-white py-5 rounded-[24px] border border-dashed border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-2 mb-6"
+            activeOpacity={0.7}
+            onPress={() => router.push({ 
+              pathname: '/(tabs)/scan', 
+              params: { isAddingPet: 'true' } 
+            })}
+          >
+            <View className=" rounded-full mr-2">
+              <Ionicons name="add" size={20} color="#8E8E93" />
+            </View>
+            <Text className="text-[#8E8E93] font-thin text-base">{t('Add New Pet')}</Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
     </SafeAreaView>

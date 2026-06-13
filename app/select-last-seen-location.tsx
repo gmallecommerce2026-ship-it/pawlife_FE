@@ -19,7 +19,7 @@ export default function SelectLocationMapScreen() {
   const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
   const [radius, setRadius] = useState(500);
-
+  
   const { petId, petName, petAvatar, petBreed, petAge, lostDateStr } = params;
 
   const [region, setRegion] = useState({
@@ -31,6 +31,7 @@ export default function SelectLocationMapScreen() {
 
   const [selectedAddress, setSelectedAddress] = useState('Đang định vị...');
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+
 
   useEffect(() => {
     (async () => {
@@ -85,14 +86,17 @@ export default function SelectLocationMapScreen() {
     latitude: 21.028511,
     longitude: 105.804817,
   });
+  const debounceRef: any = useRef<NodeJS.Timeout | null>(null);
 
   const onRegionChangeComplete = (newRegion: any) => {
     setRegion(newRegion);
-    setCenterCoord({
-      latitude: newRegion.latitude,
-      longitude: newRegion.longitude,
-    });
-    getAddressFromGoogleMapAPI(newRegion.latitude, newRegion.longitude);
+    setCenterCoord({ latitude: newRegion.latitude, longitude: newRegion.longitude });
+    
+    // Debounce 500ms
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      getAddressFromGoogleMapAPI(newRegion.latitude, newRegion.longitude);
+    }, 500);
   };
 
   const handleConfirm = () => {

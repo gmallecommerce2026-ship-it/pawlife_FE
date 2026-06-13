@@ -1,7 +1,6 @@
 // app/(tabs)/matching.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-// 1. IMPORT USELANGUAGE HOOK
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -494,7 +493,7 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
                                             contentFit="cover"
                                         />
                                     )}
-                                    <Text className="ml-2 font-medium text-[16px] text-black">{t("Use Current Location")}</Text>
+                                    <Text className="ml-2 font-medium text-[16px] text-black">{t("Use My Current Location")}</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -571,8 +570,8 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                     contentContainerStyle={{ paddingBottom: 40 }}
                 >
                     <View className="mb-4">
-                        <PolicyItem number="1" title={t("Love and care for your pet for life")} content={t("Do not abandon, harm, or use the pet for any illegal or inhumane purposes")} />
-                        <PolicyItem number="2" title={t("Provide a safe & suitable living environment")} content={t("This includes proper food, shelter, attention, and veterinary care when needed")} />
+                        <PolicyItem number="1" title={t("Love and care for your pet for life")} content={t("Do not abandon, harm, or use the pet for any illegal or inhumane purposes.")} />
+                        <PolicyItem number="2" title={t("Provide a safe & suitable living environment")} content={t("This includes proper food, shelter, attention, and veterinary care when needed.")} />
                         <PolicyItem number="3" title={t("Take care of your pet's health")} content={t("Check-ups, vaccinations, and rabies shots as recommended.")} />
                         <PolicyItem number="4" title={t("Stay in touch after adoption & when needed")} content={t("During the first 6 months, share updates to ensure pet is doing well.")} />
                         <PolicyItem number="5" title={t("Do not transfer your pet")} content={t("Contact PawLife if you can no longer care for the pet.")} />
@@ -933,7 +932,7 @@ const ImageViewerOverlay = ({ images, isVisible, onClose }: { images: string[], 
 };
 
 // ==================================================================
-// 4. MAIN SWIPE SCREEN (PURE UI)
+// 4. MAIN SWIPE SCREEN (Đã sửa lỗi loading focus và cải thiện UI)
 // ==================================================================
 const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any, onBack: () => void, onDetail: (item: any) => void, onAdopt: (item: any) => void }) => {
     const { t, language } = useLanguage();
@@ -1055,19 +1054,28 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
             setLoading(false);
         }
     };
+    
     const handleOpenViewer = (images: string[]) => {
         if (images && images.length > 0) {
             setViewerImages(images);
             setIsViewerVisible(true);
         }
     };
+
+    // FIX 1: Chuyển loadPets vào useEffect độc lập, chỉ gọi lại khi có vị trí hoặc đổi bộ lọc (filters)
+    useEffect(() => {
+        if (isLocationLoaded) {
+            loadPets();
+        }
+    }, [isLocationLoaded, location, filters]);
+
+    // FIX 2: Giữ useFocusEffect chỉ để update số lượng Tim ngầm định khi chuyển tab, KHÔNG loadPets lại
     useFocusEffect(
         useCallback(() => {
             if (isLocationLoaded) {
-                loadPets();
                 loadFavoritesCount();
             }
-        }, [isLocationLoaded, location, user?.id])
+        }, [isLocationLoaded])
     );
 
     useEffect(() => {
@@ -1217,9 +1225,13 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
             </View>
 
             <View className="flex-1 px-6 pb-5 pt-0">
+                {/* FIX 3: Nâng cấp Loading State cho xịn sò hơn, phù hợp với UI ứng dụng */}
                 {loading ? (
-                    <View className="flex-1 items-center justify-center">
-                        <Text className="text-gray-400 font-medium">{t("Loading pets...")}</Text>
+                    <View className="flex-1 items-center justify-center pb-10">
+                        <View className="w-[84px] h-[84px] bg-white rounded-full items-center justify-center shadow-lg shadow-orange-100 mb-6 border border-orange-50">
+                            <ActivityIndicator size="large" color="#E89B5A" />
+                        </View>
+                        <Text className="text-gray-500 font-medium text-lg">{t("Finding perfect matches...")}</Text>
                     </View>
                 ) : (
                     <View className="flex-1 relative w-full h-full">
@@ -1282,6 +1294,14 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                                     }}
                                 />
                                 <Text className="text-gray-800 text-lg font-bold mt-8">{t("That's all for now")}</Text>
+                                {/* FIX 4: Thêm nút Refresh cực kỳ cần thiết khi quẹt hết bài */}
+                                <TouchableOpacity
+                                    onPress={() => loadPets()}
+                                    activeOpacity={0.8}
+                                    className="mt-6 px-8 py-3 bg-white border-[1.5px] border-[#E89B5A] rounded-full shadow-sm"
+                                >
+                                    <Text className="text-[#E89B5A] font-bold text-[15px]">{t("Refresh List")}</Text>
+                                </TouchableOpacity>
                             </View>
                         ) : null}
                         <PetDetailOverlay

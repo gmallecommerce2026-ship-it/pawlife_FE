@@ -1,7 +1,6 @@
 // app/adoption-status.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
-import { CustomLoader } from '@/components/CustomLoader';
 import { useLanguage } from '@/contexts/LanguageContext'; // IMPORT HOOK
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,7 +29,7 @@ interface TimelineStep {
 export default function AdoptionStatusScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { t } = useLanguage(); // GỌI HOOK DỊCH THUẬT
+  const { t } = useLanguage(); 
 
   const [applicationData, setApplicationData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,12 +62,12 @@ export default function AdoptionStatusScreen() {
 
   const handleRemovePhoto = (index: number) => {
     setPhotos(photos.filter((_, i) => i !== index));
-    setHasUnsavedPhotos(true); // Đánh dấu là có sự thay đổi
+    setHasUnsavedPhotos(true); 
   };
 
   const [photos, setPhotos] = useState<string[]>([]);
-  const [hasUnsavedPhotos, setHasUnsavedPhotos] = useState(false); // Check xem đã chọn ảnh mới chưa để enable nút
-  const [isSubmittingPhotos, setIsSubmittingPhotos] = useState(false); // Trạng thái loading của nút
+  const [hasUnsavedPhotos, setHasUnsavedPhotos] = useState(false); 
+  const [isSubmittingPhotos, setIsSubmittingPhotos] = useState(false); 
   
   useEffect(() => {
     if (id) {
@@ -101,7 +100,6 @@ export default function AdoptionStatusScreen() {
     }
   };
 
-  // --- LOGIC SINH TIMELINE ĐỘNG CHO 7 TRẠNG THÁI ---
   const generateTimelineSteps = (status: string, createdAt: string, updatedAt: string) => {
     const createdDate = new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const updatedDate = new Date(updatedAt || createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -155,30 +153,27 @@ export default function AdoptionStatusScreen() {
   const handleAddPhoto = async () => {
     if (photos.length >= 5) return;
     const imageUrl = await pickAndUploadImage({
-      folder: 'lost-pets', // Hoặc đổi thành 'adoption-docs' nếu BE bạn cấu hình khác
+      folder: 'lost-pets', 
       aspect: [4, 3],
       quality: 0.8,
     });
     if (imageUrl) {
       setPhotos((prev) => [...prev, imageUrl]);
-      setHasUnsavedPhotos(true); // Đánh dấu là có sự thay đổi
+      setHasUnsavedPhotos(true); 
     }
   };
 
   const handleSubmitPhotos = async () => {
     setIsSubmittingPhotos(true);
     try {
-      // 1. Gọi API gửi danh sách URLs (biến photos đang chứa các R2 URLs trả về từ hook)
       await axiosClient.patch(`/applications/${id}/verification-photos`, { 
         photos: photos 
       });
       
       Alert.alert(t('Success'), t('Image uploaded successfully!'));
-      setHasUnsavedPhotos(false); // Disable nút submit
+      setHasUnsavedPhotos(false); 
       
-      // 2. Fetch lại data để UI cập nhật Timeline (Status lúc này sẽ là PENDING thay vì NEED_MORE_INFO)
       fetchApplicationDetails();
-      
     } catch (error: any) {
       console.error('Lỗi khi gửi ảnh xác minh:', error);
       Alert.alert(
@@ -200,8 +195,6 @@ export default function AdoptionStatusScreen() {
       default: return <View className="w-[26px] h-[26px] rounded-full bg-[#E89B5A] border-[3px] border-[#D38544] items-center justify-center z-20 shadow-sm shadow-[#D38544]"><View className="w-2.5 h-2.5 rounded-full bg-[#D38544]" /></View>;
     }
   };
-
- 
 
   const SectionCard = ({ title, children }: { title: string, children: React.ReactNode }) => (
     <View className="mb-[30px] px-[23px]">
@@ -230,12 +223,19 @@ export default function AdoptionStatusScreen() {
     </View>
   );
 
+  // --- SỬA LỖI #1: TRÁNH CRASH TRƯỚC KHI CÓ DATA ---
+  if (isLoading || !applicationData) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white">
+        <ActivityIndicator size="large" color="#E89B5A" />
+      </View>
+    );
+  }
+
   const pet = applicationData.pet;
   const isClosed = applicationData.status === 'CLOSED';
 
-  // DÙNG HÀM TẠO TIMELINE ĐỘNG DỰA VÀO DỮ LIỆU BACKEND
   const timelineSteps = generateTimelineSteps(applicationData.status, applicationData.createdAt, applicationData.updatedAt);
-
   const commitments = applicationData.commitments || {};
 
   const submittedDate = new Date(applicationData.createdAt).toLocaleDateString('en-US', {
@@ -246,7 +246,6 @@ export default function AdoptionStatusScreen() {
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* 1. HEADER */}
       <View className="flex-row items-center justify-between px-4 py-3 bg-white z-10 relative">
         <TouchableOpacity
           onPress={() => router.back()}
@@ -301,21 +300,19 @@ export default function AdoptionStatusScreen() {
         <LinearGradient
           colors={
             pet?.gender === 'FEMALE'
-              ? ['#FBF0F6', '#F8E8F1'] // Màu Tone Hồng cho bé cái
-              : ['#F5FBFF', '#E2EFF8'] // Màu Tone Xanh cho bé đực 
+              ? ['#FBF0F6', '#F8E8F1'] 
+              : ['#F5FBFF', '#E2EFF8']  
           }
           locations={[0, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 13 }}
         />
-        {/* Phần trên: Ảnh và Thông tin cơ bản */}
         <TouchableOpacity
-          className="flex-row mb-3.5 relative z-10" // Thêm relative z-10
+          className="flex-row mb-3.5 relative z-10" 
           activeOpacity={0.7}
           onPress={() => {
             if (pet?.id) {
-              // Fix: Dùng Object navigation để tránh lỗi parse URL
               router.push({
                 pathname: '/pet-detail-modal',
                 params: { id: pet.id }
@@ -330,18 +327,15 @@ export default function AdoptionStatusScreen() {
           />
 
           <View className="flex-1 mb-2 ml-[10px] justify-center pointer-events-none">
-            {/* Thêm pointer-events-none để text không chặn bấm */}
             <Text className="text-[16px] font-medium text-black leading-tight" numberOfLines={1}>
               {pet?.name}
             </Text>
 
-            {/* Fix: Tính toán tuổi từ DOB */}
             <Text className="text-[#8E8E93] text-[12px] font-regular mt-[7px]" numberOfLines={1}>
               {getDisplayAge(pet?.dob)} • {pet?.breed || t('Unknown')}
             </Text>
           </View>
 
-          {/* Sửa lại nút bấm Shelter: Bọc riêng ra góc để không conflict vùng bấm */}
           <View className="absolute bottom-0 right-0 z-20">
             <TouchableOpacity
               activeOpacity={0.6}
@@ -361,16 +355,13 @@ export default function AdoptionStatusScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Phần dưới: Màu nền xám, thêm padding dọc (py-3), bo góc dưới */}
         <View className="flex-row justify-between items-center py-[14px] border-t border-[#E5E5E5] bg-[#FFFFFF]/40 -mx-[14px] px-[14px] rounded-b-[13px]">
-          {/* ID thay cho status ở góc trái */}
           <View className="">
             <Text className="text-[#8E8E93] text-[12px] font-medium">
               ID: #{applicationData.id.substring(applicationData.id.length - 6).toUpperCase()}
             </Text>
           </View>
 
-          {/* Nút View Application Details thay cho ngày tháng ở góc phải */}
           <TouchableOpacity
             className=""
             activeOpacity={0.7}
@@ -383,7 +374,6 @@ export default function AdoptionStatusScreen() {
         </View>
       </View>
 
-      {/* 5. APPLICATION PROGRESS TIMELINE */}
       <View className="bg-white px-5 mt-[38px] pb-2 shadow-sm shadow-gray-50/50">
         <Text className="text-[16px] font-semibold text-black mb-[21px] tracking-[0.06px]">{t('Application Progress')}</Text>
         <View className="p-[17px] border rounded-[16px] border-[#E5E5E5]">
@@ -398,12 +388,13 @@ export default function AdoptionStatusScreen() {
 
                 <View className={`flex-1 ml-4 ${!isLast ? 'pb-8' : 'pb-4'}`}>
                   <Text className={`text-[14px] font-medium mt-1 ${step.state === 'alert' ? 'text-[#F59E0B]' : step.state === 'error' ? 'text-[#EF4444]' : step.state === 'success' ? 'text-[#10B981]' : 'text-gray-900'}`}>{step.title}</Text>
-                  {step.date && <Text className="text-[12px] font-regular text-[#8E8E93] mt-1">{step.date}</Text>}
-                  {isLast && step.description && <Text className="text-[12px] font-regular text-[#8E8E93] mt-2 leading-5">{step.description}</Text>}
-                  {step.actionRequired && (
+                  
+                  {/* SỬA LỖI #2: DÙNG TERNARY ? ĐỂ TRÁNH RENDER LỖI CHUỖI RỖNG NGOÀI THẺ TEXT */}
+                  {step.date ? <Text className="text-[12px] font-regular text-[#8E8E93] mt-1">{step.date}</Text> : null}
+                  {(isLast && step.description) ? <Text className="text-[12px] font-regular text-[#8E8E93] mt-2 leading-5">{step.description}</Text> : null}
+                  
+                  {step.actionRequired ? (
                     <View className="flex-col mt-3 w-full">
-                      
-                      {/* HEADER HIỂN THỊ SỐ LƯỢNG ẢNH VÀ TIÊU ĐỀ */}
                       <View className="flex-row justify-between items-center mb-3">
                         <Text className="text-[14px] font-medium text-gray-800">
                           {step.actionRequired}
@@ -413,7 +404,6 @@ export default function AdoptionStatusScreen() {
                         </Text>
                       </View>
 
-                      {/* KHUNG CHỨA ẢNH - SỬ DỤNG gap-2 ĐỂ VỪA 5 ẢNH */}
                       <View className="flex-row flex-wrap gap-2">
                         {photos.length === 0 ? (
                           <TouchableOpacity 
@@ -454,8 +444,7 @@ export default function AdoptionStatusScreen() {
                               </View>
                             ))}
 
-                            {/* CHỈNH THÀNH < 5 ĐỂ CHOP PHÉP UP TỐI ĐA 5 ẢNH */}
-                            {photos.length < 5 && (
+                            {photos.length < 5 ? (
                               <TouchableOpacity
                                 onPress={handleAddPhoto}
                                 activeOpacity={0.7}
@@ -472,13 +461,12 @@ export default function AdoptionStatusScreen() {
                                   />
                                 )}
                               </TouchableOpacity>
-                            )}
+                            ) : null}
                           </>
                         )}
                       </View>
 
-                      {/* --- NÚT SUBMIT XUẤT HIỆN KHI ĐÃ CÓ ẢNH --- */}
-                      {photos.length > 0 && (
+                      {photos.length > 0 ? (
                         <TouchableOpacity
                           activeOpacity={0.8}
                           disabled={!hasUnsavedPhotos || isSubmittingPhotos}
@@ -486,28 +474,27 @@ export default function AdoptionStatusScreen() {
                           className={`w-full mt-4 h-[44px] rounded-[14px] items-center justify-center flex-row ${hasUnsavedPhotos && !isSubmittingPhotos ? 'bg-[#E89B5A]' : 'bg-[#F9DCC5]'}`}
                           style={hasUnsavedPhotos && !isSubmittingPhotos ? { shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 4 } : {}}
                         >
-                          {isSubmittingPhotos && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />}
+                          {isSubmittingPhotos ? <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} /> : null}
                           <Text className="text-white font-semibold text-[14px] tracking-wide">
                             {isSubmittingPhotos ? t('Sending...') : t('Send Verification Image')}
                           </Text>
                         </TouchableOpacity>
-                      )}
+                      ) : null}
                     </View>
-                  )}
+                  ) : null}
                 </View>
               </View>
             );
           })}
         </View>
       </View>
-      {!isClosed && <Text className="text-center text-[13px] text-gray-400 mb-4 mt-[24px] font-regular tracking-[0.06px]">{t('All adoption decisions are handled directly by the shelter.')}</Text>}
+      {!isClosed ? <Text className="text-center text-[13px] text-gray-400 mb-4 mt-[24px] font-regular tracking-[0.06px]">{t('All adoption decisions are handled directly by the shelter.')}</Text> : null}
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
       </ScrollView>
-      {/* 6. FOOTER ACTIONS */}
       <View className="px-5 pb-[31px] bg-white w-full">
         {isClosed ? (
           <View className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm shadow-gray-100/50">
@@ -536,10 +523,6 @@ export default function AdoptionStatusScreen() {
         )}
       </View>
 
-
-      {/* ========================================= */}
-      {/* POPUP 2: WITHDRAW CONFIRMATION DIALOG */}
-      {/* ========================================= */}
       <Modal
         visible={isWithdrawVisible}
         animationType="fade"
@@ -583,6 +566,7 @@ export default function AdoptionStatusScreen() {
           </View>
         </View>
       </Modal>
+
       <Modal
         visible={isDetailsVisible}
         animationType="fade"
@@ -604,10 +588,9 @@ export default function AdoptionStatusScreen() {
                 {t('Application Details')}
               </Text>
 
-              {/* Nút X định vị tuyệt đối ở góc bên phải */}
               <TouchableOpacity
                 onPress={() => setIsDetailsVisible(false)}
-                className="p-2 absolute right-5" // Sử dụng absolute và right-5
+                className="p-2 absolute right-5" 
                 activeOpacity={0.7}
               >
                 <Feather name="x" size={16} color="#000000" />
@@ -615,7 +598,6 @@ export default function AdoptionStatusScreen() {
 
             </View>
 
-            {/* Nội dung chi tiết (Sử dụng dữ liệu applicationData có sẵn) */}
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30, paddingTop: 24 }}>
 
               <SectionCard title={t('A - Contact Information')}>
@@ -650,16 +632,16 @@ export default function AdoptionStatusScreen() {
                     {`${applicationData.adoptionReason || 'N/A'}`}
                   </Text>
                 </View>
-                {Object.keys(commitments).length > 0 && (
+                {Object.keys(commitments).length > 0 ? (
                   <View className="pt-2 pb-1">
-                    {commitments.vaccine === 'Yes' && <CommitmentItem text={t('Yearly vaccinations')} />}
-                    {commitments.medical === 'Yes' && <CommitmentItem text={t('Hospital treatment when needed')} />}
-                    {commitments.expenses === 'Yes' && <CommitmentItem text={t('Cover pre-adoption expenses')} />}
-                    {commitments.updateStatus === 'Yes' && <CommitmentItem text={t('Provide status updates')} />}
-                    {commitments.homeVisit === 'Yes' && <CommitmentItem text={t('Allow home visits')} />}
-                    {commitments.provideID === 'Yes' && <CommitmentItem text={t('Provide ID and address')} />}
+                    {commitments.vaccine === 'Yes' ? <CommitmentItem text={t('Yearly vaccinations')} /> : null}
+                    {commitments.medical === 'Yes' ? <CommitmentItem text={t('Hospital treatment when needed')} /> : null}
+                    {commitments.expenses === 'Yes' ? <CommitmentItem text={t('Cover pre-adoption expenses')} /> : null}
+                    {commitments.updateStatus === 'Yes' ? <CommitmentItem text={t('Provide status updates')} /> : null}
+                    {commitments.homeVisit === 'Yes' ? <CommitmentItem text={t('Allow home visits')} /> : null}
+                    {commitments.provideID === 'Yes' ? <CommitmentItem text={t('Provide ID and address')} /> : null}
                   </View>
-                )}
+                ) : null}
               </SectionCard>
 
               <Text className="text-center text-[13px] font-medium text-gray-400 ">

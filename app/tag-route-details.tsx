@@ -4,8 +4,9 @@ import ReportUGCModal from '@/components/ReportUGCModal';
 import ShelterContactModal from '@/components/ShelterContactModal'; // 🌟 THÊM IMPORT NÀY
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMinutes } from '@/utils/date.util';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { TouchableWithoutFeedback } from '@gorhom/bottom-sheet';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,7 +25,7 @@ import {
   StatusBar,
   TouchableOpacity,
   UIManager,
-  View,
+  View
 } from 'react-native';
 import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Animated, {
@@ -64,7 +65,48 @@ const getShortAddress = (geoData: any) => {
   }
   return null;
 };
+const AnimatedMapPin = ({
+  coordinate,
+  pinColor,
+  isEstimated // Nếu true -> vẽ nét đứt (fake), false -> vẽ nét liền (thật)
+}: any) => {
+  return (
+    <Marker
+      coordinate={coordinate}
+      anchor={{ x: 0.5, y: 0.5 }} // Đặt tâm ghim vào chính giữa chấm tròn
+      key={`marker-${coordinate.latitude}-${coordinate.longitude}`}
+    >
+      {/* Container chứa chấm tròn Google Maps */}
+      <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
 
+        {/* 1. Vòng tròn ngoài (hiệu ứng trong suốt) */}
+        <View style={{
+          width: 24, height: 24,
+          borderRadius: 12,
+          backgroundColor: `${pinColor}40`, // Màu pin với độ trong suốt 25% (40 là mã hex cho 25% alpha)
+          position: 'absolute',
+          borderWidth: isEstimated ? 1 : 0,
+          borderColor: isEstimated ? pinColor : 'transparent',
+          // Nếu là điểm fake, có thể làm nét đứt bằng style hoặc đơn giản là dùng border thường
+        }} />
+
+        {/* 2. Chấm tròn tâm điểm */}
+        <View style={{
+          width: 12, height: 12,
+          borderRadius: 6,
+          backgroundColor: pinColor,
+          borderWidth: 2,
+          borderColor: '#FFFFFF',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.3,
+          shadowRadius: 2,
+          elevation: 4
+        }} />
+      </View>
+    </Marker>
+  );
+};
 export default function TagRouteDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -83,6 +125,7 @@ export default function TagRouteDetailsScreen() {
 
   const rawRadius = params.radius;
   const radius = (rawRadius !== null && rawRadius !== undefined && !isNaN(parseFloat(rawRadius as string))) ? parseFloat(rawRadius as string) : 0;
+  const isEstimated = params.isEstimated === 'true';
   const shinePosition = useSharedValue(-0.5);
   const [currentRegion, setCurrentRegion] = useState({
     latitude: targetLat,
@@ -108,6 +151,7 @@ export default function TagRouteDetailsScreen() {
   const modeRef = useRef<'NONE' | 'CENTERED' | 'COMPASS'>('NONE');
   const currentLocRef = useRef({ lat: targetLat, lng: targetLng });
   const headingSubRef = useRef<Location.LocationSubscription | null>(null);
+
   const handleRegionChangeComplete = async (region: any) => {
     setCurrentRegion(region);
     if (mapRef.current) {
@@ -137,19 +181,19 @@ export default function TagRouteDetailsScreen() {
   // Bắt đầu đọc cảm biến la bàn
   const startHeadingWatch = async () => {
     if (headingSubRef.current) return;
-    
+
     let lastHeading = 0;
     headingSubRef.current = await Location.watchHeadingAsync((data) => {
       // Dùng magHeading (hướng từ trường) và làm tròn để chống giật (jitter)
       const currentHeading = Math.round(data.magHeading);
-      
+
       if (Math.abs(currentHeading - lastHeading) > 1) {
         lastHeading = currentHeading;
         setDeviceHeading(currentHeading);
-        
+
         // Nếu đang ở chế độ xoay theo la bàn -> Cập nhật camera map liên tục
         if (modeRef.current === 'COMPASS' && mapRef.current) {
-          mapRef.current.setCamera({ 
+          mapRef.current.setCamera({
             heading: currentHeading,
             center: { latitude: currentLocRef.current.lat, longitude: currentLocRef.current.lng }
           });
@@ -171,18 +215,18 @@ export default function TagRouteDetailsScreen() {
         // Trạng thái 1 -> 2: Zoom về, thẳng hướng Bắc
         updateLocationMode('CENTERED');
         setMapHeading(0);
-        
+
         mapRef.current.animateCamera({
           center: { latitude: currentLocRef.current.lat, longitude: currentLocRef.current.lng },
           heading: 0,
           pitch: 0,
           zoom: 17
         }, { duration: 800 });
-        
+
       } else if (locationMode === 'CENTERED') {
         // Trạng thái 2 -> 3: Bật La bàn xoay theo điện thoại
         updateLocationMode('COMPASS');
-        
+
         // 🌟 FIX LA BÀN GIẬT: Lấy góc ngay lập tức để đưa vào animation mượt
         const currentH = await Location.getHeadingAsync();
         const targetHeading = Math.round(currentH.magHeading);
@@ -207,10 +251,10 @@ export default function TagRouteDetailsScreen() {
   };
   const arriveByTime = useMemo(() => {
     if (!realStats.duration || realStats.duration === 0) return '...';
-    
+
     // Lấy timestamp hiện tại và cộng thêm số phút di chuyển (quy đổi ra mili giây)
     const arrivalDate = new Date(Date.now() + realStats.duration * 60 * 1000);
-    
+
     // Định dạng hiển thị hh:mm AM/PM đồng bộ với chuẩn en-US của app hiện tại
     return arrivalDate.toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -221,16 +265,16 @@ export default function TagRouteDetailsScreen() {
 
   const handleZoom = async (isZoomIn: boolean) => {
     if (!mapRef.current) return;
-    
+
     try {
       // 🌟 FIX LỖI ZOOM: Dùng getCamera để giữ nguyên độ nghiêng (pitch) và hướng (heading)
       const camera = await mapRef.current.getCamera();
       const currentZoom = camera.zoom || 15;
-      
+
       mapRef.current.animateCamera({
         zoom: isZoomIn ? currentZoom + 1 : currentZoom - 1
       }, { duration: 300 });
-      
+
     } catch (e) {
       console.warn("Lỗi zoom:", e);
     }
@@ -241,29 +285,29 @@ export default function TagRouteDetailsScreen() {
 
   const dynamicMapPadding = React.useMemo(() => {
     return {
-      top: Platform.OS === 'ios' ? 160 : 150,     
+      top: Platform.OS === 'ios' ? 160 : 150,
       right: 20,
-      bottom: isExpanded ? 500 : 300,            
+      bottom: isExpanded ? 500 : 300,
       left: 20,
     };
   }, [isExpanded]);
 
   useEffect(() => {
     if (isGpsReady && mapRef.current) {
-      
+
       // 🌟 FIX LỖI MODAL: Chặn không cho ép lại bản đồ 2D nếu đang ở chế độ Focus/La bàn
       if (modeRef.current !== 'NONE') return;
 
       const timeoutId = setTimeout(() => {
-        const coordinatesToFit = routeCoordinates.length > 0 
-          ? routeCoordinates 
+        const coordinatesToFit = routeCoordinates.length > 0
+          ? routeCoordinates
           : [
-              { latitude: currentLoc.lat, longitude: currentLoc.lng }, 
-              { latitude: targetLat, longitude: targetLng }            
-            ];
+            { latitude: currentLoc.lat, longitude: currentLoc.lng },
+            { latitude: targetLat, longitude: targetLng }
+          ];
 
         mapRef.current?.fitToCoordinates(coordinatesToFit, {
-          edgePadding: { top: 80, right: 40, bottom: 40, left: 40 }, 
+          edgePadding: { top: 80, right: 40, bottom: 40, left: 40 },
           animated: true,
         });
       }, 400);
@@ -271,19 +315,19 @@ export default function TagRouteDetailsScreen() {
       return () => clearTimeout(timeoutId);
     }
   }, [isExpanded, currentLoc.lat, currentLoc.lng, isGpsReady, targetLat, targetLng, routeCoordinates.length]);
-  
+
   const handleShareLocation = () => {
-    setIsMenuVisible(false); 
-    
+    setIsMenuVisible(false);
+
     setTimeout(async () => {
       const mapUrl = `https://maps.google.com/?q=${displayLocation.lat},${displayLocation.lng}`;
       try {
         await Share.share({
-          message: Platform.OS === 'android' 
-            ? `Pet location scanned here:\n${mapUrl}` 
+          message: Platform.OS === 'android'
+            ? `Pet location scanned here:\n${mapUrl}`
             : `Pet location scanned here:`,
           url: mapUrl,
-          title: 'Pet Location' 
+          title: 'Pet Location'
         }, {
           dialogTitle: 'Share Pet Location',
           subject: 'Pet Location'
@@ -306,6 +350,21 @@ export default function TagRouteDetailsScreen() {
     );
   }, []);
 
+  // 🌟 KHAI BÁO ANIMATION CHO LỚP KÍNH CẢNH BÁO
+  const isFocusingEstimatedPin = useMemo(() => {
+    if (!isEstimated || currentRegion.longitudeDelta > 0.005) return false;
+    const dLat = Math.abs(displayLocation.lat - currentRegion.latitude);
+    const dLng = Math.abs(displayLocation.lng - currentRegion.longitude);
+    return dLat < currentRegion.latitudeDelta / 1.5 && dLng < currentRegion.longitudeDelta / 1.5;
+  }, [currentRegion, displayLocation, isEstimated]);
+
+  const warningAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      // Vì màn hình này không có BottomSheet, ta neo lớp kính cố định cách đỉnh trên cùng 140px
+      transform: [{ translateY: 140 }],
+      opacity: withTiming(isFocusingEstimatedPin ? 1 : 0, { duration: 300 }),
+    };
+  });
   const shineStyle = useAnimatedStyle(() => {
     return {
       left: `${shinePosition.value * 100}%`,
@@ -337,7 +396,7 @@ export default function TagRouteDetailsScreen() {
 
       const dirUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${startLat},${startLng}&destination=${destLat},${destLng}&key=${GOOGLE_API_KEY}`;
       const geoUrl = (lat: number, lng: number) => `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GOOGLE_API_KEY}`;
-      
+
       try {
         const [dirRes, oriRes, destRes] = await Promise.all([
           fetch(dirUrl).catch(() => null),
@@ -361,7 +420,7 @@ export default function TagRouteDetailsScreen() {
             // 🌟 FIX LỖI 1: KHÔNG CHẠM ĐÍCH HOÀN HẢO
             // Dùng chi tiết từng bước (steps) thay vì đường tổng quan (overview_polyline)
             let highResCoords: { latitude: number, longitude: number }[] = [];
-            
+
             if (leg.steps && leg.steps.length > 0) {
               leg.steps.forEach((step: any) => {
                 if (step.polyline && step.polyline.points) {
@@ -371,12 +430,12 @@ export default function TagRouteDetailsScreen() {
             } else {
               highResCoords = decodeGooglePolyline(route.overview_polyline.points);
             }
-            
+
             // Ép điểm đích tuyệt đối vào cuối mảng để nét vẽ chạm mốc 100%
             setRouteCoordinates([
               { latitude: startLat, longitude: startLng },
               ...highResCoords,
-              { latitude: destLat, longitude: destLng } 
+              { latitude: destLat, longitude: destLng }
             ]);
           } catch (err) {
             console.error("Error decoding Polyline:", err);
@@ -402,7 +461,7 @@ export default function TagRouteDetailsScreen() {
     const initializeDataAndMap = async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
-        
+
         let curLat: number | null = null;
         let curLng: number | null = null;
 
@@ -414,7 +473,7 @@ export default function TagRouteDetailsScreen() {
               if (isMounted) {
                 currentLocRef.current = { lat: newLocation.coords.latitude, lng: newLocation.coords.longitude };
                 setCurrentLoc(currentLocRef.current);
-                
+
                 // 🌟 FIX LỖI 2: MẤT ĐƯỜNG ĐI (Do miss GPS ở lần đầu, sẽ fetch bù ở đây)
                 if (isFetchingRoute) {
                   fetchDirections(newLocation.coords.latitude, newLocation.coords.longitude);
@@ -426,7 +485,7 @@ export default function TagRouteDetailsScreen() {
           try {
             let location = await Location.getLastKnownPositionAsync();
             if (!location) location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            
+
             if (location) {
               curLat = location.coords.latitude;
               curLng = location.coords.longitude;
@@ -592,11 +651,11 @@ export default function TagRouteDetailsScreen() {
             showsCompass={false}
             showsBuildings={true}
             mapPadding={dynamicMapPadding}
-            onRegionChangeComplete={handleRegionChangeComplete} 
+            onRegionChangeComplete={handleRegionChangeComplete}
 
             // 🌟 THÊM DÒNG NÀY: Thoát trạng thái focus khi user tự vuốt bản đồ
             onPanDrag={() => updateLocationMode('NONE')}
-            
+
             initialRegion={{
               latitude: currentLoc.lat,
               longitude: currentLoc.lng,
@@ -604,45 +663,90 @@ export default function TagRouteDetailsScreen() {
               longitudeDelta: 0.05,
             }}
           >
-            {radius > 0 && (
+            {(isEstimated || pageTitle === 'Reported as Lost') && (
               <Circle
                 center={{ latitude: displayLocation.lat, longitude: displayLocation.lng }}
-                radius={radius}
-                fillColor={pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.25)' : 'rgba(232, 155, 90, 0.25)'}
-                strokeColor={pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.6)' : 'rgba(232, 155, 90, 0.6)'}
-                strokeWidth={1.5}
+                radius={isEstimated ? Math.max(radius, 1000) : radius}
+                fillColor={isEstimated ? "rgba(156, 163, 175, 0.25)" : (pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.15)' : 'rgba(232, 155, 90, 0.15)')}
+                strokeColor={isEstimated ? "rgba(156, 163, 175, 0.6)" : (pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.6)' : 'rgba(232, 155, 90, 0.6)')}
+                strokeWidth={isEstimated ? 1 : 1.5}
+                lineDashPattern={isEstimated ? [5, 5] : undefined}
+                zIndex={1}
               />
             )}
 
             {routeCoordinates.length > 0 && (
               <>
-                <Polyline coordinates={routeCoordinates} strokeColor="#1d4ed8" strokeWidth={8} lineCap="round" lineJoin="round" zIndex={10} />
-                <Polyline coordinates={routeCoordinates} strokeColor="#3b82f6" strokeWidth={5} lineCap="round" lineJoin="round" zIndex={11} />
+                {/* Viền ngoài mỏng màu cam nhạt */}
+                <Polyline
+                  coordinates={routeCoordinates}
+                  strokeColor="#ffb476"
+                  fillColor='#ffb476'
+                  strokeWidth={4}
+                  lineCap="round"
+                  lineJoin="round"
+                  zIndex={10}
+                />
+                {/* Đường chính gradient cam */}
+                <Polyline
+                  coordinates={routeCoordinates}
+                  strokeColor="#ffb476"
+                  fillColor='#ffb476'
+                  strokeWidth={2.5}
+                  lineCap="round"
+                  lineJoin="round"
+                  zIndex={11}
+                />
               </>
             )}
 
-            <Marker 
-              coordinate={{ latitude: displayLocation.lat, longitude: displayLocation.lng }} 
-              title={pageTitle === 'Reported as Lost' ? 'Lost Location' : 'Scanned Point'} 
+            <AnimatedMapPin
+              coordinate={{ latitude: displayLocation.lat, longitude: displayLocation.lng }}
+              currentRegion={currentRegion}
+              timeAgo={timeAgo}
+              titleText={pageTitle === 'Reported as Lost' ? 'Lost Location' : 'Scanned Point'}
+              iconName={pageTitle === 'Reported as Lost' ? "alert-outline" : "scan-outline"}
+              pinColor={pageTitle === 'Reported as Lost' ? '#DA5A5A' : '#E89B5A'}
+              isEstimated={isEstimated}
+            />
+            {/* <Marker
+              coordinate={{ latitude: displayLocation.lat, longitude: displayLocation.lng }}
+              title={pageTitle === 'Reported as Lost' ? 'Lost Location' : 'Scanned Point'}
               zIndex={50}
             >
-              <View style={{ 
-                width: 48, height: 48, borderRadius: 24, 
-                backgroundColor: pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.25)' : 'rgba(232, 155, 90, 0.25)', 
-                justifyContent: 'center', alignItems: 'center' 
+              <View style={{
+                width: 48, height: 48, borderRadius: 24,
+                backgroundColor: pageTitle === 'Reported as Lost' ? 'rgba(218, 90, 90, 0.25)' : 'rgba(232, 155, 90, 0.25)',
+                justifyContent: 'center', alignItems: 'center'
               }}>
-                <View style={{ 
-                  width: 22, height: 22, borderRadius: 11, 
-                  backgroundColor: pageTitle === 'Reported as Lost' ? '#DA5A5A' : '#E89B5A', 
+                <View style={{
+                  width: 22, height: 22, borderRadius: 11,
+                  backgroundColor: pageTitle === 'Reported as Lost' ? '#DA5A5A' : '#E89B5A',
                   borderWidth: 2, borderColor: '#FFFFFF',
                   shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2, shadowRadius: 3, elevation: 4, 
+                  shadowOpacity: 0.2, shadowRadius: 3, elevation: 4,
                 }} />
               </View>
-            </Marker>
+            </Marker> */}
           </MapView>
         )}
 
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 9999, elevation: 99 },
+            warningAnimatedStyle
+          ]}
+        >
+          <View style={{ borderRadius: 100, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4, borderWidth: 1, borderColor: 'rgb(255, 255, 255)' }}>
+            <BlurView intensity={80} tint="light" style={{ backgroundColor: 'rgba(255, 255, 255, 0.6)', paddingHorizontal: 20, paddingVertical: 6, flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="location" size={16} color="#E89B5A" style={{ marginRight: 6 }} />
+              <Text className="text-[12px] font-medium text-[#757575] tracking-[0.1px]">
+                {isVi ? "Vị trí này được ước lượng dựa trên bán kính chia sẻ" : "This location is estimated based on shared radius"}
+              </Text>
+            </BlurView>
+          </View>
+        </Animated.View>
         {!isGpsReady && (
           <View className="absolute inset-0 justify-center items-center bg-[#F3F4F6] z-10 pb-[20%]">
             <ActivityIndicator size="large" color="#3B82F6" />
@@ -651,11 +755,11 @@ export default function TagRouteDetailsScreen() {
         )}
 
         {/* --- CỤM NÚT ĐIỀU KHIỂN BÊN PHẢI BẢN ĐỒ --- */}
-        <View 
-          className="absolute right-4 z-50 flex-col items-center" 
+        <View
+          className="absolute right-4 z-50 flex-col items-center"
           style={{ top: 140, gap: 16 }}
         >
-          
+
 
           {/* 2. CỤM NÚT ZOOM (+/-) */}
           <View
@@ -673,32 +777,32 @@ export default function TagRouteDetailsScreen() {
 
           {/* 1. LA BÀN THẬT (Hiển thị góc xoay chi tiết) */}
           {(locationMode === 'COMPASS' || Math.abs(mapHeading) > 2) && (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => {
-              mapRef.current?.animateCamera({ heading: 0, pitch: 0 }, { duration: 500 });
-              setMapHeading(0);
-              updateLocationMode('NONE');
-            }}
-            style={{
-              width: 46, height: 46,
-              borderRadius: 23,
-              backgroundColor: '#FFFFFF',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
-              elevation: 5,
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}
-          >
-            <CompassWidget
-              heading={locationMode === 'COMPASS' ? deviceHeading : mapHeading}
-            />
-          </TouchableOpacity>
-        )}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                mapRef.current?.animateCamera({ heading: 0, pitch: 0 }, { duration: 500 });
+                setMapHeading(0);
+                updateLocationMode('NONE');
+              }}
+              style={{
+                width: 46, height: 46,
+                borderRadius: 23,
+                backgroundColor: '#FFFFFF',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 5,
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              <CompassWidget
+                heading={locationMode === 'COMPASS' ? deviceHeading : mapHeading}
+              />
+            </TouchableOpacity>
+          )}
         </View>
 
         <TouchableOpacity
@@ -710,14 +814,14 @@ export default function TagRouteDetailsScreen() {
             shadowOpacity: 0.25, shadowRadius: 3, elevation: 4,
           }}
         >
-           {/* Vẽ icon "Target" y hệt Google Maps bằng View thuần cực nét */}
-           <View className="w-[18px] h-[18px] rounded-full border-[2px] border-[#666666] items-center justify-center">
-              <View className="w-[8px] h-[8px] rounded-full bg-[#3B82F6]" />
-              <View className="absolute top-[-6px] w-[2px] h-[4px] bg-[#666666]" />
-              <View className="absolute bottom-[-6px] w-[2px] h-[4px] bg-[#666666]" />
-              <View className="absolute left-[-6px] w-[4px] h-[2px] bg-[#666666]" />
-              <View className="absolute right-[-6px] w-[4px] h-[2px] bg-[#666666]" />
-           </View>
+          {/* Vẽ icon "Target" y hệt Google Maps bằng View thuần cực nét */}
+          <View className="w-[18px] h-[18px] rounded-full border-[2px] border-[#666666] items-center justify-center">
+            <View className="w-[8px] h-[8px] rounded-full bg-[#3B82F6]" />
+            <View className="absolute top-[-6px] w-[2px] h-[4px] bg-[#666666]" />
+            <View className="absolute bottom-[-6px] w-[2px] h-[4px] bg-[#666666]" />
+            <View className="absolute left-[-6px] w-[4px] h-[2px] bg-[#666666]" />
+            <View className="absolute right-[-6px] w-[4px] h-[2px] bg-[#666666]" />
+          </View>
         </TouchableOpacity>
 
         {/* 🌟 THÊM 2: NÚT LA BÀN (Chỉ hiện khi bản đồ bị xoay lệch hướng Bắc) */}
@@ -736,10 +840,10 @@ export default function TagRouteDetailsScreen() {
           >
             {/* Vòng quay của la bàn, sẽ phản chiếu nghịch với góc xoay của map */}
             <View style={{ transform: [{ rotate: `${-mapHeading}deg` }], alignItems: 'center', justifyContent: 'center' }}>
-               {/* Kim Đỏ (Hướng Bắc) */}
-               <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 12, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#EF4444' }} />
-               {/* Kim Xám (Hướng Nam) */}
-               <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 12, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#9CA3AF' }} />
+              {/* Kim Đỏ (Hướng Bắc) */}
+              <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 12, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#EF4444' }} />
+              {/* Kim Xám (Hướng Nam) */}
+              <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 12, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#9CA3AF' }} />
             </View>
           </TouchableOpacity>
         )}
@@ -872,7 +976,7 @@ export default function TagRouteDetailsScreen() {
                 />
                 <Image source={require('../assets/icon/phone-white.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
                 <Text className="text-[#ffffff] text-[16px] font-semibold ml-2.5 tracking-tight">Contact Now</Text>
-                
+
                 <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, width: 60, transform: [{ skewX: '-20deg' }], zIndex: 10 }, shineStyle]}>
                   <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1 }} />
                 </Animated.View>
@@ -907,7 +1011,7 @@ export default function TagRouteDetailsScreen() {
               right: 0,
               pointerEvents: 'none',
             },
-            innerShadowStyle 
+            innerShadowStyle
           ]}
         >
           <LinearGradient
@@ -964,23 +1068,23 @@ export default function TagRouteDetailsScreen() {
           </TouchableOpacity>
         </Modal>
       </View>
-      <ReportUGCModal 
-          isVisible={isReportModalVisible} 
-          onClose={() => setIsReportModalVisible(false)}
-          reportTargetName={scannerName}
-        />
-        
-        {/* 🌟 THÊM MODAL LIÊN HỆ */}
-        <ShelterContactModal
-          isVisible={isContactModalVisible}
-          onClose={() => setIsContactModalVisible(false)}
-          shelterData={{ 
-            name: scannerName, 
-            phone: scannerPhone,
-            avatarUrl: 'https://ui-avatars.com/api/?name=' + scannerName + '&background=E89B5A&color=fff', // Fake avatar bằng chữ cái đầu
-            note: scannerMessage // Truyền thêm message quét thẻ vào làm note
-          }}
-        />
+      <ReportUGCModal
+        isVisible={isReportModalVisible}
+        onClose={() => setIsReportModalVisible(false)}
+        reportTargetName={scannerName}
+      />
+
+      {/* 🌟 THÊM MODAL LIÊN HỆ */}
+      <ShelterContactModal
+        isVisible={isContactModalVisible}
+        onClose={() => setIsContactModalVisible(false)}
+        shelterData={{
+          name: scannerName,
+          phone: scannerPhone,
+          avatarUrl: 'https://ui-avatars.com/api/?name=' + scannerName + '&background=E89B5A&color=fff', // Fake avatar bằng chữ cái đầu
+          note: scannerMessage // Truyền thêm message quét thẻ vào làm note
+        }}
+      />
     </View>
   );
 }

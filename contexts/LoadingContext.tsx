@@ -1,7 +1,7 @@
 // contexts/LoadingContext.tsx
 import { CustomLoader } from '@/components/CustomLoader';
 import React, { createContext, ReactNode, useContext, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 interface LoadingContextType {
     showLoading: (text?: string) => void;
@@ -37,12 +37,14 @@ export const LoadingProvider = ({ children }: { children: ReactNode }) => {
 
     return (
         <LoadingContext.Provider value={{ showLoading, hideLoading }}>
-            {/* LƯU Ý QUAN TRỌNG: Phải có style={{ flex: 1 }} ở đây */}
-            <View style={{ flex: 1 }}> 
+            <View style={{ flex: 1 }}>
                 {children}
-                
+
+                {/* Phủ toàn màn hình phía trên tất cả children */}
                 {isLoading && (
-                    <CustomLoader text={loadingText} transparent={true} />
+                    <View style={StyleSheet.absoluteFill} pointerEvents="auto">
+                        <CustomLoader text={loadingText} />
+                    </View>
                 )}
             </View>
         </LoadingContext.Provider>

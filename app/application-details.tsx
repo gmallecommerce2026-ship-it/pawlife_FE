@@ -5,7 +5,7 @@ import { CustomLoader } from '@/components/CustomLoader';
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // --- TÁCH CÁC COMPONENT GIAO DIỆN SANG ĐÂY ---
@@ -62,7 +62,7 @@ export default function ApplicationDetailsScreen() {
   };
 
   if (isLoading || !applicationData) {
-      return <CustomLoader text="Loading..." />;
+      return <ActivityIndicator size="small" color="#e9a353" />;
   }
 
   const commitments = applicationData.commitments || {};

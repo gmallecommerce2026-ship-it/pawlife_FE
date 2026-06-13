@@ -17,12 +17,12 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useContext, useEffect, useRef, useState } from 'react';
 // BỔ SUNG 1: Thêm Alert vào import từ react-native
-import { Alert, AppState, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Alert, Animated, AppState, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
-
 // Import thư viện bảo mật
+import { setSplashVideoState } from '@/api/axiosClient';
 import { toastConfig } from '@/components/toastConfig';
 import { connectSocket, socket } from '@/utils/socket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,11 +30,10 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import Toast from 'react-native-toast-message';
 import { SuccessModal } from '../components/SuccessModal';
-
 // BỔ SUNG: Import React Query
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
+import { ResizeMode, Video } from 'expo-av';
 export { ErrorBoundary } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
@@ -42,7 +41,7 @@ SplashScreen.preventAutoHideAsync();
 const overrideDefaultFont = () => {
   const TextRender = Text as any;
   const TextInputRender = TextInput as any;
-  
+
   // Áp dụng font Urbanist cho Text
   TextRender.defaultProps = TextRender.defaultProps || {};
   TextRender.defaultProps.style = [{ fontFamily: 'Urbanist' }, TextRender.defaultProps.style];
@@ -189,9 +188,9 @@ function RootLayoutNavGuard() {
       } else {
         if (inSignInScreen || inCompleteProfileScreen) {
           if (!hasSeenIntro) {
-            router.push('/intro'); 
+            router.push('/intro');
           } else {
-            router.push('/(tabs)'); 
+            router.push('/(tabs)');
           }
         }
       }
@@ -227,11 +226,77 @@ function RootLayoutNavGuard() {
     </>
   );
 }
+const GlobalOverlay = () => {
+  // Lấy state từ context của bạn
+  // const isGlobalLoading = useLoadingStore((state: any) => state.isGlobalLoading); // Hoặc hook zustand/context của bạn
+  // const isGlobalLoading = true;
+  return (
+    <>
+      {/* <CustomLoader visible={isGlobalLoading} /> */}
+      <Toast config={toastConfig} position="top" topOffset={50} />
+      <SuccessModal />
+    </>
+  );
+};
+const VideoSplashOverlay = ({ onFinish }: { onFinish: () => void }) => {
+  const { t } = useLanguage(); // Gọi hook dịch thuật hợp lệ bên trong Provider
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const [isVisible, setIsVisible] = useState(true);
 
+  const handleDismiss = () => {
+    // Hiệu ứng fade out nhẹ nhàng 0.4s khi bấm Skip hoặc khi hết video
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 400,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsVisible(false);
+      onFinish(); // Báo cho trục chính biết video đã kết thúc
+    });
+  };
+
+  if (!isVisible) return null;
+
+  return (
+    <Animated.View
+      style={[
+        StyleSheet.absoluteFill,
+        { opacity: fadeAnim, zIndex: 9999, elevation: 9999, backgroundColor: '#000' }
+      ]}
+    >
+      <Video
+        source={require('../assets/video/splash.mp4')}
+        style={StyleSheet.absoluteFill}
+        resizeMode={ResizeMode.COVER}
+        shouldPlay={true}
+        isLooping={false}
+        isMuted={true}
+        onPlaybackStatusUpdate={(status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            handleDismiss();
+          }
+        }}
+      />
+
+      {/* NÚT SKIP Ở GÓC TRÊN BÊN PHẢI (Sử dụng cấu trúc thiết kế tinh tế, tối giản) */}
+      <TouchableOpacity
+        onPress={handleDismiss}
+        activeOpacity={0.8}
+        // top-14 giúp đẩy nút xuống qua khỏi khu vực Tai thỏ/Dynamic Island của iPhone
+        className="absolute top-14 right-5 bg-black/40 px-4 py-2 rounded-full border border-white/20 active:bg-black/60"
+      >
+        <Text className="text-white text-xs font-semibold tracking-wider">
+          {t('Skip')}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 // ------------------------------------------------------------------
 // Component RootLayout chính: Load Font và Provider
 // ------------------------------------------------------------------
 export default function RootLayout() {
+  //const isGlobalLoading = useLoadingStore((state: any) => state.isGlobalLoading);
   const [loaded, error] = useFonts({
     Urbanist: Urbanist_400Regular,
     UrbanistMedium: Urbanist_500Medium,
@@ -240,7 +305,8 @@ export default function RootLayout() {
     UrbanistItalic: Urbanist_400Regular_Italic,
     UrbanistExtraBold: Urbanist_800ExtraBold,
   });
-
+  const [isVideoFinished, setIsVideoFinished] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -251,24 +317,63 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
+  const handleVideoFinish = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 500,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsVideoFinished(true);
+      setSplashVideoState(false); 
+    });
+  };
+
   if (!loaded) {
     return null;
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
       <QueryClientProvider client={queryClient}>
-        <AppProvider>
-          <AuthProvider>
-            <LanguageProvider>
-              <LoadingProvider>
+        
+        {/* QUAN TRỌNG: Đưa LoadingProvider lên TRƯỚC AppProvider và AuthProvider */}
+        <LoadingProvider> 
+          <AppProvider>
+            <AuthProvider>
+              <LanguageProvider>
+                
                 <RootLayoutNavGuard />
-                <Toast config={toastConfig} position="top" topOffset={50} />
-                <SuccessModal />
-              </LoadingProvider>
-            </LanguageProvider>
-          </AuthProvider>
-        </AppProvider>
+                <GlobalOverlay />
+
+                {/* OVERLAY VIDEO SPLASH */}
+                {!isVideoFinished && (
+                  <Animated.View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { opacity: fadeAnim, zIndex: 9999, elevation: 9999, backgroundColor: '#000' }
+                    ]}
+                  >
+                    <Video
+                      source={require('../assets/video/splash.mp4')}
+                      style={StyleSheet.absoluteFill}
+                      resizeMode={ResizeMode.COVER} 
+                      shouldPlay={true}
+                      isLooping={false}
+                      isMuted={true}
+                      onPlaybackStatusUpdate={(status) => {
+                        if (status.isLoaded && status.didJustFinish) {
+                          handleVideoFinish();
+                        }
+                      }}
+                    />
+                  </Animated.View>
+                )}
+
+              </LanguageProvider>
+            </AuthProvider>
+          </AppProvider>
+        </LoadingProvider>
+
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

@@ -6,80 +6,85 @@ import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// BỔ SUNG: Import global ref từ LoadingContext của bạn
 import { globalLoadingRef } from '@/contexts/LoadingContext';
 
 export const BASE_URL = 'https://api.p3tid.com/';
 
 // =======================================================================
-// 🚀 IN-MEMORY CACHE: Tối ưu hiệu năng cực đại (Chống giật lag App)
+// 🚀 IN-MEMORY CACHE
 // =======================================================================
 let inMemoryToken: string | null = null;
 let inMemoryDeviceId: string | null = null;
-let isRedirecting = false; // Biến cờ chống gọi router.replace nhiều lần
+let isRedirecting = false; 
 
 export const setCachedAccessToken = (token: string | null) => {
   inMemoryToken = token;
 };
 
 // =======================================================================
-// 🌐 GLOBAL LOADING LOGIC (Biến đếm request để xử lý gọi API đồng thời)
-// =======================================================================
-// =======================================================================
-// 🌐 GLOBAL LOADING LOGIC (Có cơ chế Failsafe chống đơ App)
+// 🌐 GLOBAL LOADING LOGIC (Fix Race Condition & Memory Leaks)
 // =======================================================================
 let activeRequests = 0;
-let failsafeTimeout: any = null;
-let showTimer: any = null;
-let hideTimer: any = null;
+let showTimer: ReturnType<typeof setTimeout> | null = null;
+let hideTimer: ReturnType<typeof setTimeout> | null = null;
+let failsafeTimeout: ReturnType<typeof setTimeout> | null = null;
 let loadingStartTime = 0;
 let isLoaderVisible = false;
-
-const MIN_LOADING_TIME = 600;  // Nếu đã hiện, giữ ít nhất 0.6 giây
-const DELAY_BEFORE_SHOW = 250; // Nếu API xong trước 250ms, không hiện loading
+export let isSplashVideoPlaying = true;
+export const setSplashVideoState = (isPlaying: boolean) => {
+  isSplashVideoPlaying = isPlaying;
+  
+  // Nếu video vừa tắt đi, mà API vẫn chưa load xong -> Ép hiện Loading Con Chó
+  if (!isPlaying && activeRequests > 0 && !isLoaderVisible) {
+    isLoaderVisible = true;
+    loadingStartTime = Date.now();
+    globalLoadingRef.current?.showLoading();
+  }
+};
+const MIN_LOADING_TIME = 500;  
+const DELAY_BEFORE_SHOW = 250;
 
 const forceHideLoading = () => {
   activeRequests = 0;
   isLoaderVisible = false;
-  if (showTimer) clearTimeout(showTimer);
-  if (hideTimer) clearTimeout(hideTimer);
-  if (failsafeTimeout) clearTimeout(failsafeTimeout);
+  
+  if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  if (failsafeTimeout) { clearTimeout(failsafeTimeout); failsafeTimeout = null; }
+  
   globalLoadingRef.current?.hideLoading();
 };
 
 const showGlobalLoading = () => {
-  if (activeRequests === 0) {
-    // Đợi 250ms mới gọi màn hình Loading
+  activeRequests++;
+  
+  if (activeRequests === 1) {
     showTimer = setTimeout(() => {
+      // BỔ SUNG: Nếu Video đang chạy -> Bỏ qua, không hiện Loading để tránh che video
+      if (isSplashVideoPlaying) return; 
+
       isLoaderVisible = true;
       loadingStartTime = Date.now();
       globalLoadingRef.current?.showLoading();
+
+      failsafeTimeout = setTimeout(() => {
+        forceHideLoading();
+      }, 15000); 
     }, DELAY_BEFORE_SHOW);
   }
-  activeRequests++;
-
-  // Failsafe 15s: Chống treo app nếu rớt mạng
-  if (failsafeTimeout) clearTimeout(failsafeTimeout);
-  failsafeTimeout = setTimeout(() => {
-    forceHideLoading();
-  }, 15000); 
 };
 
 const hideGlobalLoading = () => {
   activeRequests = Math.max(0, activeRequests - 1);
+  
   if (activeRequests === 0) {
-    // 1. Nếu API chạy xong nhanh hơn 250ms -> Hủy bỏ lệnh show -> UI mượt, không chớp giật
+    // 1. Nếu API chạy xong nhanh hơn 250ms -> Hủy bỏ lệnh show ngay lập tức
     if (showTimer) {
       clearTimeout(showTimer);
       showTimer = null;
     }
-    
-    if (failsafeTimeout) {
-      clearTimeout(failsafeTimeout);
-      failsafeTimeout = null;
-    }
 
-    // 2. Nếu Loading đã lỡ hiện lên rồi -> Ép nó chờ cho đủ 600ms mới được tắt
+    // 2. Nếu Loading đã hiện, ép chờ đủ MIN_LOADING_TIME mới tắt để tránh chớp nháy
     if (isLoaderVisible) {
       const elapsedTime = Date.now() - loadingStartTime;
       const remainingTime = MIN_LOADING_TIME - elapsedTime;
@@ -91,6 +96,9 @@ const hideGlobalLoading = () => {
       } else {
         forceHideLoading();
       }
+    } else {
+      // Đảm bảo dọn dẹp sạch sẽ nếu loader chưa kịp hiện
+      forceHideLoading();
     }
   }
 };
@@ -103,11 +111,10 @@ const axiosClient = axios.create({
 });
 
 // =======================================================================
-// HÀM LẤY HOẶC TẠO DEVICE ID (CÓ SỬ DỤNG CACHE)
+// HÀM LẤY HOẶC TẠO DEVICE ID
 // =======================================================================
 const getUniqueDeviceId = async (): Promise<string> => {
   if (inMemoryDeviceId) return inMemoryDeviceId;
-
   try {
     let deviceId = await SecureStore.getItemAsync('x_device_id');
     if (!deviceId) {
@@ -117,7 +124,6 @@ const getUniqueDeviceId = async (): Promise<string> => {
     inMemoryDeviceId = deviceId;
     return deviceId;
   } catch (error) {
-    console.error('Lỗi khi lấy Device ID:', error);
     return `fallback_${Platform.OS}_${Date.now()}`;
   }
 };
@@ -128,10 +134,9 @@ const getUniqueDeviceId = async (): Promise<string> => {
 axiosClient.interceptors.request.use(
   async (config) => {
     try {
-      // 1. LẤY TOKEN (Ưu tiên RAM -> Fallback SecureStore)
       let token = inMemoryToken;
       if (!token) {
-        token = await SecureStore.getItemAsync('accessToken'); // Hoặc 'access_token' tuỳ code auth
+        token = await SecureStore.getItemAsync('accessToken'); 
         if (token) inMemoryToken = token;
       }
 
@@ -139,7 +144,6 @@ axiosClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
 
-      // 2. LẤY DEVICE ID & INFO
       const deviceId = await getUniqueDeviceId();
       if (config.headers) {
         config.headers['x-device-id'] = deviceId;
@@ -147,21 +151,19 @@ axiosClient.interceptors.request.use(
         config.headers['x-device-os'] = `${Platform.OS} ${Platform.Version}`;
       }
       
-      // 3. BẬT LOADING SCREEN
-      // Nếu API không có header 'X-Silent-Request' thì mới bật loading
+      // BẬT LOADING (Bỏ qua nếu có header X-Silent-Request)
       if (config.headers && !config.headers['X-Silent-Request']) {
         showGlobalLoading();
       }
-
     } catch (error) {
-      console.error('Lỗi Request Interceptor:', error);
+      console.error('Interceptor Error:', error);
     }
-
     return config;
   },
   (error) => {
-    // Tắt loading nếu request fail ngay từ đầu
-    hideGlobalLoading();
+    if (error.config && error.config.headers && !error.config.headers['X-Silent-Request']) {
+      hideGlobalLoading();
+    }
     return Promise.reject(error);
   }
 );
@@ -171,14 +173,13 @@ axiosClient.interceptors.request.use(
 // =======================================================================
 axiosClient.interceptors.response.use(
   (response) => {
-    // 1. TẮT LOADING KHI THÀNH CÔNG
     if (response.config && response.config.headers && !response.config.headers['X-Silent-Request']) {
       hideGlobalLoading();
     }
     return response;
   },
   async (error) => {
-    // 1. TẮT LOADING KHI CÓ LỖI (Quan trọng: Phải tắt loading trước khi handle lỗi/redirect)
+    // TẮT LOADING TRƯỚC KHI XỬ LÝ LỖI
     if (error.config && error.config.headers && !error.config.headers['X-Silent-Request']) {
       hideGlobalLoading();
     }
@@ -187,7 +188,6 @@ axiosClient.interceptors.response.use(
     const statusCode = errorData?.statusCode;
     const message = errorData?.message;
 
-    // 2. LỖI THIẾU PROFILE
     if (statusCode === 4032 || message === 'PROFILE_INCOMPLETE') {
       if (!isRedirecting) {
         isRedirecting = true;
@@ -197,21 +197,17 @@ axiosClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // 3. LỖI HẾT HẠN TOKEN (401)
     if (error.response && error.response.status === 401) {
       const isLoginRoute = error.config?.url?.includes('/auth/login');
       
       if (!isLoginRoute && !isRedirecting) {
         isRedirecting = true; 
         
-        // Dọn dẹp cache RAM và SecureStore
         inMemoryToken = null;
-        await SecureStore.deleteItemAsync('accessToken'); // Nếu bạn lưu key là access_token thì sửa lại cho đúng
+        await SecureStore.deleteItemAsync('accessToken'); 
         await SecureStore.deleteItemAsync('userData');
         
-        // Điều hướng ra màn hình chính/login
         router.replace('/');
-        
         setTimeout(() => { isRedirecting = false; }, 1000); 
       }
     }

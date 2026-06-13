@@ -1,7 +1,6 @@
 // app/(tabs)/index.tsx
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
-// Đã tạm tắt hook useInfiniteSlider để khắc phục lỗi liệt cảm ứng do re-render loop
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -11,9 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-// THÊM: AppState để lắng nghe vòng đời ứng dụng
-import { CustomLoader } from '@/components/CustomLoader';
-import { AppState, FlatList, Image, PixelRatio, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, Image, PixelRatio, ScrollView, TouchableOpacity, View } from 'react-native';
 import Animated, {
     Easing,
     Extrapolation,
@@ -49,9 +46,17 @@ const SectionHeader = ({ title, onLinkPress, t }: { title: string, onLinkPress?:
     </View>
 );
 
+// Component hiển thị loading inline mượt mà không phá vỡ UI
+const SectionLoader = () => (
+    <View className="w-full h-32 items-center justify-center">
+        <ActivityIndicator size="small" color="#E89B5A" />
+    </View>
+);
+
 export default function HomeScreen() {
     const { t } = useLanguage();
     const router = useRouter();
+    const [data, setData] = useState(null);
     const insets = useSafeAreaInsets();
     const { user } = useContext(AuthContext);
     const { location, errorMsg, isLocationLoaded } = useLocation();
@@ -59,10 +64,8 @@ export default function HomeScreen() {
     const translateY = useSharedValue(0);
     const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-    // --- LOGIC XỬ LÝ ẢNH HERO THEO THỜI GIAN SÁNG/TỐI ---
     const [heroImage, setHeroImage] = useState(() => {
         const hour = new Date().getHours();
-        // Từ 6h sáng đến trước 18h tối là ban ngày
         return (hour >= 6 && hour < 18)
             ? require('../../assets/images/home_hero_1.png')
             : require('../../assets/images/home_hero_2.png');
@@ -70,28 +73,23 @@ export default function HomeScreen() {
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState) => {
-            // Khi app được mở lên lại từ màn hình chính hoặc đa nhiệm
             if (nextAppState === 'active') {
                 const hour = new Date().getHours();
                 const newImage = (hour >= 6 && hour < 18)
                     ? require('../../assets/images/home_hero_1.png')
                     : require('../../assets/images/home_hero_2.png');
-
-                // Chỉ cập nhật state nếu ảnh thực sự cần thay đổi để tránh re-render thừa
                 setHeroImage((currentImage: any) => currentImage !== newImage ? newImage : currentImage);
             }
         });
-
-        return () => {
-            subscription.remove();
-        };
+        return () => subscription.remove();
     }, []);
-    // ----------------------------------------------------
 
     const [pets, setPets] = useState<any[]>([]);
     const [shelters, setShelters] = useState<any[]>([]);
     const [events, setEvents] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    
+    // Đổi logic loading: Tách riêng initialLoading để phục vụ hiển thị UI mượt
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [hasUnread, setHasUnread] = useState(false);
     const bounceY = useSharedValue(0);
 
@@ -103,32 +101,23 @@ export default function HomeScreen() {
     useEffect(() => {
         bounceY.value = withRepeat(
             withSequence(
-                withDelay(
-                    5000,
-                    withTiming(-12, { duration: 120, easing: Easing.out(Easing.ease) })
-                ),
+                withDelay(5000, withTiming(-12, { duration: 120, easing: Easing.out(Easing.ease) })),
                 withTiming(0, { duration: 400, easing: Easing.bounce })
             ),
-            -1,
-            false
+            -1, false
         );
     }, []);
 
-    const bounceStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: bounceY.value }],
-    }));
+    const bounceStyle = useAnimatedStyle(() => ({ transform: [{ translateY: bounceY.value }] }));
 
     const HEADER_MAX_HEIGHT = 320;
     const CURVE_HEIGHT = 28;
     const HEADER_MIN_HEIGHT = insets.top + 116;
     const SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
-
     const scrollY = useSharedValue(0);
 
     const scrollHandler = useAnimatedScrollHandler({
-        onScroll: (event) => {
-            scrollY.value = event.contentOffset.y;
-        },
+        onScroll: (event) => { scrollY.value = event.contentOffset.y; },
     });
 
     const headerAnimatedStyle = useAnimatedStyle(() => {
@@ -145,27 +134,9 @@ export default function HomeScreen() {
     const targetX = PixelRatio.roundToNearestPixel(50);
 
     const textContainerAnimatedStyle = useAnimatedStyle(() => {
-        const translateY = interpolate(
-            scrollY.value,
-            [0, SCROLL_DISTANCE],
-            [0, targetY],
-            Extrapolation.CLAMP
-        );
-
-        const translateX = interpolate(
-            scrollY.value,
-            [0, SCROLL_DISTANCE],
-            [0, targetX],
-            Extrapolation.CLAMP
-        );
-
-        const scale = interpolate(
-            scrollY.value,
-            [0, SCROLL_DISTANCE],
-            [1, 0.9],
-            Extrapolation.CLAMP
-        );
-
+        const translateY = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, targetY], Extrapolation.CLAMP);
+        const translateX = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, targetX], Extrapolation.CLAMP);
+        const scale = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [1, 0.9], Extrapolation.CLAMP);
         return { transform: [{ translateY }, { translateX }, { scale }] };
     });
 
@@ -177,12 +148,7 @@ export default function HomeScreen() {
     });
 
     const backgroundImageAnimatedStyle = useAnimatedStyle(() => {
-        const translateY = interpolate(
-            scrollY.value,
-            [0, SCROLL_DISTANCE],
-            [0, -132],
-            Extrapolation.CLAMP
-        );
+        const translateY = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, -132], Extrapolation.CLAMP);
         return { transform: [{ translateY }] };
     });
 
@@ -191,7 +157,8 @@ export default function HomeScreen() {
             const checkUnreadNotifications = async () => {
                 if (!user?.id) return;
                 try {
-                    const res = await axiosClient.get('/notifications?page=1&limit=10');
+                    // Gọi silent request cho đếm thông báo
+                    const res = await axiosClient.get('/notifications?page=1&limit=10', { headers: { 'X-Silent-Request': 'true' }});
                     const notifications = res.data.data || [];
                     setHasUnread(notifications.some((item: any) => !item.isRead));
                 } catch (error) {
@@ -199,16 +166,24 @@ export default function HomeScreen() {
                 }
             };
             checkUnreadNotifications();
-            if (isLocationLoaded) {
+            
+            // Xóa loadHomeData ở đây nếu nó gây gọi API đúp khi vừa mở app
+            // Giữ lại nếu bạn muốn refresh data ngầm mỗi khi chuyển tab
+            if (isLocationLoaded && !isInitialLoading) {
                 loadHomeData(location?.lat, location?.lng, true);
             }
-        }, [isLocationLoaded, location, user?.id])
+        }, [isLocationLoaded, location, user?.id, isInitialLoading])
     );
 
     const loadHomeData = async (currentLat?: number, currentLng?: number, isSilentRefresh = false) => {
         try {
-            if (!isSilentRefresh) setIsLoading(true);
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Không set trạng thái loading nếu đây là Silent Refresh
+            if (!isSilentRefresh && pets.length === 0) setIsInitialLoading(true);
+            
+            // ĐÃ XÓA: Lệnh setTimeout 2000ms gây chậm app vô lý. API bao nhiêu ms thì trả về bấy nhiêu ms.
+            
+            // Gợi ý: Nếu trong service bạn cấu hình truyền được headers, hãy thêm X-Silent-Request: 'true' 
+            // vào tham số nếu isSilentRefresh = true để không chớp Global Loader.
             const [eventsRes, petsRes, sheltersRes] = await Promise.all([
                 eventService.getUpcomingEvents(5),
                 petService.getFeed(10, currentLat, currentLng),
@@ -216,6 +191,7 @@ export default function HomeScreen() {
                     ? shelterService.getSheltersNearBy(currentLat, currentLng, 5)
                     : shelterService.getShelters({ limit: 5 })
             ]);
+            
             setEvents(eventsRes?.data || eventsRes || []);
 
             let fetchedPets = petsRes?.data || petsRes || [];
@@ -237,16 +213,14 @@ export default function HomeScreen() {
                 setPets([]); setEvents([]); setShelters([]);
             }
         } finally {
-            if (!isSilentRefresh) setIsLoading(false);
+            setIsInitialLoading(false);
         }
     };
 
     useEffect(() => {
         if (!isLocationLoaded) return;
         const initLoad = async () => {
-            setIsLoading(true);
             await loadHomeData(location?.lat, location?.lng);
-            setIsLoading(false);
         };
         initLoad();
     }, [isLocationLoaded, location, errorMsg, user?.id]);
@@ -271,18 +245,11 @@ export default function HomeScreen() {
     }, []);
 
     const cornerOverlayAnimatedStyle = useAnimatedStyle(() => {
-        const opacity = interpolate(
-            scrollY.value,
-            [SCROLL_DISTANCE * 0.3, SCROLL_DISTANCE],
-            [0, 1],
-            Extrapolation.CLAMP
-        );
+        const opacity = interpolate(scrollY.value, [SCROLL_DISTANCE * 0.3, SCROLL_DISTANCE], [0, 1], Extrapolation.CLAMP);
         return { opacity };
     });
 
-    const getItemLayout = useCallback((data: any, index: number) => ({
-        length: 140, offset: 140 * index, index,
-    }), []);
+    const getItemLayout = useCallback((data: any, index: number) => ({ length: 140, offset: 140 * index, index }), []);
 
     const renderPetItem = useCallback(({ item: pet }: { item: any }) => {
         const petImageUrl = (pet.images && pet.images.length > 0) ? pet.images[0]?.url : 'https://via.placeholder.com/200x300.png?text=No+Image';
@@ -294,29 +261,23 @@ export default function HomeScreen() {
         }
 
         const isFemale = pet.gender?.toUpperCase() === 'FEMALE' || pet.gender?.toUpperCase() === 'CÁ';
-
         const displayAge = (() => {
             if (pet.age) {
                 if (typeof pet.age === 'number' || !isNaN(Number(pet.age))) return `${pet.age}`;
                 return pet.age;
             }
-
             if (pet.dob) {
                 const birthDate = new Date(pet.dob);
                 const today = new Date();
                 let years = today.getFullYear() - birthDate.getFullYear();
                 let months = today.getMonth() - birthDate.getMonth();
-
                 if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
-                    years--;
-                    months += 12;
+                    years--; months += 12;
                 }
-
                 if (years > 0) return `${years}`;
                 if (months > 0) return `${months}T`;
                 return '1T';
             }
-
             return 'N/A';
         })();
 
@@ -327,15 +288,7 @@ export default function HomeScreen() {
                 style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 }}
                 onPress={() => router.push({
                     pathname: '/pet-detail-modal',
-                    params: {
-                        id: pet.id,
-                        name: pet.name,
-                        gender: pet.gender || 'male',
-                        distance: displayCity,
-                        image: petImageUrl,
-                        age: displayAge,
-                        breed: pet.breed || 'Unknown Breed'
-                    }
+                    params: { id: pet.id, name: pet.name, gender: pet.gender || 'male', distance: displayCity, image: petImageUrl, age: displayAge, breed: pet.breed || 'Unknown Breed' }
                 })}
             >
                 <View className="w-full h-full rounded-[24px] overflow-hidden relative">
@@ -362,17 +315,14 @@ export default function HomeScreen() {
         );
     }, [router]);
 
-    if (isLoading) {
-        return <CustomLoader text="Loading data..." />;
-    }
+    // QUAN TRỌNG: Đã xóa cục if (isLoading) return <ActivityIndicator /> chặn ngang UI tại đây.
+    // UI bây giờ sẽ render Bộ Header NGAY LẬP TỨC.
 
     return (
         <View className="flex-1 bg-white ">
             <Animated.ScrollView
                 showsVerticalScrollIndicator={false}
-                style={{
-                    flex: 1, zIndex: 1
-                }}
+                style={{ flex: 1, zIndex: 1 }}
                 contentContainerStyle={{ paddingBottom: 60 }}
                 onScroll={scrollHandler}
                 scrollEventThrottle={16}
@@ -382,33 +332,14 @@ export default function HomeScreen() {
                 <View style={{ height: HEADER_MAX_HEIGHT }} />
 
                 <View className="bg-white pb-6">
-                    <LinearGradient
-                        colors={['#FFFFFF', '#FCF8ED']}
-                        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-                        className="pb-6"
-                    >
+                    <LinearGradient colors={['#FFFFFF', '#FCF8ED']} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} className="pb-6">
                         <View className="px-6 mt-2">
                             <Animated.View style={[bounceStyle, {}]}>
-
                                 <TouchableOpacity activeOpacity={0.8} onPress={handleScanPress}>
-                                    <View
-                                        className="relative p-[20px] rounded-[32px] flex-row items-center bg-white/50"
-                                        style={{
-                                            shadowColor: '#E89B5A5D', shadowOffset: { width: 0, height: 0 },
-                                            shadowOpacity: 0.6, shadowRadius: 5, elevation: 4,
-                                        }}
-                                    >
-                                        <LinearGradient
-                                            colors={['#FFFFFF', '#FCF8ED']} locations={[0.3, 0.8]}
-                                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 32 }}
-                                        />
+                                    <View className="relative p-[20px] rounded-[32px] flex-row items-center bg-white/50" style={{ shadowColor: '#E89B5A5D', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 5, elevation: 4 }}>
+                                        <LinearGradient colors={['#FFFFFF', '#FCF8ED']} locations={[0.3, 0.8]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 32 }} />
                                         <View className="w-16 h-16 rounded-2xl overflow-hidden items-center justify-center mr-5">
-                                            <LinearGradient
-                                                colors={['rgb(255, 244, 230)', 'rgba(255, 232, 204, 0.52)']}
-                                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                                            />
+                                            <LinearGradient colors={['rgb(255, 244, 230)', 'rgba(255, 232, 204, 0.52)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
                                             <Image source={require('../../assets/icon/scan-index.png')} style={{ width: 21, height: 21 }} resizeMode="cover" />
                                         </View>
                                         <View className="flex-1">
@@ -419,22 +350,12 @@ export default function HomeScreen() {
                                 </TouchableOpacity>
                             </Animated.View>
 
-                            {/* PAWCARE */}
                             <View className="mt-[38px]">
                                 <Text className="text-[16px] font-semibold text-gray-900 mb-4">{t('Pawcare')}</Text>
                                 <View className="flex-row justify-between">
                                     {CATEGORIES.map((cat) => (
-                                        <TouchableOpacity
-                                            key={cat.id}
-                                            className="items-center w-[22%] -ml-1"
-                                            activeOpacity={0.7}
-                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                            onPress={() => router.push({ pathname: '/pawcare/[category]', params: { category: cat.label } })}
-                                        >
-                                            <View
-                                                className="w-20 h-20 bg-white rounded-full items-center justify-center mb-3"
-                                                style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 }}
-                                            >
+                                        <TouchableOpacity key={cat.id} className="items-center w-[22%] -ml-1" activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.push({ pathname: '/pawcare/[category]', params: { category: cat.label } })}>
+                                            <View className="w-20 h-20 bg-white rounded-full items-center justify-center mb-3" style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 }}>
                                                 <Image source={cat.icon} className="w-11 h-11" />
                                             </View>
                                             <Text className="text-gray-500 text-xs font-medium">{t(cat.label)}</Text>
@@ -447,7 +368,9 @@ export default function HomeScreen() {
                         {/* --- PETS NEAR YOU TỪ API --- */}
                         <View className="mt-[38px]">
                             <SectionHeader title="Pets Near You" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })} t={t} />
-                            {pets.length === 0 ? (
+                            {isInitialLoading && pets.length === 0 ? (
+                                <SectionLoader />
+                            ) : pets.length === 0 ? (
                                 <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có thú cưng nào gần đây</Text>
                             ) : (
                                 <FlatList
@@ -476,14 +399,12 @@ export default function HomeScreen() {
                         {/* --- ADOPTION SHELTERS TỪ API --- */}
                         <View className="mt-[38px]">
                             <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} t={t} />
-                                {shelters.length === 0 ? (<Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
+                            {isInitialLoading && shelters.length === 0 ? (
+                                <SectionLoader />
+                            ) : shelters.length === 0 ? (
+                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
                             ) : (
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }}
-                                    nestedScrollEnabled={true}
-                                >
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }} nestedScrollEnabled={true}>
                                     {shelters.map((shelter) => (
                                         <TouchableOpacity
                                             key={shelter.id}
@@ -493,9 +414,7 @@ export default function HomeScreen() {
                                         >
                                             <Image source={{ uri: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' }} className="w-14 h-14 rounded-full bg-gray-200 mr-3" resizeMode="cover" />
                                             <View className="flex-1">
-                                                <Text className="font-medium text-black text-[14px]" numberOfLines={1}>
-                                                    {shelter.name}
-                                                </Text>
+                                                <Text className="font-medium text-black text-[14px]" numberOfLines={1}>{shelter.name}</Text>
                                                 <View className="flex-row items-center mt-2">
                                                     <Image source={require('../../assets/icon/location-solid-gray.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
                                                     <Text className="text-[#8E8E93] font-regular text-[12px] ml-1 flex-1" numberOfLines={1}>{shelter.address || 'Đang cập nhật'}</Text>
@@ -510,15 +429,12 @@ export default function HomeScreen() {
                         {/* --- UPCOMING EVENTS TỪ API --- */}
                         <View className="mt-[38px] mb-6">
                             <SectionHeader title="Upcoming Events" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })} t={t} />
-                            {events.length === 0 ? (
+                            {isInitialLoading && events.length === 0 ? (
+                                <SectionLoader />
+                            ) : events.length === 0 ? (
                                 <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có sự kiện nào sắp tới</Text>
                             ) : (
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }}
-                                    nestedScrollEnabled={true}
-                                >
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }} nestedScrollEnabled={true}>
                                     {events.map((event) => {
                                         const d = new Date(event.startDate);
                                         return (
@@ -540,7 +456,6 @@ export default function HomeScreen() {
                                                                     <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>{event.locationName || event.address}</Text>
                                                                 </View>
                                                             </View>
-
                                                         </View>
                                                         <View className="items-center justify-center shrink-0 min-w-[32px]">
                                                             <Text className="text-[20px] font-semibold text-black leading-tight">{d.getDate().toString().padStart(2, '0')}</Text>
@@ -556,89 +471,25 @@ export default function HomeScreen() {
                         </View>
                     </LinearGradient>
                 </View>
-
             </Animated.ScrollView>
 
             <Animated.View style={[headerAnimatedStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: '#FFDDA2', overflow: 'hidden' }]} pointerEvents="box-none">
-
-                <Animated.View
-                    pointerEvents="none"
-                    style={[
-                        { position: 'absolute', top: 0, left: 0, width: '100%', height: HEADER_MAX_HEIGHT },
-                        backgroundImageAnimatedStyle
-                    ]}
-                >
-                    {/* ĐÃ SỬA: Thay thế ảnh hardcode thành state heroImage */}
-                    <Image
-                        source={heroImage}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
-                    />
+                <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, width: '100%', height: HEADER_MAX_HEIGHT }, backgroundImageAnimatedStyle]}>
+                    <Image source={heroImage} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                 </Animated.View>
 
-                <Animated.View
-                    pointerEvents="none"
-                    style={[
-                        cornerOverlayAnimatedStyle,
-                        {
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: CURVE_HEIGHT + 14,
-                            borderBottomLeftRadius: 40,
-                            zIndex: 2,
-                            overflow: 'hidden',
-                            borderWidth: 2.5,
-                            borderColor: 'rgba(234, 164, 100, 0.5)',
-                        }
-                    ]}
-                >
-                    <BlurView
-                        tint="light"
-                        intensity={7}
-                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                    />
-                    <View
-                        style={{
-                            position: 'absolute',
-                            top: 0, left: 0, right: 0, bottom: 0,
-                            backgroundColor: 'rgba(232, 155, 90, 0.15)'
-                        }}
-                    />
+                <Animated.View pointerEvents="none" style={[cornerOverlayAnimatedStyle, { position: 'absolute', top: 0, left: 0, right: 0, bottom: CURVE_HEIGHT + 14, borderBottomLeftRadius: 40, zIndex: 2, overflow: 'hidden', borderWidth: 2.5, borderColor: 'rgba(234, 164, 100, 0.5)' }]}>
+                    <BlurView tint="light" intensity={7} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+                    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(232, 155, 90, 0.15)' }} />
                 </Animated.View>
 
                 <View className="px-6 w-full h-full" pointerEvents="box-none" style={{ paddingTop: insets.top + 10, zIndex: 10 }}>
                     <View className="flex-row justify-between content-center items-start z-20" pointerEvents="box-none">
                         <View className="flex-row items-center flex-1" pointerEvents="box-none">
                             <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/edit-profile')}>
-                                <Animated.View
-                                    style={[
-                                        avatarAnimatedStyle,
-                                        {
-                                            shadowColor: '#000',
-                                            shadowOffset: { width: 0, height: 4 },
-                                            shadowOpacity: 0.1,
-                                            shadowRadius: 1,
-                                            elevation: 8,
-                                            zIndex: 50,
-                                        }
-                                    ]}
-                                >
-                                    <View
-                                        style={{
-                                            flex: 1,
-                                            backgroundColor: '#ffedd5',
-                                            overflow: 'hidden',
-                                            borderWidth: 2.5,
-                                            borderColor: '#FFFFFF',
-                                            borderRadius: 1000,
-                                        }}
-                                    >
-                                        <Image
-                                            source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }}
-                                            className="w-full h-full"
-                                        />
+                                <Animated.View style={[avatarAnimatedStyle, { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 8, zIndex: 50 }]}>
+                                    <View style={{ flex: 1, backgroundColor: '#ffedd5', overflow: 'hidden', borderWidth: 2.5, borderColor: '#FFFFFF', borderRadius: 1000 }}>
+                                        <Image source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150?img=32' }} className="w-full h-full" />
                                     </View>
                                 </Animated.View>
                             </TouchableOpacity>
@@ -651,9 +502,7 @@ export default function HomeScreen() {
 
                             <TouchableOpacity activeOpacity={0.7} className="relative" onPress={() => router.push('/notifications')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                                 <Ionicons name="notifications" size={26} color="white" style={{ textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                                {hasUnread && (
-                                    <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-[#E89B5A] rounded-full border border-white" />
-                                )}
+                                {hasUnread && <View className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-[#E89B5A] rounded-full border border-white" />}
                             </TouchableOpacity>
 
                             <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/profile-settings')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
@@ -662,32 +511,16 @@ export default function HomeScreen() {
                         </View>
                     </View>
 
-                    <Animated.View
-                        pointerEvents="none"
-                        style={[
-                            textContainerAnimatedStyle,
-                            { position: 'absolute', bottom: CURVE_HEIGHT + 83, left: 24, zIndex: 10 }
-                        ]}
-                        className={'-ml-1'}
-                    >
-                        <Text className="text-white font-semibold text-[20px] shadow-black/10" style={{ transformOrigin: 'left center' }}>
-                            {t('Hello,')} {user?.name || t('User')}!
-                        </Text>
+                    <Animated.View pointerEvents="none" style={[textContainerAnimatedStyle, { position: 'absolute', bottom: CURVE_HEIGHT + 83, left: 24, zIndex: 10 }]} className={'-ml-1'}>
+                        <Text className="text-white font-semibold text-[20px] shadow-black/10" style={{ transformOrigin: 'left center' }}>{t('Hello,')} {user?.name || t('User')}!</Text>
                         <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium tracking-tight overflow-hidden">
-                            <Text>
-                                {t('Let’s dive into your account')}
-                            </Text>
+                            <Text>{t('Let’s dive into your account')}</Text>
                         </Animated.Text>
                     </Animated.View>
                 </View>
 
-                <View
-                    className="absolute bottom-0 w-full bg-[#FFFFFF] rounded-t-[60px]"
-                    style={{ height: CURVE_HEIGHT - 5, zIndex: 0 }}
-                    pointerEvents="none"
-                />
+                <View className="absolute bottom-0 w-full bg-[#FFFFFF] rounded-t-[60px]" style={{ height: CURVE_HEIGHT - 5, zIndex: 0 }} pointerEvents="none" />
             </Animated.View>
-
         </View>
     );
 }

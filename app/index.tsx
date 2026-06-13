@@ -211,7 +211,7 @@ export default function WelcomeScreen() {
             </View>
             <View className="w-full flex-1 items-center mt-2">
               <Text className="text-[30px] font-semibold text-black mb-[21px] tracking-[0.06px] ">
-                Let’s Get Started!
+                Let's Get Started!
               </Text>
               <Text className="text-gray-500 mb-[33px] font-medium text-[16px]">
                 Let's dive into your account

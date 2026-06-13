@@ -4,7 +4,7 @@ import { useImageUpload } from '@/hooks/useImageUpload';
 import { Feather } from '@expo/vector-icons';
 import { Slider } from '@miblanchard/react-native-slider';
 import { BlurView } from 'expo-blur';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
@@ -28,7 +28,7 @@ import {
   View
 } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
-
+import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const MODAL_MAP_WIDTH = Math.round(SCREEN_WIDTH * 0.9 - 48);
 const MODAL_MAP_HEIGHT = 178; // Tương ứng h-[178px]
@@ -253,12 +253,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
     setRadius(numericValue);
   };
 
-  const currentLat = location?.latitude || 21.028511;
-  const currentLng = location?.longitude || 105.804817;
-  const zoomLevel = 14;
-
-  const metersPerPx = getMetersPerPixel(currentLat, zoomLevel);
-  const exactCircleSize = (radius / metersPerPx) * 2;
   return (
     <Modal
       animationType="fade"
@@ -312,27 +306,38 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                             <Text className="text-gray-400 text-xs mt-2 text-center">Fetching location...</Text>
                           </View>
                         ) : location ? (
-                          <>
-                            <Image
-                              source={{
-                                // Thay số 14 ở link Mapbox thành biến ZOOM_LEVEL
-                                uri: `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s+EF4444(${location.longitude},${location.latitude})/${location.longitude},${location.latitude},${zoomLevel},0/400x200@2x?access_token=${process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN}`
-                              }}
-                              style={{ width: '100%', height: '100%', position: 'absolute' }}
+                          /* SỬA MỚI: DÙNG NATIVE MAPVIEW THAY CHO IMAGE TĨNH */
+                          <MapView
+                            provider={PROVIDER_GOOGLE}
+                            style={{ width: '100%', height: '100%' }}
+                            // Dùng thuộc tính region để map tự động zoom mượt mà khi đổi radius
+                            region={{
+                              latitude: location.latitude,
+                              longitude: location.longitude,
+                              // Công thức tính Delta auto scale theo bán kính (có cộng thêm 30% padding)
+                              latitudeDelta: (radius / 111320) * 3, 
+                              longitudeDelta: (radius / 111320) * 3,
+                            }}
+                            // Khóa tương tác vì đây chỉ là bản đồ xem trước (Preview)
+                            scrollEnabled={false}
+                            zoomEnabled={false}
+                            pitchEnabled={false}
+                            rotateEnabled={false}
+                            showsUserLocation={false}
+                          >
+                            {/* Vòng tròn Radius */}
+                            <Circle
+                              center={{ latitude: location.latitude, longitude: location.longitude }}
+                              radius={radius}
+                              fillColor="rgba(255, 156, 86, 0.2)"
+                              strokeColor="rgba(255, 156, 86, 0.8)"
+                              strokeWidth={1.5}
                             />
-                            <View
-                              style={{
-                                // Dùng exactCircleSize thay vì circleSize
-                                width: exactCircleSize,
-                                height: exactCircleSize,
-                                borderRadius: exactCircleSize / 2,
-                                backgroundColor: 'rgba(255, 156, 86, 0.2)',
-                                borderColor: 'rgba(255, 156, 86, 0.6)',
-                                borderWidth: 1.5,
-                                position: 'absolute',
-                              }}
-                            />
-                          </>
+                            {/* Điểm Marker trung tâm */}
+                            <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }}>
+                              <View className="w-4 h-4 bg-[#EF4444] rounded-full border-2 border-white" style={{ elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3 }} />
+                            </Marker>
+                          </MapView>
                         ) : (
                           <TouchableOpacity activeOpacity={0.7} className="items-center justify-center p-4 w-full h-full" onPress={() => fetchLocation(true)}>
                             <View className="w-12 h-12 rounded-full bg-gray-200/70 items-center justify-center mb-2">

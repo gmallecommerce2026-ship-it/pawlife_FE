@@ -319,12 +319,7 @@ export default function PetProfileDetailScreen() {
   );
 
   if (isLoading) {
-      return (
-          <View className="flex-1 justify-center items-center bg-[#FAFAFA]">
-              <ActivityIndicator size="large" color="#E89B5A" />
-              <Text className="mt-4 text-gray-500 font-medium">Loading pet profile...</Text>
-          </View>
-      );
+      return <ActivityIndicator size="small" color="#e9a353" />;
   }
 
   if (!petData) {

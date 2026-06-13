@@ -226,13 +226,9 @@ export default function PetDetailModal() {
     toggleFavoriteMutation.mutate(previousState);
   };
 
-  // if (isLoading || !pet) {
-  //   return (
-  //     <View className="flex-1 justify-center items-center bg-white">
-  //       <ActivityIndicator color="#F2A465" />
-  //     </View>
-  //   );
-  // }
+  if (isLoading || !pet) {
+    return <ActivityIndicator size="small" color="#e9a353" />;
+  }
 
   return (
     <View className="flex-1 bg-black">

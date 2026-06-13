@@ -91,11 +91,7 @@ export default function PetProfileDetailScreen() {
   };
 
   if (isLoading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-white">
-        <ActivityIndicator size="large" color="#F2A465" />
-      </View>
-    );
+    return <ActivityIndicator size="small" color="#e9a353" />;
   }
 
   const displayName = petData?.name || 'Unknown Name';

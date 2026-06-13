@@ -8,29 +8,35 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { CheckCircle, ChevronLeft } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, Mask, Rect } from 'react-native-svg';
-// 1. IMPORT CỦA BẠN VÀO ĐÂY
+
 import { QRGuideModal } from '@/components/QRGuideModal';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useModalStore } from '@/store/useModalStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BOX_SIZE = 288;
 const CUTOUT_RADIUS = 24; 
-const OVERLAY_COLOR = 'rgba(0, 0, 0, 0.6)';
+const OVERLAY_COLOR = 'rgba(0, 0, 0, 0.65)';
 
 const boxX = (SCREEN_WIDTH - BOX_SIZE) / 2;
 const boxY = (SCREEN_HEIGHT - BOX_SIZE) / 2;
 
 export default function ScanScreen() {
   const router = useRouter();
+  const { t } = useLanguage(); // Áp dụng đa ngôn ngữ
   const [permission, requestPermission] = useCameraPermissions();
+  
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
-  const isFocused = useIsFocused(); 
   const [showGuideModal, setShowGuideModal] = useState(false);
-  // 2. KHAI BÁO STATE GỌI MODAL
+  
+  // Trạng thái giữ nhịp mở Camera để tránh khựng màn hình
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  
+  const isFocused = useIsFocused(); 
   const showModal = useModalStore((state) => state.showModal);
 
   const params = useLocalSearchParams();
@@ -38,13 +44,25 @@ export default function ScanScreen() {
   const replacePetId = params.replacePetId as string;
   const action = params.action as string;
   const isAddingPet = params.isAddingPet === 'true';
+
   // Animations
   const laserAnim = useRef(new Animated.Value(0)).current;
   const successScaleAnim = useRef(new Animated.Value(0)).current;
   const successOpacityAnim = useRef(new Animated.Value(0)).current;
 
+  // FIX TỐI ƯU HIỆU NĂNG: Delay việc mount Camera 200ms để animation chuyển màn hình được mượt mà 100%
   useEffect(() => {
-    if (!scanSuccess && isFocused) {
+    let timer: any;
+    if (isFocused && permission?.granted) {
+      timer = setTimeout(() => setIsCameraReady(true), 250);
+    } else {
+      setIsCameraReady(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isFocused, permission?.granted]);
+
+  useEffect(() => {
+    if (!scanSuccess && isFocused && isCameraReady) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(laserAnim, {
@@ -64,7 +82,7 @@ export default function ScanScreen() {
     } else {
       laserAnim.stopAnimation();
     }
-  }, [scanSuccess, laserAnim, isFocused]);
+  }, [scanSuccess, laserAnim, isFocused, isCameraReady]);
 
   const handleBarCodeScanned = ({ type, data, bounds }: any) => {
     if (scanned || scanSuccess) return;
@@ -98,7 +116,6 @@ export default function ScanScreen() {
 
       // Trích xuất ID
       let finalTagId = data;
-      // Thêm dấu _ vào regex: [a-zA-Z0-9-_]+
       const tagMatch = data.match(/\/tag\/([a-zA-Z0-9-_]+)/) || data.match(/pawlife:\/\/tag\/([a-zA-Z0-9-_]+)/);
       if (tagMatch && tagMatch[1]) {
         finalTagId = tagMatch[1];
@@ -126,9 +143,9 @@ export default function ScanScreen() {
           try {
             await petService.linkQrCode(linkPetId, finalTagId);
             showModal({
-              title: 'Success',
-              message: 'QR code successfully assigned to the pet!',
-              buttonText: 'View QR',
+              title: t('Success'),
+              message: t('QR code successfully assigned to the pet!'),
+              buttonText: t('View QR'),
               onConfirm: () => {
                 resetCamera();
                 router.replace(`/view-qr-code?id=${linkPetId}`); 
@@ -139,23 +156,18 @@ export default function ScanScreen() {
           }
         } 
         
-        // LUỒNG 3: THAY THẾ QR CODE (REPLACE) - BỔ SUNG MỚI
+        // LUỒNG 3: THAY THẾ QR CODE (REPLACE)
         else if (replacePetId) {
           try {
-            // 1. Gọi API thay thế QR
             await petService.replaceQrCode(replacePetId, finalTagId);
-            
-            // 2. [QUAN TRỌNG] Gọi thêm API để reset flag "Needs Replacement"
-            // Giả sử bạn có hàm updatePet trong petService
             await petService.updatePet(replacePetId, { needsQrReplacement: false });
             
             showModal({
-              title: 'Replace Success',
-              message: 'Great! The pet\'s collar has been replaced with the new QR code.',
-              buttonText: 'View New QR',
+              title: t('Replace Success'),
+              message: t("Great! The pet's collar has been replaced with the new QR code."),
+              buttonText: t('View New QR'),
               onConfirm: () => {
                 resetCamera();
-                // Replace trang để quay lại màn xem QR và load lại data mới
                 router.replace(`/view-qr-code?id=${replacePetId}`); 
               }
             });
@@ -186,30 +198,37 @@ export default function ScanScreen() {
     }, 500);
   };
 
-  // Hàm tiện ích xử lý lỗi show Modal
   const handleScanError = (error: any) => {
     showModal({
-      title: 'Error',
-      message: error.response?.data?.message || error.message || "Invalid QR code or already in use!",
-      buttonText: 'Try Again',
+      title: t('Error'),
+      message: error.response?.data?.message || error.message || t("Invalid QR code or already in use!"),
+      buttonText: t('Try Again'),
       onConfirm: () => resetCamera()
     });
   };
 
+  // FIX LỖI NHÁY MÀN HÌNH: Đợi permission fetch xong, trong lúc đó chỉ để màn hình đen tĩnh tuyệt đối
   if (!permission) {
-    return (
-      <View className="flex-1 bg-[#1A1A1A] items-center justify-center">
-        <ActivityIndicator color="#ffa053" size="large" />
-      </View>
-    );
+    return <View style={StyleSheet.absoluteFillObject} className="bg-black" />;
   }
 
+  // YÊU CẦU QUYỀN CAMERA (Đã đồng bộ màu sắc với app và có dịch)
   if (!permission.granted) {
     return (
-      <View className="flex-1 bg-[#1A1A1A] items-center justify-center px-6">
-        <Text className="text-white mb-4 text-center">Need to grant camera access to scan QR code.</Text>
-        <TouchableOpacity className="bg-[#F97316] py-3 px-6 rounded-xl" onPress={requestPermission}>
-          <Text className="text-white font-bold">Grant Camera Access</Text>
+      <View className="flex-1 bg-black items-center justify-center px-6">
+        <StatusBar style="light" />
+        <View className="w-20 h-20 bg-gray-900 rounded-full items-center justify-center mb-6">
+           <Feather name="camera" size={32} color="#E89B5A" />
+        </View>
+        <Text className="text-white text-[18px] font-semibold mb-2 text-center">{t('Camera Access Required')}</Text>
+        <Text className="text-gray-400 mb-8 text-center text-[15px] leading-6 px-4">
+           {t('Need to grant camera access to scan QR code.')}
+        </Text>
+        <TouchableOpacity className="bg-[#E89B5A] py-[16px] px-10 rounded-full w-full items-center active:opacity-80" onPress={requestPermission}>
+          <Text className="text-white font-bold text-[16px]">{t('Grant Camera Access')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity className="mt-6 py-2 px-6" onPress={() => router.back()}>
+          <Text className="text-gray-500 font-medium text-[15px]">{t('Cancel')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -220,7 +239,7 @@ export default function ScanScreen() {
       <StatusBar style="light" />
       
       {/* --- LỚP 1: CAMERA TOÀN MÀN HÌNH --- */}
-      {isFocused && (
+      {isCameraReady && (
         <CameraView
           style={StyleSheet.absoluteFillObject}
           facing="back"
@@ -236,9 +255,7 @@ export default function ScanScreen() {
         <Svg height="100%" width="100%">
           <Defs>
             <Mask id="mask" x="0" y="0" height="100%" width="100%">
-              {/* Nền hiển thị mờ */}
               <Rect height="100%" width="100%" fill="#fff" />
-              {/* Khung xuyên thấu với toạ độ đồng bộ tuyệt đối */}
               <Rect
                 x={boxX}
                 y={boxY}
@@ -260,26 +277,21 @@ export default function ScanScreen() {
       </View>
 
       {/* --- LỚP 3: GIAO DIỆN QUÉT VÀ HIỆU ỨNG --- */}
-      {/* Sử dụng pointerEvents="box-none" để không chặn thao tác chạm camera bên dưới ngoại trừ các nút */}
       <View style={StyleSheet.absoluteFillObject} className="z-20" pointerEvents="box-none">
         
-        {/* Nút How to Scan (Đặt cách khung quét 64px) */}
+        {/* Nút How to Scan */}
         <View style={{ position: 'absolute', top: boxY - 64, left: 0, right: 0, alignItems: 'center' }}>
           <TouchableOpacity 
             activeOpacity={0.7}
-            onPress={() => setShowGuideModal(true)} // GẮN SỰ KIỆN Ở ĐÂY
-            className="px-6 py-2.5 flex-row items-center justify-center gap-2 bg-black/40 rounded-full border border-white/10" // Cải thiện chút UI cho nút nổi bật hơn trên nền camera
+            onPress={() => setShowGuideModal(true)} 
+            className="px-5 py-2.5 flex-row items-center justify-center gap-2 bg-black/50 rounded-full border border-white/20 backdrop-blur-md" 
           >
-            <Feather 
-                name="alert-circle" 
-                size={16} 
-                color={"#ffffff"} 
-            />
-            <Text className="text-[#EAEaea] font-medium text-[16px]">How to Scan</Text>
+            <Feather name="alert-circle" size={16} color={"#ffffff"} />
+            <Text className="text-white font-medium text-[15px]">{t('How to Scan')}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Khung quét trung tâm (Đồng bộ toạ độ tĩnh với Mask SVG) */}
+        {/* Khung quét trung tâm */}
         <View 
           style={{ 
             position: 'absolute', 
@@ -287,21 +299,20 @@ export default function ScanScreen() {
             left: boxX, 
             width: BOX_SIZE, 
             height: BOX_SIZE,
-            borderRadius: CUTOUT_RADIUS, // Cực kỳ quan trọng để tia laser không tràn góc bo
+            borderRadius: CUTOUT_RADIUS,
             overflow: 'hidden', 
           }}
         >
-            {/* 4 Cạnh viền màu cam */}
-            <View className="absolute top-0 left-0 w-20 h-20 border-t-[4px] border-l-[4px] border-[#F97316] rounded-tl-[24px]" />
-            <View className="absolute top-0 right-0 w-20 h-20 border-t-[4px] border-r-[4px] border-[#F97316] rounded-tr-[24px]" />
-            <View className="absolute bottom-0 left-0 w-20 h-20 border-b-[4px] border-l-[4px] border-[#F97316] rounded-bl-[24px]" />
-            <View className="absolute bottom-0 right-0 w-20 h-20 border-b-[4px] border-r-[4px] border-[#F97316] rounded-br-[24px]" />
+            <View className="absolute top-0 left-0 w-16 h-16 border-t-[4px] border-l-[4px] border-[#E89B5A] rounded-tl-[24px]" />
+            <View className="absolute top-0 right-0 w-16 h-16 border-t-[4px] border-r-[4px] border-[#E89B5A] rounded-tr-[24px]" />
+            <View className="absolute bottom-0 left-0 w-16 h-16 border-b-[4px] border-l-[4px] border-[#E89B5A] rounded-bl-[24px]" />
+            <View className="absolute bottom-0 right-0 w-16 h-16 border-b-[4px] border-r-[4px] border-[#E89B5A] rounded-br-[24px]" />
 
             {/* Animation Laser / Success */}
             {!scanSuccess ? (
               <Animated.View 
                 style={{ transform: [{ translateY: laserAnim }] }} 
-                className="absolute top-0 w-full h-[2px] bg-orange-500 shadow-lg shadow-orange-500 opacity-80" 
+                className="absolute top-0 w-full h-[2px] bg-[#E89B5A] shadow-lg shadow-orange-400 opacity-90" 
               />
             ) : (
               <Animated.View 
@@ -320,54 +331,46 @@ export default function ScanScreen() {
             )}
         </View>
 
-        {/* Text hướng dẫn (Đặt phía dưới khung quét 40px) */}
+        {/* Text hướng dẫn */}
         <View style={{ position: 'absolute', top: boxY + BOX_SIZE + 40, left: 0, right: 0, alignItems: 'center' }}>
-          <Text className="text-[#8E8E93] text-center text-[14px] font-regular leading-relaxed px-[90px]">
-            Move QR Code to the camera center for automatic scanning
+          <Text className="text-gray-300 text-center text-[15px] font-regular leading-relaxed px-[60px]">
+            {t('Move QR Code to the camera center for automatic scanning')}
           </Text>
         </View>
       </View>
 
       {/* --- LỚP 4: HEADER VỚI CÁC NÚT ĐIỀU HƯỚNG --- */}
       <SafeAreaView pointerEvents="box-none" className="absolute top-0 w-full z-30">
-        <View pointerEvents="box-none" className="flex-row items-center justify-between px-6 pt-4 relative">
+        <View pointerEvents="box-none" className="flex-row items-center justify-between px-6 pt-2 relative">
           
-          {/* Nút Back - Nằm bên trái */}
           <TouchableOpacity 
             onPress={() => {
-              // Ép điều hướng về lại màn Detail nếu đang ở luồng gán/thay mã QR
               if (linkPetId) {
                 router.replace(`/pet-profile-detail?id=${linkPetId}`);
               } else if (replacePetId) {
                 router.replace(`/pet-profile-detail?id=${replacePetId}`);
               } else {
-                // Giữ nguyên back bình thường cho các luồng quét gốc (như quét pet lạc, add pet)
                 router.back();
               }
             }}
-            className="w-12 h-12 bg-[#2A2A2A]/80 rounded-full items-center justify-center z-20"
+            className="w-12 h-12 bg-black/50 rounded-full items-center justify-center z-20 backdrop-blur-md"
           >
             <ChevronLeft size={24} color="white" />
           </TouchableOpacity>
 
-          {/* CHỈ HIỂN THỊ NÚT SKIP KHI ĐANG Ở LUỒNG THÊM PET MỚI */}
           {isAddingPet && (
             <View pointerEvents="box-none" className="absolute left-0 right-0 items-center justify-center z-10">
               <TouchableOpacity 
-                onPress={() => {
-                  // Chuyển thẳng tới form nhập liệu
-                  router.replace('/add-pet'); 
-                }}
-                className="bg-black/40 px-5 py-3 rounded-full border border-white/10 shadow-sm"
+                activeOpacity={0.8}
+                onPress={() => router.replace('/add-pet')}
+                className="bg-black/50 px-5 py-[10px] rounded-full border border-white/20 backdrop-blur-md"
               >
-                <Text className="text-white font-lighter text-[12px]">Continue without scanning</Text>
+                <Text className="text-white font-medium text-[14px]">{t('Continue without scanning')}</Text>
               </TouchableOpacity>
             </View>
           )}
           
-          {/* View trống để giữ bố cục flex layout */}
           <View className="w-12" />
-
         </View>
       </SafeAreaView>
 

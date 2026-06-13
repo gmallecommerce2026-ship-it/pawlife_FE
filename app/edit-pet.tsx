@@ -507,9 +507,9 @@ export default function EditPetScreen() {
     }
   };
 
-  // if (isLoading) {
-  //       return <CustomLoader text="Loading information..." />;
-  //   }
+  if (isLoading) {
+        return <ActivityIndicator size="small" color="#e9a353" />;
+    }
 
   return (
     <SafeAreaView className="flex-1 bg-white">

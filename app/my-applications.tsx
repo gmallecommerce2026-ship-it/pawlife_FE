@@ -342,12 +342,15 @@ export default function MyApplicationsScreen() {
               </View>
             }
             renderItem={({ item }) => {
-              const isNeedMoreInfo = item.status.toLowerCase().replace(/\s+/g, '_') === 'need_more_info';
-              const petImage = item.pet.images?.[0]?.url || 'https://via.placeholder.com/150';
+              // 1. CHỐNG CRASH: Tránh trường hợp cả mảng có phần tử null
+              if (!item) return null;
+
+              const isNeedMoreInfo = item.status?.toLowerCase().replace(/\s+/g, '_') === 'need_more_info';
               
-              // SỬ DỤNG HÀM TÍNH TUỔI MỚI THAY VÌ CALCULATEAGE
-              const computedAge = getDisplayAge(item.pet.dob);
-              const ageAndBreed = [computedAge, item.pet.breed || t('Unknown')].filter(Boolean).join(' • ');
+              // 2. CHỐNG CRASH: Thêm dấu ?. sau item.pet để an toàn khi thú cưng bị xóa
+              const petImage = item.pet?.images?.[0]?.url || 'https://via.placeholder.com/150';
+              const computedAge = getDisplayAge(item.pet?.dob);
+              const ageAndBreed = [computedAge, item.pet?.breed || t('Unknown')].filter(Boolean).join(' • ');
 
               return (
                 <TouchableOpacity
@@ -372,7 +375,8 @@ export default function MyApplicationsScreen() {
 
                     <View className="flex-1 mb-2 ml-[10px] justify-center">
                       <Text className="text-[16px] font-medium text-black" numberOfLines={1}>
-                        {item.pet.name}
+                        {/* 3. Thêm ?. và fallback text */}
+                        {item.pet?.name || t('Unknown Pet')}
                       </Text>
 
                       <Text className="text-[#8E8E93] text-[12px] font-regular tracking-[0.5px] mt-[7px]" numberOfLines={1}>
@@ -380,7 +384,8 @@ export default function MyApplicationsScreen() {
                       </Text>
 
                       <Text className="text-[#000000] text-[12px] font-regular tracking-[0.5px] mt-[7px]" numberOfLines={1}>
-                        {item.pet.shelter?.name || 'PawLife Shelter'}
+                        {/* 4. Thêm ?. */}
+                        {item.pet?.shelter?.name || 'PawLife Shelter'}
                       </Text>
                     </View>
 
@@ -400,7 +405,7 @@ export default function MyApplicationsScreen() {
                   </View>
 
                   <View className={`flex-row justify-between items-center py-3 border-t ${isNeedMoreInfo ? 'border-[#E89B5A] bg-[#FFF5EE]' : 'border-[#E5E5E5] bg-[#F6F6F6]'}  -mx-[14px] px-[14px] rounded-b-[13px]`}>
-                    <StatusBadge status={item.status} t={t} /> {/* TRUYỀN T VÀO ĐÂY */}
+                    <StatusBadge status={item.status} t={t} /> 
 
                     <View className="flex-row items-center">
                       <Text className={`${isNeedMoreInfo ? 'text-[#E89B5A]' : 'text-[#8E8E93]'} text-[12px] font-regular tracking-[0.5px] ml-1.5`}>
