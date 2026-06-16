@@ -140,31 +140,29 @@ const TimelineItem = ({
 
         {item.location && (
           <TouchableOpacity
-            className="flex-row items-start mt-1"
+            className="flex-row items-center mt-1.5" // Đổi items-start -> items-center, tăng mt lên xíu cho thoáng
             activeOpacity={item.routeData ? 0.6 : 1}
             onPress={() => item.routeData && onLocationPress && onLocationPress(item)}
           >
             <Image
-              className="top-[3px]"
               source={require('../assets/icon/location-gray-icon.png')}
               style={{ width: 8, height: 10 }}
               resizeMode="cover"
             />
-            <Text className="text-[#8E8E93] text-[12px] ml-1 font-regular leading-5 flex-1">
+            <Text className="text-[#8E8E93] text-[12px] ml-1.5 font-regular flex-1">
               {item.location}
             </Text>
           </TouchableOpacity>
         )}
 
         {item.note && (
-          <View className="flex-row items-start mt-1">
+          <View className="flex-row items-center mt-1.5"> {/* Đổi items-start -> items-center */}
             <Image
-              className="top-[3px]"
               source={require('../assets/icon/note-gray.png')}
               style={{ width: 9, height: 9 }}
               resizeMode="cover"
             />
-            <Text className="text-[#8E8E93] text-[12px] ml-1 font-regular leading-5">
+            <Text className="text-[#8E8E93] text-[12px] ml-1.5 font-regular flex-1">
               "{item.note}"
             </Text>
           </View>
@@ -172,18 +170,18 @@ const TimelineItem = ({
 
         {item.contactPhone && (
           <TouchableOpacity
-            className="flex-row items-center mt-1"
+            className="flex-row items-center mt-1.5"
             onPress={handleCallPress}
             activeOpacity={0.6}
           >
             <Image
-              className="top-[1px] mr-[1px]"
+              className="mr-[2px]" // Xóa top-[1px]
               source={require('../assets/icon/phone-gray.png')}
               style={{ width: 10, height: 10 }}
               resizeMode="contain"
             />
             <Image
-              className="top-[1px] mr-[1px]"
+              className="mr-[2px]" // Xóa top-[1px]
               source={require('../assets/icon/message-gray.png')}
               style={{ width: 10, height: 10 }}
               resizeMode="contain"
@@ -296,7 +294,6 @@ const PinIcon = React.memo(({
   useEffect(() => {
     const timer = setTimeout(() => setTracks(false), 300);
     return () => clearTimeout(timer);
-    // chỉ chạy 1 lần khi mount — icon không đổi visual sau đó
   }, []);
 
   const handlePress = (e: any) => {
@@ -308,32 +305,38 @@ const PinIcon = React.memo(({
     }
   };
 
-  const anchorY = hasRadius ? 0.5: 1;
+  // Tinh chỉnh Anchor: 
+  // - 0.5 là tâm toán học. 
+  // - Nâng nhẹ lên 0.53 (hoặc 0.55) sẽ kéo Pin nhích lên trên một chút để bù trừ ảo giác quang học
+  const anchorY = hasRadius ? 0.53 : 0.5;
 
   return (
     <Marker
       coordinate={coordinate}
       tracksViewChanges={tracks}
-      anchor={{ x: 0.5, y: anchorY }}
+      anchor={{ x: 0.5, y: anchorY }} // 0.5 hoặc 0.53 để nhấc nhẹ lên như mình đề cập ở trên
       onPress={handlePress}
       zIndex={1000}
     >
-      <View collapsable={false} style={{ alignItems: 'center' }}>
+      {/* SỬA Ở ĐÂY: Thêm width: 60, height: 60
+        Vòng tròn w-11 h-11 của bạn tương đương khoảng 44x44px. 
+        Khi set wrapper 60x60, nó sẽ có dư dả không gian xung quanh để không bao giờ bị cắt khuyết.
+      */}
+      <View
+        collapsable={false}
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 60,
+          height: 60
+        }}
+      >
         <View
           style={{ borderColor: pinColor, borderWidth: 2.5 }}
           className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm"
         >
           <Ionicons name={iconName as any} size={20} color={pinColor} />
         </View>
-        {!hasRadius && (
-          <View
-            style={{
-              width: 0, height: 0,
-              borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9,
-              borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: pinColor,
-            }}
-          />
-        )}
       </View>
     </Marker>
   );
@@ -364,25 +367,26 @@ const PinBadge = React.memo(({
   const [tracks, setTracks] = useState(true);
 
   useEffect(() => {
-    // Reset tracks=true mỗi khi isRead thay đổi để Native re-snapshot
     setTracks(true);
-    const timer = setTimeout(() => setTracks(false), 500); // tăng lên 500ms
+    const timer = setTimeout(() => setTracks(false), 500);
     return () => clearTimeout(timer);
-  }, [isRead]); // ← dependency là isRead, không phải []
-
-  const anchorY = hasRadius ? 1.45 : 1.95;
+  }, [isRead]);
 
   return (
     <Marker
       coordinate={coordinate}
       tracksViewChanges={tracks}
-      anchor={{ x: 0.5, y: anchorY }}
+      anchor={{ x: 0.5, y: 1 }} // Canh gốc vào đáy thẻ view
       zIndex={9999}
       onPress={onPress}
     >
-      <View collapsable={false} style={{ alignItems: 'center', width: 260, paddingTop: 10 }}>
+      {/* SỬA Ở ĐÂY: Thêm paddingTop: 16 và paddingHorizontal: 16 
+        Việc này tạo ra vùng đệm trong suốt xung quanh Badge, 
+        giúp bóng mờ (shadow) và chấm đỏ (top: -6, right: -6) có không gian hiển thị, không bị gọt mất cạnh.
+      */}
+      <View collapsable={false} style={{ alignItems: 'center', width: 260, paddingBottom: 28, paddingTop: 16, paddingHorizontal: 16 }}>
         <View
-          style={{ maxWidth: 260 }}
+          style={{ maxWidth: 220 }} // Đã có vùng đệm 16px hai bên nên giảm max-width một chút để cân đối
           className="bg-white px-3 py-1.5 rounded-lg shadow-md items-center relative"
         >
           <View
@@ -865,31 +869,41 @@ export default function TagReportDetailScreen() {
 
   // Tính toán derived booleans tại parent — KHÔNG truyền currentRegion xuống Marker
   const isZoomedIn = currentRegion.longitudeDelta < ZOOM_THRESHOLD;
+  const radius = pet.lostRadius ? parseFloat(pet.lostRadius) : 100;
 
   const isFocusingEstimatedPin = useMemo(() => {
     // 1. Chỉ check nếu zoom đủ gần
     if (currentRegion.longitudeDelta > 0.005) return false;
 
-    // 2. Tìm pin nào đang được focus
+    // 2. Xử lý nếu Pin đang focus là Pin Mất tích (Lost Pin)
+    if (focusedPinId === 'lost-pin') {
+      const lostHasRadius = radius > 0;
+      // NẾU CÓ HIỂN THỊ BÁN KÍNH => KHÔNG HIỆN TEXT CẢNH BÁO
+      if (lostHasRadius) return false;
+
+      if (!fakeLostPos) return false;
+      const dLat = Math.abs(fakeLostPos.lat - currentRegion.latitude);
+      const dLng = Math.abs(fakeLostPos.lng - currentRegion.longitude);
+      return dLat < currentRegion.latitudeDelta && dLng < currentRegion.longitudeDelta;
+    }
+
+    // 3. Xử lý nếu Pin đang focus là Pin Lịch sử quét (Scan pins)
     const focusedPin = processedScans.find(s => s.id === focusedPinId);
     if (!focusedPin) return false;
 
-    // 3. Tính tọa độ pin sau khi đã xoay (giống hệt cách bạn tính pinIconCoordinate)
     const r = parseFloat(focusedPin.radius) || 0;
     const hasRadius = r > 0 && !focusedPin.isEstimated;
 
-    const pinCoord = hasRadius
-      ? getEdgeCoordinateByBearing(focusedPin.displayLat, focusedPin.displayLng, r, mapHeading % 360)
-      : { latitude: focusedPin.displayLat, longitude: focusedPin.displayLng };
+    // NẾU CÓ HIỂN THỊ BÁN KÍNH => KHÔNG HIỆN TEXT CẢNH BÁO
+    if (hasRadius) return false;
 
-    // 4. Kiểm tra sự gần đúng (threshold) bằng khoảng cách Euclidean đơn giản
-    // Lưu ý: không dùng currentRegion làm tâm chính xác khi xoay, 
-    // chỉ cần check xem pin có nằm trong phạm vi viewport không
+    // 4. Nếu KHÔNG có bán kính, kiểm tra xem Pin có đang nằm trong khung nhìn màn hình không
+    const pinCoord = { latitude: focusedPin.displayLat, longitude: focusedPin.displayLng };
     const dLat = Math.abs(pinCoord.latitude - currentRegion.latitude);
     const dLng = Math.abs(pinCoord.longitude - currentRegion.longitude);
 
     return dLat < currentRegion.latitudeDelta && dLng < currentRegion.longitudeDelta;
-  }, [currentRegion, processedScans, focusedPinId, mapHeading]);
+  }, [currentRegion, processedScans, focusedPinId, radius, fakeLostPos]);
 
   const warningAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: animatedPosition.value - 38 }],
@@ -912,7 +926,6 @@ export default function TagReportDetailScreen() {
     );
   }
 
-  const radius = pet.lostRadius ? parseFloat(pet.lostRadius) : 100;
 
   const handleShareLocation = () => {
     setIsOptionsVisible(false);
@@ -1152,10 +1165,8 @@ export default function TagReportDetailScreen() {
           {/* LOST PIN - Cập nhật: Chỉ hiện pin nếu radius <= 0 */}
           {fakeLostPos && lostLat && lostLng && (() => {
             const lostHasRadius = radius > 0;
-            const effectiveRadius = !isOwner ? Math.max(radius, 1000) : radius;
-            const lostCoordinate = lostHasRadius
-              ? getEdgeCoordinateByBearing(fakeLostPos.lat, fakeLostPos.lng, effectiveRadius, mapHeading % 360)
-              : { latitude: fakeLostPos.lat, longitude: fakeLostPos.lng };
+            // LUÔN LẤY TÂM
+            const lostCoordinate = { latitude: fakeLostPos.lat, longitude: fakeLostPos.lng };
 
             const lostIsFocused = focusedPinId === 'lost-pin';
 
@@ -1202,10 +1213,8 @@ export default function TagReportDetailScreen() {
             const r = parseFloat(scanPoint.radius) || 0;
             const hasRadius = r > 0 && !scanPoint.isEstimated;
 
-            const pinCoordinate = hasRadius
-              ? getEdgeCoordinateByBearing(scanPoint.displayLat, scanPoint.displayLng, r, mapHeading % 360)
-              : { latitude: scanPoint.displayLat, longitude: scanPoint.displayLng };
-
+            // LUÔN LẤY TÂM
+            const pinCoordinate = { latitude: scanPoint.displayLat, longitude: scanPoint.displayLng };
 
             const isFocused = focusedPinId === scanPoint.id;
 

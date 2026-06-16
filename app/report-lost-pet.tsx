@@ -1,4 +1,5 @@
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { petService } from '@/services/petService';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
@@ -117,6 +118,8 @@ export default function ReportLostPetScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { t, language } = useLanguage();
+    const isVi = language === 'vi';
   const showModal = useModalStore((state) => state.showModal);
   // --- API State ---
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -545,31 +548,55 @@ export default function ReportLostPetScreen() {
                 </TouchableOpacity>
 
                 <View className="h-[150px] w-full">
-                  <MapView
-                    provider={PROVIDER_GOOGLE}
-                    style={{ height: 150, borderRadius: 22 }}
-                    initialRegion={{ latitude: mapLat, longitude: mapLng, latitudeDelta: 0.015, longitudeDelta: 0.015 }}
-                    scrollEnabled={false} zoomEnabled={false} pitchEnabled={false} rotateEnabled={false}
-                  >
-                    <Circle center={{ latitude: mapLat, longitude: mapLng }} radius={mapRadius} fillColor="rgba(232, 155, 90, 0.2)" strokeColor="rgba(232, 155, 90, 0.8)" strokeWidth={1} />
-                    <Marker coordinate={{ latitude: mapLat, longitude: mapLng }}>
-                      <View style={{ alignItems: 'center', width: 135 }}>
-                        <View className="bg-[#FFFFFF] px-3 py-1.5 rounded-lg shadow-md w-full">
-                          <Text className="text-black text-[13px] font-medium tracking-[0.06px] text-center">Reported as Lost</Text>
-                          <Text className="text-[#8E8E93] text-[11px] font-regular tracking-[0.06px] text-center">
-                            Selected Location
-                          </Text>
-                        </View>
-                        <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 6, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FFFFFF' }} />
-                        <View className="h-1.5" />
-                        <View style={{ borderColor: '#DA5A5A', borderWidth: 2.5 }} className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm">
-                          {/* Đổi icon thành alert-outline và dùng màu đỏ #DA5A5A */}
-                          <Ionicons name="alert-outline" size={20} color="#DA5A5A" />
-                        </View>
-                        <View style={{ width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#DA5A5A' }} />
-                      </View>
-                    </Marker>
-                  </MapView>
+                  {/* --- TÍNH TOÁN ĐỘ ZOOM TỰ ĐỘNG DỰA TRÊN RADIUS --- */}
+                  {(() => {
+                    // Nhân 2.5 để tạo khoảng trống (padding) cho viền xung quanh vòng tròn
+                    const latDelta = (mapRadius * 2.5) / 111320; 
+                    // Longitude thu hẹp dần về hai cực, nên cần chia cho cos(latitude)
+                    const lngDelta = latDelta / Math.cos(mapLat * (Math.PI / 180));
+
+                    return (
+                      <MapView
+                        provider={PROVIDER_GOOGLE}
+                        style={{ height: 150, borderRadius: 22 }}
+                        // Dùng `region` thay cho `initialRegion` để update ngay lập tức khi radius thay đổi
+                        region={{ 
+                          latitude: mapLat, 
+                          longitude: mapLng, 
+                          latitudeDelta: latDelta, 
+                          longitudeDelta: lngDelta 
+                        }}
+                        scrollEnabled={false} 
+                        zoomEnabled={false} 
+                        pitchEnabled={false} 
+                        rotateEnabled={false}
+                      >
+                        <Circle 
+                          center={{ latitude: mapLat, longitude: mapLng }} 
+                          radius={mapRadius} 
+                          fillColor="rgba(232, 155, 90, 0.2)" 
+                          strokeColor="rgba(232, 155, 90, 0.8)" 
+                          strokeWidth={1} 
+                        />
+                        <Marker coordinate={{ latitude: mapLat, longitude: mapLng }}>
+                          <View style={{ alignItems: 'center', width: 135 }}>
+                            <View className="bg-[#FFFFFF] px-3 py-1.5 rounded-lg shadow-md w-full">
+                              <Text className="text-black text-[13px] font-medium tracking-[0.06px] text-center">Reported as Lost</Text>
+                              <Text className="text-[#8E8E93] text-[11px] font-regular tracking-[0.06px] text-center">
+                                Selected Location
+                              </Text>
+                            </View>
+                            <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 6, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FFFFFF' }} />
+                            <View className="h-1.5" />
+                            <View style={{ borderColor: '#DA5A5A', borderWidth: 2.5 }} className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm">
+                              <Ionicons name="alert-outline" size={20} color="#DA5A5A" />
+                            </View>
+                            <View style={{ width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#DA5A5A' }} />
+                          </View>
+                        </Marker>
+                      </MapView>
+                    );
+                  })()}
                 </View>
               </View>
             ) : (
@@ -639,7 +666,7 @@ export default function ReportLostPetScreen() {
                 style={{ fontFamily: 'Urbanist' }}
                 value={details}
                 onChangeText={setDetails}
-                placeholder="Describe what this pet looks like when gone missing..."
+                placeholder={isVi ? "Hãy mô tả thú cưng này trông như thế nào khi bị mất tích..." : "Describe what this pet looks like when gone missing..."}
                 placeholderTextColor="#9CA3AF"
                 multiline
                 className="w-full border-b border-[#E5E5E5] py-2 text-[14px] text-[#111827] font-regular bottom-1"
@@ -752,7 +779,7 @@ export default function ReportLostPetScreen() {
                 
                 <View className="flex items-center justify-center w-4/5 bg-[#FAFAFA] px-2.5 py-1 rounded-full border border-[#D9D9D9] bottom-5">
                   <Text className="text-[#AB5C1A] text-[14px] text-center font-regular leading-[20px] py-[6px]">
-                    <TextInput value={note} onChangeText={setNote} placeholder='"Leave your note here"' placeholderTextColor="#757575" style={{ fontFamily: "Urbanist" }} className="font-regular flex-1 text-[12px] text-black p-0 text-center tracking-[0.06px]" />
+                    <TextInput value={note} onChangeText={setNote} placeholder={isVi ? '"Nhập ghi chú của bạn tại đây"' : '"Leave your note here"'} placeholderTextColor="#757575" style={{ fontFamily: "Urbanist" }} className="font-regular flex-1 text-[12px] text-black p-0 text-center tracking-[0.06px]" />
                   </Text>
                 </View>
               </View>

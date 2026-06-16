@@ -349,6 +349,9 @@ export default function ScanScreen() {
                 router.replace(`/pet-profile-detail?id=${linkPetId}`);
               } else if (replacePetId) {
                 router.replace(`/pet-profile-detail?id=${replacePetId}`);
+              } else if (isAddingPet) {
+                // CHỈNH SỬA: Đưa thẳng về my-pets nếu xuất phát từ nút Add New Pet
+                router.replace('/(tabs)/my-pets');
               } else {
                 router.back();
               }

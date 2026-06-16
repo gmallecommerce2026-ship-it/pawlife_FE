@@ -1,10 +1,10 @@
 import axiosClient from '@/api/axiosClient';
+import AddMedicalRecordModal from '@/components/AddMedicalRecordModal';
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useModalStore } from '@/store/useModalStore';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -31,7 +31,7 @@ type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
 type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
 
-// 1. ĐỒNG BỘ DANH SÁCH BREED TỪ ADD PET
+// 1. ĐỒNG BỘ DANH SÁCH BREED
 const BREED_OPTIONS: Record<string, { label: string; value: string }[]> = {
   Dog: [
     { label: 'Unknown Breed', value: 'Unknown Breed' },
@@ -91,7 +91,6 @@ const BREED_OPTIONS: Record<string, { label: string; value: string }[]> = {
   ]
 };
 
-
 interface EditPetFormData {
   name: string;
   species: SpeciesType | string;
@@ -107,7 +106,6 @@ interface EditPetFormData {
   contactName: string;
   contactPhone: string;
   contactAddress: string;
-  vaccinationRecordUrls: string[];
   qrCodeUrl: string;
   sterilized: boolean | null;
 }
@@ -121,7 +119,7 @@ const Label = ({ text, required = false }: { text: string; required?: boolean })
 const CustomInput = ({ value, onChangeText, placeholder }: { value?: string; onChangeText?: (text: string) => void; placeholder?: string }) => (
   <View>
     <TextInput
-      className="w-full bg-white border border-[#E5E5E5] rounded-2xl px-4 text-black h-14"
+      className="w-full bg-white border border-[#E5E5E5] rounded-[16px] px-4 text-black h-14"
       placeholder={placeholder}
       placeholderTextColor="#9CA3AF"
       value={value}
@@ -139,7 +137,7 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
       <TouchableOpacity
         onPress={() => setVisible(true)}
         activeOpacity={0.7}
-        className={`w-full bg-white border border-[#E5E5E5] rounded-2xl h-14 px-4 flex-row items-center justify-between ${visible ? 'border-[#E89B5A]' : ''}`}
+        className={`w-full bg-white border border-[#E5E5E5] rounded-[16px] h-14 px-4 flex-row items-center justify-between ${visible ? 'border-[#E89B5A]' : ''}`}
       >
         <Text className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`} numberOfLines={1}>
           {value || placeholder}
@@ -189,26 +187,26 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
     </View>
   );
 };
+
 export default function EditPetScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const showModal = useModalStore((state) => state.showModal);
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
-  const { pickAndUploadImage: pickQR, isUploading: isUploadingQR } = useImageUpload();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   
-  // State quản lý Modal Vaccine
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 28 });
-  const [showVaccineMenu, setShowVaccineMenu] = useState(false);
-  const [selectedVaccineIndex, setSelectedVaccineIndex] = useState<number | null>(null);
-  const [isUploadingVaccine, setIsUploadingVaccine] = useState(false);
+  // State quản lý Medical Records mới
+  const [showMedicalModal, setShowMedicalModal] = useState(false);
+  const [medicalRecords, setMedicalRecords] = useState<any[]>([]);
+  const [isUploadingRecords, setIsUploadingRecords] = useState(false);
 
-  // 2. ĐỒNG BỘ POPUP ADDRESS (API V2 GIỐNG ADD PET)
+  // 2. ĐỒNG BỘ POPUP ADDRESS (API V2)
   const [showAddressPopup, setShowAddressPopup] = useState(false);
   const [provinces, setProvinces] = useState<any[]>([]);
   const [wardOptions, setWardOptions] = useState<string[]>([]);
@@ -218,15 +216,16 @@ export default function EditPetScreen() {
   const [tempDetail, setTempDetail] = useState('');
   
   const speciesData = [
-      { label: isVi ? 'Chó' : 'Dog', value: 'Dog' },
-      { label: isVi ? 'Mèo' : 'Cat', value: 'Cat' },
-    ];
+    { label: isVi ? 'Chó' : 'Dog', value: 'Dog' },
+    { label: isVi ? 'Mèo' : 'Cat', value: 'Cat' },
+  ];
 
   const genderData = [
-      { label: isVi ? 'Đực' : 'Male', value: 'MALE' },
-      { label: isVi ? 'Cái' : 'Female', value: 'FEMALE' },
-      { label: isVi ? 'Không rõ' : 'Unknown', value: 'UNKNOWN' },
-    ];
+    { label: isVi ? 'Đực' : 'Male', value: 'MALE' },
+    { label: isVi ? 'Cái' : 'Female', value: 'FEMALE' },
+    { label: isVi ? 'Không rõ' : 'Unknown', value: 'UNKNOWN' },
+  ];
+
   // Fetch Tỉnh/Thành
   useEffect(() => {
     fetch('https://provinces.open-api.vn/api/v2/p/')
@@ -236,17 +235,15 @@ export default function EditPetScreen() {
           const formattedProvinces = data
             .map((p: any) => ({
               ...p,
-              // Xóa chữ "Thành phố " hoặc "Tỉnh " ở đầu chuỗi
               name: p.name.replace(/^(Thành phố |Tỉnh )/i, '')
             }))
-            // Sort alphabet chuẩn theo tiếng Việt
             .sort((a: any, b: any) => a.name.localeCompare(b.name, 'vi'));
 
           setProvinces(formattedProvinces);
         }
       })
-      .catch(e => console.error("Lỗi fetch tỉnh/thành phố:", e));
-  }, []);
+      .catch(e => console.error(isVi ? "Lỗi fetch tỉnh/thành phố:" : "Error fetching provinces:", e));
+  }, [isVi]);
 
   const cityOptions = provinces.map((c: any) => c.name);
 
@@ -257,7 +254,6 @@ export default function EditPetScreen() {
       return;
     }
     
-    // Tìm province code dựa trên tên đã được làm sạch
     const selectedProvince = provinces.find((p: any) => p.name === tempCity);
     
     if (selectedProvince && selectedProvince.code) {
@@ -272,13 +268,16 @@ export default function EditPetScreen() {
             setWardOptions(sortedWards);
           }
         })
-        .catch(e => console.error("Lỗi fetch phường/xã:", e));
+        .catch(e => console.error(isVi ? "Lỗi fetch phường/xã:" : "Error fetching wards:", e));
     }
-  }, [tempCity, provinces]);
+  }, [tempCity, provinces, isVi]);
 
   const handleConfirmAddress = () => {
     if (!tempCity || !tempWard) {
-      Alert.alert("Thiếu thông tin", "Vui lòng chọn Tỉnh/Thành phố và Phường/Xã.");
+      Alert.alert(
+        isVi ? "Thiếu thông tin" : "Missing Information", 
+        isVi ? "Vui lòng chọn Tỉnh/Thành phố và Phường/Xã." : "Please select City/Province and Ward/District."
+      );
       return;
     }
     let fullAddress = `${tempWard}, ${tempCity}`; 
@@ -304,7 +303,6 @@ export default function EditPetScreen() {
     contactName: '',
     contactPhone: '',
     contactAddress: '',
-    vaccinationRecordUrls: [],
     qrCodeUrl: '',
     sterilized: null,
   });
@@ -331,54 +329,27 @@ export default function EditPetScreen() {
           contactName: data.contactName || '',
           contactPhone: data.contactPhone || '',
           contactAddress: data.contactAddress || '',
-          vaccinationRecordUrls: data.vaccinationRecordUrls
-            ? data.vaccinationRecordUrls
-            : (data.vaccinationRecordUrl ? [data.vaccinationRecordUrl] : []),
           qrCodeUrl: data.qrCodeUrl || '',
           sterilized: data.isSpayedNeutered !== undefined ? data.isSpayedNeutered : null,
         });
+
+        // Set danh sách medical records nếu backend trả về
+        if (data.medicalRecords && Array.isArray(data.medicalRecords)) {
+          setMedicalRecords(data.medicalRecords);
+        }
       } catch (error) {
-        Alert.alert("Error", "Could not load pet information.");
+        Alert.alert(isVi ? "Lỗi" : "Error", isVi ? "Không thể tải thông tin thú cưng." : "Could not load pet information.");
         router.back();
       } finally {
         setIsLoading(false);
       }
     };
     if (id) fetchPet();
-  }, [id]);
+  }, [id, isVi]);
 
   const handlePickAvatar = async () => {
     const uploadedUrl = await pickAvatar({ folder: 'pets', aspect: [1, 1], quality: 0.8 });
     if (uploadedUrl) handleChange('imageUrl', uploadedUrl);
-  };
-
-  const handlePickVaccine = async () => {
-    try {
-      const remainingSlots = 5 - formData.vaccinationRecordUrls.length;
-      if (remainingSlots <= 0) {
-        Alert.alert("Giới hạn", "Bạn chỉ được tải lên tối đa 5 tài liệu.");
-        return;
-      }
-
-      let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Chỉnh sửa chuẩn Enum
-        allowsMultipleSelection: true,
-        selectionLimit: remainingSlots,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets) {
-        // Edit Pet: Vẫn lưu URI file local lại để hiện thanh "Ready to upload" và nút xoá
-        const newLocalUrls = result.assets.slice(0, remainingSlots).map(asset => asset.uri);
-        handleChange('vaccinationRecordUrls', [
-          ...formData.vaccinationRecordUrls,
-          ...newLocalUrls
-        ]);
-      }
-    } catch (error) {
-      console.error("Lỗi khi chọn ảnh:", error);
-      Alert.alert("Lỗi", "Không thể mở thư viện ảnh.");
-    }
   };
 
   const handleChange = (field: keyof EditPetFormData, value: any) => {
@@ -396,74 +367,67 @@ export default function EditPetScreen() {
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      Alert.alert('Missing Information', "Please enter the pet's name.");
+      Alert.alert(isVi ? 'Thiếu thông tin' : 'Missing Information', isVi ? 'Vui lòng nhập tên thú cưng.' : "Please enter the pet's name.");
       return;
     }
 
     try {
       setIsSubmitting(true);
+      setIsUploadingRecords(true);
 
-      // 3. THỰC THI UPLOAD FILE:// TẠI ĐÂY TRƯỚC KHI GỌI API SERVER
-      const existingUrls = formData.vaccinationRecordUrls.filter(url => url.startsWith('http'));
-      const localUris = formData.vaccinationRecordUrls.filter(url => !url.startsWith('http'));
+      // 3. THỰC THI UPLOAD FILE:// CHO TỪNG BẢN GHI Y TẾ
+      const finalMedicalRecords = await Promise.all(
+        medicalRecords.map(async (record) => {
+          if (!record.images || record.images.length === 0) return record;
 
-      let successfulNewUrls: string[] = [];
+          const uploadedImages = await Promise.all(
+            record.images.map(async (uri: string) => {
+              if (uri.startsWith('http')) return uri; // Đã là link mạng thì bỏ qua
+              
+              try {
+                const filename = uri.split('/').pop() || `medical-record-${Date.now()}.jpg`;
+                const match = /\.(\w+)$/.exec(filename);
+                const ext = match ? match[1].toLowerCase() : 'jpeg';
 
-      if (localUris.length > 0) {
-        setIsUploadingVaccine(true); // Hiển thị Loading UI cho file local
-        
-        const uploadPromises = localUris.map(async (uri) => {
-          try {
-            const filename = uri.split('/').pop() || `vaccine-${Date.now()}.jpg`;
-            const match = /\.(\w+)$/.exec(filename);
-            const ext = match ? match[1].toLowerCase() : 'jpeg';
+                let type = 'image/jpeg';
+                if (ext === 'png') type = 'image/png';
+                else if (ext === 'webp') type = 'image/webp';
 
-            let type = 'image/jpeg';
-            if (ext === 'png') type = 'image/png';
-            else if (ext === 'webp') type = 'image/webp';
+                // Gọi API lấy Presigned URL
+                const presignedRes = await axiosClient.post('/storage/presigned-url', {
+                  fileName: filename,
+                  fileType: type,
+                  folder: 'medical-records'
+                });
 
-            // Gọi API lấy Presigned URL
-            const presignedRes = await axiosClient.post('/storage/presigned-url', {
-              fileName: filename,
-              fileType: type,
-              folder: 'vaccines'
-            });
+                const { uploadUrl, fileUrl } = presignedRes.data;
 
-            const { uploadUrl, fileUrl } = presignedRes.data;
+                const localFileFetch = await fetch(uri);
+                const fileBlob = await localFileFetch.blob();
 
-            const localFileFetch = await fetch(uri);
-            const fileBlob = await localFileFetch.blob();
+                // PUT thẳng lên R2
+                const uploadRes = await fetch(uploadUrl, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': type },
+                  body: fileBlob
+                });
 
-            // PUT thẳng lên R2
-            const uploadRes = await fetch(uploadUrl, {
-              method: 'PUT',
-              headers: { 'Content-Type': type },
-              body: fileBlob
-            });
+                if (!uploadRes.ok) throw new Error('Upload R2 failed');
 
-            if (!uploadRes.ok) throw new Error('Upload R2 failed');
+                return fileUrl;
+              } catch (fileError) {
+                console.error(`[Upload Lỗi] Không thể upload ảnh ${uri}:`, fileError);
+                return null; // Bỏ qua file bị lỗi
+              }
+            })
+          );
+          
+          return { ...record, images: uploadedImages.filter(Boolean) };
+        })
+      );
 
-            return fileUrl;
-          } catch (fileError) {
-            console.error(`[Upload Lỗi] Không thể upload ảnh ${uri}:`, fileError);
-            return null; // Bỏ qua file bị lỗi
-          }
-        });
-
-        const uploadedResults = await Promise.all(uploadPromises);
-        successfulNewUrls = uploadedResults.filter((url): url is string => url !== null);
-
-        if (successfulNewUrls.length < localUris.length) {
-          Alert.alert("Cảnh báo", "Một số ảnh tiêm chủng không thể tải lên. Dữ liệu sẽ chỉ lưu các ảnh thành công.");
-        }
-      }
-
-      // Gộp ảnh cũ + ảnh vừa upload thành công
-      const finalVaccineUrls = [...existingUrls, ...successfulNewUrls];
-      
-      // Mẹo an toàn: Cập nhật lại form state ở đây, đề phòng đoạn code petService.updatePet bị lỗi,
-      // thì lần bấm Submit tiếp theo người dùng sẽ không bị upload lặp các file đã đẩy R2 thành công.
-      setFormData(prev => ({ ...prev, vaccinationRecordUrls: finalVaccineUrls }));
+      // Cập nhật state để không bị upload lại nếu bấm Submit lần sau
+      setMedicalRecords(finalMedicalRecords);
 
       // ----------------------------------------------------------- //
 
@@ -481,9 +445,11 @@ export default function EditPetScreen() {
         contactPhone: formData.contactPhone || null,
         contactAddress: formData.contactAddress || null,
         images: formData.imageUrl ? [formData.imageUrl] : [],
-        vaccinationRecordUrls: finalVaccineUrls, // Mảng sạch (toàn http)
         qrCodeUrl: formData.qrCodeUrl || null,
         isSpayedNeutered: formData.sterilized !== null ? formData.sterilized : null,
+        
+        // Đẩy thẳng mảng record vào đây, backend sẽ lo phần update
+        medicalRecords: finalMedicalRecords.length > 0 ? finalMedicalRecords : undefined, 
       };
 
       if (formData.dob) {
@@ -493,23 +459,27 @@ export default function EditPetScreen() {
       await petService.updatePet(id as string, payload);
 
       showModal({
-        title: 'Success',
-        message: 'Pet profile updated successfully! ',
-        buttonText: 'Back',
+        title: isVi ? 'Thành công' : 'Success',
+        message: isVi ? 'Cập nhật hồ sơ thú cưng thành công!' : 'Pet profile updated successfully!',
+        buttonText: isVi ? 'Trở lại' : 'Back',
         onConfirm: () => router.back(),
       });
 
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update pet. Please try again.');
+      Alert.alert(isVi ? 'Lỗi' : 'Error', error.message || (isVi ? 'Cập nhật thất bại. Vui lòng thử lại.' : 'Failed to update pet. Please try again.'));
     } finally {
       setIsSubmitting(false);
-      setIsUploadingVaccine(false);
+      setIsUploadingRecords(false);
     }
   };
 
   if (isLoading) {
-        return <ActivityIndicator size="small" color="#e9a353" />;
-    }
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator size="large" color="#EFA062" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -527,7 +497,7 @@ export default function EditPetScreen() {
             >
               <Feather name="chevron-left" size={24} color="#000000" />
             </TouchableOpacity>
-            <Text className="text-[18px] font-semibold text-[#000000]">Edit Pet Profile</Text>
+            <Text className="text-[18px] font-semibold text-[#000000]">{isVi ? 'Chỉnh sửa hồ sơ' : 'Edit Pet Profile'}</Text>
             <View className="w-8" />
           </View>
 
@@ -558,14 +528,14 @@ export default function EditPetScreen() {
 
             {/* Pet Information Section */}
             <View className="mb-6">
-              <Text className="text-[16px] font-semibold text-black mb-3">Pet Information</Text>
+              <Text className="text-[16px] font-semibold text-black mb-3">{isVi ? 'Thông tin thú cưng' : 'Pet Information'}</Text>
 
               <View className="bg-white p-6 rounded-[20px] border border-gray-200">
 
                 {/* 1. Name & Type Row */}
                 <View className="flex-row gap-3 mb-5">
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Name</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Tên' : 'Name'}</Text>
                     <TextInput
                       style={inputFontStyle}
                       className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
@@ -576,7 +546,7 @@ export default function EditPetScreen() {
                     />
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Type</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Loài' : 'Type'}</Text>
                     <Dropdown
                       style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
                       containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
@@ -600,7 +570,7 @@ export default function EditPetScreen() {
                 {/* 2. Gender & Sterilized Row */}
                 <View className="flex-row gap-3 mb-5">
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Gender</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Giới tính' : 'Gender'}</Text>
                     <Dropdown
                       style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
                       containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 4, borderColor: '#E5E7EB', borderWidth: 1 }}
@@ -617,19 +587,19 @@ export default function EditPetScreen() {
                     />
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-2.5">Sterilized</Text>
+                    <Text className="text-[14px] text-black font-medium mb-2.5">{isVi ? 'Đã triệt sản' : 'Sterilized'}</Text>
                     <View className="flex-row items-center gap-8 h-[30px]">
                       <TouchableOpacity onPress={() => handleChange('sterilized', true)} className="flex-row items-center">
                         <View className={`w-4 h-4 rounded-full border items-center justify-center mr-2 ${formData.sterilized === true ? 'border-[#EFA062]' : ' border-[#E5E7EB]'}`}>
                           {formData.sterilized === true && <View className="w-2.5 h-2.5 rounded-full bg-[#EFA062]" />}
                         </View>
-                        <Text className="text-[14px] text-black">Yes</Text>
+                        <Text className="text-[14px] text-black">{isVi ? 'Có' : 'Yes'}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleChange('sterilized', false)} className="flex-row items-center">
                         <View className={`w-4 h-4 rounded-full border items-center justify-center mr-2 ${formData.sterilized === false ? 'border-[#EFA062]' : ' border-[#E5E7EB]'}`}>
                           {formData.sterilized === false && <View className="w-2.5 h-2.5 rounded-full bg-[#EFA062]" />}
                         </View>
-                        <Text className="text-[14px] text-black">No</Text>
+                        <Text className="text-[14px] text-black">{isVi ? 'Không' : 'No'}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -638,7 +608,7 @@ export default function EditPetScreen() {
                 {/* 3. Breed & Color Row */}
                 <View className="flex-row gap-3 mb-5">
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Breed</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Giống' : 'Breed'}</Text>
                     <Dropdown
                       style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
                       containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
@@ -655,7 +625,7 @@ export default function EditPetScreen() {
                     />
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Color</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Màu sắc' : 'Color'}</Text>
                     <TextInput
                       style={inputFontStyle}
                       className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
@@ -670,7 +640,7 @@ export default function EditPetScreen() {
                 {/* 4. Birthday & Weight Row */}
                 <View className="flex-row gap-3 mb-5">
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Birthday</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Ngày sinh' : 'Birthday'}</Text>
                     <TouchableOpacity onPress={() => setShowDatePicker(true)} className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 justify-center bg-white">
                       <Text className={`text-[14px] ${formData.dob ? 'text-black' : 'text-[#A1A1AA]'}`}>
                         {formData.dob ? new Date(formData.dob).toLocaleDateString('en-GB') : 'DD/MM/YYYY'}
@@ -678,14 +648,14 @@ export default function EditPetScreen() {
                     </TouchableOpacity>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">Weight</Text>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Cân nặng' : 'Weight'}</Text>
                     <TextInput
                       style={inputFontStyle}
                       className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
                       value={formData.weight}
                       onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
                       keyboardType="decimal-pad"
-                      placeholder="Weight (kg)"
+                      placeholder={isVi ? "Cân nặng (kg)" : "Weight (kg)"}
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
@@ -694,13 +664,13 @@ export default function EditPetScreen() {
                 <View className="h-[1px] bg-gray-100 my-5" />
 
                 <View>
-                  <Text className="text-[14px] text-black font-medium mb-1.5">Notes</Text>
+                  <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Ghi chú' : 'Notes'}</Text>
                   <TextInput
                     style={[inputFontStyle, { paddingTop: 12 }]}
                     className="border border-[#E5E5E5] rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
                     value={formData.description}
                     onChangeText={(text) => handleChange('description', text)}
-                    placeholder={isVi ? "Thích được xoa bụng và chơi trò ném đồ vật cho chó nhặt lại..." : "Loves belly rubs and playing fetch..."}
+                    placeholder={isVi ? "Thích được xoa bụng và chơi trò ném đồ..." : "Loves belly rubs and playing fetch..."}
                     placeholderTextColor="#A1A1AA"
                     multiline
                     textAlignVertical="top"
@@ -711,11 +681,11 @@ export default function EditPetScreen() {
 
             {/* Owner Information Section */}
             <View className="mb-6">
-              <Text className="text-[16px] font-semibold text-black mb-3">Owner Information</Text>
+              <Text className="text-[16px] font-semibold text-black mb-3">{isVi ? 'Thông tin chủ nuôi' : 'Owner Information'}</Text>
 
               <View className="bg-white rounded-[20px] border border-gray-200 px-4 py-2">
                 <View className="flex-row items-center py-3 border-b border-gray-100">
-                  <Text className="text-[16px] font-medium text-black w-[80px]">Name</Text>
+                  <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'Tên' : 'Name'}</Text>
                   <TextInput
                     style={inputFontStyle}
                     className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
@@ -727,7 +697,7 @@ export default function EditPetScreen() {
                 </View>
 
                 <View className="flex-row items-center py-3 border-b border-gray-100">
-                  <Text className="text-[16px] font-medium text-black w-[80px]">Phone</Text>
+                  <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'SĐT' : 'Phone'}</Text>
                   <TextInput
                     style={inputFontStyle}
                     className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
@@ -741,7 +711,7 @@ export default function EditPetScreen() {
                 </View>
 
                 <View className="flex-row items-center py-4">
-                  <Text className="text-[14px] font-medium text-black w-[80px]">Address</Text>
+                  <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
                   <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
                     <Text 
                       style={inputFontStyle}
@@ -755,145 +725,118 @@ export default function EditPetScreen() {
               </View>
             </View>
 
-            {/* Vaccination Record Section */}
+            {/* MEDICAL RECORDS SECTION */}
             <View className="mb-8">
-              <Text className="text-[16px] font-semibold text-[#111827] mb-3">
-                {isVi ? 'Hồ sơ tiêm phòng' : 'Vaccination Record'} ({formData.vaccinationRecordUrls.length}/5)
-              </Text>
-
-              {formData.vaccinationRecordUrls.length < 5 && (
-                <TouchableOpacity
-                  onPress={handlePickVaccine}
-                  activeOpacity={0.7}
-                  className="bg-white border border-dashed border-[#D1D5DB] rounded-[12px] py-6 items-center justify-center"
+              <View className="flex-row justify-between items-center mb-[20px]">
+                <Text className="text-[16px] font-semibold text-[#111827] tracking-[0.06px]">
+                  {isVi ? 'Hồ sơ y tế' : 'Medical Records'} ({medicalRecords.length})
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => setShowMedicalModal(true)}
+                  className="bg-[#FFF8F0] px-4 py-2 rounded-full border border-[#E89B5A]/30"
                 >
-                  <View className="items-center justify-center mb-2">
-                    <Image source={require('../assets/icon/upload-black.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
-                  </View>
-                  <Text className="text-[16px] text-[#292D32] font-medium mb-[10px]">
-                    Choose a file to upload
-                  </Text>
-                  <Text className="text-[14px] text-[#A9ACB4]">JPEG, PNG formats, up to 50MB</Text>
+                  <Text className="text-[#E89B5A] font-medium text-[13px]">{isVi ? '+ Thêm hồ sơ' : '+ Add Record'}</Text>
                 </TouchableOpacity>
-              )}
+              </View>
 
-              {/* Progress UI hiển thị khi ấn Save Changes và có file:// cần upload */}
-              {isUploadingVaccine && (
-                <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mt-2">
+              {/* Progress UI hiển thị khi ấn Save Changes và đang upload */}
+              {isUploadingRecords && (
+                <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mb-4">
                   <View className='flex-row items-center mb-3'>
                     <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
                     <View className="flex-1 ml-3">
                       <View className="flex-row justify-between items-center">
                         <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
-                          Uploading files...
+                          {isVi ? 'Đang tải ảnh y tế lên...' : 'Uploading medical photos...'}
                         </Text>
                       </View>
                       <View className="flex-row items-center mt-1">
-                        <View className="flex-row items-center">
-                          <ActivityIndicator color="#E89B5A" style={{ transform: [{ scaleX: 0.6 }, { scaleY: 0.6 }] }} />
-                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">
-                            Please wait...
-                          </Text>
-                        </View>
+                        <ActivityIndicator color="#E89B5A" style={{ transform: [{ scaleX: 0.6 }, { scaleY: 0.6 }] }} />
+                        <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">
+                          {isVi ? 'Vui lòng đợi...' : 'Please wait...'}
+                        </Text>
                       </View>
                     </View>
                   </View>
-                  
                   <View className="h-1.5 bg-[#E3E3E4] rounded-full ">
                     <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '100%' }} />
                   </View>
                 </View>
               )}
 
-              {formData.vaccinationRecordUrls.map((url, index) => {
-                const isLocalFile = !url.startsWith('http');
-
-                return (
-                  <View key={index} className="border border-[#E5E5E5] rounded-[16px] pl-3 pt-3 pb-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50 mt-3">
-                    <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
-                    <View className="flex-1 mx-3">
-                      <View className="flex-row justify-between items-center">
-                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
-                          vaccination_record_{index + 1}.jpg
+              {/* Danh sách các record */}
+              {medicalRecords.length === 0 ? (
+                <Text className="text-gray-400 text-[14px] italic">
+                  {isVi ? 'Chưa có hồ sơ y tế nào.' : 'No medical records yet.'}
+                </Text>
+              ) : (
+                medicalRecords.map((record, index) => (
+                  <View key={index} className="p-4 bg-[#FAFAFA] rounded-[12px] mb-3 border border-[#E5E5EA] flex-row items-center justify-between">
+                    <View className="flex-1">
+                      <Text className="font-semibold text-[#111827] text-[15px] mb-1">
+                        {record.recordName || (isVi ? "Hồ sơ không tên" : "Unnamed Record")}
+                      </Text>
+                      <Text className="text-[#6B7280] text-[13px]">
+                        {isVi ? 'Loại' : 'Type'}: {record.type} | {isVi ? 'Ngày' : 'Date'}: {new Date(record.recordDate).toLocaleDateString('vi-VN')}
+                      </Text>
+                      
+                      {/* Trạng thái ảnh */}
+                      {record.images && record.images.length > 0 && (
+                        <Text className="text-[#9CA3AF] text-[12px] mt-1">
+                          {isVi ? `Đính kèm: ${record.images.length} ảnh` : `Attachments: ${record.images.length} photos`}
                         </Text>
-                        
-                        {/* ==================================================== */}
-                        {/* ĐÃ COMMENT BUTTON 3 CHẤM CŨ THEO YÊU CẦU             */}
-                        {/* {isLocalFile ? (
-                          <TouchableOpacity
-                            onPress={() => {
-                              const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== index);
-                              handleChange('vaccinationRecordUrls', newUrls);
-                            }}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          >
-                            <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              const { pageY } = e.nativeEvent;
-                              setMenuPosition({ top: pageY + 10, right: 32 });
-                              setSelectedVaccineIndex(index);
-                              setShowVaccineMenu(true);
-                            }}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          >
-                            <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                          </TouchableOpacity>
-                        )}
-                        */}
-                        {/* ==================================================== */}
+                      )}
 
-                        {/* LUÔN HIỂN THỊ NÚT XÓA BẤT KỂ LÀ LOCAL HAY REMOTE */}
-                        <TouchableOpacity
-                          onPress={() => {
-                            const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== index);
-                            handleChange('vaccinationRecordUrls', newUrls);
-                          }}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      {record.hasNextDueDate && (
+                        <Text className="text-[#E89B5A] text-[12px] mt-1 font-medium">
+                          {isVi ? 'Lịch tiếp theo' : 'Next due'}: {new Date(record.nextDueDate).toLocaleDateString('vi-VN')} ({record.nextDueName})
+                        </Text>
+                      )}
+                    </View>
+
+                    <View className="flex-row items-center gap-2">
+                      {/* Nút Xem Chi Tiết Nếu Có Link */}
+                      {record.images && record.images.length > 0 && record.images[0].startsWith('http') && (
+                        <TouchableOpacity 
+                          onPress={() => Linking.openURL(record.images[0]).catch(() => Alert.alert("Lỗi", "Không thể mở file."))}
+                          className="p-2 bg-gray-100 rounded-full"
                         >
-                          <Image source={require('../assets/icon/trash.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                          <Feather name="eye" size={18} color="#6B7280" />
                         </TouchableOpacity>
+                      )}
 
-                      </View>
-                      <View className="flex-row items-center mt-1">
-                        <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">
-                          {isLocalFile ? 'Local File • ' : '1.2 MB • '}
-                        </Text>
-                        <View className="flex-row items-center">
-                          {!isLocalFile && <Feather name="check" size={12} color="#EFA062" />}
-                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">
-                            {isLocalFile ? 'Ready to upload' : 'Completed'}
-                          </Text>
-                        </View>
-                      </View>
+                      {/* Nút Xóa Record */}
+                      <TouchableOpacity 
+                        onPress={() => setMedicalRecords(prev => prev.filter((_, i) => i !== index))}
+                        className="p-2 bg-red-50 rounded-full"
+                      >
+                        <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                      </TouchableOpacity>
                     </View>
                   </View>
-                );
-              })}
+                ))
+              )}
             </View>
 
             <View className="space-y-3 mb-10">
               <TouchableOpacity
                 onPress={handleSubmit}
-                disabled={isSubmitting || isUploadingAvatar || isUploadingVaccine || isUploadingQR}
-                className={`bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm ${(isSubmitting || isUploadingVaccine) ? 'opacity-70' : ''}`}
+                disabled={isSubmitting || isUploadingAvatar || isUploadingRecords}
+                className={`bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm ${(isSubmitting || isUploadingRecords) ? 'opacity-70' : ''}`}
               >
-                {(isSubmitting || isUploadingVaccine) ? (
+                {(isSubmitting || isUploadingRecords) ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Text className="text-white font-semibold text-[16px]">Save Changes</Text>
+                  <Text className="text-white font-semibold text-[16px]">{isVi ? 'Lưu thay đổi' : 'Save Changes'}</Text>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => router.back()}
-                disabled={isSubmitting || isUploadingVaccine}
+                disabled={isSubmitting || isUploadingRecords}
                 className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-5"
               >
-                <Text className="text-[#9CA3AF] font-medium text-[16px]">Cancel</Text>
+                <Text className="text-[#9CA3AF] font-medium text-[16px]">{isVi ? 'Hủy' : 'Cancel'}</Text>
               </TouchableOpacity>
             </View>
 
@@ -908,11 +851,11 @@ export default function EditPetScreen() {
             <View className="bg-white rounded-t-3xl p-4 pb-8">
               <View className="flex-row justify-between items-center mb-4 border-b border-gray-100 pb-3">
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text className="text-gray-500 font-medium text-lg px-2">Cancel</Text>
+                  <Text className="text-gray-500 font-medium text-lg px-2">{isVi ? 'Hủy' : 'Cancel'}</Text>
                 </TouchableOpacity>
-                <Text className="font-bold text-gray-900 text-lg">Date of Birth</Text>
+                <Text className="font-bold text-gray-900 text-lg">{isVi ? 'Ngày sinh' : 'Date of Birth'}</Text>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text className="text-[#EFA062] font-bold text-lg px-2">Done</Text>
+                  <Text className="text-[#EFA062] font-bold text-lg px-2">{isVi ? 'Xong' : 'Done'}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -938,151 +881,37 @@ export default function EditPetScreen() {
         )
       )}
 
-      {/* --- MENU MODAL CHỈ HIỆN KHI BẤM DẤU 3 CHẤM NÊN KHÔNG ĐƯỢC GỌI NỮA --- */}
-      <Modal
-        visible={showVaccineMenu}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowVaccineMenu(false)}
-      >
-        <TouchableOpacity
-          style={{ flex: 1 }}
-          activeOpacity={1}
-          onPress={() => setShowVaccineMenu(false)}
-        >
-          <View
-            className="absolute bg-white rounded-xl border border-gray-100 w-36"
-            style={{
-              top: menuPosition.top,
-              right: menuPosition.right,
-              elevation: 8,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 10
-            }}
-          >
-            <TouchableOpacity
-              className="flex-row items-center px-2 py-3"
-              activeOpacity={0.6}
-              disabled={isUploadingVaccine}
-              onPress={async () => {
-                setShowVaccineMenu(false);
-                if (selectedVaccineIndex === null) return;
-                try {
-                  let result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    quality: 0.8,
-                  });
-                  if (!result.canceled && result.assets) {
-                    setIsUploadingVaccine(true);
-                    const asset = result.assets[0];
-                    const filename = asset.uri.split('/').pop() || `vaccine-${Date.now()}.jpg`;
-                    const match = /\.(\w+)$/.exec(filename);
-                    const ext = match ? match[1].toLowerCase() : 'jpeg';
-                    let type = 'image/jpeg';
-                    if (ext === 'png') type = 'image/png';
-                    else if (ext === 'webp') type = 'image/webp';
-                    
-                    const presignedRes = await axiosClient.post('/storage/presigned-url', {
-                      fileName: filename,
-                      fileType: type,
-                      folder: 'vaccines'
-                    });
-                    
-                    const { uploadUrl, fileUrl } = presignedRes.data;
-                    const localFileFetch = await fetch(asset.uri);
-                    const fileBlob = await localFileFetch.blob();
-                    
-                    const uploadRes = await fetch(uploadUrl, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': type },
-                      body: fileBlob
-                    });
-
-                    if (!uploadRes.ok) throw new Error('Upload R2 thất bại');
-
-                    const newUrlsList = [...formData.vaccinationRecordUrls];
-                    newUrlsList[selectedVaccineIndex] = fileUrl; 
-                    handleChange('vaccinationRecordUrls', newUrlsList);
-                  }
-                } catch (error) {
-                  console.error("Lỗi thay thế file:", error);
-                  Alert.alert("Lỗi", "Không thể tải lên lúc này.");
-                } finally {
-                  setIsUploadingVaccine(false);
-                }
-              }}
-            >
-              <Text className="text-[14px] text-gray-700 ml-3 font-regular">Replace file</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="flex-row items-center px-2 py-3"
-              activeOpacity={0.6}
-              onPress={() => {
-                setShowVaccineMenu(false);
-                if (selectedVaccineIndex !== null && formData.vaccinationRecordUrls[selectedVaccineIndex]) {
-                  const urlToView = formData.vaccinationRecordUrls[selectedVaccineIndex];
-                  if (urlToView.startsWith('http')) {
-                    Linking.openURL(urlToView).catch(() => Alert.alert("Lỗi", "Không thể mở file này."));
-                  } else {
-                    Alert.alert("Thông báo", "Vui lòng Save Changes để có thể xem file trực tuyến.");
-                  }
-                }
-              }}
-            >
-              <Text className="text-[14px] text-gray-700 ml-3 font-regular">View file</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="flex-row items-center px-2 py-3"
-              activeOpacity={0.6}
-              onPress={() => {
-                setShowVaccineMenu(false);
-                if (selectedVaccineIndex !== null) {
-                  const newUrls = formData.vaccinationRecordUrls.filter((_, i) => i !== selectedVaccineIndex);
-                  handleChange('vaccinationRecordUrls', newUrls);
-                }
-              }}
-            >
-              <Text className="text-[14px] text-[#FF3B30] ml-3 font-regular">Delete</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* --- POPUP ADDRESS MODAL (ĐÃ ĐỒNG BỘ TỪ ADD-PET) --- */}
+      {/* --- POPUP ADDRESS MODAL (API V2) --- */}
       <Modal visible={showAddressPopup} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center px-4">
           <View className="bg-white rounded-[24px] p-6 shadow-2xl max-h-[85%]">
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text className="text-[20px] font-semibold text-black mb-2 text-center">
-                Địa chỉ của bạn
+                {isVi ? 'Địa chỉ của bạn' : 'Your Address'}
               </Text>
               
-              <Label text="Thành phố / Tỉnh" required />
+              <Label text={isVi ? "Thành phố / Tỉnh" : "City / Province"} required />
               <CustomDropdown
-                placeholder="Chọn Tỉnh/Thành phố"
+                placeholder={isVi ? "Chọn Tỉnh/Thành phố" : "Select City/Province"}
                 value={tempCity}
                 options={cityOptions}
                 onSelect={(val) => {
                   setTempCity(val);
-                  setTempWard(''); // Cần reset Phường Xã khi đổi Tỉnh
+                  setTempWard(''); 
                 }}
               />
 
-              <Label text="Quận/Huyện & Phường/Xã" required />
+              <Label text={isVi ? "Quận/Huyện & Phường/Xã" : "District & Ward"} required />
               <CustomDropdown
-                placeholder="Chọn Phường/Xã"
+                placeholder={isVi ? "Chọn Phường/Xã" : "Select Ward"}
                 value={tempWard}
                 options={wardOptions}
                 onSelect={setTempWard}
               />
 
-              <Label text="Địa chỉ chi tiết (Tùy chọn)" />
+              <Label text={isVi ? "Địa chỉ chi tiết (Tùy chọn)" : "Detailed Address (Optional)"} />
               <CustomInput
-                placeholder="Số nhà, tên ngõ, tên đường..."
+                placeholder={isVi ? "Số nhà, tên ngõ, tên đường..." : "House number, street name..."}
                 value={tempDetail}
                 onChangeText={setTempDetail}
               />
@@ -1092,19 +921,29 @@ export default function EditPetScreen() {
                   className="flex-1 py-4 rounded-xl border border-[#E5E5E5] items-center bg-[#F9FAFB]"
                   onPress={() => setShowAddressPopup(false)}
                 >
-                  <Text className="text-[#8E8E93] font-bold text-[14px]">Hủy bỏ</Text>
+                  <Text className="text-[#8E8E93] font-bold text-[14px]">{isVi ? 'Hủy bỏ' : 'Cancel'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   className="flex-1 py-4 rounded-xl bg-[#E89B5A] items-center shadow-sm"
                   onPress={handleConfirmAddress}
                 >
-                  <Text className="text-white font-bold text-[14px]">Xác nhận</Text>
+                  <Text className="text-white font-bold text-[14px]">{isVi ? 'Xác nhận' : 'Confirm'}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
           </View>
         </View>
       </Modal>
+
+      {/* Gọi component Modal Medical Record */}
+      <AddMedicalRecordModal 
+        visible={showMedicalModal} 
+        onClose={() => setShowMedicalModal(false)}
+        species={formData.species as 'Dog' | 'Cat'}
+        onSubmit={(data) => {
+          setMedicalRecords(prev => [...prev, data]);
+        }}
+      />
     </SafeAreaView>
   );
 }
