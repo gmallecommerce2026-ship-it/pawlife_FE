@@ -1,10 +1,14 @@
+import { BASE_URL } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import * as Sharing from 'expo-sharing';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
@@ -158,6 +162,43 @@ export default function ViewQrCode() {
     }
   };
 
+  // Tải thẻ .pkpass từ BE (kèm Bearer token) rồi present qua PassKit để thêm vào Apple Wallet
+  const handleAddToWallet = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('accessToken');
+      const fileUri = `${FileSystem.cacheDirectory}pawlife-${displayId}.pkpass`;
+      const res = await FileSystem.downloadAsync(
+        `${BASE_URL}wallet/pets/${petId}/pass`,
+        fileUri,
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+      );
+
+      if (res.status !== 200) {
+        throw new Error(`Pass download failed: ${res.status}`);
+      }
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(res.uri, {
+          mimeType: 'application/vnd.apple.pkpass',
+          UTI: 'com.apple.pkpass',
+          dialogTitle: isVi ? 'Thêm vào Apple Wallet' : 'Add to Apple Wallet',
+        });
+      } else {
+        Alert.alert(
+          isVi ? 'Lỗi' : 'Error',
+          isVi ? 'Thiết bị không hỗ trợ thêm thẻ vào Wallet.' : 'This device does not support adding to Wallet.',
+        );
+      }
+    } catch (error) {
+      console.error('[handleAddToWallet] Error:', error);
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        isVi ? 'Không thể tạo thẻ Apple Wallet. Vui lòng thử lại.' : 'Unable to create Apple Wallet pass. Please try again.',
+      );
+    }
+  };
+
   async function handleSubmitReport() {
     setShowReportModal(false);
 
@@ -243,7 +284,7 @@ export default function ViewQrCode() {
           <View className="flex-1 w-full self-center" style={{ maxWidth: 380, alignItems: 'center' }}>
             <View className="items-center mb-auto flex-1 w-full self-center">
               <View
-                className="bg-white rounded-[24px] items-center mt-24 w-full"
+                className="bg-white rounded-[24px] items-center mt-24 w-full px-[25px] pb-5"
                 style={{ maxWidth: 294, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: SHADOW_OPACITY, shadowRadius: SHADOW_RADIUS, elevation: ELEVATION }}
               >
                 {/* Avatar */}
@@ -269,11 +310,11 @@ export default function ViewQrCode() {
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setShowQrOverlay(true)}
-                  className="py-5 bg-white items-center justify-center w-full"
+                  className="py-[12px] bg-white items-center justify-center"
                 >
-                  <View style={{ width: 189, height: 189, justifyContent: 'center', alignItems: 'center' }}>
+                  <View style={{ width: 171, height: 171, justifyContent: 'center', alignItems: 'center' }}>
                     {qrUri ? (
-                      <SvgUri width="189" height="189" uri={qrUri} onError={() => {}} />
+                      <SvgUri width="171" height="171" uri={qrUri} onError={() => {}} />
                     ) : (
                       <View className="items-center justify-center flex-1">
                         <Text className="text-center text-[13px] text-gray-500">
@@ -284,44 +325,52 @@ export default function ViewQrCode() {
                   </View>
                 </TouchableOpacity>
 
-                <View className="flex-row items-center justify-center pb-10">
-                  <Text className="text-[20px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
-                  <Text className="text-[20px] font-semibold text-[#E89B5A] tracking-tighter">Life</Text>
+                {/* Hướng dẫn gắn thẻ */}
+                <Text className="text-center text-[12px] text-[#8E8E93] font-regular mt-1 mb-[18px]">
+                  {isVi
+                    ? `Hãy luôn gắn thẻ QR cho ${petData.name}`
+                    : `Please always attach QR tag on ${petData.name}`}
+                </Text>
+
+                {/* Vạch ngăn */}
+                <View className="h-[1px] self-stretch bg-[#E5E5E5]" />
+
+                {/* 2 cột hành động: Thay thẻ QR | Chuyển thú cưng */}
+                <View className="flex-row self-stretch mt-[18px] mb-[18px]">
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => router.push({ pathname: '/(tabs)/scan', params: { replacePetId: petData.id } })}
+                    className="flex-1 items-center justify-center"
+                  >
+                    <Image source={require('../assets/icon/qr-replace.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                    <Text className="text-[14px] font-medium text-[#1E1E1E] mt-2">
+                      {isVi ? 'Thay thẻ QR' : 'Replace QR tag'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => router.push({ pathname: '/transfer-ownership', params: { petId } })}
+                    className="flex-1 items-center justify-center"
+                  >
+                    <Image source={require('../assets/icon/qr-transfer.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                    <Text className="text-[14px] font-medium text-[#1E1E1E] mt-2">
+                      {isVi ? 'Chuyển thú cưng' : 'Transfer pet'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
 
-              <Text className="text-center text-[12px] text-[#8E8E93] font-regular mt-[15px] mb-10 px-4 w-[294px]">
-                {isVi
-                  ? `Hãy luôn gắn thẻ QR cho ${petData.name}`
-                  : `Please always attach QR tag on ${petData.name}`}
-              </Text>
-
-              <View className="w-full">
-                <TouchableOpacity
-                  onPress={() => router.push({ pathname: '/transfer-ownership', params: { petId } })}
-                  activeOpacity={0.7}
-                  className="w-full bg-white border border-[#E89B5A] py-[16px] rounded-[20px] items-center justify-center"
-                >
-                  <View className="flex-row items-center">
-                    <Image source={require('../assets/icon/transfer.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
-                    <Text className="text-[16px] font-medium text-[#E89B5A] ml-2">
-                      {isVi ? 'Chuyển quyền sở hữu' : 'Transfer Ownership'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => router.push({ pathname: '/(tabs)/scan', params: { replacePetId: petData.id } })}
-                  activeOpacity={0.7}
-                  className="w-full mt-[12px] bg-white border border-gray-200 py-[16px] rounded-[20px] items-center justify-center"
-                >
-                  <View className="flex-row items-center">
-                    <Image source={require('../assets/icon/refresh.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
-                    <Text className="text-[16px] font-medium text-[#8E8E93] ml-2">
-                      {isVi ? 'Thay mã QR' : 'Replace QR Code'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                {/* Nút Add to Apple Wallet — chỉ hiện trên iOS (Apple Wallet không có trên Android) */}
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity
+                    onPress={handleAddToWallet}
+                    activeOpacity={0.85}
+                    className="flex-row items-center justify-center self-stretch h-[40px] mx-[5px] rounded-[12px] bg-black border border-[#757575]"
+                  >
+                    <Image source={require('../assets/icon/apple-wallet.png')} style={{ width: 21, height: 15 }} resizeMode="contain" />
+                    <Text className="text-white text-[14px] font-medium ml-2">Add to Apple Wallet</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
