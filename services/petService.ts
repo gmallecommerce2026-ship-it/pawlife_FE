@@ -17,7 +17,7 @@ export const petService = {
     return response.data;
   },
 
-  linkQrCode: async(petId: string, tagId: string) => {
+  linkQrCode: async (petId: string, tagId: string) => {
     const response = await axiosClient.post(`/pets/${petId}/link-qr`, { tagId });
     return response.data;
   },
@@ -74,7 +74,7 @@ export const petService = {
       throw error.response?.data || { message: error.message };
     }
   },
-  
+
   getMyPets: async () => {
     const response = await axiosClient.get('/pets/my-pets');
     return response.data;
@@ -114,6 +114,11 @@ export const petService = {
     } catch (error: any) {
       throw error.response?.data || { message: error.message };
     }
+  },
+
+  getPassToken: async (petId: string) => {
+    const response = await axiosClient.post(`/wallet/pets/${petId}/pass-token`);
+    return response.data; 
   },
 
   toggleLostMode: async (petId: string, data: {

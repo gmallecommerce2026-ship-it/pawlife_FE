@@ -4,18 +4,18 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { File, Paths } from 'expo-file-system';
-import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Sharing from 'expo-sharing';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   Dimensions,
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -27,7 +27,15 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SvgUri } from 'react-native-svg';
+import Svg, {
+  Defs,
+  Line,
+  Path,
+  Stop,
+  LinearGradient as SvgLinearGradient,
+  SvgUri,
+} from 'react-native-svg';
+import ViewShot from 'react-native-view-shot';
 import { petService } from '../services/petService';
 
 const { width } = Dimensions.get('window');
@@ -36,13 +44,131 @@ const QR_SIZE = Math.min(width * 0.45, 170);
 const SHADOW_OPACITY = 0.05;
 const SHADOW_RADIUS = 8;
 const ELEVATION = 3;
-
+const CARD_WIDTH = 294;
+const CARD_RADIUS = 24;
+const CARD_NOTCH_RADIUS = 18;
+const CARD_PADDING_X = 25;
+const CARD_DIVIDER_Y = 346; // Tọa độ Y chuẩn xác cho nét đứt
+const CARD_HEIGHT = Platform.OS === 'ios' ? 516 : 476;
 interface RadioOptionProps {
   label: string;
   subLabel?: string;
   selected: boolean;
   onPress: () => void;
 }
+
+type TicketCardSvgProps = {
+  width: number;
+  height: number;
+  borderRadius?: number;
+  notchRadius?: number;
+  dividerY: number;
+};
+const TicketCardSvg = ({
+  width,
+  height,
+  borderRadius = 24,
+  notchRadius = 14,
+  dividerY,
+}: TicketCardSvgProps) => {
+  const left = 0;
+  const top = 0;
+  const right = width;
+  const bottom = height;
+  const safeDividerY = Math.max(
+    borderRadius + notchRadius + 8,
+    Math.min(dividerY, height - borderRadius - notchRadius - 8)
+  );
+  const notchTop = safeDividerY - notchRadius;
+  const notchBottom = safeDividerY + notchRadius;
+  const dividerInset = notchRadius + 10;
+  const dividerStartX = dividerInset;
+  const dividerEndX = width - dividerInset;
+  const pathD = [
+    `M ${left + borderRadius} ${top}`,
+    `L ${right - borderRadius} ${top}`,
+    `Q ${right} ${top} ${right} ${top + borderRadius}`,
+    `L ${right} ${notchTop}`,
+    `A ${notchRadius} ${notchRadius} 0 0 0 ${right} ${notchBottom}`,
+    `L ${right} ${bottom - borderRadius}`,
+    `Q ${right} ${bottom} ${right - borderRadius} ${bottom}`,
+    `L ${left + borderRadius} ${bottom}`,
+    `Q ${left} ${bottom} ${left} ${bottom - borderRadius}`,
+    `L ${left} ${notchBottom}`,
+    `A ${notchRadius} ${notchRadius} 0 0 0 ${left} ${notchTop}`,
+    `L ${left} ${top + borderRadius}`,
+    `Q ${left} ${top} ${left + borderRadius} ${top}`,
+    `Z`,
+  ].join(' ');
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Svg width={width} height={height}>
+        <Defs>
+          <SvgLinearGradient id="ticketSurfaceHighlight" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity="1" />
+            <Stop offset="100%" stopColor="#FCFCFD" stopOpacity="1" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="notchShadeLeft" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0%" stopColor="#000000" stopOpacity="0.12" />
+            <Stop offset="45%" stopColor="#000000" stopOpacity="0.05" />
+            <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="notchShadeRight" x1="1" y1="0" x2="0" y2="0">
+            <Stop offset="0%" stopColor="#000000" stopOpacity="0.12" />
+            <Stop offset="45%" stopColor="#000000" stopOpacity="0.05" />
+            <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+          </SvgLinearGradient>
+        </Defs>
+        {/* Ticket body */}
+        <Path d={pathD} fill="url(#ticketSurfaceHighlight)" />
+        {/* Very subtle outer edge for crispness */}
+        <Path d={pathD} fill="none" stroke="#F1F3F5" strokeWidth={1} />
+        {/* Dashed divider integrated into the ticket */}
+        <Line
+          x1={dividerStartX}
+          y1={safeDividerY}
+          x2={dividerEndX}
+          y2={safeDividerY}
+          stroke="#E5E7EB"
+          strokeWidth={1.5}
+          strokeDasharray="5 5"
+          strokeLinecap="round"
+        />
+        {/* Inner notch ambient occlusion */}
+        <Path
+          d={`M 0 ${notchTop} A ${notchRadius} ${notchRadius} 0 0 1 0 ${notchBottom}`}
+          fill="none"
+          stroke="url(#notchShadeLeft)"
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
+        <Path
+          d={`M ${width} ${notchTop} A ${notchRadius} ${notchRadius} 0 0 0 ${width} ${notchBottom}`}
+          fill="none"
+          stroke="url(#notchShadeRight)"
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
+        {/* Subtle notch highlight to keep edge premium */}
+        <Path
+          d={`M 0 ${notchTop + 1} A ${notchRadius - 1} ${notchRadius - 1} 0 0 1 0 ${notchBottom - 1}`}
+          fill="none"
+          stroke="rgba(255,255,255,0.65)"
+          strokeWidth={1}
+          strokeLinecap="round"
+        />
+        <Path
+          d={`M ${width} ${notchTop + 1} A ${notchRadius - 1} ${notchRadius - 1} 0 0 0 ${width} ${notchBottom - 1}`}
+          fill="none"
+          stroke="rgba(255,255,255,0.65)"
+          strokeWidth={1}
+          strokeLinecap="round"
+        />
+      </Svg>
+    </View>
+  );
+};
 
 export default function ViewQrCode() {
   const router = useRouter();
@@ -61,7 +187,7 @@ export default function ViewQrCode() {
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [replaceTag, setReplaceTag] = useState<string | null>(null);
   const [otherDetail, setOtherDetail] = useState('');
-
+  const cardRef = useRef<ViewShot>(null);
   const RadioOption = ({ label, subLabel, selected, onPress }: RadioOptionProps) => (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -79,7 +205,36 @@ export default function ViewQrCode() {
       </View>
     </TouchableOpacity>
   );
+  const handleShareCard = async () => {
+    try {
+      if (!cardRef.current || !cardRef.current.capture) {
+        return;
+      }
 
+      // Đợi rendering ổn định rồi mới chụp (đảm bảo ảnh avatar và QR đã load xong)
+      const uri = await cardRef.current.capture();
+
+      // Sử dụng expo-sharing để tương thích tốt nhất cho cả iOS và Android khi chia sẻ file ảnh
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: isVi ? `Chia sẻ thẻ của ${petData?.name}` : `Share ${petData?.name}'s card`,
+        });
+      } else {
+        Alert.alert(
+          isVi ? 'Lỗi' : 'Error',
+          isVi ? 'Thiết bị không hỗ trợ tính năng chia sẻ' : 'Sharing not supported on this device'
+        );
+      }
+    } catch (error) {
+      console.error('[handleShareCard] Error:', error);
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        isVi ? 'Không thể tạo ảnh chia sẻ. Vui lòng thử lại.' : 'Unable to create share image. Please try again.'
+      );
+    }
+  };
   useFocusEffect(
     useCallback(() => {
       const fetchPetDetail = async () => {
@@ -164,40 +319,45 @@ export default function ViewQrCode() {
 
   // Tải thẻ .pkpass từ BE (kèm Bearer token) rồi present qua PassKit để thêm vào Apple Wallet
   const handleAddToWallet = async () => {
+    if (Platform.OS !== 'ios') return;
+
     try {
-      const token = await SecureStore.getItemAsync('accessToken');
-      const fileUri = `${FileSystem.cacheDirectory}pawlife-${displayId}.pkpass`;
-      const res = await FileSystem.downloadAsync(
-        `${BASE_URL}wallet/pets/${petId}/pass`,
-        fileUri,
-        { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
-      );
+      const accessToken = await SecureStore.getItemAsync('accessToken');
 
-      if (res.status !== 200) {
-        throw new Error(`Pass download failed: ${res.status}`);
+      // Bước 1: Xin token (giữ nguyên)
+      const tokenRes = await fetch(`${BASE_URL}wallet/pets/${petId}/pass-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!tokenRes.ok) throw new Error(`Token failed: ${tokenRes.status}`);
+      const { token: passToken } = await tokenRes.json();
+
+      // Bước 2: Mở URL trực tiếp — iOS sẽ intercept MIME type và gọi PassKit
+      // KHÔNG download về cache, KHÔNG dùng Sharing.shareAsync
+      const downloadUrl = `${BASE_URL}wallet/download-pass/${passToken}`;
+
+      const supported = await Linking.canOpenURL(downloadUrl);
+      if (!supported) {
+        throw new Error('Cannot open URL');
       }
 
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(res.uri, {
-          mimeType: 'application/vnd.apple.pkpass',
-          UTI: 'com.apple.pkpass',
-          dialogTitle: isVi ? 'Thêm vào Apple Wallet' : 'Add to Apple Wallet',
-        });
-      } else {
-        Alert.alert(
-          isVi ? 'Lỗi' : 'Error',
-          isVi ? 'Thiết bị không hỗ trợ thêm thẻ vào Wallet.' : 'This device does not support adding to Wallet.',
-        );
-      }
+      await Linking.openURL(downloadUrl);
+
     } catch (error) {
       console.error('[handleAddToWallet] Error:', error);
       Alert.alert(
         isVi ? 'Lỗi' : 'Error',
-        isVi ? 'Không thể tạo thẻ Apple Wallet. Vui lòng thử lại.' : 'Unable to create Apple Wallet pass. Please try again.',
+        isVi
+          ? 'Không thể thêm thẻ vào Apple Wallet. Vui lòng thử lại.'
+          : 'Unable to add pass to Apple Wallet. Please try again.'
       );
     }
   };
+
 
   async function handleSubmitReport() {
     setShowReportModal(false);
@@ -235,6 +395,63 @@ export default function ViewQrCode() {
         style={StyleSheet.absoluteFillObject}
       />
 
+      {/* --- OFF-SCREEN VIEWSHOT: Thẻ tàng hình dùng riêng để chụp ảnh --- */}
+      <View style={{ position: 'absolute', zIndex: -10, opacity: 0, pointerEvents: 'none', top: 100, left: 0, right: 0, alignItems: 'center' }}>
+        <ViewShot 
+          ref={cardRef} 
+          options={{ format: 'png', quality: 1.0 }} 
+          style={{ backgroundColor: 'transparent' }}
+        >
+          {/* LỚP BỌC MỚI: Tạo không gian thở và phông nền phía sau */}
+          <View 
+            style={{ 
+              backgroundColor: '#FAFAFA', // Màu nền phía sau giúp nổi bật thẻ và giữ hiệu ứng khuyết
+              paddingTop: 64,             // Hứng trọn Avatar (top: -41px)
+              paddingBottom: 32,          // Hứng trọn Shadow (đổ xuống 4px + radius 8)
+              paddingHorizontal: 24,      // Cân đối hai bên
+              alignItems: 'center' 
+            }}
+          >
+            <View
+              className="bg-white rounded-[24px] items-center pb-[26px] self-center border border-gray-100"
+              style={{ width: 338, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: SHADOW_OPACITY, shadowRadius: SHADOW_RADIUS, elevation: ELEVATION }}
+            >
+              {/* AVATAR KHỐI NHÔ LÊN */}
+              <View className="absolute -top-[41px] self-center w-[82px] h-[82px] z-10">
+                <View style={{ position: 'absolute', width: 120, height: 80, bottom: 41, left: -19, overflow: 'hidden' }}>
+                  <View style={{ width: 82, height: 82, borderRadius: 41, bottom: -41, left: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6' }} />
+                </View>
+                <View style={{ position: 'absolute', width: 82, height: 41, top: 41, left: 0, overflow: 'hidden' }}>
+                  <View style={{ width: 82, height: 82, borderRadius: 41, top: -41, left: 0, backgroundColor: '#FFFFFF' }} />
+                </View>
+                <View className="absolute inset-0 items-center justify-center pointer-events-none">
+                  <Image source={{ uri: avatarUrl }} className="w-[70px] h-[70px] rounded-full bg-gray-200" resizeMode="cover" />
+                </View>
+              </View>
+
+              <Text className="text-[20px] font-semibold text-black mt-[48px] mb-[4px] tracking-tight">{petData.name}</Text>
+              <Text className="text-[12px] font-regular text-[#8E8E93] mb-[4px] tracking-wider">{isVi ? 'Mã' : 'ID'}: {displayId}</Text>
+
+              <View className="my-[24px]">
+                <View style={{ width: 196, height: 196, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+                  {qrUri && (
+                    <View style={{ position: 'absolute', width: '110%', height: '110%', top: '-5%', left: '0%', justifyContent: 'center', alignItems: 'center' }}>
+                      <SvgUri width="100%" height="100%" uri={qrUri} preserveAspectRatio="xMidYMid meet" style={{ transform: [{ scale: 0.88 }] }} onError={() => { }} />
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View className="flex-row items-center justify-center">
+                <Text className="text-[22px] font-semibold text-gray-900 tracking-tighter">Paw</Text>
+                <Text className="text-[22px] font-semibold text-[#E89B5A] tracking-tighter">Life</Text>
+              </View>
+            </View>
+          </View>
+        </ViewShot>
+      </View>
+      {/* --- KẾT THÚC VIEWSHOT TÀNG HÌNH --- */}
+
       <SafeAreaView className="flex-1" edges={['top']}>
         {/* HEADER */}
         <View className="flex-row items-center justify-between px-5 py-4">
@@ -261,7 +478,7 @@ export default function ViewQrCode() {
           </View>
 
           <TouchableOpacity
-            onPress={handleDownloadQr}
+            onPress={handleShareCard}
             activeOpacity={0.7}
             style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 }}
           >
@@ -284,93 +501,154 @@ export default function ViewQrCode() {
           <View className="flex-1 w-full self-center" style={{ maxWidth: 380, alignItems: 'center' }}>
             <View className="items-center mb-auto flex-1 w-full self-center">
               <View
-                className="bg-white rounded-[24px] items-center mt-24 w-full px-[25px] pb-5"
-                style={{ maxWidth: 294, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: SHADOW_OPACITY, shadowRadius: SHADOW_RADIUS, elevation: ELEVATION }}
+                className="items-center mt-24 w-full"
+                style={{
+                  maxWidth: CARD_WIDTH,
+                  width: CARD_WIDTH,
+                  height: CARD_HEIGHT,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: SHADOW_OPACITY,
+                  shadowRadius: SHADOW_RADIUS,
+                  elevation: ELEVATION,
+                }}
               >
-                {/* Avatar */}
-                <View className="absolute -top-[41px] self-center w-[82px] h-[82px] z-10">
-                  <View style={{ position: 'absolute', width: 120, height: 80, bottom: 41, left: -19, overflow: 'hidden' }}>
-                    <View style={{ width: 82, height: 82, borderRadius: 41, bottom: -41, left: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: SHADOW_OPACITY, shadowRadius: SHADOW_RADIUS, elevation: ELEVATION }} />
-                  </View>
-                  <View style={{ position: 'absolute', width: 82, height: 41, top: 41, left: 0, overflow: 'hidden' }}>
-                    <View style={{ width: 82, height: 82, borderRadius: 41, top: -41, left: 0, backgroundColor: '#FFFFFF' }} />
-                  </View>
-                  <View className="absolute inset-0 items-center justify-center pointer-events-none">
-                    <Image source={{ uri: avatarUrl }} className="w-[70px] h-[70px] rounded-full bg-gray-200" resizeMode="cover" />
-                  </View>
-                </View>
-
-                <Text className="text-[20px] font-semibold text-black mt-[48px] mb-[4px] tracking-tight">
-                  {petData.name}
-                </Text>
-                <Text className="text-[12px] font-regular text-[#8E8E93] mb-[4px] tracking-wider">
-                  {isVi ? 'Mã' : 'ID'}: {displayId}
-                </Text>
-
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => setShowQrOverlay(true)}
-                  className="py-[12px] bg-white items-center justify-center"
+                <TicketCardSvg
+                  width={CARD_WIDTH}
+                  height={CARD_HEIGHT}
+                  borderRadius={CARD_RADIUS}
+                  notchRadius={CARD_NOTCH_RADIUS}
+                  dividerY={CARD_DIVIDER_Y}
+                />
+                {/* Content layer */}
+                <View
+                  className="absolute inset-0 items-center"
+                  style={{
+                    paddingHorizontal: CARD_PADDING_X,
+                    paddingBottom: 20,
+                  }}
                 >
-                  <View style={{ width: 171, height: 171, justifyContent: 'center', alignItems: 'center' }}>
-                    {qrUri ? (
-                      <SvgUri width="171" height="171" uri={qrUri} onError={() => {}} />
-                    ) : (
-                      <View className="items-center justify-center flex-1">
-                        <Text className="text-center text-[13px] text-gray-500">
-                          {isVi ? 'Không tìm thấy mã QR' : 'QR code not found'}
-                        </Text>
+                  {/* --- KHU VỰC TRÊN NÉT ĐỨT (Click để xem chi tiết) --- */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setShowQrOverlay(true)}
+                    style={{ width: '100%', alignItems: 'center' }}
+                  >
+                    {/* Avatar */}
+                    <View className="absolute -top-[41px] self-center w-[82px] h-[82px] z-10">
+                      <View style={{ position: 'absolute', width: 120, height: 80, bottom: 41, left: -19, overflow: 'hidden' }}>
+                        <View
+                          style={{
+                            width: 82,
+                            height: 82,
+                            borderRadius: 41,
+                            bottom: -41,
+                            left: 19,
+                            backgroundColor: '#FFFFFF',
+                            borderWidth: 1,
+                            borderColor: '#F3F4F6',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: -4 },
+                            shadowOpacity: SHADOW_OPACITY,
+                            shadowRadius: SHADOW_RADIUS,
+                            elevation: ELEVATION,
+                          }}
+                        />
                       </View>
-                    )}
+                      <View style={{ position: 'absolute', width: 82, height: 41, top: 41, left: 0, overflow: 'hidden' }}>
+                        <View style={{ width: 82, height: 82, borderRadius: 41, top: -41, left: 0, backgroundColor: '#FFFFFF' }} />
+                      </View>
+                      <View className="absolute inset-0 items-center justify-center pointer-events-none">
+                        <Image source={{ uri: avatarUrl }} className="w-[70px] h-[70px] rounded-full bg-gray-200" resizeMode="cover" />
+                      </View>
+                    </View>
+
+                    <Text className="text-[20px] font-semibold text-black mt-[46px] mb-[6px] tracking-tight">
+                      {petData.name}
+                    </Text>
+                    <Text className="text-[12px] font-regular text-[#8E8E93] mb-[20px] tracking-wider">
+                      {isVi ? 'Mã' : 'ID'}: {displayId}
+                    </Text>
+
+                    {/* QR Code - Fix lỗi bị cắt góc bằng cách nới vùng chứa và dùng 100% */}
+                    <View style={{ width: 175, height: 175, justifyContent: 'center', alignItems: 'center' }}>
+                      {qrUri ? (
+                        // Overshoot Wrapper: Nới rộng không gian render thêm 10% để hứng phần viền bị cắt
+                        <View style={{
+                          position: 'absolute',
+                          width: '110%',
+                          height: '110%',
+                          top: '-5%',
+                          left: '-5%',
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}>
+                          <SvgUri
+                            width="100%"
+                            height="100%"
+                            uri={qrUri}
+                            preserveAspectRatio="xMidYMid meet"
+                            // Thu nhỏ lại tổng thể để nằm gọn và đẹp mắt bên trong khung 175x175
+                            style={{ transform: [{ scale: 0.88 }] }}
+                            onError={() => { }}
+                          />
+                        </View>
+                      ) : (
+                        <View className="items-center justify-center flex-1">
+                          <Text className="text-center text-[13px] text-gray-500">
+                            {isVi ? 'Không tìm thấy mã QR' : 'QR code not found'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <Text
+                      className="text-center text-[12px] text-[#8E8E93] pt-[10px] font-regular"
+                      style={{ marginTop: 6, marginBottom: 30 }}
+                    >
+                      {isVi
+                        ? `Hãy luôn gắn thẻ QR cho ${petData.name}`
+                        : `Please always attach QR tag on ${petData.name}`}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* --- KHU VỰC DƯỚI NÉT ĐỨT --- */}
+                  {/* Nét đứt nằm ngay đây trên bề mặt SVG, cách Text trên 30px và cách 2 nút dưới 30px */}
+                  <View className="flex-row self-stretch" style={{ marginTop: 66, marginBottom: 30 }}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => router.push({ pathname: '/(tabs)/scan', params: { replacePetId: petData.id } })}
+                      className="flex-1 items-center justify-center"
+                    >
+                      <Image source={require('../assets/icon/qr-replace.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                      <Text className="text-[14px] font-medium text-[#1E1E1E] mt-2">
+                        {isVi ? 'Thay thẻ QR' : 'Replace QR tag'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => router.push({ pathname: '/transfer-ownership', params: { petId } })}
+                      className="flex-1 items-center justify-center"
+                    >
+                      <Image source={require('../assets/icon/qr-transfer.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                      <Text className="text-[14px] font-medium text-[#1E1E1E] mt-2">
+                        {isVi ? 'Chuyển thú cưng' : 'Transfer pet'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
 
-                {/* Hướng dẫn gắn thẻ */}
-                <Text className="text-center text-[12px] text-[#8E8E93] font-regular mt-1 mb-[18px]">
-                  {isVi
-                    ? `Hãy luôn gắn thẻ QR cho ${petData.name}`
-                    : `Please always attach QR tag on ${petData.name}`}
-                </Text>
-
-                {/* Vạch ngăn */}
-                <View className="h-[1px] self-stretch bg-[#E5E5E5]" />
-
-                {/* 2 cột hành động: Thay thẻ QR | Chuyển thú cưng */}
-                <View className="flex-row self-stretch mt-[18px] mb-[18px]">
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => router.push({ pathname: '/(tabs)/scan', params: { replacePetId: petData.id } })}
-                    className="flex-1 items-center justify-center"
-                  >
-                    <Image source={require('../assets/icon/qr-replace.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
-                    <Text className="text-[14px] font-medium text-[#1E1E1E] mt-2">
-                      {isVi ? 'Thay thẻ QR' : 'Replace QR tag'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => router.push({ pathname: '/transfer-ownership', params: { petId } })}
-                    className="flex-1 items-center justify-center"
-                  >
-                    <Image source={require('../assets/icon/qr-transfer.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
-                    <Text className="text-[14px] font-medium text-[#1E1E1E] mt-2">
-                      {isVi ? 'Chuyển thú cưng' : 'Transfer pet'}
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Nút Apple Wallet - Cách 2 nút trên đúng 30px theo thiết lập marginBottom bên trên */}
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity
+                      onPress={handleAddToWallet}
+                      activeOpacity={0.85}
+                      className="flex-row items-center justify-center self-stretch h-[40px] mx-[5px] rounded-[12px] bg-black border border-[#757575]"
+                    >
+                      <Image source={require('../assets/icon/apple-wallet.png')} style={{ width: 21, height: 15 }} resizeMode="contain" />
+                      <Text className="text-white text-[14px] font-medium ml-2">Add to Apple Wallet</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-
-                {/* Nút Add to Apple Wallet — chỉ hiện trên iOS (Apple Wallet không có trên Android) */}
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity
-                    onPress={handleAddToWallet}
-                    activeOpacity={0.85}
-                    className="flex-row items-center justify-center self-stretch h-[40px] mx-[5px] rounded-[12px] bg-black border border-[#757575]"
-                  >
-                    <Image source={require('../assets/icon/apple-wallet.png')} style={{ width: 21, height: 15 }} resizeMode="contain" />
-                    <Text className="text-white text-[14px] font-medium ml-2">Add to Apple Wallet</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             </View>
 
@@ -389,6 +667,8 @@ export default function ViewQrCode() {
       <Modal animationType="fade" transparent visible={showQrOverlay} onRequestClose={() => setShowQrOverlay(false)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setShowQrOverlay(false)} className="flex-1 justify-center items-center">
           <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} className="flex-1 justify-center items-center">
+
+            {/* --- VIEWSHOT: Bọc toàn bộ khối thẻ trắng --- */}
             <View
               className="bg-white rounded-[24px] items-center pb-[26px] self-center border border-gray-100 w-full"
               style={{ maxWidth: 338, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: SHADOW_OPACITY, shadowRadius: SHADOW_RADIUS, elevation: ELEVATION }}
@@ -413,9 +693,27 @@ export default function ViewQrCode() {
               </Text>
 
               <View className="my-[24px]">
+                {/* --- FIX CẮT QR: Dùng Overshoot Wrapper --- */}
                 <View style={{ width: 196, height: 196, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
                   {qrUri ? (
-                    <SvgUri width="196" height="196" uri={qrUri} />
+                    <View style={{
+                      position: 'absolute',
+                      width: '110%',
+                      height: '110%',
+                      top: '-5%',
+                      left: '-5%',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}>
+                      <SvgUri
+                        width="100%"
+                        height="100%"
+                        uri={qrUri}
+                        preserveAspectRatio="xMidYMid meet"
+                        style={{ transform: [{ scale: 0.88 }] }}
+                        onError={() => { }}
+                      />
+                    </View>
                   ) : (
                     <Text className="text-gray-400">
                       {isVi ? 'Không có mã QR' : 'QR unavailable'}
@@ -430,16 +728,18 @@ export default function ViewQrCode() {
               </View>
             </View>
 
+            {/* --- NÚT BẤM: Gọi hàm chụp và chia sẻ thẻ --- */}
             <TouchableOpacity
-              onPress={handleDownloadQr}
+              onPress={handleShareCard} // Gắn hàm xử lý chia sẻ ViewShot
               activeOpacity={0.8}
               className="absolute flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] bottom-24"
             >
               <Feather name="share" size={20} color="#8E8E93" />
               <Text className="text-[#8E8E93] font-medium text-[16px] ml-3">
-                {isVi ? 'Lưu mã QR' : 'Save QR'}
+                {isVi ? 'Chia sẻ thẻ' : 'Share Card'}
               </Text>
             </TouchableOpacity>
+
           </BlurView>
         </TouchableOpacity>
       </Modal>
