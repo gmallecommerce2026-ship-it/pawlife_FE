@@ -18,13 +18,13 @@ import {
   Modal,
   Platform,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useModalStore } from '../store/useModalStore';
+import { TextInput } from '@/components/AppTextInput';
 
 // --- DATA CONSTANTS ---
 const HOUSING_TYPES_EN = [

@@ -3,7 +3,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { memo, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Dimensions, FlatList, Image, LayoutAnimation, StatusBar, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Dimensions, FlatList, Image, LayoutAnimation, StatusBar, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { eventService } from '../services/eventService';
 import { petService } from '../services/petService';
@@ -14,6 +14,7 @@ import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
+import { TextInput } from '@/components/AppTextInput';
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
 const getAge = (dobString?: string) => {

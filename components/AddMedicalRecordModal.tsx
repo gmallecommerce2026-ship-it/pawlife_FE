@@ -11,11 +11,11 @@ import {
   Modal,
   Platform,
   Switch,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Text } from './AppText';
+import { TextInput } from './AppTextInput';
 const formatShortDate = (date: Date, isVi: boolean) => {
   const day = date.getDate();
   const year = date.getFullYear();

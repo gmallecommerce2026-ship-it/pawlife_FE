@@ -3,10 +3,11 @@ import { Text } from '@/components/AppText';
 import { AntDesign, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient'; // Đảm bảo đường dẫn này đúng với dự án của bạn
 import { useModalStore } from '@/store/useModalStore';
+import { TextInput } from '@/components/AppTextInput';
 export default function ChangePasswordScreen() {
   const router = useRouter();
 

@@ -524,7 +524,7 @@ export default function PetProfileDetailScreen() {
                       <Text className={`text-[14px] mt-0.5 font-light ${isLostMode ? 'text-[#8B3A3ACC]' : 'text-gray-400'}`}>
                         {isLostMode ? (
                           <Text>
-                            Active -{' '}
+                            Active •{' '}
                             <Text 
                               className="underline font-medium"
                               onPress={() => {
@@ -549,7 +549,7 @@ export default function PetProfileDetailScreen() {
                             </Text>
                           </Text>
                         ) : (
-                          "Inactive - Pet is safe"
+                          "Inactive • Pet is safe"
                         )}
                       </Text>
                     </View>
@@ -599,7 +599,7 @@ export default function PetProfileDetailScreen() {
             <View className='bg-white rounded-[24px] p-6 border border-gray-200'>
 
               <InfoRow
-                label1="Gender" value1={petData.gender || 'not updated'}
+                label1="Gender" value1={petData.gender.charAt(0).toUpperCase() + petData.gender.slice(1).toLowerCase() || 'not updated'}
                 label2="Sterilized" value2={
                   petData.isSpayedNeutered === true ? 'Yes' : 
                   petData.isSpayedNeutered === false ? 'No' : 

@@ -4,6 +4,13 @@ import { AppProvider } from '@/contexts/AppContext';
 import { AuthContext, AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext'; // BỔ SUNG: Import useLanguage
 import {
+  BeVietnamPro_300Light,
+  BeVietnamPro_400Regular,
+  BeVietnamPro_500Medium,
+  BeVietnamPro_600SemiBold,
+  BeVietnamPro_700Bold,
+} from '@expo-google-fonts/be-vietnam-pro';
+import {
   Urbanist_400Regular,
   Urbanist_400Regular_Italic,
   Urbanist_500Medium,
@@ -62,8 +69,20 @@ function RootLayoutNavGuard() {
   const { isAuthenticated, isLoading, user } = useContext(AuthContext);
   const segments = useSegments() as string[];
   const router = useRouter();
-  const { t } = useLanguage(); // BỔ SUNG: Gọi hook dịch thuật
+  const { t, language } = useLanguage(); // BỔ SUNG: Gọi hook dịch thuật
+  useEffect(() => {
+    const TextRender = Text as any;
+    const TextInputRender = TextInput as any;
 
+    // Tiếng Anh dùng Urbanist (400), Tiếng Việt hạ 1 cấp dùng BeVietnamPro_300Light
+    const baseFont = language === 'vi' ? 'BeVietnamPro_300Light' : 'Urbanist';
+
+    TextRender.defaultProps = TextRender.defaultProps || {};
+    TextRender.defaultProps.style = [{ fontFamily: baseFont }, TextRender.defaultProps.style];
+
+    TextInputRender.defaultProps = TextInputRender.defaultProps || {};
+    TextInputRender.defaultProps.style = [{ fontFamily: baseFont }, TextInputRender.defaultProps.style];
+  }, [language]);
   // Face ID States
   const [isAppLocked, setIsAppLocked] = useState(false);
   const appState = useRef(AppState.currentState);
@@ -296,14 +315,21 @@ const VideoSplashOverlay = ({ onFinish }: { onFinish: () => void }) => {
 // Component RootLayout chính: Load Font và Provider
 // ------------------------------------------------------------------
 export default function RootLayout() {
-  //const isGlobalLoading = useLoadingStore((state: any) => state.isGlobalLoading);
   const [loaded, error] = useFonts({
-    Urbanist: Urbanist_400Regular,
-    UrbanistMedium: Urbanist_500Medium,
-    UrbanistSemiBold: Urbanist_600SemiBold,
-    UrbanistBold: Urbanist_700Bold,
-    UrbanistItalic: Urbanist_400Regular_Italic,
-    UrbanistExtraBold: Urbanist_800ExtraBold,
+    // Chuẩn hóa font Urbanist (Tiếng Anh)
+    'Urbanist-Regular': Urbanist_400Regular,
+    'Urbanist-Medium': Urbanist_500Medium,
+    'Urbanist-SemiBold': Urbanist_600SemiBold,
+    'Urbanist-Bold': Urbanist_700Bold,
+    'Urbanist-ExtraBold': Urbanist_800ExtraBold,
+    'Urbanist-Italic': Urbanist_400Regular_Italic,
+
+    // Chuẩn hóa font Be Vietnam Pro (Tiếng Việt)
+    'BeVietnamPro-Light': BeVietnamPro_300Light,
+    'BeVietnamPro-Regular': BeVietnamPro_400Regular,
+    'BeVietnamPro-Medium': BeVietnamPro_500Medium,
+    'BeVietnamPro-SemiBold': BeVietnamPro_600SemiBold,
+    'BeVietnamPro-Bold': BeVietnamPro_700Bold,
   });
   const [isVideoFinished, setIsVideoFinished] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -324,7 +350,7 @@ export default function RootLayout() {
       useNativeDriver: true,
     }).start(() => {
       setIsVideoFinished(true);
-      setSplashVideoState(false); 
+      setSplashVideoState(false);
     });
   };
 
@@ -335,13 +361,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
       <QueryClientProvider client={queryClient}>
-        
+
         {/* QUAN TRỌNG: Đưa LoadingProvider lên TRƯỚC AppProvider và AuthProvider */}
-        <LoadingProvider> 
+        <LoadingProvider>
           <AppProvider>
             <AuthProvider>
               <LanguageProvider>
-                
+
                 <RootLayoutNavGuard />
                 <GlobalOverlay />
 
@@ -356,7 +382,7 @@ export default function RootLayout() {
                     <Video
                       source={require('../assets/video/splash.mp4')}
                       style={StyleSheet.absoluteFill}
-                      resizeMode={ResizeMode.COVER} 
+                      resizeMode={ResizeMode.COVER}
                       shouldPlay={true}
                       isLooping={false}
                       isMuted={true}

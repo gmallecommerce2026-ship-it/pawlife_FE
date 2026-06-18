@@ -3,7 +3,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { memo, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, Modal, StatusBar, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Image, Modal, StatusBar, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { eventService } from '../services/eventService';
 import { petService } from '../services/petService';
@@ -11,6 +11,7 @@ import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
 
 import { Text } from '@/components/AppText';
+import { TextInput } from './AppTextInput';
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 15) / 2;
 

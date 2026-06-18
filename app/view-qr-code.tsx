@@ -1,10 +1,11 @@
 import { BASE_URL } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { File, Paths } from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Sharing from 'expo-sharing';
@@ -13,15 +14,14 @@ import {
   Alert,
   Dimensions,
   Image,
+  ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
   ScrollView,
-  Share,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -44,12 +44,12 @@ const QR_SIZE = Math.min(width * 0.45, 170);
 const SHADOW_OPACITY = 0.05;
 const SHADOW_RADIUS = 8;
 const ELEVATION = 3;
-const CARD_WIDTH = 294;
+const CARD_WIDTH = 296;
 const CARD_RADIUS = 24;
-const CARD_NOTCH_RADIUS = 18;
+const CARD_NOTCH_RADIUS = 22;
 const CARD_PADDING_X = 25;
-const CARD_DIVIDER_Y = 346; // Tọa độ Y chuẩn xác cho nét đứt
-const CARD_HEIGHT = Platform.OS === 'ios' ? 516 : 476;
+const CARD_DIVIDER_Y = 321; // Tọa độ Y chuẩn xác cho nét đứt
+const CARD_HEIGHT = Platform.OS === 'ios' ? 494 : 490;
 interface RadioOptionProps {
   label: string;
   subLabel?: string;
@@ -284,35 +284,45 @@ export default function ViewQrCode() {
 
   const handleDownloadQr = async () => {
     try {
-      if (!qrUri) {
+      // 1. Kiểm tra ViewShot đã sẵn sàng chưa
+      if (!cardRef.current || !cardRef.current.capture) {
+        return;
+      }
+
+      // 2. Chụp ảnh thẻ thành định dạng PNG (Giống hệt cách làm của handleShareCard)
+      const uri = await cardRef.current.capture();
+
+      // 3. Yêu cầu quyền truy cập thư viện ảnh từ người dùng
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+
+      if (status !== 'granted') {
         Alert.alert(
-          isVi ? 'Lỗi' : 'Error',
-          isVi ? 'Không tìm thấy mã QR để tải về.' : 'QR code not found.'
+          isVi ? 'Thiếu quyền' : 'Permission Required',
+          isVi
+            ? 'Cần cấp quyền truy cập thư viện ảnh để lưu thẻ QR.'
+            : 'Photo library permission is required to save the QR card.'
         );
         return;
       }
 
-      const fileName = `pawlife_qr_${petData?.name ?? 'pet'}_${Date.now()}.svg`;
-      const file = new File(Paths.cache, fileName);
+      // 4. Lưu ảnh vừa chụp vào thiết bị
+      await MediaLibrary.saveToLibraryAsync(uri);
 
-      const response = await fetch(qrUri);
-      const svgText = await response.text();
-      await file.write(svgText);
+      // 5. Thông báo thành công
+      Alert.alert(
+        isVi ? 'Thành công' : 'Success',
+        isVi
+          ? `Thẻ của ${petData?.name} đã được lưu vào thư viện ảnh!`
+          : `The card for ${petData?.name} has been saved to your photos!`
+      );
 
-      await Share.share({
-        url: file.uri,
-        message: isVi
-          ? `Mã QR của ${petData?.name} - PawLife`
-          : `QR Code of ${petData?.name} - PawLife`,
-        title: isVi ? `Mã QR - ${petData?.name}` : `QR Code - ${petData?.name}`,
-      });
-
-      file.delete();
     } catch (error) {
       console.error('[handleDownloadQr] Error:', error);
       Alert.alert(
         isVi ? 'Lỗi' : 'Error',
-        isVi ? 'Không thể lưu mã QR. Vui lòng thử lại.' : 'Unable to save QR code. Please try again.'
+        isVi
+          ? 'Không thể lưu thẻ QR. Vui lòng thử lại.'
+          : 'Unable to save QR card. Please try again.'
       );
     }
   };
@@ -397,20 +407,22 @@ export default function ViewQrCode() {
 
       {/* --- OFF-SCREEN VIEWSHOT: Thẻ tàng hình dùng riêng để chụp ảnh --- */}
       <View style={{ position: 'absolute', zIndex: -10, opacity: 0, pointerEvents: 'none', top: 100, left: 0, right: 0, alignItems: 'center' }}>
-        <ViewShot 
-          ref={cardRef} 
-          options={{ format: 'png', quality: 1.0 }} 
+        <ViewShot
+          ref={cardRef}
+          options={{ format: 'png', quality: 1.0 }}
           style={{ backgroundColor: 'transparent' }}
         >
-          {/* LỚP BỌC MỚI: Tạo không gian thở và phông nền phía sau */}
-          <View 
-            style={{ 
-              backgroundColor: '#FAFAFA', // Màu nền phía sau giúp nổi bật thẻ và giữ hiệu ứng khuyết
-              paddingTop: 64,             // Hứng trọn Avatar (top: -41px)
-              paddingBottom: 32,          // Hứng trọn Shadow (đổ xuống 4px + radius 8)
-              paddingHorizontal: 24,      // Cân đối hai bên
-              alignItems: 'center' 
+          {/* LỚP BỌC MỚI DÙNG IMAGE BACKGROUND */}
+          <ImageBackground
+            source={require('@/assets/images/share-background.jpg')} // Đường dẫn tới background của bạn
+            style={{
+              paddingTop: 84,             // Hứng trọn Avatar (top: -41px) + dư dả lề trên cho đẹp
+              paddingBottom: 48,          // Hứng trọn Shadow (đổ xuống 4px + radius 8)
+              paddingHorizontal: 40,      // Rộng hai bên để thấy background rõ hơn
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
+            imageStyle={{ borderRadius: 16 }} // (Tuỳ chọn) Bo góc cho ảnh share nếu muốn
           >
             <View
               className="bg-white rounded-[24px] items-center pb-[26px] self-center border border-gray-100"
@@ -447,7 +459,7 @@ export default function ViewQrCode() {
                 <Text className="text-[22px] font-semibold text-[#E89B5A] tracking-tighter">Life</Text>
               </View>
             </View>
-          </View>
+          </ImageBackground>
         </ViewShot>
       </View>
       {/* --- KẾT THÚC VIEWSHOT TÀNG HÌNH --- */}
@@ -539,11 +551,11 @@ export default function ViewQrCode() {
                       <View style={{ position: 'absolute', width: 120, height: 80, bottom: 41, left: -19, overflow: 'hidden' }}>
                         <View
                           style={{
-                            width: 82,
-                            height: 82,
+                            width: 76,
+                            height: 76,
                             borderRadius: 41,
-                            bottom: -41,
-                            left: 19,
+                            bottom: -43,
+                            left: 22,
                             backgroundColor: '#FFFFFF',
                             borderWidth: 1,
                             borderColor: '#F3F4F6',
@@ -559,27 +571,26 @@ export default function ViewQrCode() {
                         <View style={{ width: 82, height: 82, borderRadius: 41, top: -41, left: 0, backgroundColor: '#FFFFFF' }} />
                       </View>
                       <View className="absolute inset-0 items-center justify-center pointer-events-none">
-                        <Image source={{ uri: avatarUrl }} className="w-[70px] h-[70px] rounded-full bg-gray-200" resizeMode="cover" />
+                        <Image source={{ uri: avatarUrl }} className="w-[66px] h-[66px] rounded-full bg-gray-200" resizeMode="cover" />
                       </View>
                     </View>
 
-                    <Text className="text-[20px] font-semibold text-black mt-[46px] mb-[6px] tracking-tight">
+                    <Text className="text-[20px] font-semibold text-black mt-[41px] mb-[6px] tracking-tight">
                       {petData.name}
                     </Text>
-                    <Text className="text-[12px] font-regular text-[#8E8E93] mb-[20px] tracking-wider">
+                    <Text className="text-[12px] font-regular text-[#8E8E93] mb-[12px] tracking-wider">
                       {isVi ? 'Mã' : 'ID'}: {displayId}
                     </Text>
 
                     {/* QR Code - Fix lỗi bị cắt góc bằng cách nới vùng chứa và dùng 100% */}
-                    <View style={{ width: 175, height: 175, justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={{ width: 171, height: 171, justifyContent: 'center', alignItems: 'center' }}>
                       {qrUri ? (
-                        // Overshoot Wrapper: Nới rộng không gian render thêm 10% để hứng phần viền bị cắt
+                        // Khung trong nới rộng ra 200x200 để SVG thoải mái render không bị xén cạnh.
+                        // Dùng scale = 171 / 200 (tương đương 0.855) để ép cái khung 200x200 này chui lọt vừa khít vào khung 171x171.
                         <View style={{
-                          position: 'absolute',
-                          width: '110%',
-                          height: '110%',
-                          top: '-5%',
-                          left: '-5%',
+                          width: 200,
+                          height: 200,
+                          transform: [{ scale: 171 / 200 }],
                           justifyContent: 'center',
                           alignItems: 'center'
                         }}>
@@ -588,8 +599,6 @@ export default function ViewQrCode() {
                             height="100%"
                             uri={qrUri}
                             preserveAspectRatio="xMidYMid meet"
-                            // Thu nhỏ lại tổng thể để nằm gọn và đẹp mắt bên trong khung 175x175
-                            style={{ transform: [{ scale: 0.88 }] }}
                             onError={() => { }}
                           />
                         </View>
@@ -603,8 +612,8 @@ export default function ViewQrCode() {
                     </View>
 
                     <Text
-                      className="text-center text-[12px] text-[#8E8E93] pt-[10px] font-regular"
-                      style={{ marginTop: 6, marginBottom: 30 }}
+                      className="text-center text-[12px] text-[#8E8E93] pt-[4px] font-regular"
+                      style={{ marginTop: 0 }}
                     >
                       {isVi
                         ? `Hãy luôn gắn thẻ QR cho ${petData.name}`
@@ -614,7 +623,7 @@ export default function ViewQrCode() {
 
                   {/* --- KHU VỰC DƯỚI NÉT ĐỨT --- */}
                   {/* Nét đứt nằm ngay đây trên bề mặt SVG, cách Text trên 30px và cách 2 nút dưới 30px */}
-                  <View className="flex-row self-stretch" style={{ marginTop: 66, marginBottom: 30 }}>
+                  <View className="flex-row self-stretch" style={{ marginTop: 63, marginBottom: 35 }}>
                     <TouchableOpacity
                       activeOpacity={0.7}
                       onPress={() => router.push({ pathname: '/(tabs)/scan', params: { replacePetId: petData.id } })}
@@ -701,7 +710,7 @@ export default function ViewQrCode() {
                       width: '110%',
                       height: '110%',
                       top: '-5%',
-                      left: '-5%',
+                      left: '0%',
                       justifyContent: 'center',
                       alignItems: 'center'
                     }}>
@@ -730,13 +739,13 @@ export default function ViewQrCode() {
 
             {/* --- NÚT BẤM: Gọi hàm chụp và chia sẻ thẻ --- */}
             <TouchableOpacity
-              onPress={handleShareCard} // Gắn hàm xử lý chia sẻ ViewShot
+              onPress={handleDownloadQr} // Gắn hàm xử lý chia sẻ ViewShot
               activeOpacity={0.8}
               className="absolute flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] bottom-24"
             >
               <Feather name="share" size={20} color="#8E8E93" />
               <Text className="text-[#8E8E93] font-medium text-[16px] ml-3">
-                {isVi ? 'Chia sẻ thẻ' : 'Share Card'}
+                {isVi ? 'Tải về' : 'Download'}
               </Text>
             </TouchableOpacity>
 

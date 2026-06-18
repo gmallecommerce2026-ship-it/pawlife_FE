@@ -1,5 +1,6 @@
 // app/new-fill-profile.tsx
 import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -18,7 +19,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View

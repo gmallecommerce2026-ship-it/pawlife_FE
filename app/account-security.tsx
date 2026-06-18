@@ -13,7 +13,6 @@ import {
   Modal,
   ScrollView,
   Switch,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -23,6 +22,7 @@ import axiosClient from '../api/axiosClient';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { TextInput } from '@/components/AppTextInput';
 
 // Tái sử dụng component cho dạng bật/tắt (Toggle)
 const SettingToggle = ({ label, value, onValueChange, t }: { label: string, value: boolean, onValueChange: (val: boolean) => void, t: any }) => (

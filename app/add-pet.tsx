@@ -19,7 +19,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View
@@ -27,6 +26,7 @@ import {
 import { Dropdown } from 'react-native-element-dropdown';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useImageUpload } from '../hooks/useImageUpload';
+import { TextInput } from '@/components/AppTextInput';
 
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';

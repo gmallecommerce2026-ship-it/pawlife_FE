@@ -1,4 +1,5 @@
 import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
@@ -6,7 +7,6 @@ import {
   LayoutAnimation,
   Platform,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   UIManager,
   View

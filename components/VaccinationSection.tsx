@@ -1,19 +1,19 @@
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-  View,
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
-  Image,
-  Switch,
-  TextInput,
-  Modal,
-  StyleSheet,
-  Platform,
-  Alert
+  View
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
+import { TextInput } from './AppTextInput';
 
 export default function VaccinationSection() {
   const [images, setImages] = useState<string[]>([]);

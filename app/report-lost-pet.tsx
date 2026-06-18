@@ -21,7 +21,6 @@ import {
   Platform,
   ScrollView,
   StatusBar,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View
@@ -30,6 +29,7 @@ import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useModalStore } from '../store/useModalStore';
+import { TextInput } from '@/components/AppTextInput';
 interface LocItem {
   code: number;
   name: string;

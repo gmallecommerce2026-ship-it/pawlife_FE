@@ -21,7 +21,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   useWindowDimensions,
@@ -29,6 +28,7 @@ import {
 } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { TextInput } from './AppTextInput';
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const MODAL_MAP_WIDTH = Math.round(SCREEN_WIDTH * 0.9 - 48);
 const MODAL_MAP_HEIGHT = 178; // Tương ứng h-[178px]

@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, FlatList, Image, PixelRatio, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, Dimensions, FlatList, Image, PixelRatio, ScrollView, TouchableOpacity, View } from 'react-native';
 import Animated, {
     Easing,
     Extrapolation,
@@ -52,10 +52,11 @@ const SectionLoader = () => (
         <ActivityIndicator size="small" color="#E89B5A" />
     </View>
 );
-
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function HomeScreen() {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const router = useRouter();
+
     const [data, setData] = useState(null);
     const insets = useSafeAreaInsets();
     const { user } = useContext(AuthContext);
@@ -63,6 +64,120 @@ export default function HomeScreen() {
     const rotation = useSharedValue(0);
     const translateY = useSharedValue(0);
     const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+    const [greetingSubtitle, setGreetingSubtitle] = useState('');
+
+    const generateGreeting = useCallback((petName = '') => {
+        const isVi = language === 'vi';
+        const defaultPetNameVi = petName || 'các bé';
+        const defaultPetNameEn = petName || 'the furry friends';
+
+        const currentPetName = isVi ? defaultPetNameVi : defaultPetNameEn;
+
+        const hour = new Date().getHours();
+        // Buổi tối từ 18:00 đến 04:59 sáng hôm sau
+        const isEvening = hour >= 18 || hour < 5;
+
+        if (isEvening) {
+            const eveningPhrasesVi = [
+                "Lướt một chút thôi trước khi nghỉ ngơi nhé",
+                "Cùng thư giãn với PawLife nào",
+                "Một chút thời gian chill chill~",
+                "Hôm nay của bạn thế nào rồi?",
+                "Xem thử có gì mới trước khi ngủ hem?",
+                `Dành chút thời gian cho ${currentPetName} nhé`
+            ];
+            const eveningPhrasesEn = [
+                "A quick scroll before you rest?",
+                "Time to unwind with PawLife.",
+                "Just a little chill time~",
+                "How was your day today?",
+                "Catch up on what's new before bedtime.",
+                `Spend a little evening time with ${currentPetName}.`
+            ];
+            const list = isVi ? eveningPhrasesVi : eveningPhrasesEn;
+            return list[Math.floor(Math.random() * list.length)];
+        }
+
+        // --- BAN NGÀY ---
+        const rand = Math.random() * 100;
+
+        if (rand <= 50) {
+            const group1Vi = [
+                `Hôm nay bạn muốn làm gì cùng ${currentPetName} nè?`,
+                "Khám phá xem hôm nay có gì cho bạn nào",
+                "Bạn muốn bắt đầu từ đâu nhỉ?",
+                "Có vài điều hay ho đang chờ bạn đó",
+                "Lướt một chút xem có gì mới nào",
+                "Cùng xem hôm nay PawLife có gì nào"
+            ];
+            const group1En = [
+                `What's the plan for today with ${currentPetName}?`,
+                "Let's see what's waiting for you today!",
+                "Where should we start today?",
+                "Exciting things are waiting for you!",
+                "Let's dive in and see what's new.",
+                "Ready to explore PawLife today?"
+            ];
+            const list = isVi ? group1Vi : group1En;
+            return list[Math.floor(Math.random() * list.length)];
+
+        } else if (rand <= 85) {
+            const group2Vi = [
+                "Chúc bạn ngày mới tốt lành nha",
+                "Mong là hôm nay thật dịu dàng với bạn",
+                `Dành chút thời gian cho ${currentPetName} nhé`
+            ];
+            const group2En = [
+                "Wishing you a wonderful day ahead!",
+                "Hope today is treating you well.",
+                `Take a little moment for ${currentPetName} today.`
+            ];
+            const list = isVi ? group2Vi : group2En;
+            return list[Math.floor(Math.random() * list.length)];
+
+        } else {
+            const group3Vi = [
+                "Các bé đang chờ bạn đó 🐾",
+                "Có vài người bạn nhỏ muốn gặp bạn lắm ý",
+                "Hôm nay bạn muốn ngắm ai nè?"
+            ];
+            const group3En = [
+                "The furry friends are waiting for you 🐾",
+                "Some little buddies really want to see you!",
+                "Who do you want to check on today?"
+            ];
+            const list = isVi ? group3Vi : group3En;
+            return list[Math.floor(Math.random() * list.length)];
+        }
+    }, [language]);
+
+    useEffect(() => {
+        const fetchSubtitle = async () => {
+            let selectedPetName = '';
+
+            try {
+                // Chỉ gọi API nếu user đã đăng nhập
+                if (user?.id) {
+                    // Gọi API lấy danh sách pet giống y hệt file my-pets.tsx
+                    const myPets = await petService.getMyPets();
+
+                    // Nếu user có pet
+                    if (myPets && myPets.length > 0) {
+                        // Random bốc 1 pet bất kỳ trong mảng
+                        const randomIndex = Math.floor(Math.random() * myPets.length);
+                        selectedPetName = myPets[randomIndex].name;
+                    }
+                }
+            } catch (error) {
+                console.log('Lỗi lấy pet name cho header:', error);
+            }
+
+            // Truyền tên pet vừa random được vào hàm sinh câu chào
+            setGreetingSubtitle(generateGreeting(selectedPetName));
+        };
+
+        fetchSubtitle();
+    }, [language, generateGreeting, user?.id]);
 
     const [heroImage, setHeroImage] = useState(() => {
         const hour = new Date().getHours();
@@ -87,7 +202,7 @@ export default function HomeScreen() {
     const [pets, setPets] = useState<any[]>([]);
     const [shelters, setShelters] = useState<any[]>([]);
     const [events, setEvents] = useState<any[]>([]);
-    
+
     // Đổi logic loading: Tách riêng initialLoading để phục vụ hiển thị UI mượt
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [hasUnread, setHasUnread] = useState(false);
@@ -137,7 +252,19 @@ export default function HomeScreen() {
         const translateY = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, targetY], Extrapolation.CLAMP);
         const translateX = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [0, targetX], Extrapolation.CLAMP);
         const scale = interpolate(scrollY.value, [0, SCROLL_DISTANCE], [1, 0.9], Extrapolation.CLAMP);
-        return { transform: [{ translateY }, { translateX }, { scale }] };
+
+        // Đổi maxWidth thành width và trừ hao nhiều hơn do chữ bị tịnh tiến sang phải (translateX)
+        const dynamicWidth = interpolate(
+            scrollY.value,
+            [0, SCROLL_DISTANCE],
+            [SCREEN_WIDTH - 48, SCREEN_WIDTH - 190], // Ép chiều rộng nhỏ lại đủ không gian cho 3 icon
+            Extrapolation.CLAMP
+        );
+
+        return {
+            transform: [{ translateY }, { translateX }, { scale }],
+            width: dynamicWidth // QUAN TRỌNG: Dùng width thay vì maxWidth
+        };
     });
 
     const subtitleAnimatedStyle = useAnimatedStyle(() => {
@@ -158,7 +285,7 @@ export default function HomeScreen() {
                 if (!user?.id) return;
                 try {
                     // Gọi silent request cho đếm thông báo
-                    const res = await axiosClient.get('/notifications?page=1&limit=10', { headers: { 'X-Silent-Request': 'true' }});
+                    const res = await axiosClient.get('/notifications?page=1&limit=10', { headers: { 'X-Silent-Request': 'true' } });
                     const notifications = res.data.data || [];
                     setHasUnread(notifications.some((item: any) => !item.isRead));
                 } catch (error) {
@@ -166,7 +293,7 @@ export default function HomeScreen() {
                 }
             };
             checkUnreadNotifications();
-            
+
             // Xóa loadHomeData ở đây nếu nó gây gọi API đúp khi vừa mở app
             // Giữ lại nếu bạn muốn refresh data ngầm mỗi khi chuyển tab
             if (isLocationLoaded && !isInitialLoading) {
@@ -179,9 +306,9 @@ export default function HomeScreen() {
         try {
             // Không set trạng thái loading nếu đây là Silent Refresh
             if (!isSilentRefresh && pets.length === 0) setIsInitialLoading(true);
-            
+
             // ĐÃ XÓA: Lệnh setTimeout 2000ms gây chậm app vô lý. API bao nhiêu ms thì trả về bấy nhiêu ms.
-            
+
             // Gợi ý: Nếu trong service bạn cấu hình truyền được headers, hãy thêm X-Silent-Request: 'true' 
             // vào tham số nếu isSilentRefresh = true để không chớp Global Loader.
             const [eventsRes, petsRes, sheltersRes] = await Promise.all([
@@ -191,7 +318,7 @@ export default function HomeScreen() {
                     ? shelterService.getSheltersNearBy(currentLat, currentLng, 5)
                     : shelterService.getShelters({ limit: 5 })
             ]);
-            
+
             setEvents(eventsRes?.data || eventsRes || []);
 
             let fetchedPets = petsRes?.data || petsRes || [];
@@ -511,10 +638,28 @@ export default function HomeScreen() {
                         </View>
                     </View>
 
-                    <Animated.View pointerEvents="none" style={[textContainerAnimatedStyle, { position: 'absolute', bottom: CURVE_HEIGHT + 83, left: 24, zIndex: 10 }]} className={'-ml-1'}>
-                        <Text className="text-white font-semibold text-[20px] shadow-black/10" style={{ transformOrigin: 'left center' }}>{t('Hello,')} {user?.name || t('User')}!</Text>
-                        <Animated.Text style={[subtitleAnimatedStyle]} className="text-white text-[14px] font-medium tracking-tight overflow-hidden">
-                            <Text>{t('Let’s dive into your account')}</Text>
+                    <Animated.View
+                        pointerEvents="none"
+                        style={[textContainerAnimatedStyle, { position: 'absolute', bottom: CURVE_HEIGHT + 83, left: 24, zIndex: 10 }]}
+                        className="-ml-1" // Đã xoá w-[60%]
+                    >
+                        {/* Vẫn giữ nguyên numberOfLines={1} và ellipsizeMode="tail" nhé */}
+                        <Text
+                            className="text-white font-semibold text-[20px] shadow-black/10"
+                            style={{ transformOrigin: 'left center' }}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            {t('Hello,')} {user?.name || t('User')}!
+                        </Text>
+
+                        <Animated.Text
+                            style={[subtitleAnimatedStyle]}
+                            className="text-white text-[14px] font-medium tracking-tight overflow-hidden"
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            {greetingSubtitle}
                         </Animated.Text>
                     </Animated.View>
                 </View>

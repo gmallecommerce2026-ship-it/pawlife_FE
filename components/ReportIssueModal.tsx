@@ -12,13 +12,13 @@ import {
     Modal,
     Platform,
     ScrollView,
-    TextInput,
     TouchableOpacity,
     TouchableWithoutFeedback,
     View
 } from 'react-native';
 import { Text } from './AppText';
 import ReportSuccessModal from './ReportSuccessModal';
+import { TextInput } from './AppTextInput';
 
 interface Props {
     isVisible: boolean;

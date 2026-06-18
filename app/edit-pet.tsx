@@ -1,6 +1,7 @@
 import axiosClient from '@/api/axiosClient';
 import AddMedicalRecordModal from '@/components/AddMedicalRecordModal';
 import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useModalStore } from '@/store/useModalStore';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
@@ -17,7 +18,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View
@@ -711,11 +711,11 @@ export default function EditPetScreen() {
                 </View>
 
                 <View className="flex-row items-center py-4">
-                  <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
+                  <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
                   <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
                     <Text 
                       style={inputFontStyle}
-                      className={`text-right text-[14px] p-0 ${formData.contactAddress ? 'text-black' : 'text-[#A1A1AA]'}`} 
+                      className={`text-right text-[14px] p-0 ${formData.contactAddress ? 'text-[#8E8E93]' : 'text-[#A1A1AA]'}`} 
                       numberOfLines={1}
                     >
                       {formData.contactAddress || (isVi ? "Địa chỉ của bạn" : "Street Address, District, City")}

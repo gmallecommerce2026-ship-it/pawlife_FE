@@ -1,6 +1,7 @@
 // app/sign-in.tsx
 import axiosClient, { BASE_URL, setCachedAccessToken } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { connectSocket } from '@/utils/socket';
@@ -20,7 +21,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  ScrollView, TextInput, TouchableOpacity, View
+  ScrollView, TouchableOpacity, View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // GoogleSignin.configure({

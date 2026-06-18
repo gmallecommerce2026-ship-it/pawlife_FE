@@ -1,12 +1,13 @@
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { socket } from '@/utils/socket';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function TransferOwnershipScreen() {
