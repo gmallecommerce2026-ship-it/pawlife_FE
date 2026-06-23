@@ -16,6 +16,7 @@ import { eventService } from '../services/eventService';
 import { useEngagementStore } from '../store/useEngagementStore';
 // BỔ SUNG: Import React Query
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const { width } = Dimensions.get('window');
@@ -41,6 +42,7 @@ export default function EventDetailScreen() {
     const eventId = params.id as string;
     const { user } = useContext(AuthContext);
     const { t, language } = useLanguage();
+    const { l } = useLocalizedData();
     const isVi = language === 'vi';
     const queryClient = useQueryClient();
 
@@ -103,15 +105,19 @@ export default function EventDetailScreen() {
         const year = startDate.getFullYear();
         const timeString = startDate.toLocaleTimeString(isVi ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
 
-        const title = eventData.title || (isVi ? 'Sự kiện từ PawLife' : 'PawLife Events');
+        // Áp dụng l() để lấy đúng ngôn ngữ
+        const title = l(eventData.title) || (isVi ? 'Sự kiện từ PawLife' : 'PawLife Events');
         const organizer = eventData.organizer?.name || 'PawLife';
-        const location = [eventData.locationName, eventData.address].filter(Boolean).join(', ');
+        const locationName = l(eventData.locationName);
+        const location = [locationName, eventData.address].filter(Boolean).join(', ');
         const date = `${day} ${monthName}, ${year} at ${timeString}`;
         const interested = eventData.interestedCount ?? 0;
-        const description = eventData.description
-            ? eventData.description.length > 120
-                ? eventData.description.substring(0, 120) + '...'
-                : eventData.description
+
+        const rawDesc = l(eventData.description);
+        const description = rawDesc
+            ? rawDesc.length > 120
+                ? rawDesc.substring(0, 120) + '...'
+                : rawDesc
             : null;
 
         const lines = [
@@ -444,14 +450,14 @@ export default function EventDetailScreen() {
                             <View className="flex-row mb-[20px]">
                                 <View className="bg-[#E89B5A]/10 border border-[#E89B5A]/50 px-3 py-1.5 rounded-[12px]">
                                     <Text className="text-[14px] font-medium text-[#E89B5A] tracking-wider">
-                                        {eventData.category}
+                                        {l(eventData.category)}
                                     </Text>
                                 </View>
                             </View>
                         )}
 
                         <Text className="text-[24px] font-semibold text-black leading-8 mb-[15px]">
-                            {eventData.title}
+                            {l(eventData.title)}
                         </Text>
 
                         <View className='mb-[30px]'>
@@ -465,7 +471,7 @@ export default function EventDetailScreen() {
                                 </View>
                                 <View>
                                     <Text className="text-[#8E8E93] font-regular text-[16px]" numberOfLines={1}>
-                                        {eventData.locationName} Mall, {eventData.address}
+                                        {l(eventData.locationName)} Mall, {eventData.address}
                                     </Text>
                                 </View>
                             </View>
@@ -488,7 +494,7 @@ export default function EventDetailScreen() {
                         <View className="mb-[30px]">
                             <Text className="text-[16px] font-medium text-black mb-[12px]">About Event</Text>
                             <Text className="text-[#8E8E93] font-regular leading-relaxed text-[14px] text-justify">
-                                {eventData.description || (isVi ? "Chưa có mô tả cho sự kiện này." : "There is no description for this event.")}
+                                {l(eventData.description) || (isVi ? "Chưa có mô tả cho sự kiện này." : "There is no description for this event.")}
                             </Text>
                         </View>
 
@@ -544,7 +550,7 @@ export default function EventDetailScreen() {
 
                             <View className="mb-[12px]">
                                 <Text className="text-[#8E8E93] text-[14px] font-regular flex-1 mb-[6px]" numberOfLines={2}>
-                                    {eventData.locationName} Mall
+                                    {l(eventData.locationName)} Mall
                                 </Text>
                                 <Text className="text-[#8E8E93] text-[14px] font-regular flex-1" numberOfLines={2}>
                                     {eventData.address}
@@ -634,10 +640,14 @@ export default function EventDetailScreen() {
                                                     <View className="flex-1 flex-row items-center pl-3 pr-4 py-3">
                                                         <View className="flex-1 justify-between h-full pr-3">
                                                             <View>
-                                                                <Text className="font-medium text-gray-800 text-[14px] leading-tight mb-0.5 tracking-[0.06px]" numberOfLines={1}>{ev.title}</Text>
+                                                                <Text className="font-medium text-gray-800 text-[14px] leading-tight mb-0.5 tracking-[0.06px]" numberOfLines={1}>
+                                                                    {l(ev.title) || ev.title}
+                                                                </Text>
                                                                 <View className="flex-row items-center mt-1.5">
                                                                     <Image source={require('../assets/icon/location-solid-gray.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                                                                    <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>{ev.locationName || ev.address}</Text>
+                                                                    <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>
+                                                                        {l(ev.locationName) || l(ev.address) || (isVi ? 'Đang cập nhật' : 'Updating')}
+                                                                    </Text>
                                                                 </View>
                                                             </View>
                                                         </View>

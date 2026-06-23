@@ -20,19 +20,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { petService } from '../services/petService';
 
-const getAge = (dobString?: string, isVi?: boolean) => {
-  if (!dobString) return isVi ? 'Không rõ' : 'Unknown';
+const getAge = (pet?: any, isVi?: boolean) => {
+  if (pet?.dob) {
+    const dob = new Date(pet.dob);
+    const today = new Date();
+    let years = today.getFullYear() - dob.getFullYear();
+    let months = today.getMonth() - dob.getMonth();
 
-  const dob = new Date(dobString);
-  const diff_ms = Date.now() - dob.getTime();
-  const age_dt = new Date(diff_ms);
-  const years = Math.abs(age_dt.getUTCFullYear() - 1970);
-  const months = age_dt.getUTCMonth();
+    if (months < 0 || (months === 0 && today.getDate() < dob.getDate())) {
+      years--;
+      months += 12;
+    }
 
-  if (years > 0) return `${years}`;
-  if (months > 0) return isVi ? `${months} tháng` : `${months} month${months > 1 ? 's' : ''}`;
+    if (years > 0) return isVi ? `${years} tuổi` : `${years} year${years > 1 ? 's' : ''}`;
+    if (months > 0) return isVi ? `${months} tháng` : `${months} month${months > 1 ? 's' : ''}`;
 
-  return isVi ? 'Mới sinh' : 'Newborn';
+    return isVi ? 'Mới sinh' : 'Newborn';
+  }
+
+  // Phòng hờ trường hợp Backend không trả về dob mà trả về age
+  if (pet?.age) {
+    return isVi ? `${pet.age} tuổi` : `${pet.age} years`;
+  }
+
+  return isVi ? 'Không rõ' : 'Unknown';
 };
 
 const formatCapitalize = (str?: string) => {
@@ -298,7 +309,7 @@ export default function PetDetailModal() {
 
               <View className="flex-1 bg-[#FCF8D6] py-[12px] rounded-[16px] items-center">
                 <Text className="text-[#8E8E93] text-[12px] font-regular mb-1">{isVi ? 'Tuổi' : 'Age'}</Text>
-                <Text className="text-black text-[14px] font-semibold">{getAge(pet?.dob, isVi)}</Text>
+                <Text className="text-black text-[14px] font-semibold">{getAge(pet, isVi)}</Text>
               </View>
 
               <View className="flex-1 bg-[#E8F9E6] py-[12px] rounded-[16px] items-center">
@@ -369,9 +380,10 @@ export default function PetDetailModal() {
                         <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                         <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">{isVi ? 'Hợp với:' : 'Good with:'}</Text>
                       </View>
-                      {/* Vì BE đã trả về {vi: "...", en: "..."} nên chỉ cần l() là mở được */}
                       <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                        {l(pet.goodWith)}
+                        {Array.isArray(pet.goodWith)
+                          ? pet.goodWith.map((item: any) => l(item) || item).filter(Boolean).join(', ')
+                          : l(pet.goodWith)}
                       </Text>
                     </View>
                   )}
@@ -383,7 +395,9 @@ export default function PetDetailModal() {
                         <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">{isVi ? 'Không hợp với:' : 'Not suitable:'}</Text>
                       </View>
                       <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                        {l(pet.badWith)}
+                        {Array.isArray(pet.badWith)
+                          ? pet.badWith.map((item: any) => l(item) || item).filter(Boolean).join(', ')
+                          : l(pet.badWith)}
                       </Text>
                     </View>
                   )}

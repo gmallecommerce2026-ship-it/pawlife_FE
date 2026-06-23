@@ -3,6 +3,7 @@ import { Text } from '@/components/AppText';
 import { TextInput } from '@/components/AppTextInput';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,7 +15,6 @@ import { eventService } from '../services/eventService';
 import { petService } from '../services/petService';
 import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
-
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
 
@@ -47,66 +47,72 @@ function useDebounce<T>(value: T, delay: number): T {
 // 1. PURE COMPONENTS
 // =========================================================================
 
-const formatBreed = (breed?: string) => {
+const formatBreed = (breed?: any) => {
     if (!breed) return '';
-    if (breed.length <= 15) return breed;
-    const words = breed.split(' ');
+    const breedStr = typeof breed === 'string' ? breed : (breed.vi || breed.en || '');
+    if (!breedStr) return '';
+    if (breedStr.length <= 15) return breedStr;
+    const words = breedStr.split(' ');
     if (words.length > 1) {
         const firstLetter = words[0][0];
         const restOfWords = words.slice(1).join(' ');
-
         return `${firstLetter}. ${restOfWords}`;
     }
-
-    return `${breed.substring(0, 15)}...`;
+    return `${breedStr.substring(0, 15)}...`;
 };
 
+
 // --- CẬP NHẬT PETCARD NHẬN THÊM PROPS isVi ---
-const PetCard = memo(({ item, onPress, isVi }: { item: any; onPress: (item: any) => void; isVi: boolean }) => (
-    <TouchableOpacity
-        className="bg-transparent mb-[21px]"
-        style={{ width: COLUMN_WIDTH }}
-        activeOpacity={0.9}
-        onPress={() => onPress(item)}
-    >
-        <View className="relative">
-            <Image
-                source={{ uri: item.images?.[0]?.url || item.image || 'https://via.placeholder.com/600' }}
-                className="w-full aspect-square rounded-[24px] bg-gray-100"
-                style={{ height: COLUMN_WIDTH }}
-                resizeMode="cover"
-            />
-            {item.sticker && (
-                <View className="absolute top-1/2 left-1/2 -ml-8 -mt-4 opacity-90">
-                    <MaterialCommunityIcons name="glasses" size={60} color="white" />
-                </View>
-            )}
-        </View>
-        <View className="pt-[12px]">
-            <Text className="text-black font-semibold text-[16px] mb-1">{item.name}</Text>
-            <View className="flex-row items-start">
+const PetCard = memo(({ item, onPress, isVi }: { item: any; onPress: (item: any) => void; isVi: boolean }) => {
+    const { l } = useLocalizedData(); // 👈 thêm
+
+    return (
+
+        <TouchableOpacity
+            className="bg-transparent mb-[21px]"
+            style={{ width: COLUMN_WIDTH }}
+            activeOpacity={0.9}
+            onPress={() => onPress(item)}
+        >
+            <View className="relative">
                 <Image
-                    className='top-1'
-                    source={item.gender?.toLowerCase() === 'female' ? require('../assets/icon/female.png') : require('../assets/icon/male.png')}
-                    style={{ width: 10, height: 10 }}
+                    source={{ uri: item.images?.[0]?.url || item.image || 'https://via.placeholder.com/600' }}
+                    className="w-full aspect-square rounded-[24px] bg-gray-100"
+                    style={{ height: COLUMN_WIDTH }}
                     resizeMode="cover"
                 />
-
-                <Text
-                    className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
-                    numberOfLines={1}
-                >
-                    {item.age || getAge(item.dob, isVi)} · {formatBreed(item.breed) || (isVi ? 'Không rõ' : 'Unknown')}
-                </Text>
+                {item.sticker && (
+                    <View className="absolute top-1/2 left-1/2 -ml-8 -mt-4 opacity-90">
+                        <MaterialCommunityIcons name="glasses" size={60} color="white" />
+                    </View>
+                )}
             </View>
-        </View>
-    </TouchableOpacity>
-));
+            <View className="pt-[12px]">
+                <Text className="text-black font-semibold text-[16px] mb-1">{item.name}</Text>
+                <View className="flex-row items-start">
+                    <Image
+                        className='top-1'
+                        source={item.gender?.toLowerCase() === 'female' ? require('../assets/icon/female.png') : require('../assets/icon/male.png')}
+                        style={{ width: 10, height: 10 }}
+                        resizeMode="cover"
+                    />
+
+                    <Text
+                        className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
+                        numberOfLines={1}
+                    >
+                        {item.age || getAge(item.dob, isVi)} · {formatBreed(l(item.breed)) || (isVi ? 'Không rõ' : 'Unknown')}
+                    </Text>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+});
 
 const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
     const { user } = useContext(AuthContext);
-    const [isLoading, setIsLoading] = useState(false); 
-    const queryClient = useQueryClient(); 
+    const [isLoading, setIsLoading] = useState(false);
+    const queryClient = useQueryClient();
     const isFollowed = useEngagementStore(state => state.followedShelters[item.id] ?? item.isFollowed);
     const toggleShelterFollow = useEngagementStore(state => state.toggleShelterFollow);
 
@@ -127,7 +133,7 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
 
     const handleToggleFollow = async (e: any) => {
         if (e && e.stopPropagation) e.stopPropagation();
-        if (isLoading) return; 
+        if (isLoading) return;
 
         setIsLoading(true);
         toggleShelterFollow(item.id);
@@ -138,9 +144,9 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
             queryClient.invalidateQueries({ queryKey: ['followed-shelters'] });
         } catch (error) {
             console.error("Lỗi khi toggle follow:", error);
-            toggleShelterFollow(item.id); 
+            toggleShelterFollow(item.id);
         } finally {
-            setIsLoading(false); 
+            setIsLoading(false);
         }
     };
 
@@ -151,7 +157,7 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
             onPress={() => onPress(item)}
         >
             <Image
-                source={{ uri: item.avatarUrl || item.avatar || 'https://via.placeholder.com/200' }}
+                source={{ uri: item.avatarUrl || item.coverUrl || 'https://via.placeholder.com/200' }}
                 className="w-[54px] h-[54px] rounded-full bg-gray-200"
             />
             <View className="flex-1 ml-[14px] pr-2 justify-center">
@@ -182,6 +188,7 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
     const { user } = useContext(AuthContext);
     const queryClient = useQueryClient();
     const { language } = useLanguage();
+    const { l } = useLocalizedData();
     const isVi = language === 'vi';
 
     const isInterested = useEngagementStore(state => state.interestedEvents[item.id] ?? item.isInterested);
@@ -206,7 +213,7 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
             queryClient.invalidateQueries({ queryKey: ['interested-events', user?.id] });
         } catch (error) {
             console.error("Lỗi khi bookmark:", error);
-            toggleEventInterest(item.id); 
+            toggleEventInterest(item.id);
         }
     };
 
@@ -240,10 +247,10 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
             <View className="flex-1 p-[14px] justify-between">
                 <View className="pr-6 relative">
                     <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1 -top-1" numberOfLines={2}>
-                        {item.title || (isVi ? 'Sự kiện thú cưng' : 'Weekend Animal Event')}
+                        {l(item.title) || (isVi ? 'Sự kiện thú cưng' : 'Weekend Animal Event')}
                     </Text>
                     <Text className="text-[#8E8E93] text-[13px] font-regular" numberOfLines={1}>
-                        {item.locationName || item.address || (isVi ? 'Đang cập nhật vị trí' : 'Unknown location')}
+                        {l(item.locationName) || l(item.address) || (isVi ? 'Đang cập nhật vị trí' : 'Unknown location')}
                     </Text>
 
                     <TouchableOpacity
@@ -303,7 +310,7 @@ const PetsSection = ({ searchQuery, onDetailPress, isVi }: { searchQuery: string
             }
         };
         fetchPets();
-    }, [searchQuery, activeType]); 
+    }, [searchQuery, activeType]);
 
     return (
         <View className="flex-1 px-6 pt-4">
@@ -447,11 +454,12 @@ export default function SearchScreen() {
     const [activeTab, setActiveTab] = useState<'Pet' | 'Shelter' | 'Event'>(initialTab);
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearchQuery = useDebounce(searchInput, 500);
-    
+
     // Lấy language để dùng song ngữ nội tuyến
-    const { t, language } = useLanguage();
+    const { language } = useLanguage();
+    const { l } = useLocalizedData();
     const isVi = language === 'vi';
-    
+
     const [isFocused, setIsFocused] = useState(false);
     const handleFocus = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -489,18 +497,19 @@ export default function SearchScreen() {
                 id: item.id,
                 name: item.name,
                 address: item.address || item.loc,
-                image: item.avatarUrl || item.avatar || item.img
+                image: item.avatarUrl || item.coverUrl || item.img
             }
         });
     };
+
 
     const handleEventPress = (item: any) => {
         router.push({
             pathname: '/event-detail',
             params: {
                 id: item.id,
-                title: item.title,
-                location: item.locationName || item.address,
+                title: l(item.title) || item.title,
+                location: l(item.locationName) || item.address,
                 date: item.startDate,
                 image: item.bannerUrl
             }
@@ -508,12 +517,13 @@ export default function SearchScreen() {
     };
 
 
+
     const TabButton = ({ title }: { title: 'Pet' | 'Shelter' | 'Event' }) => {
         const isActive = activeTab === title;
 
         const getDisplayTitle = () => {
             if (isVi) {
-                switch(title) {
+                switch (title) {
                     case 'Pet': return 'Thú cưng';
                     case 'Shelter': return 'Trạm cứu hộ';
                     case 'Event': return 'Sự kiện';
@@ -588,7 +598,7 @@ export default function SearchScreen() {
                     <Feather name="search" size={18} color="#8E8E93" />
                     <TextInput
                         className="flex-1 ml-3 text-[14px] text-gray-800 font-regular"
-                        placeholder={isVi ? 'Tìm kiếm trạm cứu hộ, thú cưng...' : 'Search shelters, pets...'} 
+                        placeholder={isVi ? 'Tìm kiếm trạm cứu hộ, thú cưng...' : 'Search shelters, pets...'}
                         placeholderTextColor="#8E8E93"
                         value={searchInput}
                         style={{ fontFamily: "Urbanist" }}

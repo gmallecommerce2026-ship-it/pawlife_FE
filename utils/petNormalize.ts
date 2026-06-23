@@ -1,5 +1,5 @@
 // utils/petNormalize.ts
-import { getLocalizedField } from './localization'; // chỉnh path nếu khác
+import { getLocalizedField, getLocalizedArrayField } from './localization';
 
 // Các field song ngữ {vi, en} chỉ dùng để HIỂN THỊ — không dùng để so sánh logic.
 // "species" KHÔNG nằm trong list này vì nó còn dùng để so sánh logic (icon, filter...)
@@ -7,12 +7,17 @@ const BILINGUAL_DISPLAY_FIELDS = [
     'breed',
     'description',
     'color',
-    'traits',
     'idealHome',
     'lostDetails',
+] as const;
+
+// Field song ngữ dạng MẢNG các item -> getLocalizedArrayField
+const BILINGUAL_ARRAY_FIELDS = [
+    'traits',
     'goodWith',
     'badWith',
 ] as const;
+
 const MEDICAL_RECORD_BILINGUAL_FIELDS = ['recordName', 'nextDueName'] as const;
 const PAW_HISTORY_BILINGUAL_FIELDS = ['title', 'description'] as const;
 
@@ -48,6 +53,13 @@ export function normalizePet(pet: any, lang: string): any {
         }
     });
 
+    // THÊM MỚI
+    BILINGUAL_ARRAY_FIELDS.forEach((field) => {
+        if (normalized[field] !== undefined) {
+            normalized[field] = getLocalizedArrayField(normalized[field], lang);
+        }
+    });
+
     if (Array.isArray(normalized.medicalRecords)) {
         normalized.medicalRecords = normalized.medicalRecords.map((r: any) => normalizeMedicalRecord(r, lang));
     }
@@ -58,6 +70,7 @@ export function normalizePet(pet: any, lang: string): any {
 
     return normalized;
 }
+
 
 
 export function normalizePets(pets: any[], lang: string): any[] {

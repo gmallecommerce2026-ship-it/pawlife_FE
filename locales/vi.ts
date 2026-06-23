@@ -163,6 +163,7 @@ export const viDict: Record<string, string> = {
   "Dog": "Chó",
   "Cat": "Mèo",
   "Other": "Khác",
+  "No pets recently": "Chưa có thú cưng nào gần đây",
   "Manage your furry friends": "Quản lý thú cưng của bạn",
   "You don't have any pets yet": "Bạn chưa có thú cưng nào",
   "Add your pet or adopt a new friend!": "Thêm thú cưng của bạn hoặc nhận nuôi!",
@@ -1034,6 +1035,8 @@ export const viDict: Record<string, string> = {
   "7. CHANGES TO PRIVACY POLICY": "7. THAY ĐỔI CHÍNH SÁCH BẢO MẬT",
   "We may update this policy from time to time. When material changes are made, we will notify you via your registered email or through an in-app notification. The last updated date is always displayed at the top of this page. Continued use of the app after the effective date means you agree to the new policy.": "Chúng tôi có thể cập nhật chính sách này theo thời gian. Khi có thay đổi trọng đại, chúng tôi sẽ thông báo cho bạn qua email đăng ký hoặc qua thông báo trong ứng dụng. Ngày cập nhật gần nhất luôn hiển thị ở đầu trang này. Việc tiếp tục sử dụng ứng dụng sau ngày có hiệu lực đồng nghĩa với việc bạn đồng ý với chính sách mới.",
   "PawLife Web Policy": "Chính sách PawLife trên Web",
+  "That's all for now": "Hiện tại chỉ có vậy thôi",
+  "Refresh List": "Làm mới danh sách",
 
   // --- Màn hình Home & Khám phá (Index & Matching) ---
   "No pets nearby": "Chưa có thú cưng nào gần đây",

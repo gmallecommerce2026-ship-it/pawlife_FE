@@ -67,11 +67,11 @@ const CardOverlay = ({ data, onAction, canReload = false, isFavorited = false }:
                 pointerEvents="none"
             />
 
-            <View className="px-6 mb-5 pointer-events-none z-50">
+            <View className="px-6 mb-5 pointer-events-none z-50 w-full pr-8">
                 <View className="flex-row items-center mb-1">
-                    <Text className="text-white text-4xl font-semibold shadow-sm mr-3">{data.name}</Text>
+                    <Text className="text-white text-4xl font-semibold shadow-sm mr-3 flex-shrink">{data.name}</Text>
 
-                    <View className="flex-row items-center bg-white/25 px-2 py-0.5 rounded-full border-[1px] border-white/90 overflow-hidden backdrop-blur-xl shadow-sm">
+                    <View className="flex-row items-center bg-white/25 px-2 py-0.5 rounded-full border-[1px] border-white/90 overflow-hidden backdrop-blur-xl shadow-sm flex-shrink-0">
                         <Ionicons
                             name={data.gender?.toLowerCase() === 'female' ? "female" : "male"}
                             size={12}
@@ -990,7 +990,7 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                     if (years > 0) {
                         calculatedAge = `${years}`;
                     } else if (months > 0) {
-                        calculatedAge = `${months} ${t(months > 1 ? 'months old' : 'month old')}`;
+                        calculatedAge = `${months} ${t(months > 1 ? 'months' : 'month')}`;
                     } else {
                         calculatedAge = t('Less than 1 month');
                     }
@@ -1483,8 +1483,21 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                             <Text className="font-medium text-black text-[16px] mb-2">{isVi ? `Thói quen của ${currentPet.name}` : `${currentPet.name}'s Behavior`}</Text>
 
                             {(() => {
-                                const goodWithText = fullPet?.goodWith || currentPet?.goodWith || '';
-                                const badWithText = fullPet?.badWith || currentPet?.badWith || '';
+                                console.log('RAW goodWith:', JSON.stringify(fullPet?.goodWith));
+                                console.log('RAW badWith:', JSON.stringify(fullPet?.badWith));
+                                const resolveGoodBad = (raw: any) => {
+                                    if (!raw) return '';
+                                    if (Array.isArray(raw)) {
+                                        return raw
+                                            .map((item: any) => getLocalizedField(item, language) || (typeof item === 'string' ? item : ''))
+                                            .filter(Boolean)
+                                            .join(', ');
+                                    }
+                                    return getLocalizedField(raw, language) || (typeof raw === 'string' ? raw : '');
+                                };
+
+                                const goodWithText = resolveGoodBad(fullPet?.goodWith || currentPet?.goodWith);
+                                const badWithText = resolveGoodBad(fullPet?.badWith || currentPet?.badWith);
 
                                 if (!goodWithText && !badWithText) {
                                     return (

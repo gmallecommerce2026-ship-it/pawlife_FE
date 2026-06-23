@@ -33,3 +33,37 @@ export const getLocalizedField = (
 
   return String(data);
 };
+
+export const getLocalizedArrayField = (
+  fieldData: any,
+  currentLang: string,
+  fallbackLang: string = 'en'
+): string => {
+  if (!fieldData) return '';
+
+  let data = fieldData;
+
+  // Parse nếu Backend trả về mảng dưới dạng stringified JSON
+  if (typeof fieldData === 'string') {
+    try {
+      const parsed = JSON.parse(fieldData);
+      if (Array.isArray(parsed)) {
+        data = parsed;
+      } else {
+        return fieldData;
+      }
+    } catch (e) {
+      return fieldData;
+    }
+  }
+
+  if (Array.isArray(data)) {
+    return data
+      .map((item) => getLocalizedField(item, currentLang, fallbackLang))
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  // Không phải mảng -> fallback dùng resolver gốc
+  return getLocalizedField(data, currentLang, fallbackLang);
+};

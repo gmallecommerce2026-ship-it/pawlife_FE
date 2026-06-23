@@ -3,6 +3,7 @@ import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
@@ -62,6 +63,7 @@ const SectionLoader = () => (
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function HomeScreen() {
     const { t, language } = useLanguage();
+    const { l } = useLocalizedData(); 
     const router = useRouter();
     const isVi = language === 'vi';
     const [data, setData] = useState(null);
@@ -327,7 +329,7 @@ export default function HomeScreen() {
             ]);
 
             setEvents(eventsRes?.data || eventsRes || []);
-
+            console.log("Event: ", eventsRes?.data);
             let fetchedPets = petsRes?.data || petsRes || [];
             if (fetchedPets.length > 0) {
                 let infinitePetsData: any[] = [];
@@ -339,7 +341,6 @@ export default function HomeScreen() {
                 fetchedPets = infinitePetsData;
             }
             setPets(fetchedPets);
-
             const fetchedShelters = sheltersRes?.data?.data || sheltersRes?.data || sheltersRes || [];
             setShelters(Array.isArray(fetchedShelters) ? fetchedShelters : []);
         } catch (error: any) {
@@ -396,22 +397,25 @@ export default function HomeScreen() {
 
         const isFemale = pet.gender?.toUpperCase() === 'FEMALE' || pet.gender?.toUpperCase() === 'CÁI';
         const displayAge = (() => {
-            if (pet.age) {
-                if (typeof pet.age === 'number' || !isNaN(Number(pet.age))) return `${pet.age}`;
-                return pet.age;
-            }
             if (pet.dob) {
                 const birthDate = new Date(pet.dob);
                 const today = new Date();
                 let years = today.getFullYear() - birthDate.getFullYear();
                 let months = today.getMonth() - birthDate.getMonth();
+
                 if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
-                    years--; months += 12;
+                    years--;
+                    months += 12;
                 }
-                if (years > 0) return `${years}`;
-                if (months > 0) return `${months}T`;
-                return '1T';
+
+                // Hiển thị rõ ràng Tuổi hoặc Tháng
+                if (years > 0) return isVi ? `${years}` : `${years}`;
+                if (months > 0) return isVi ? `${months} th` : `${months} mos`;
+                return isVi ? 'Mới sinh' : 'Newborn';
             }
+
+            // Fallback nếu backend trả về age thay vì dob
+            if (pet.age) return `${pet.age}`;
             return 'N/A';
         })();
 
@@ -505,7 +509,7 @@ export default function HomeScreen() {
                             {isInitialLoading && pets.length === 0 ? (
                                 <SectionLoader />
                             ) : pets.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có thú cưng nào gần đây</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">No pets recently</Text>
                             ) : (
                                 <FlatList
                                     horizontal
@@ -536,7 +540,7 @@ export default function HomeScreen() {
                             {isInitialLoading && shelters.length === 0 ? (
                                 <SectionLoader />
                             ) : shelters.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có trạm cứu hộ nào</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">No shelters available</Text>
                             ) : (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }} nestedScrollEnabled={true}>
                                     {shelters.map((shelter) => (
@@ -566,7 +570,7 @@ export default function HomeScreen() {
                             {isInitialLoading && events.length === 0 ? (
                                 <SectionLoader />
                             ) : events.length === 0 ? (
-                                <Text className="text-center text-gray-400 mt-2 mb-4">Chưa có sự kiện nào sắp tới</Text>
+                                <Text className="text-center text-gray-400 mt-2 mb-4">No upcoming events</Text>
                             ) : (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }} nestedScrollEnabled={true}>
                                     {events.map((event) => {
@@ -584,10 +588,14 @@ export default function HomeScreen() {
                                                     <View className="flex-1 flex-row items-center pl-3 pr-4 py-3">
                                                         <View className="flex-1 my-[15px] items-center justify-center h-full pr-3">
                                                             <View>
-                                                                <Text className="font-medium text-gray-800 text-[14px] leading-tight mb-0.5 tracking-[0.06px]" numberOfLines={1}>{event.title}</Text>
+                                                                <Text className="font-medium text-gray-800 text-[14px] leading-tight mb-0.5 tracking-[0.06px]" numberOfLines={1}>
+                                                                    {l(event.title) || event.title}
+                                                                </Text>
                                                                 <View className="flex-row items-center mt-1.5">
                                                                     <Image source={require('../../assets/icon/location-solid-gray.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                                                                    <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>{event.locationName || event.address}</Text>
+                                                                    <Text className="text-[#8E8E93] text-[12px] ml-1 flex-1 tracking-[0.06px]" numberOfLines={1}>
+                                                                        {l(event.locationName) || l(event.address) || (isVi ? 'Đang cập nhật' : 'Updating')}
+                                                                    </Text>
                                                                 </View>
                                                             </View>
                                                         </View>
