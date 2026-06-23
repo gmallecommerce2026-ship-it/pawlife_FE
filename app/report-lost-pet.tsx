@@ -409,7 +409,7 @@ export default function ReportLostPetScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsSubmitting(true);
     try {
-      await petService.toggleLostMode(petId, {
+      const res = await petService.toggleLostMode(petId, {
         isLost: true,
         location: location || "",
         dateTime: dateTime || "",
@@ -427,6 +427,9 @@ export default function ReportLostPetScreen() {
 
       DeviceEventEmitter.emit('LOST_MODE_ACTIVATED', { petId });
 
+      // Lấy reportId trả về từ BE nếu có (ví dụ res?.data?.reportId hoặc res?.reportId)
+      const newReportId = res?.data?.reportId;
+
       Alert.alert(
         isVi ? 'Báo lạc thành công' : 'Reported lost successfully',
         isVi ? `Đã kích hoạt chế độ báo lạc cho ${petName || 'thú cưng'}.` : `Lost Mode activated for ${petName || 'pet'}.`,
@@ -436,7 +439,20 @@ export default function ReportLostPetScreen() {
             onPress: () => {
               DeviceEventEmitter.emit('LOST_MODE_ACTIVATED', { petId });
               setTimeout(() => {
-                router.back();
+                if (newReportId) {
+                  // Trường hợp BE trả về reportId cụ thể của lượt báo lạc này
+                  router.replace({
+                    pathname: '/tag-report-detail',
+                    params: { reportId: newReportId, openFrom: 'profile' }
+                  });
+                } else {
+                  // Fallback: chưa có report cụ thể, dùng petId + openFrom=profile
+                  // (TagReportDetailScreen sẽ cần hỗ trợ fetch theo petId trong trường hợp này)
+                  router.replace({
+                    pathname: '/tag-report-detail',
+                    params: { reportId: petId, openFrom: 'profile' }
+                  });
+                }
               }, 100);
             }
           }

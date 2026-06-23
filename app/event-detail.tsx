@@ -146,10 +146,8 @@ export default function EventDetailScreen() {
         onMutate: async () => {
             const previousState = isInterested;
 
-            // Optimistic Update cho Global Store
             toggleEventInterest(eventId);
 
-            // Optimistic Update cho dữ liệu chi tiết hiển thị số người quan tâm
             queryClient.setQueryData(['event-detail', eventId], (oldData: any) => {
                 if (!oldData) return oldData;
                 return {
@@ -158,11 +156,10 @@ export default function EventDetailScreen() {
                 };
             });
 
-            // Hiện Toast lập tức
             Toast.show({
                 type: 'custom_badge',
                 props: {
-                    petName: eventData?.title || 'This event',
+                    petName: l(eventData?.title) || (isVi ? 'Sự kiện này' : 'This event'), // ✅ đã localize
                     actionText: !previousState ? ' has been added to Interested' : ' has been removed from Interested'
                 },
                 visibilityTime: 2500, autoHide: true,

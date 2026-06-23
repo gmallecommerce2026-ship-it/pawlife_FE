@@ -1,9 +1,10 @@
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
-import { AntDesign } from '@expo/vector-icons';
+import { displayBilingual, parseBilingual } from '@/utils/bilingualField';
+import { AntDesign, Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useContext, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +22,7 @@ import ShelterContactModal from '@/components/ShelterContactModal';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // Bổ sung import LanguageContext
+import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
@@ -58,9 +60,14 @@ export default function ScannedPetScreen() {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
+  const { user } = useContext(AuthContext) as any;
   const [pet, setPet] = useState<any>(null);
+  const isOwner = React.useMemo(() => {
+    if (!user || !pet) return false;
+    return user.id === pet.ownerId || user.id === pet.owner?.id;
+  }, [user, pet]);
   const [loading, setLoading] = useState(true);
-
+  const [isContentBlocked, setIsContentBlocked] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [hasReported, setHasReported] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +76,7 @@ export default function ScannedPetScreen() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isContactModalVisible, setIsContactModalVisible] = useState(false);
 
+  // Xác định xem người đang cầm máy quét có phải là chủ không
   const displayImages = React.useMemo(() => {
     // 1. Kiểm tra nếu pet chưa load xong
     if (!pet) return ['https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop'];
@@ -107,6 +115,8 @@ export default function ScannedPetScreen() {
       : ['https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop'];
   }, [pet, isVi]);
 
+
+
   const calculateAgeDisplay = (dob: string | Date | undefined | null): string => {
     if (!dob) return isVi ? 'Không rõ tuổi' : 'Unknown age';
 
@@ -140,13 +150,14 @@ export default function ScannedPetScreen() {
       let isActive = true;
 
       const fetchPetData = async () => {
+        console.log("Fetching pet for tagId:", tagId);
         try {
           setLoading(true);
           setHasReported(false);
           setCurrentImageIndex(0);
 
           const response = await axiosClient.get(`/tags/${tagId}/scan?t=${Date.now()}`);
-
+          console.log("API Response:", response.data);
           if (!isActive) return;
 
           const petData = response.data;
@@ -168,6 +179,8 @@ export default function ScannedPetScreen() {
       };
     }, [tagId])
   );
+
+
 
   const handleShareLocation = async (location: any, formData: FormData, isSkipped: boolean) => {
     if (isSubmitting) return;
@@ -283,11 +296,76 @@ export default function ScannedPetScreen() {
   const displayOwnerName = pet?.lostInfo?.ownerName || pet?.ownerName || pet?.owner?.name || (isVi ? 'Không rõ chủ nhân' : 'Unknown Owner');
   const displayOwnerPhone = pet?.lostInfo?.ownerPhone || pet?.ownerPhone || pet?.owner?.phone || null;
   const displayOwnerAddress = pet?.lostInfo?.ownerAddress || pet?.ownerAddress || pet?.owner?.address || (isVi ? 'Chưa cung cấp địa chỉ' : 'No address provided');
-  const displayNote = pet?.lostInfo?.note || pet?.note || (isVi ? 'Vui lòng liên hệ tôi sớm nhất' : 'Please contact me ASAP');
+
+  // SỬA Ở ĐÂY: Xử lý an toàn cho note (phòng trường hợp BE trả về object đa ngôn ngữ {vi, en})
+  const rawNote = pet?.lostInfo?.note || pet?.note;
+  const displayNote = rawNote
+    ? (typeof rawNote === 'object' ? displayBilingual(parseBilingual(rawNote), isVi) : rawNote)
+    : (isVi ? 'Vui lòng liên hệ tôi sớm nhất' : 'Please contact me ASAP');
 
   const lostImageWidth = width - 40;
   const safeImageWidth = width - 48;
+  const handleReportSubmit = async (reason: string, details: string, isBlockRequested: boolean) => {
+    try {
+      // Nếu chưa đăng nhập thì hiện thông báo yêu cầu đăng nhập ở đây
 
+      await axiosClient.post('/interactions/report-and-block', {
+        petId: pet.id,
+        reason,
+        details,
+        isBlockRequested
+      });
+
+      setIsReportVisible(false);
+
+      // NẾU CÓ BLOCK -> ĐỔI UI NGAY LẬP TỨC TRẢI NGHIỆM CỰC MƯỢT
+      if (isBlockRequested) {
+        setIsContentBlocked(true);
+      } else {
+        Alert.alert(
+          isVi ? "Đã ghi nhận" : "Reported",
+          isVi ? "Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét sớm nhất." : "Thank you for reporting. We will review it shortly."
+        );
+      }
+    } catch (error) {
+      Alert.alert("Error", "Could not submit report.");
+    }
+  };
+
+  if (isContentBlocked) {
+    return (
+      <View className="flex-1 bg-white items-center justify-center px-6">
+        <StatusBar style="dark" />
+        <View className="absolute top-12 left-6 z-40">
+          <TouchableOpacity onPress={() => router.back()} className="p-2">
+            <Feather name="chevron-left" size={24} color="#000000" />
+          </TouchableOpacity>
+        </View>
+
+        <View className="w-20 h-20 bg-gray-100 rounded-full items-center justify-center mb-6">
+          <Feather name="eye-off" size={32} color="#8E8E93" />
+        </View>
+
+        <Text className="text-xl font-bold text-gray-800 mt-4 text-center">
+          {isVi ? 'Nội dung đã bị ẩn' : 'Content Hidden'}
+        </Text>
+        <Text className="text-gray-500 text-center mt-3 mb-8 px-4 leading-6">
+          {isVi
+            ? 'Bạn đã chặn nội dung từ người dùng này. Chúng tôi đã ghi nhận báo cáo và sẽ xem xét kĩ lưỡng.'
+            : 'You have blocked content from this user. We have received your report and will review it.'}
+        </Text>
+
+        <TouchableOpacity
+          onPress={() => router.replace('/')}
+          className="bg-[#E89B5A] px-8 py-3.5 rounded-full shadow-sm"
+        >
+          <Text className="text-white font-bold text-[16px]">
+            {isVi ? 'Về trang chủ' : 'Return Home'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
@@ -372,7 +450,8 @@ export default function ScannedPetScreen() {
                     {pet?.name?.toLowerCase() || (isVi ? 'thú cưng' : 'pet')}
                   </Text>
                   <Text className="text-white text-[14px] font-regular text-center tracking-[0.5px]">
-                    {displayAge !== (isVi ? 'Không rõ tuổi' : 'Unknown age') ? `${displayAge}` : (isVi ? 'Không rõ tuổi' : 'Age unknown')} • {pet?.breed || (isVi ? 'Không rõ giống' : 'Unknown breed')}
+                    {/* SỬA Ở DÒNG DƯỚI: Bọc displayBilingual cho pet?.breed giống như đã làm ở Safe Mode */}
+                    {displayAge !== (isVi ? 'Không rõ tuổi' : 'Unknown age') ? `${displayAge}` : (isVi ? 'Không rõ tuổi' : 'Age unknown')} • {displayBilingual(parseBilingual(pet?.breed), isVi) || (isVi ? 'Không rõ giống' : 'Unknown breed')}
                   </Text>
                 </View>
               </View>
@@ -500,19 +579,24 @@ export default function ScannedPetScreen() {
                   <View className="w-1/2">
                     <Text className="font-medium text-[16px] mb-[12.5px]">{isVi ? 'Giới tính' : 'Gender'}</Text>
                     <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">
-                      {pet.gender?.toLowerCase() || (isVi ? 'không rõ' : 'unknown')}
+                      {/* Ép kiểu an toàn cho gender tránh lỗi object */}
+                      {typeof pet.gender === 'string' ? pet.gender.toLowerCase() : (isVi ? 'không rõ' : 'unknown')}
                     </Text>
                   </View>
                   <View className="w-1/2">
                     <Text className="font-medium text-[16px] mb-[12.5px] ">{isVi ? 'Giống' : 'Breed'}</Text>
-                    <Text className="text-[#8E8E93] font-regular text-[14px]">{pet.breed || (isVi ? 'Không rõ' : 'Unknown')}</Text>
+                    <Text className="text-[#8E8E93] font-regular text-[14px]">
+                      {/* Xử lý đa ngôn ngữ cho breed tương tự edit-pet */}
+                      {displayBilingual(parseBilingual(pet.breed), isVi) || (isVi ? 'Không rõ' : 'Unknown')}
+                    </Text>
                   </View>
                 </View >
                 <View className="flex-row justify-between items-center gap-2">
                   <View className="w-1/2">
                     <Text className="font-medium text-[16px] mb-[12.5px]">{isVi ? 'Màu sắc' : 'Color'}</Text>
                     <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">
-                      {pet.color?.toLowerCase() || (isVi ? 'không rõ' : 'unknown')}
+                      {/* Xử lý đa ngôn ngữ cho color và thêm Optional Chaining */}
+                      {displayBilingual(parseBilingual(pet.color), isVi)?.toLowerCase() || (isVi ? 'không rõ' : 'unknown')}
                     </Text>
                   </View>
                   <View className="w-1/2">
@@ -533,8 +617,31 @@ export default function ScannedPetScreen() {
           )}
 
           {/* --- 3. BOTTOM ACTIONS --- */}
+          {/* --- 3. BOTTOM ACTIONS --- */}
           <View className="-mt-4 mb-5">
-            {isLost ? (
+            {isOwner ? (
+              // UX CHO CHỦ NHÂN (OWNER VIEW - PREVIEW MODE)
+              <View className="gap-3">
+                <View className="bg-blue-50 w-full px-5 py-3 rounded-[16px] border border-blue-100 items-center mb-2 mt-2">
+                  <Text className="text-center text-blue-600 font-medium text-[14px] leading-5">
+                    {isVi
+                      ? 'Đây là góc nhìn của người khác khi quét mã thú cưng của bạn.'
+                      : 'This is how others view your pet’s profile when scanning.'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => router.push(`/edit-pet?id=${pet.id}`)}
+                  className="w-full bg-[#E89B5A] py-4 rounded-2xl flex-row justify-center items-center shadow-sm"
+                >
+                  <Feather name="edit-2" size={16} color="white" />
+                  <Text className="text-white font-semibold text-[16px] ml-2">
+                    {isVi ? 'Chỉnh sửa hồ sơ' : 'Edit Profile'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : isLost ? (
+              // UX CHO NGƯỜI LẠ KHI PET BỊ MẤT
               <View className="gap-3">
                 <TouchableOpacity
                   onPress={() => setIsContactModalVisible(true)}
@@ -559,7 +666,7 @@ export default function ScannedPetScreen() {
                       source={require('../../assets/icon/location-gray.png')}
                       style={{ width: 10, height: 14 }}
                       resizeMode="cover"
-                      className='bottom-[2px]'
+                      className="bottom-[2px]"
                     />
                     <Text className="text-[#8E8E93] font-medium text-[16px] leading-5 ml-2">
                       {isVi ? 'Chia sẻ vị trí của tôi' : 'Share My Location'}
@@ -568,20 +675,28 @@ export default function ScannedPetScreen() {
                 )}
               </View>
             ) : (
+              // UX CHO NGƯỜI LẠ KHI PET AN TOÀN
               <View className="bg-[#FAFAFA] w-full px-9 py-[13px] rounded-[16px] border border-[#D9D9D9] items-center mt-5">
                 <Text className="text-center text-[#757575] font-regular text-[14px] leading-6 tracking-[0.5px] ">
-                  {isVi ? 'Vì lý do bảo mật, thông tin liên hệ của chủ nhân chỉ hiển thị khi thú cưng bị báo mất.' : 'For privacy, owner’s contact information is only available when a pet is marked as lost.'}
+                  {isVi
+                    ? 'Vì lý do bảo mật, thông tin liên hệ của chủ nhân chỉ hiển thị khi thú cưng bị báo mất.'
+                    : 'For privacy, owner’s contact information is only available when a pet is marked as lost.'}
                 </Text>
               </View>
             )}
           </View>
-          <TouchableOpacity
-            onPress={() => setIsReportVisible(true)}
-            className="items-center justify-center">
-            <Text className="text-center text-[#8E8E93] text-[14px] font-regular leading-13 underline">
-              {isVi ? 'Có gì đó không đúng? Báo cáo tại đây' : "Something isn't right? Report here"}
-            </Text>
-          </TouchableOpacity>
+
+          {/* CHỈ HIỂN THỊ NÚT BÁO CÁO (REPORT) CHO NGƯỜI LẠ */}
+          {!isOwner && (
+            <TouchableOpacity
+              onPress={() => setIsReportVisible(true)}
+              className="items-center justify-center pt-2 pb-4"
+            >
+              <Text className="text-center text-[#8E8E93] text-[14px] font-regular leading-13 underline">
+                {isVi ? 'Có gì đó không đúng? Báo cáo tại đây' : "Something isn't right? Report here"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -596,6 +711,25 @@ export default function ScannedPetScreen() {
       <ReportIssueModal
         isVisible={isReportVisible}
         onClose={() => setIsReportVisible(false)}
+        onSubmit={async (data) => {
+          try {
+            await axiosClient.post('/interactions/report-and-block', {
+              petId: pet.id,
+              reason: data.reason,
+              details: data.details,
+              isBlockRequested: data.isBlockRequested,
+            });
+            if (data.isBlockRequested) setIsContentBlocked(true);
+          } catch (error: any) {
+            const msg = error.response?.data?.message;
+            Alert.alert(
+              isVi ? 'Lỗi' : 'Error',
+              msg || (isVi ? 'Không thể gửi báo cáo. Vui lòng thử lại.' : 'Could not submit report. Please try again.')
+            );
+            throw error;
+          }
+        }}
+
       />
 
       <LostModeShareModal

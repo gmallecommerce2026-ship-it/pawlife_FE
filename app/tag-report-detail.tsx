@@ -4,12 +4,12 @@ import ShelterContactModal from '@/components/ShelterContactModal';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getTimeAgo } from '@/utils/date.util';
+import { getLocalizedField } from '@/utils/localization';
 import { normalizeRadius } from '@/utils/map.util';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getLocalizedField } from '@/utils/localization';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -76,21 +76,20 @@ interface ActivityProp {
   contactPhone?: string;
   images?: string[];
   routeData?: { displayLat: number; displayLng: number; originalLat: number; originalLng: number; radius: number; isEstimated: boolean; };
+  tagReportId?: string;
 }
 
 // ─────────────────────────────────────────────
 // TimelineItem
 // ─────────────────────────────────────────────
 const TimelineItem = ({
-  item,
-  isLast,
-  onLocationPress,
-  onContactPress,
+  item, isLast, onLocationPress, onContactPress, onReportPress,
 }: {
   item: ActivityProp;
   isLast: boolean;
   onLocationPress?: (item: ActivityProp) => void;
   onContactPress?: (item: ActivityProp) => void;
+  onReportPress?: (item: ActivityProp) => void;
 }) => {
   const handleCallPress = () => {
     if (onContactPress && item.contactPhone) {
@@ -149,15 +148,26 @@ const TimelineItem = ({
       </View>
       <View className="flex-1 pb-6">
         <View className="flex-row justify-between items-center mb-1 h-6">
-          <Text
-            className="text-black text-[14px] font-medium flex-1 pr-2 leading-5"
-            numberOfLines={1}
-          >
+          <Text className="text-black text-[14px] font-medium flex-1 pr-2 leading-5" numberOfLines={1}>
             {item.title}
           </Text>
-          <Text className="text-[#8E8E93] font-regular text-[12px] tracking-[0.06px]">
-            {item.time}
-          </Text>
+          <View className="flex-row items-center">
+            <Text className="text-[#8E8E93] font-regular text-[12px] tracking-[0.06px] mr-1">
+              {item.time}
+            </Text>
+            {(item.type === 'SCAN' || item.type === 'LOCATION') && onReportPress && (
+              <TouchableOpacity
+                onPress={() => onReportPress(item)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.6}
+                className="ml-1.5 w-6 h-6 items-center justify-center rounded-full"
+                accessibilityRole="button"
+                accessibilityLabel="Report this content"
+              >
+                <Feather name="flag" size={13} color="#B0B0B5" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Đã thêm !! để chặn lỗi chuỗi rỗng */}
@@ -487,6 +497,53 @@ export default function TagReportDetailScreen() {
 
   const [focusedPinId, setFocusedPinId] = useState<string | null>(null);
   const [mapHeading, setMapHeading] = useState(0);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const [reportTarget, setReportTarget] = useState<ActivityProp | null>(null);
+
+  const handleReportSubmit = async (
+    reason: string,
+    details: string | undefined,
+    isHideRequested: boolean,
+    isBlockRequested: boolean
+  ) => {
+    if (!reportTarget) return;
+    await axiosClient.post('/interactions/report-tag-report', {
+      tagReportId: reportTarget.id,
+      reason,
+      details,
+      isHideRequested,
+      isBlockRequested,
+    });
+    if (isHideRequested) {
+      setHiddenIds((prev) => [...prev, reportTarget.id]);
+    }
+  };
+
+
+
+  const handleReportPress = (item: ActivityProp) => {
+    setReportTarget(item);
+  };
+
+
+
+  const submitReportAndHide = async (item: ActivityProp, hide: boolean, reason = 'inappropriate_content', details?: string) => {
+    try {
+      await axiosClient.post('/interactions/report-tag-report', {
+        tagReportId: item.id,
+        reason,
+        details,
+        isHideRequested: hide,
+      });
+      if (hide) setHiddenIds((prev) => [...prev, item.id]);
+      Alert.alert(
+        isVi ? 'Đã ghi nhận' : 'Done',
+        isVi ? 'Nội dung đã được xử lý.' : 'Content has been processed.'
+      );
+    } catch {
+      Alert.alert('Error', isVi ? 'Không thể xử lý. Vui lòng thử lại.' : 'Could not process. Please try again.');
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -1027,6 +1084,7 @@ export default function TagReportDetailScreen() {
       location: displayContactAddress,
     });
   }
+  const visibleActivities = activities.filter(a => !hiddenIds.includes(a.id));
 
   const handleLostPinPress = () => {
     if (!lostLat || !lostLng || !fakeLostPos) return;
@@ -1463,13 +1521,14 @@ export default function TagReportDetailScreen() {
 
           <Text className="text-[14px] font-semibold text-black mb-4 mt-2">Scan Activity</Text>
           <View className="ml-1 mb-6">
-            {activities.map((activity, index, array) => (
+            {visibleActivities.map((activity, index, array) => (
               <TimelineItem
                 key={activity.id}
                 item={activity}
                 isLast={index === array.length - 1}
                 onLocationPress={handleTimelineLocationPress}
                 onContactPress={handleTimelineContactPress}
+                onReportPress={handleReportPress}
               />
             ))}
           </View>
@@ -1506,7 +1565,10 @@ export default function TagReportDetailScreen() {
                   setTimeout(() => setIsReportModalVisible(true), 200);
                 }}
               >
-                <Text className="ml-3 text-[13px] font-medium text-[#EF4444]">Report</Text>
+                <Feather name="flag" size={14} color="#EF4444" style={{ marginRight: 8 }} />
+                <Text className="ml-1 text-[13px] font-medium text-[#EF4444]">
+                  {isVi ? 'Báo cáo nội dung này' : 'Report this content'}
+                </Text>
               </TouchableOpacity>
             </View>
           </RNTouchableWithoutFeedback>
@@ -1514,9 +1576,11 @@ export default function TagReportDetailScreen() {
       </Modal>
 
       <ReportUGCModal
-        isVisible={isReportModalVisible}
-        onClose={() => setIsReportModalVisible(false)}
-        reportTargetName={reportData?.scannedBy || 'Anonymous'}
+        isVisible={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        reportTargetName={reportTarget?.contactName || (isVi ? 'người dùng này' : 'this user')}
+        allowModeration={isOwner}
+        onSubmit={handleReportSubmit}
       />
 
       {

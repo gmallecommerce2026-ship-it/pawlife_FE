@@ -34,9 +34,8 @@ const AnimatedFeather = Animated.createAnimatedComponent(Feather);
 
 const FavoritePetCard = memo(({ item, onPress, onUnfavorite, isVi }: { item: any; onPress: (item: any) => void; onUnfavorite: (id: string) => void; isVi: boolean }) => {
 
-  // 1. TÍNH TOÁN TUỔI TỪ NGÀY SINH (dob)
   const petAge = useMemo(() => {
-    if (!item.dob) return 'Unknown age';
+    if (!item.dob) return isVi ? 'Chưa rõ tuổi' : 'Unknown age';
 
     const dob = new Date(item.dob);
     const today = new Date();
@@ -49,15 +48,20 @@ const FavoritePetCard = memo(({ item, onPress, onUnfavorite, isVi }: { item: any
       months += 12;
     }
 
-    if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
-    if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
+    if (years > 0) {
+      return isVi ? `${years} năm` : `${years} year${years > 1 ? 's' : ''}`;
+    }
+    if (months > 0) {
+      return isVi ? `${months} tháng` : `${months} month${months > 1 ? 's' : ''}`;
+    }
 
-    // Nếu dưới 1 tháng tuổi
     const days = Math.floor((today.getTime() - dob.getTime()) / (1000 * 60 * 60 * 24));
-    return days > 0 ? `${days} day${days > 1 ? 's' : ''}` : 'Newborn';
-  }, [item.dob]);
+    if (days > 0) {
+      return isVi ? `${days} ngày` : `${days} day${days > 1 ? 's' : ''}`;
+    }
+    return isVi ? 'Mới sinh' : 'Newborn';
+  }, [item.dob, isVi]);
 
-  // 2. CHUẨN HÓA GIỚI TÍNH (Đưa về IN HOA để khớp với DB Enum MALE/FEMALE)
   const isMale = item.gender?.toUpperCase() === 'MALE';
   const breedText = getLocalizedField(item.breed, isVi ? 'vi' : 'en');
 
@@ -104,7 +108,7 @@ const FavoritePetCard = memo(({ item, onPress, onUnfavorite, isVi }: { item: any
           />
 
           <Text className="text-gray-400 text-[12px] font-regular mt-0.5 ml-1.5" numberOfLines={1}>
-            {petAge} · {breedText || 'Unknown'}
+            {petAge} · {breedText || (isVi ? 'Chưa rõ' : 'Unknown')}
           </Text>
 
         </View>
@@ -113,17 +117,19 @@ const FavoritePetCard = memo(({ item, onPress, onUnfavorite, isVi }: { item: any
   );
 });
 
-const FilterTab = memo(({ title, isActive, onPress }: { title: TabType; isActive: boolean; onPress: (tab: TabType) => void }) => (
+
+const FilterTab = memo(({ title, label, isActive, onPress }: { title: TabType; label: string; isActive: boolean; onPress: (tab: TabType) => void }) => (
   <TouchableOpacity
     onPress={() => onPress(title)}
     className={`flex-1 items-center pb-3 border-b-2 ${isActive ? 'border-[#E89B5A]' : 'border-transparent'}`}
     activeOpacity={0.8}
   >
     <Text className={`text-[16px] ${isActive ? 'text-[#E89B5A] font-semibold' : 'text-gray-400 font-regular'}`}>
-      {title}
+      {label}
     </Text>
   </TouchableOpacity>
 ));
+
 
 
 
@@ -308,16 +314,18 @@ export default function FavoritePetsScreen() {
 
         {/* 2. TITLE */}
         <Animated.View style={[headerTitleStyle, { position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }]}>
-          <Text className="text-[20px] font-semibold text-black">Favorite Pets</Text>
+          <Text className="text-[20px] font-semibold text-black">
+            {isVi ? 'Thú cưng yêu thích' : 'Favorite Pets'}
+          </Text>
         </Animated.View>
 
       </View>
 
       {/* Tabs Filter (Giống màn hình Search) */}
       <View className="flex-row px-6 border-b border-gray-100 pt-2">
-        <FilterTab title="All" isActive={activeTab === 'All'} onPress={setActiveTab} />
-        <FilterTab title="Dog" isActive={activeTab === 'Dog'} onPress={setActiveTab} />
-        <FilterTab title="Cat" isActive={activeTab === 'Cat'} onPress={setActiveTab} />
+        <FilterTab title="All" label={isVi ? 'Tất cả' : 'All'} isActive={activeTab === 'All'} onPress={setActiveTab} />
+        <FilterTab title="Dog" label={isVi ? 'Chó' : 'Dog'} isActive={activeTab === 'Dog'} onPress={setActiveTab} />
+        <FilterTab title="Cat" label={isVi ? 'Mèo' : 'Cat'} isActive={activeTab === 'Cat'} onPress={setActiveTab} />
       </View>
 
       {/* Content */}
@@ -346,15 +354,21 @@ export default function FavoritePetsScreen() {
                       height: 232,
                     }}
                   />
-                  <Text className="text-black text-[16px] font-medium mt-6">You don't have any pets yet</Text>
-                  <Text className="text-[#8E8E93] text-[14px] text-center mt-2 mb-8">Add your pet or adopt a new friend!</Text>
+                  <Text className="text-black text-[16px] font-medium mt-6">
+                    {isVi ? 'Bạn chưa có thú cưng yêu thích nào' : "You don't have any pets yet"}
+                  </Text>
+                  <Text className="text-[#8E8E93] text-[14px] text-center mt-2 mb-8">
+                    {isVi ? 'Thêm thú cưng của bạn hoặc nhận nuôi một người bạn mới!' : 'Add your pet or adopt a new friend!'}
+                  </Text>
 
                   <TouchableOpacity
                     className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50"
                     activeOpacity={0.7}
                     onPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })}
                   >
-                    <Text className="text-[#8E8E93] font-medium">Browse pets</Text>
+                    <Text className="text-[#8E8E93] font-medium">
+                      {isVi ? 'Khám phá thú cưng' : 'Browse pets'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               );

@@ -138,6 +138,7 @@ export const petService = {
     try {
       // Truyền toàn bộ object data vào body của patch request
       const response = await axiosClient.patch(`/pets/${petId}/lost-mode`, data);
+      console.log('toggleLostMode response:', JSON.stringify(response));
       return response.data;
     } catch (error: any) {
       throw error.response?.data || { message: error.message };
