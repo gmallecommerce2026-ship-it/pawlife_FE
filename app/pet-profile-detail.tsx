@@ -1,17 +1,19 @@
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useLocalizedData } from '@/hooks/useLocalizedData';
+import { resolvePawHistoryItem } from '@/utils/pawHistory';
+import { normalizePet } from '@/utils/petNormalize';
 import { Feather, FontAwesome5, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, DeviceEventEmitter, Image, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, Dimensions, Image, InteractionManager, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
-
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -41,7 +43,7 @@ const MOCK_PAW_HISTORY = [
     title: 'DHPP Vaccination',
     date: '01/01/2026',
     description: 'Vaccinated: hepatitis, rabies, parvo, and parainfluenza',
-    icon: 'syringe', 
+    icon: 'syringe',
     color: '#5A90DA', // Xanh dương
     bgColor: '#E8F1FF'
   },
@@ -64,12 +66,39 @@ const MOCK_PAW_HISTORY = [
     bgColor: '#FFF4EC'
   }
 ];
+const getSafeBilingualText = (val: any, isVi: boolean, logPrefix: string = '') => {
+  console.log(`\n[DEBUG_MEDICAL_RECORD - ${logPrefix}] Type: ${typeof val} | Value:`, val);
 
+  if (!val) return '';
+  if (typeof val === 'string') {
+    if (val === '[object Object]') {
+      console.log(`⚠️ CẢNH BÁO: Dữ liệu Medical Record đã bị ép thành [object Object] từ trước!`);
+    }
+    if (val.trim().startsWith('{')) {
+      try {
+        const p = JSON.parse(val);
+        const res = isVi ? (p.vi || p.en) : (p.en || p.vi);
+        console.log(`[DEBUG_MEDICAL_RECORD] Parsed JSON String ->`, res);
+        return res;
+      } catch { return val; }
+    }
+    return val;
+  }
+  if (typeof val === 'object') {
+    const res = isVi ? (val.vi || val.en) : (val.en || val.vi);
+    console.log(`[DEBUG_MEDICAL_RECORD] Parsed Object ->`, res);
+    return res;
+  }
+  return String(val);
+};
 export default function PetProfileDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const petId = params.id as string;
   const insets = useSafeAreaInsets();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+  const { l } = useLocalizedData();
 
   const queryClient = useQueryClient();
   // --- STATE ---
@@ -84,30 +113,50 @@ export default function PetProfileDetailScreen() {
   const [pendingLostMode, setPendingLostMode] = useState<boolean>(false);
   const [showVaccineMenu, setShowVaccineMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 28 });
-  const { t } = useLanguage();
   const [selectedVaccineIndex, setSelectedVaccineIndex] = useState<number | null>(null);
+  const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
+  const [tooltipAnchor, setTooltipAnchor] = useState({ x: 0, y: 0 });
 
+  // KHỞI TẠO BIẾN ANIMATION
+  const tooltipAnim = useRef(new Animated.Value(0)).current;
   // State quản lý việc xem ảnh full màn hình trong App
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
-  const [currentImageToView, setCurrentImageToView] = useState<string | null>(null);
+  const [currentImageList, setCurrentImageList] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop';
   const displayAvatar = petData?.avatarUrl || petData?.images?.[0]?.url || FALLBACK_AVATAR;
-  
+
   const getHistoryUIConfig = (type: string) => {
-    switch(type) {
-      case 'BIRTH': 
+    switch (type) {
+      case 'BIRTH':
         return { icon: 'birthday-cake', color: '#F2A465', bgColor: '#FFF4EC' };
-      case 'CREATED': 
+      case 'CREATED':
         return { icon: 'paw', color: '#885BF2', bgColor: '#EAE7FB' };
-      case 'QR_LINKED': 
+      case 'QR_LINKED':
         return { icon: 'qrcode', color: '#5A90DA', bgColor: '#E8F1FF' };
-      case 'TRANSFER': 
+      case 'TRANSFER':
         return { icon: 'home', color: '#77C582', bgColor: '#EBFFE2' };
-      case 'VACCINE': 
+      case 'VACCINE':
         return { icon: 'syringe', color: '#EF4444', bgColor: '#FEE2E2' };
-      default: 
+      default:
         return { icon: 'history', color: '#8E8E93', bgColor: '#F5F5F5' };
+    }
+  };
+  const getMedicalRecordIconConfig = (type: string) => {
+    const t = (type || '').toUpperCase();
+    switch (t) {
+      case 'VACCINE':
+      case 'VACCINATION':
+        return { icon: 'syringe' };
+      case 'CHECKUP':
+        return { icon: 'stethoscope' };
+      case 'SURGERY':
+        return { icon: 'procedures' };
+      case 'DEWORMING':
+        return { icon: 'pills' };
+      default:
+        return { icon: 'file-medical' };
     }
   };
 
@@ -141,10 +190,10 @@ export default function PetProfileDetailScreen() {
     const subscription = DeviceEventEmitter.addListener('LOST_MODE_ACTIVATED', (data) => {
       if (data.petId === petId) {
         // Bật khóa: Không cho phép API GET ghi đè trạng thái lost mode
-        lockLostStatusRef.current = true; 
-        
-        setIsLostMode(true); 
-        setPetData((prev: any) => 
+        lockLostStatusRef.current = true;
+
+        setIsLostMode(true);
+        setPetData((prev: any) =>
           prev ? { ...prev, status: 'LOST', isLost: true } : prev
         );
 
@@ -159,32 +208,33 @@ export default function PetProfileDetailScreen() {
   }, [petId]);
 
   // 2. USEFOCUSEFFECT: Chỉ nhận trạng thái từ API nếu không bị khóa
+  // Tìm đến đoạn useFocusEffect và sửa lại như sau:
+
   useFocusEffect(
     useCallback(() => {
+      let task: any; // Lưu lại reference của task để dọn dẹp
+
       const fetchPetDetail = async () => {
         if (!petId) return;
+        console.log(petId);
         try {
-          // Tránh chớp màn hình nếu đã có data
           setPetData((prev: any) => {
             if (!prev) setIsLoading(true);
             return prev;
           });
 
           const data = await petService.getPetById(petId);
-          
-          // NẾU ĐANG BỊ KHÓA (Vừa toggle xong): Giữ nguyên trạng thái Lost của Local, chỉ cập nhật data khác
+
           if (lockLostStatusRef.current) {
-            setPetData({ ...data, status: 'LOST', isLost: true });
-            // Không set lại setIsLostMode vì local đang là true rồi
-          } 
-          // NẾU BÌNH THƯỜNG (Không bị khóa): Lấy trạng thái từ Backend trả về
-          else {
-            setPetData(data);
-            const isCurrentlyLost = 
-              data.tags?.some((tag: any) => tag.status === 'LOST') || 
-              data.status === 'LOST' || 
-              data.isLost === true; 
-              
+            setPetData({ ...normalizePet(data, language), status: 'LOST', isLost: true });
+          } else {
+            setPetData(normalizePet(data, language));
+
+            const isCurrentlyLost =
+              data.tags?.some((tag: any) => tag.status === 'LOST') ||
+              data.status === 'LOST' ||
+              data.isLost === true;
+
             setIsLostMode(!!isCurrentlyLost);
           }
         } catch (error) {
@@ -194,8 +244,18 @@ export default function PetProfileDetailScreen() {
         }
       };
 
-      fetchPetDetail();
-    }, [petId])
+      // CHỈ GỌI API KHI HIỆU ỨNG CHUYỂN MÀN HÌNH ĐÃ KẾT THÚC
+      task = InteractionManager.runAfterInteractions(() => {
+        fetchPetDetail();
+      });
+
+      // Cleanup function để tránh memory leak nếu user thoát màn hình quá nhanh
+      return () => {
+        if (task && task.cancel) {
+          task.cancel();
+        }
+      };
+    }, [petId, language])
   );
 
   const HISTORY_DATA = [
@@ -221,18 +281,18 @@ export default function PetProfileDetailScreen() {
     if (value === true) {
       // 1. Tính toán tuổi chính xác từ ngày sinh (dob) trước khi truyền đi
       let calculatedAge = petData?.age?.toString();
-      
+
       if (petData?.dob) {
         const birthDate = new Date(petData.dob);
         const today = new Date();
         let years = today.getFullYear() - birthDate.getFullYear();
         const m = today.getMonth() - birthDate.getMonth();
-        
+
         // Trừ đi 1 năm nếu chưa đến tháng sinh, hoặc cùng tháng nhưng chưa đến ngày sinh
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
           years--;
         }
-        
+
         // Nếu nhỏ hơn 1 tuổi thì để là '0'
         calculatedAge = years > 0 ? years.toString() : '0';
       }
@@ -241,14 +301,14 @@ export default function PetProfileDetailScreen() {
         pathname: '/report-lost-pet' as any,
         params: {
           petId: petId,
-          petName: petData?.name, 
-          petAvatar: displayAvatar, 
-          
+          petName: petData?.name,
+          petAvatar: displayAvatar,
+
           // 2. BỔ SUNG TRUYỀN THÊM petBreed VÀ petAge VÀO PARAMS
           petBreed: petData?.breed,
           petAge: calculatedAge,
-          
-          petShelterName: petData?.contactName || ownerInfo?.name || 'not updated', 
+
+          petShelterName: petData?.contactName || ownerInfo?.name || 'not updated',
           petShelterPhone: petData?.contactPhone || ownerInfo?.phone || 'not updated',
           petShelterAddress: petData?.contactAddress || ownerInfo?.address || 'not updated'
         }
@@ -275,10 +335,74 @@ export default function PetProfileDetailScreen() {
     }
   };
 
+  const closeTooltip = () => {
+    // Hiệu ứng Fade Out + Move Down
+    Animated.timing(tooltipAnim, {
+      toValue: 0,
+      duration: 150, // Tốc độ đóng nhanh hơn mở một chút cho tự nhiên
+      useNativeDriver: true, // Ép chạy trên UI Thread (mượt 60fps)
+    }).start(() => setActiveTooltipId(null));
+  };
+
+  const handleToggleTooltip = (id: string, x: number, y: number) => {
+    if (activeTooltipId === id) {
+      closeTooltip();
+    } else {
+      // Mở popup mới
+      setTooltipAnchor({ x, y });
+      setActiveTooltipId(id);
+      tooltipAnim.setValue(0); // Reset về trạng thái tàng hình + nằm bên dưới
+
+      // Hiệu ứng Fade In + Move Up
+      Animated.timing(tooltipAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+
   const toggleHistory = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowHistory(!showHistory);
   };
+
+  const combinedHistory = React.useMemo(() => {
+    if (!petData) return [];
+
+    const baseHistory = petData.pawHistory || [];
+
+    return baseHistory.map((item: any) => {
+      let isPending = false;
+      const resolved = resolvePawHistoryItem(item, t, l, language);
+      let displayTitle = resolved.title;
+      let displayDescription = resolved.description;
+
+
+      // Nếu đây là sự kiện VACCINE do Backend trả về
+      if (item.type === 'VACCINE') {
+        displayTitle = isVi ? `Tiêm phòng • ${resolved.title}` : `Vaccination • ${resolved.title}`;
+
+        const matchingRecord = petData.medicalRecords?.find((mr: any) => {
+          // Ép sang chữ an toàn trước khi so sánh
+          const mrName = getSafeBilingualText(mr.recordName, isVi);
+          return mrName === resolved.title || resolved.title.includes(mrName);
+        });
+
+        if (matchingRecord && (matchingRecord.verificationStatus === 'PENDING' || !matchingRecord.verificationStatus)) {
+          isPending = true;
+        }
+      }
+
+      return {
+        ...item,
+        displayTitle,
+        displayDescription,
+        isPending
+      };
+    }).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [petData, t, l, isVi]);
 
   // --- SUB-COMPONENTS ---
   const InfoRow = ({ label1, value1, label2, value2 }: any) => (
@@ -319,7 +443,7 @@ export default function PetProfileDetailScreen() {
   );
 
   if (isLoading) {
-      return <ActivityIndicator size="small" color="#e9a353" />;
+    return <ActivityIndicator size="small" color="#e9a353" />;
   }
 
   if (!petData) {
@@ -343,35 +467,99 @@ export default function PetProfileDetailScreen() {
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId.substring(0, 8).toUpperCase();
   const hasValidQRCode = !!petData.qrCodeUrl && petData.qrVerificationStatus === 'VERIFIED';
   const handleDownloadImage = async (url: string, fileName: string) => {
-  try {
-    // Tùy chọn hiển thị loading spinner ở đây
-    
-    // 1. Tạo đường dẫn lưu file tạm trong máy
-    const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-    
-    // 2. Tải file từ Cloudflare R2 / Server về máy
-    const downloadRes = await FileSystem.downloadAsync(url, fileUri);
-    
-    // 3. Kiểm tra xem thiết bị có hỗ trợ chia sẻ không
-    const canShare = await Sharing.isAvailableAsync();
-    
-    if (canShare) {
-      // 4. Mở Share Sheet mặc định của iOS/Android
-      // Người dùng có thể chọn "Save Image" để lưu vào máy
-      await Sharing.shareAsync(downloadRes.uri, {
-        mimeType: 'image/jpeg', // Chỉnh sửa chuẩn theo loại file
-        dialogTitle: 'Tải xuống hình ảnh tiêm chủng',
-      });
-    } else {
-      Alert.alert('Lỗi', 'Thiết bị của bạn không hỗ trợ tính năng chia sẻ/lưu tệp.');
+    try {
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          isVi ? 'Thiếu quyền' : 'Permission Required',
+          isVi
+            ? 'Cần cấp quyền truy cập thư viện ảnh để lưu ảnh.'
+            : 'Photo library permission is required to save the image.'
+        );
+        return;
+      }
+
+      await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
+
+      Alert.alert(
+        isVi ? 'Thành công' : 'Success',
+        isVi ? 'Ảnh đã được lưu vào thư viện ảnh!' : 'Image has been saved to your photos!'
+      );
+    } catch (error) {
+      console.error("Lỗi tải file:", error);
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        isVi ? 'Không thể tải xuống ảnh này lúc này.' : 'Unable to download this image right now.'
+      );
     }
-  } catch (error) {
-    console.error("Lỗi tải file:", error);
-    Alert.alert('Lỗi', 'Không thể tải xuống tệp này lúc này.');
-  }
-};
+  };
+  const handleDownloadMultipleImages = async (urls: string[]) => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          isVi ? 'Thiếu quyền' : 'Permission Required',
+          isVi
+            ? 'Cần cấp quyền truy cập thư viện ảnh để lưu ảnh.'
+            : 'Photo library permission is required to save images.'
+        );
+        return;
+      }
+
+      let successCount = 0;
+
+      for (let i = 0; i < urls.length; i++) {
+        try {
+          const fileUri = `${FileSystem.documentDirectory}medical_record_${Date.now()}_${i}.jpg`;
+          const downloadRes = await FileSystem.downloadAsync(urls[i], fileUri);
+          await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
+          successCount++;
+        } catch (err) {
+          console.error(`Lỗi tải ảnh ${i}:`, err);
+        }
+      }
+
+      if (successCount === urls.length) {
+        Alert.alert(
+          isVi ? 'Thành công' : 'Success',
+          isVi
+            ? `Đã lưu ${successCount} ảnh vào thư viện ảnh!`
+            : `Saved ${successCount} image(s) to your photos!`
+        );
+      } else if (successCount > 0) {
+        Alert.alert(
+          isVi ? 'Hoàn tất một phần' : 'Partially Completed',
+          isVi
+            ? `Đã lưu ${successCount}/${urls.length} ảnh. Một số ảnh không thể tải.`
+            : `Saved ${successCount}/${urls.length} image(s). Some images failed to download.`
+        );
+      } else {
+        Alert.alert(
+          isVi ? 'Lỗi' : 'Error',
+          isVi ? 'Không thể tải xuống ảnh.' : 'Unable to download images.'
+        );
+      }
+    } catch (error) {
+      console.error("Lỗi tải nhiều ảnh:", error);
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        isVi ? 'Không thể tải xuống ảnh lúc này.' : 'Unable to download images right now.'
+      );
+    }
+  };
+
   return (
-    <View className="flex-1 bg-[#FFFFFF]">
+    <View
+      className="flex-1 bg-[#FFFFFF]"
+      onTouchStart={() => {
+        if (activeTooltipId !== null) {
+          closeTooltip(); // Gọi hàm tắt có animation
+        }
+      }}
+    >
       <StatusBar style="dark" />
       <SafeAreaView className="flex-1" edges={['top']}>
 
@@ -411,11 +599,40 @@ export default function PetProfileDetailScreen() {
               <Feather name="chevron-left" size={20} color="#1F2937" />
             </View>
           </TouchableOpacity>
-          <Text className="text-[18px] font-semibold text-[#000000]">{petData.name} Profile</Text>
+          <Text className="text-[18px] font-semibold text-[#000000]">
+            {isVi ? `Hồ sơ của ${petData.name}` : `${petData.name} Profile`}
+          </Text>
           <View className="w-10" />
         </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+        {petData?.needsQrReplacement && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              router.push({
+                pathname: '/(tabs)/scan',
+                params: { replacePetId: petId }
+              });
+            }}
+            className="w-full flex-row bg-[#FDF5E8] py-[6px] items-center justify-center"
+          >
+            <View className="mr-2">
+              <Image source={require('../assets/icon/alert.png')} style={{ width: 15, height: 15 }} />
+            </View>
+            <Text className="text-[13px] font-semibold text-[#CF7900] underline">
+              {isVi ? 'Thẻ này cần thay thế ngay!' : 'This Tag Needs Replacement ASAP!'}
+            </Text>
+          </TouchableOpacity>
+        )}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 30 }}
+          scrollEventThrottle={16}
+          onScroll={() => {
+            if (activeTooltipId !== null) {
+              closeTooltip(); // Gọi hàm tắt có animation
+            }
+          }}
+        >
 
           {/* --- AVATAR & ID SECTION --- */}
           <View className="items-center mt-6 mb-[12px]">
@@ -426,27 +643,27 @@ export default function PetProfileDetailScreen() {
                 resizeMode="cover"
               />
             </View>
-            <Text className="text-[18px] font-semibold text-gray-900 mt-[23px]">{petData.name}</Text>
+            <Text className="text-[18px] font-semibold text-gray-900 mt-[23px] mb-[12px]">{petData.name}</Text>
 
             {/* Pet ID Tag */}
-            <View className="mt-[12px] flex-row items-center gap-2">
+            {/* <View className="mt-[12px] flex-row items-center gap-2">
               <Text className="text-[#B8B8B8] font-normal text-[14px] tracking-wider">
                 ID: {displayId}
               </Text>
-            </View>
+            </View> */}
           </View>
 
           {/* --- LOST MODE / QR REQUIRED SECTION --- */}
           {hasValidQRCode ? (
             <View>
-              <View>
+              {/* <View>
                 {petData?.needsQrReplacement && (
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => {
-                      router.push({ 
-                        pathname: '/(tabs)/scan', 
-                        params: { replacePetId: petId } 
+                      router.push({
+                        pathname: '/(tabs)/scan',
+                        params: { replacePetId: petId }
                       });
                     }}
                     className="mx-[20px] mb-8 flex-row bg-[#FDF5E8] border border-[#FFAA33] rounded-[20px] p-[17px]"
@@ -464,7 +681,7 @@ export default function PetProfileDetailScreen() {
                     </View>
                   </TouchableOpacity>
                 )}
-              </View>
+              </View> */}
               <View
                 className="mx-[20px] mb-8 rounded-[20px]"
                 style={isLostMode
@@ -524,20 +741,20 @@ export default function PetProfileDetailScreen() {
                       <Text className={`text-[14px] mt-0.5 font-light ${isLostMode ? 'text-[#8B3A3ACC]' : 'text-gray-400'}`}>
                         {isLostMode ? (
                           <Text>
-                            Active •{' '}
-                            <Text 
+                            {isVi ? "Bật" : "Turn on"} •{' '}
+                            <Text
                               className="underline font-medium"
                               onPress={() => {
                                 // Ưu tiên lấy reportId của lần quét gần nhất
                                 // Nếu chưa có ai quét (chỉ mới báo mất), thì backend của bạn CẦN TRẢ VỀ reportId của chính event báo mất đó
-                                const reportId = petData?.latestReportId || petData?.tags?.[0]?.latestReportId; 
-                                
+                                const reportId = petData?.latestReportId || petData?.tags?.[0]?.latestReportId;
+
                                 if (reportId) {
                                   router.push({
                                     pathname: '/tag-report-detail',
-                                    params: { 
+                                    params: {
                                       reportId: reportId,
-                                      openFrom: 'profile' 
+                                      openFrom: 'profile'
                                     }
                                   });
                                 } else {
@@ -549,7 +766,7 @@ export default function PetProfileDetailScreen() {
                             </Text>
                           </Text>
                         ) : (
-                          "Inactive • Pet is safe"
+                          isVi ? "Tắt • Bé đang an toàn" : "Turn Off • Pet is save"
                         )}
                       </Text>
                     </View>
@@ -599,26 +816,36 @@ export default function PetProfileDetailScreen() {
             <View className='bg-white rounded-[24px] p-6 border border-gray-200'>
 
               <InfoRow
-                label1="Gender" value1={petData.gender.charAt(0).toUpperCase() + petData.gender.slice(1).toLowerCase() || 'not updated'}
-                label2="Sterilized" value2={
-                  petData.isSpayedNeutered === true ? 'Yes' : 
-                  petData.isSpayedNeutered === false ? 'No' : 
-                  'not updated'
+                label1={isVi ? "Giới tính" : "Gender"}
+                value1={
+                  petData.gender
+                    ? (['nam', 'male'].includes(petData.gender.trim().toLowerCase())
+                      ? (isVi ? "Đực" : "Male")
+                      : ['nữ', 'nu', 'female'].includes(petData.gender.trim().toLowerCase())
+                        ? (isVi ? "Cái" : "Female")
+                        : (petData.gender.charAt(0).toUpperCase() + petData.gender.slice(1).toLowerCase()))
+                    : (isVi ? "Chưa cập nhật" : "Not updated")
+                }
+                label2={isVi ? "Triệt sản" : "Sterilized"}
+                value2={
+                  petData.isSpayedNeutered === true ? (isVi ? 'Có' : 'Yes') :
+                    petData.isSpayedNeutered === false ? (isVi ? 'Không' : 'No') :
+                      (isVi ? 'Chưa cập nhật' : 'Not updated')
                 }
               />
               <InfoRow
                 label1="Breed"
-                value1={petData.breed || 'not updated'}
-                label2="Color" value2={petData.color || 'not updated'}
+                value1={petData.breed || 'Not updated'}
+                label2="Color" value2={petData.color || 'Not updated'}
               />
               <InfoRow2
                 label1="Birthday"
                 value1={
                   petData.dob
                     ? new Date(petData.dob).toLocaleDateString('en-GB')
-                    : (petData.age ? `${petData.age} tuổi` : 'not updated')
+                    : (petData.age ? `${petData.age} tuổi` : 'Not updated')
                 }
-                label2="Weight" value2={petData.weight != null ? `${petData.weight} kg` : 'not updated'}
+                label2="Weight" value2={petData.weight != null ? `${petData.weight} kg` : 'Not updated'}
               />
               <View className="h-[1px] bg-gray-200 w-full mb-5" />
               <Text className="text-black text-[16px] font-medium mb-2">Notes</Text>
@@ -637,7 +864,7 @@ export default function PetProfileDetailScreen() {
 
             <View className="bg-white rounded-[20px] border border-gray-200 px-5">
               <OwnerRow
-                label="Name"
+                label="Full Name"
                 value={displayContactName}
               />
               <OwnerRow
@@ -654,7 +881,13 @@ export default function PetProfileDetailScreen() {
 
           <View className="mx-[20px] mb-8">
             <View className="flex-row justify-between items-center mb-5">
-              <Text className="text-[16px] font-semibold text-black">Paw History</Text>
+              <View className="flex-row items-center">
+                <Text className="text-[16px] font-semibold text-black">Paw History</Text>
+                <Text className="text-[16px] font-semibold text-[#D1D1D6] mx-2">|</Text>
+                <Text className="text-[16px] font-regular text-[#8E8E93]">
+                  {isVi ? "Hành trình" : "Journey"}
+                </Text>
+              </View>
               <TouchableOpacity
                 onPress={toggleHistory}
                 activeOpacity={0.6}
@@ -665,15 +898,18 @@ export default function PetProfileDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {showHistory && petData?.pawHistory && (
+            {showHistory && (
               <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
-                {petData.pawHistory.map((item: any, index: number) => {
-                  const isLastItem = index === petData.pawHistory.length - 1;
+
+                {combinedHistory.map((item: any, index: number) => {
+                  const isLastItem = index === combinedHistory.length - 1;
                   const uiConfig = getHistoryUIConfig(item.type);
                   const formattedDate = new Date(item.date).toLocaleDateString('en-GB');
 
                   return (
                     <View key={item.id} className="flex-row">
+                      {/* Cột Icon Timeline */}
+                      {/* Cột Icon Timeline */}
                       <View className="items-center mr-4 w-[32px]">
                         <View
                           className="w-[32px] h-[32px] rounded-full items-center justify-center z-10"
@@ -682,95 +918,187 @@ export default function PetProfileDetailScreen() {
                           <FontAwesome5 name={uiConfig.icon} size={13} color={uiConfig.color} />
                         </View>
 
+                        {/* SỬA LẠI LINE Ở ĐÂY: Hiển thị nét đứt nếu isPending */}
+                        {/* SỬA LẠI LINE Ở ĐÂY: Custom nét đứt thủ công để tuỳ chỉnh độ mau/thưa */}
                         {!isLastItem && (
-                          <View
-                            className="w-[2px] flex-1 my-1"
-                            style={{ backgroundColor: uiConfig.color }}
-                          />
+                          item.isPending ? (
+                            // NÉT ĐỨT (PENDING)
+                            <View className="flex-1 my-1 overflow-hidden w-[2px] items-center">
+                              {/* Thêm absolute để các vạch không đẩy khung dài ra */}
+                              <View className="absolute top-0 bottom-0 left-0 right-0">
+                                {Array.from({ length: 25 }).map((_, i) => (
+                                  <View
+                                    key={i}
+                                    style={{
+                                      width: 2,
+                                      height: 4, // Chiều dài 1 gạch
+                                      backgroundColor: uiConfig.color,
+                                      marginBottom: 4, // Khoảng cách thưa
+                                    }}
+                                  />
+                                ))}
+                              </View>
+                            </View>
+                          ) : (
+                            // NÉT LIỀN (BÌNH THƯỜNG)
+                            <View
+                              className="flex-1 my-1"
+                              style={{
+                                width: 2,
+                                backgroundColor: uiConfig.color,
+                              }}
+                            />
+                          )
                         )}
                       </View>
 
+                      {/* Nội dung Paw History */}
                       <View className={`flex-1 pt-1 ${!isLastItem ? 'pb-6' : ''}`}>
                         <View className="flex-row justify-between items-start">
-                          <Text className="text-[16px] font-medium text-black">
-                            {item.title}
-                          </Text>
-                          <Text className="text-[13px] text-[#8E8E93] font-regular">
+
+                          {/* Title + icon chấm than gói chung 1 khối, được phép wrap xuống dòng cùng nhau */}
+                          <View className="flex-1 flex-row flex-wrap items-center pr-2">
+                            <Text className="text-[16px] font-medium text-black">
+                              {item.displayTitle || item.title}
+                              {item.isPending && (
+                                <Text> </Text>
+                              )}
+                              {item.isPending && (
+                                <Text
+                                  suppressHighlighting={true}
+                                  onPress={(e) => {
+                                    const { pageX, pageY } = e.nativeEvent;
+                                    // pageX/pageY ở đây là điểm chạm, nhưng vì icon rất nhỏ (16px)
+                                    // và luôn đứng độc lập cuối dòng, sai số không đáng kể về mặt thị giác
+                                    handleToggleTooltip(item.id, pageX, pageY);
+                                  }}
+                                >
+                                  <Feather
+                                    name="alert-circle"
+                                    size={16}
+                                    color="#BBB4B5"
+                                    style={{ transform: [{ rotate: '180deg' }] }}
+                                  />
+                                </Text>
+                              )}
+                            </Text>
+                          </View>
+
+                          {/* Date đứng riêng, không co giãn, không bị title đẩy */}
+                          <Text className="text-[13px] text-[#8E8E93] font-regular" style={{ flexShrink: 0 }}>
                             {formattedDate}
                           </Text>
                         </View>
-                        <Text className="text-[13px] text-[#8E8E93] mt-1 leading-[18px]">
-                          {item.description}
+
+                        {/* Đổi màu description thành màu cam nếu đang pending */}
+                        <Text className="text-[13px] mt-1 leading-[18px]">
+                          {item.displayDescription}
                         </Text>
                       </View>
                     </View>
                   );
                 })}
 
-                {petData.pawHistory.length === 0 && (
+                {(!petData?.pawHistory || petData.pawHistory.length === 0) && (
                   <Text className="text-center text-gray-400 py-4">No history available.</Text>
                 )}
 
                 <View className='flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px]'>
-                  <Image
-                    source={require('../assets/icon/lock.png')}
-                    style={{ width: 12, height: 12 }}
-                    resizeMode="cover"
-                  />
+                  <Image source={require('../assets/icon/lock.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                   <Text className='font-regular text-[12px] text-[#8E8E93]'>This timeline is auto-generated and append-only.</Text>
                 </View>
               </View>
             )}
           </View>
 
-          {/* ========================================================= */}
-          {/* --- VACCINATION RECORD SECTION (SỬA LẠI ICON FILE.PNG) --- */}
-          {/* ========================================================= */}
+          {/* --- VACCINATION & MEDICAL RECORD SECTION --- */}
           <View className="mx-[20px] mb-8">
-            <Text className="font-semibold text-[16px] text-black mb-3">Vaccination Record</Text>
-            
-            {petData?.vaccinationRecordUrls && petData.vaccinationRecordUrls.length > 0 ? (
-              <View className="flex-col gap-3">
-                {petData.vaccinationRecordUrls.map((url: string, index: number) => (
-                  <View key={index} className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-center bg-[#FFFF] shadow-sm shadow-orange-100/50">
-                    
-                    {/* TRẢ LẠI ICON FILE NHƯ CŨ */}
-                    <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+            <Text className="font-semibold text-[16px] text-black mb-3">{isVi ? "Hồ sơ y tế" : "Medical Records"}</Text>
 
-                    <View className="flex-1 mx-3">
-                      <View className="flex-row justify-between items-center">
-                        <Text className="text-[12px] text-[#000000] font-medium leading-[16px]" numberOfLines={1}>
-                          Vaccination_Record_{index + 1}.jpg
-                        </Text>
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            const { pageY } = e.nativeEvent;
-                            setMenuPosition({ top: pageY + 10, right: 32 });
-                            setSelectedVaccineIndex(index); 
-                            setShowVaccineMenu(true);
-                          }}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                        </TouchableOpacity>
+            {petData?.medicalRecords && petData.medicalRecords.length > 0 ? (
+              <View className="flex-col gap-3">
+                {petData.medicalRecords.map((record: any, index: number) => {
+                  const isPending = record.verificationStatus === 'PENDING' || !record.verificationStatus;
+                  const iconConfig = getMedicalRecordIconConfig(record.type);
+
+                  return (
+                    <View key={record.id || index} className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
+
+                      {/* ICON TRUNG TÍNH: border ghi đậm, nền ghi nhạt, không tô màu theo loại */}
+                      <View
+                        className="w-[40px] h-[40px] px-[12px] py-[10px] rounded-full items-center justify-center"
+                        style={{ borderColor: '#9CA3AF', backgroundColor: '#F3F4F6' }}
+                      >
+                        <FontAwesome5 name={iconConfig.icon} size={15} color="#4B5563" />
                       </View>
-                      <View className="flex-row items-center mt-1.5">
-                        <Text className="text-[10px] text-[#8E8E93] tracking-[0.5px] leading-[13px]">
-                          Submitted on {new Date(petData.createdAt || Date.now()).toLocaleDateString('en-GB')}
-                        </Text>
+
+                      <View className="flex-1 mx-3">
+                        <View className="flex-row justify-between items-center">
+                          {/* TITLE + CHIP nằm chung 1 khối, tự wrap xuống dòng cùng nhau nếu tên dài */}
+                          <View className="flex-1 flex-row flex-wrap items-center pr-2">
+                            <Text className="text-[14px] text-[#000000] font-medium leading-[16px] mr-2" numberOfLines={1}>
+                              {getSafeBilingualText(record.recordName, isVi)}
+                            </Text>
+
+                            <View
+                              className="flex-row items-center px-2 py-[3px] rounded-full"
+                              style={{ backgroundColor: isPending ? '#FBF7EB' : '#EBFFE2', borderColor: isPending ? "#E8A53C/25" : "#D1F5BF" }}
+                            >
+                              <Feather
+                                name={isPending ? 'clock' : 'check-circle'}
+                                size={10}
+                                color={isPending ? '#E8A53C' : '#77C852'}
+                              />
+                              <Text
+                                className="text-[10px] font-medium ml-1"
+                                style={{ color: isPending ? '#E8A53C' : '#77C852' }}
+                              >
+                                {isPending
+                                  ? (isVi ? 'Đang xác minh' : 'Verifying')
+                                  : (isVi ? 'Đã xác minh' : 'Verified')}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {/* NÚT MORE OPTIONS (Đã xử lý tải ảnh bên trong mảng record.images) */}
+                          {record.images && record.images.length > 0 && (
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                const { pageY } = e.nativeEvent;
+                                setMenuPosition({ top: pageY + 10, right: 32 });
+                                setCurrentImageList(record.images);
+                                setCurrentImageIndex(0);
+                                setShowVaccineMenu(true);
+                              }}
+
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                              <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+
+                        <View className="flex-row items-center mt-1.5 justify-between">
+                          <Text className="text-[11px] text-[#8E8E93] tracking-[0.5px]">
+                            {isVi ? 'Loại:' : 'Type:'} {record.type}
+                          </Text>
+                          <Text className="text-[11px] text-[#8E8E93] tracking-[0.5px]">
+                            {new Date(record.recordDate).toLocaleDateString('en-GB')}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             ) : (
               <View className="bg-white border border-dashed border-[#E5E5E5] rounded-[12px] py-5 items-center justify-center">
                 <View className="rounded-full items-center justify-center mb-2">
                   <Image source={require('../assets/icon/file.png')} style={{ width: 17, height: 17 }} resizeMode="cover" />
                 </View>
-                <Text className="text-[16px] text-black font-medium mb-2">No vaccine records yet</Text>
-                <Text className="text-[14px] text-[#A9ACB4] font-regular">Records added to PawLife will be shown here.</Text>
+                <Text className="text-[16px] text-black font-medium mb-2">{isVi ? "Chưa có hồ sơ y tế" : "No medical records yet"}</Text>
+                <Text className="text-[14px] text-[#A9ACB4] font-regular">{isVi ? "Các hồ sơ được thêm vào sẽ hiển thị ở đây." : "Records added to PawLife will be shown here."}</Text>
               </View>
             )}
           </View>
@@ -871,6 +1199,7 @@ export default function PetProfileDetailScreen() {
       </Modal>
 
       {/* --- MENU MODAL --- */}
+      {/* --- MENU MODAL --- */}
       <Modal
         visible={showVaccineMenu}
         animationType="fade"
@@ -894,18 +1223,13 @@ export default function PetProfileDetailScreen() {
               shadowRadius: 10
             }}
           >
-            {/* View Image trong app */}
             <TouchableOpacity
               className="flex-row items-center px-4 py-3"
               activeOpacity={0.6}
               onPress={() => {
                 setShowVaccineMenu(false);
-                if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
-                  const urlToView = petData.vaccinationRecordUrls[selectedVaccineIndex];
-                  if (urlToView) {
-                    setCurrentImageToView(urlToView);
-                    setIsImageViewerVisible(true);
-                  }
+                if (currentImageList.length > 0) {
+                  setIsImageViewerVisible(true);
                 }
               }}
             >
@@ -913,50 +1237,24 @@ export default function PetProfileDetailScreen() {
               <Text className="text-[14px] text-gray-700 ml-3 font-medium">View image</Text>
             </TouchableOpacity>
 
-            {/* Download/Open external link */}
             <TouchableOpacity
-  className="flex-row items-center px-4 py-3 border-t border-gray-50"
-  activeOpacity={0.6}
-  onPress={async () => {
-    setShowVaccineMenu(false); 
-    
-    if (selectedVaccineIndex !== null && petData?.vaccinationRecordUrls) {
-      const urlToDownload = petData.vaccinationRecordUrls[selectedVaccineIndex];
-      
-      if (urlToDownload) {
-        try {
-          // Ép kiểu "as any" để VS Code không báo lỗi TS 2339 / 2305 nữa
-          const FS = FileSystem as any;
-          
-          // Lấy thư mục cache (bộ nhớ tạm), nếu lỗi thì fallback về thư mục document
-          const directory = FS.cacheDirectory || FS.documentDirectory;
-          const fileName = `vaccination_record_${selectedVaccineIndex + 1}.jpg`;
-          const fileUri = `${directory}${fileName}`;
-          
-          // Tải file về máy
-          const downloadRes = await FS.downloadAsync(urlToDownload, fileUri);
-          
-          // Kiểm tra khả năng mở Share Sheet của máy
-          const canShare = await Sharing.isAvailableAsync();
-          if (canShare) {
-            await Sharing.shareAsync(downloadRes.uri, {
-              mimeType: 'image/jpeg',
-              dialogTitle: 'Lưu hoặc chia sẻ ảnh tiêm chủng',
-            });
-          } else {
-            Alert.alert("Thông báo", "Thiết bị không hỗ trợ chia sẻ file.");
-          }
-        } catch (error) {
-          console.error("Lỗi tải file:", error);
-          Alert.alert("Lỗi", "Không thể tải file lúc này. Vui lòng thử lại sau.");
-        }
-      }
-    }
-  }}
->
-  <Feather name="download" size={16} color="#374151" />
-  <Text className="text-[14px] text-gray-700 ml-3 font-medium">Download</Text>
-</TouchableOpacity>
+              className="flex-row items-center px-4 py-3 border-t border-gray-50"
+              activeOpacity={0.6}
+              onPress={async () => {
+                setShowVaccineMenu(false);
+                if (currentImageList.length > 0) {
+                  await handleDownloadMultipleImages(currentImageList);
+                }
+              }}
+            >
+              <Feather name="download" size={16} color="#374151" />
+              <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                {currentImageList.length > 1
+                  ? (isVi ? `Tải xuống` : `Download`)
+                  : 'Download'}
+              </Text>
+            </TouchableOpacity>
+
           </View>
         </TouchableOpacity>
       </Modal>
@@ -964,41 +1262,144 @@ export default function PetProfileDetailScreen() {
       {/* ========================================================= */}
       {/* IN-APP FULLSCREEN IMAGE VIEWER MODAL (CÓ USE SafeAreaInsets CỦA IOS) */}
       {/* ========================================================= */}
-      <Modal 
-        visible={isImageViewerVisible} 
-        transparent={true} 
+      <Modal
+        visible={isImageViewerVisible}
+        transparent={true}
         animationType="fade"
         onRequestClose={() => setIsImageViewerVisible(false)}
       >
         <View className="flex-1 bg-black/95 justify-center items-center">
-          <View 
+          <View
             className="absolute top-0 w-full z-50 flex-row justify-between items-center px-4 pb-4"
-            style={{ 
-              paddingTop: Math.max(insets.top, 20), 
-              backgroundColor: 'rgba(0,0,0,0.3)' 
+            style={{
+              paddingTop: Math.max(insets.top, 20),
+              backgroundColor: 'rgba(0,0,0,0.3)'
             }}
           >
             <Text className="text-white font-medium text-lg drop-shadow-md">
-              Vaccination Record
+              {isVi ? 'Hồ sơ y tế' : 'Vaccination Record'}
+              {currentImageList.length > 1 ? `  ${currentImageIndex + 1}/${currentImageList.length}` : ''}
             </Text>
-            <TouchableOpacity
-              className="p-2.5 bg-white/20 rounded-full"
-              onPress={() => setIsImageViewerVisible(false)}
-            >
-              <Feather name="x" size={24} color="white" />
-            </TouchableOpacity>
+            <View className="flex-row items-center gap-3">
+              <TouchableOpacity
+                className="p-2.5 bg-white/20 rounded-full"
+                onPress={async () => {
+                  const currentUri = currentImageList[currentImageIndex];
+                  if (currentUri) {
+                    await handleDownloadImage(currentUri, `medical_record_${Date.now()}.jpg`);
+                  }
+                }}
+              >
+                <Feather name="download" size={22} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="p-2.5 bg-white/20 rounded-full"
+                onPress={() => setIsImageViewerVisible(false)}
+              >
+                <Feather name="x" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {currentImageToView && (
-            <Image
-              source={{ uri: currentImageToView }}
-              style={{ width: '100%', height: '80%' }}
-              resizeMode="contain"
-            />
+          {currentImageList.length > 0 && (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              contentOffset={{ x: currentImageIndex * Dimensions.get('window').width, y: 0 }}
+              onMomentumScrollEnd={(e) => {
+                const newIndex = Math.round(
+                  e.nativeEvent.contentOffset.x / Dimensions.get('window').width
+                );
+                setCurrentImageIndex(newIndex);
+              }}
+              style={{ width: '100%' }}
+            >
+              {currentImageList.map((uri, idx) => (
+                <View
+                  key={idx}
+                  style={{ width: Dimensions.get('window').width, justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <Image
+                    source={{ uri }}
+                    style={{ width: '100%', height: '80%' }}
+                    resizeMode="contain"
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Chấm tròn báo trang hiện tại, chỉ hiện khi có >1 ảnh */}
+          {currentImageList.length > 1 && (
+            <View className="absolute bottom-10 flex-row gap-2">
+              {currentImageList.map((_, idx) => (
+                <View
+                  key={idx}
+                  className={`w-2 h-2 rounded-full ${idx === currentImageIndex ? 'bg-white' : 'bg-white/30'}`}
+                />
+              ))}
+            </View>
           )}
         </View>
       </Modal>
+      {/* --- PAW HISTORY PENDING TOOLTIP (popup luôn căn giữa ngay trên icon, mũi tên cố định ở giữa popup) --- */}
+      {activeTooltipId !== null && (
+        <Animated.View
+          onTouchStart={(e) => e.stopPropagation()}
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            top: tooltipAnchor.y - 95,
+            left: tooltipAnchor.x - 85, // 85 = nửa chiều rộng popup (170/2), để icon luôn nằm giữa popup
+            width: 170,
+            backgroundColor: 'white',
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            borderRadius: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.12,
+            shadowRadius: 4,
+            elevation: 8,
+            zIndex: 999,
 
+            opacity: tooltipAnim,
+            transform: [
+              {
+                translateY: tooltipAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [10, 0],
+                }),
+              },
+            ],
+          }}
+        >
+          <Text className="text-[12px] text-[#333333] leading-[18px] text-left">
+            {isVi
+              ? "Hồ sơ sẽ được thêm vào hành trình sau khi xác minh hoàn tất."
+              : "The record will be added to the timeline once verification is complete."}
+          </Text>
+
+          {/* Mũi tên tam giác chỉ xuống - LUÔN nằm chính giữa popup (170/2 = 85) */}
+          <View
+            style={{
+              position: 'absolute',
+              bottom: -6,
+              left: 85,
+              marginLeft: -6, // Kéo lùi lại bằng viền border (6px) để đỉnh nhọn nhắm thẳng tâm
+              width: 0,
+              height: 0,
+              borderLeftWidth: 6,
+              borderRightWidth: 6,
+              borderTopWidth: 6,
+              borderLeftColor: 'transparent',
+              borderRightColor: 'transparent',
+              borderTopColor: '#FFFFFF',
+            }}
+          />
+        </Animated.View>
+      )}
     </View>
   );
 }

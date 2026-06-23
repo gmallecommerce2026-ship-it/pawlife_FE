@@ -9,6 +9,7 @@ import { ActivityIndicator, Alert, Dimensions, FlatList, Image, StyleSheet, Touc
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shelterService } from '../services/shelterService'; // Import chuẩn service của bạn
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -20,7 +21,8 @@ type TabType = typeof TABS[number];
 // =========================================================================
 
 const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
-    let displayDate = 'Đang cập nhật';
+    const { t, language } = useLanguage(); const isVi = language === 'vi';
+    let displayDate = isVi ? 'Đang cập nhật' : 'Updating';
     if (item.startDate) {
         const d = new Date(item.startDate);
         const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -109,7 +111,7 @@ const ELEVATION = 3;
 
 export default function OrganizerProfileScreen() {
     const insets = useSafeAreaInsets();
-
+    const { t, language } = useLanguage(); const isVi = language === 'vi';
     const router = useRouter();
     const { id: organizerId } = useLocalSearchParams();
     const { user } = useContext(AuthContext);
@@ -132,7 +134,7 @@ export default function OrganizerProfileScreen() {
     const headerTitleStyle = useAnimatedStyle(() => {
         const translateY = interpolate(scrollY.value, [SCROLL_THRESHOLD - 30, SCROLL_THRESHOLD], [10, 0], Extrapolation.CLAMP);
         const opacity = interpolate(scrollY.value, [SCROLL_THRESHOLD - 30, SCROLL_THRESHOLD], [0, 1], Extrapolation.CLAMP);
-        return { opacity, transform: [{ translateY }], fontFamily:"Urbanist" };
+        return { opacity, transform: [{ translateY }], fontFamily: "Urbanist" };
     });
 
     const scrollHandler = useAnimatedScrollHandler((event) => {
@@ -152,8 +154,8 @@ export default function OrganizerProfileScreen() {
                     setIsFollowing(response.data.isFollowing);
                 }
             } catch (error) {
-                console.error("Lỗi fetch organizer profile:", error);
-                Alert.alert("Lỗi", "Không thể tải thông tin ban tổ chức lúc này.");
+                console.error(isVi ? "Lỗi fetch organizer profile:" : "Failed to fetch organizer profile:", error);
+                Alert.alert(isVi ? "Lỗi" : "Error", isVi ? "Không thể tải thông tin ban tổ chức lúc này." : "Unable to load organizer information at this time.");
             } finally {
                 setLoading(false);
             }
@@ -168,7 +170,7 @@ export default function OrganizerProfileScreen() {
 
     const handleToggleFollow = async () => {
         if (!user) {
-            Alert.alert("Yêu cầu đăng nhập", "Bạn cần đăng nhập để theo dõi trạm cứu hộ.");
+            Alert.alert(isVi ? "Yêu cầu đăng nhập" : "Sign-in required", isVi ? "Bạn cần đăng nhập để theo dõi trạm cứu hộ." : "You need to log in to follow the rescue station.");
             return;
         }
 
@@ -190,7 +192,7 @@ export default function OrganizerProfileScreen() {
                 ...prev,
                 followers: prevFollowState ? prev.followers + 1 : prev.followers - 1
             }));
-            Alert.alert("Lỗi", "Không thể thực hiện thao tác. Vui lòng thử lại.");
+            Alert.alert(isVi ? "Lỗi" : "Error", isVi ? "Không thể thực hiện thao tác. Vui lòng thử lại." : "Operation could not be completed. Please try again.");
         }
     };
 
@@ -366,7 +368,7 @@ export default function OrganizerProfileScreen() {
                         </View>
 
                         {activeTab === 'Contact' ? (
-                           
+
                             <View className="mt-[21px]">
                                 {/* About Shelter */}
                                 <Text className="text-[16px] font-medium text-black mb-2">About Shelter</Text>

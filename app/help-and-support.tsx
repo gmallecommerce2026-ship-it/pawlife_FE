@@ -12,7 +12,7 @@ const HelpItem = ({
   onPress,
   isLast = false,
 }: {
-  iconSource: any, // Dùng 'any' hoặc 'ImageSourcePropType' để nhận require()
+  iconSource: any, 
   label: string,
   onPress?: () => void,
   isLast?: boolean

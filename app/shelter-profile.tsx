@@ -1,11 +1,12 @@
 // app/shelter-profile.tsx
 import { Text } from '@/components/AppText';
-import { useLanguage } from '@/contexts/LanguageContext'; // 1. IMPORT HOOK NGÔN NGỮ
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { getLocalizedField } from '@/utils/localization';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Keyboard, Linking, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import Animated, {
@@ -24,22 +25,22 @@ import { useEngagementStore } from '../store/useEngagementStore';
 
 const { width } = Dimensions.get('window');
 
-// 2. Truyền thêm hàm `t` vào getAge để dịch ngày tháng
-const getAge = (dobString?: string, t?: any) => {
-  if (!dobString) return t ? t('Unknown') : 'Unknown';
+// 2. Sử dụng isVi để xử lý logic song ngữ cho tuổi thú cưng
+const getAge = (dobString?: string, isVi?: boolean) => {
+  if (!dobString) return isVi ? 'Không rõ' : 'Unknown';
   const dob = new Date(dobString);
   const diff_ms = Date.now() - dob.getTime();
   const age_dt = new Date(diff_ms);
   const years = Math.abs(age_dt.getUTCFullYear() - 1970);
   const months = age_dt.getUTCMonth();
 
-  if (years > 0) return `${years} ${years > 1 ? (t ? t('years') : 'years') : (t ? t('year') : 'year')}`;
-  if (months > 0) return `${months} ${months > 1 ? (t ? t('months') : 'months') : (t ? t('month') : 'month')}`;
-  return t ? t('Newborn') : 'Newborn';
+  if (years > 0) return `${years} ${isVi ? 'tuổi' : (years > 1 ? 'years' : 'year')}`;
+  if (months > 0) return `${months} ${isVi ? 'tháng' : (months > 1 ? 'months' : 'month')}`;
+  return isVi ? 'sơ sinh' : 'newborn';
 };
 
-// 3. Truyền `t` vào PetCard
-const PetCard = ({ pet, formatBreed, t }: { pet: any, formatBreed: (breed: string) => string, t: any }) => {
+// 3. Truyền isVi vào PetCard
+const PetCard = ({ pet, formatBreed, t, isVi }: { pet: any, formatBreed: (breed: any, isVi?: boolean) => string, t: any, isVi: boolean }) => {
   const router = useRouter();
 
   const imageUrl = pet.images && pet.images.length > 0
@@ -85,7 +86,7 @@ const PetCard = ({ pet, formatBreed, t }: { pet: any, formatBreed: (breed: strin
             className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
             numberOfLines={1}
           >
-            {getAge(pet.dob, t)} · {formatBreed ? formatBreed(pet.breed) : (pet.breed || t('Unknown'))}
+            {getAge(pet.dob, isVi)} · {formatBreed ? formatBreed(pet.breed, isVi) : (getLocalizedField(pet.breed, isVi ? 'vi' : 'en') || (isVi ? 'Chưa rõ' : 'Unknown'))}
           </Text>
         </View>
       </View>
@@ -93,7 +94,6 @@ const PetCard = ({ pet, formatBreed, t }: { pet: any, formatBreed: (breed: strin
   );
 };
 
-// Đổi `optional` thành `optionalText` để truyền thẳng chuỗi đã dịch
 const SectionLabel = ({ title, optionalText }: { title: string, optionalText?: string }) => (
   <View className="flex-row items-baseline">
     <Text className="text-black font-semibold text-[14px] tracking-[0.06px]">
@@ -120,7 +120,7 @@ const FilterChip = ({ label, selected, onPress, iconSource }: any) => {
       {iconSource && (
         <Image
           source={iconSource}
-          className="w-[16px] h-[16px] mr-2" 
+          className="w-[16px] h-[16px] mr-2"
           resizeMode="contain"
         />
       )}
@@ -135,21 +135,21 @@ export default function ShelterProfileScreen() {
   const shelterId = params.id as string;
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  
-  // 4. LẤY HÀM TỪ HOOK
-  const { t } = useLanguage();
+
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState(''); 
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
   const [activeTab, setActiveTab] = useState<'pets' | 'info'>('pets');
   const COLUMN_WIDTH = (width - 40 - 13) / 2;
 
   const scrollY = useSharedValue(0);
-  const HEADER_HEIGHT = insets.top + 60; 
-  const SCROLL_THRESHOLD = 100; 
+  const HEADER_HEIGHT = insets.top + 60;
+  const SCROLL_THRESHOLD = 100;
   const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
 
   const [selectedGender, setSelectedGender] = useState<string | null>(null);
@@ -175,7 +175,7 @@ export default function ShelterProfileScreen() {
   });
 
   const iconButtonStyle = useAnimatedStyle(() => {
-    const backgroundColor = interpolate(scrollY.value, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], [1, 0]); 
+    const backgroundColor = interpolate(scrollY.value, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], [1, 0]);
     const borderWidth = interpolate(scrollY.value, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], [0.5, 0]);
 
     return {
@@ -234,7 +234,7 @@ export default function ShelterProfileScreen() {
       borderColor,
       paddingLeft: interpolate(searchAnimation.value, [0, 1], [8.5, 12]),
       paddingRight: interpolate(searchAnimation.value, [0, 1], [0, 12]),
-      borderWidth: 1, 
+      borderWidth: 1,
     };
   });
 
@@ -258,11 +258,9 @@ export default function ShelterProfileScreen() {
   }, [searchQuery]);
 
   const { data: shelterInfo, isLoading: loading, isError: isNotFound } = useQuery({
-    // Xóa debouncedSearch khỏi mảng này, chỉ phụ thuộc vào shelterId
-    queryKey: ['shelter-profile', shelterId], 
+    queryKey: ['shelter-profile', shelterId],
     queryFn: async () => {
-      // Chỉ lấy data 1 lần duy nhất khi mount
-      const data = await shelterService.getShelterDetail(shelterId); 
+      const data = await shelterService.getShelterDetail(shelterId);
       if (data.isFollowed !== undefined) {
         useEngagementStore.getState().setInitialShelterFollow(shelterId, data.isFollowed);
       }
@@ -275,7 +273,7 @@ export default function ShelterProfileScreen() {
   const pets = shelterInfo?.pets || [];
   const globalIsFollowed = useEngagementStore(state => state.followedShelters[shelterId]);
   const toggleShelterFollow = useEngagementStore(state => state.toggleShelterFollow);
-  
+
   const isFollowing = globalIsFollowed ?? shelterInfo?.isFollowed ?? false;
 
   const filteredPets = useMemo(() => {
@@ -312,8 +310,8 @@ export default function ShelterProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ['followed-shelters'] });
       DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', {
         shelterId,
-        isFollowed: !isFollowing, 
-        source: 'SHELTER_PROFILE' 
+        isFollowed: !isFollowing,
+        source: 'SHELTER_PROFILE'
       });
     },
     onError: (err, variables, context) => {
@@ -340,16 +338,18 @@ export default function ShelterProfileScreen() {
     toggleFollowMutation.mutate();
   };
 
-  const formatBreed = (breed?: string) => {
-    if (!breed) return '';
-    if (breed.length <= 15) return breed;
-    const words = breed.split(' ');
+  const formatBreed = (breed: any, isVi?: boolean) => {
+    const breedText = getLocalizedField(breed, isVi ? 'vi' : 'en');
+    if (!breedText) return '';
+    if (breedText.length <= 15) return breedText;
+    const words = breedText.split(' ');
+
     if (words.length > 1) {
       const firstLetter = words[0][0];
       const restOfWords = words.slice(1).join(' ');
       return `${firstLetter}. ${restOfWords}`;
     }
-    return `${breed.substring(0, 15)}...`;
+    return `${breedText.substring(0, 15)}...`;
   };
 
   const handleCall = () => {
@@ -367,7 +367,7 @@ export default function ShelterProfileScreen() {
 
   const formatDate = (dateString?: string | Date) => {
     if (!dateString) return t('Pending');
-    return new Date(dateString).toLocaleDateString(t('en-US'), { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(dateString).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
 
@@ -375,7 +375,6 @@ export default function ShelterProfileScreen() {
     return (
       <SafeAreaView className="flex-1 bg-[#FAFAFA] justify-center items-center">
         <MaterialCommunityIcons name="home-off" size={64} color="#E5E7EB" />
-        {/* Dùng key tiếng Anh để bạn dễ map từ điển */}
         <Text className="text-gray-800 text-lg font-bold mt-4">{t('Shelter not found')}</Text>
         <Text className="text-gray-500 text-sm mt-2 text-center px-6">
           {t('Shelter data might have been removed or the link is incorrect.')}
@@ -501,12 +500,6 @@ export default function ShelterProfileScreen() {
                     className="flex-1 text-[14px] text-black"
                     style={{ fontFamily: 'Urbanist' }}
                   />
-                  {/* Icon Filter Search */}
-                  {/* {isSearching && (
-                    <TouchableOpacity onPress={() => setIsFilterVisible(true)} className="ml-1 px-1">
-                      <Image className='ml-2' source={require('../assets/icon/sliders-gray.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                    </TouchableOpacity>
-                  )} */}
                 </Animated.View>
               </Animated.View>
             </TouchableOpacity>
@@ -544,9 +537,6 @@ export default function ShelterProfileScreen() {
                 <StatItem value={shelterInfo._count?.pets || pets.length} label={t("pets")} />
                 <Text className='text-[12px] px-2 font-extrabold'>•</Text>
 
-                <StatItem value={shelterInfo._count?.followers || 0} label={t("followers")} />
-                <Text className='text-[12px] px-2 font-extrabold'>•</Text>
-
                 <StatItem value={shelterInfo.adoptedCount || 0} label={t("adopted")} />
               </View>
             </View>
@@ -554,7 +544,9 @@ export default function ShelterProfileScreen() {
 
           <View className='mx-[20px]' style={{ top: -5 }}>
             <View className="mb-3">
-              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1 leading-4 tracking-[0.06px]">{t("Animal Shelter & Rescue")}</Text>
+              <Text className="text-[#8E8E93] text-[12px] font-regular mb-1 leading-4 tracking-[0.06px]">
+                {shelterInfo?.shelterType ? t(shelterInfo.shelterType) : t("Animal Shelter & Rescue")}
+              </Text>
               <Text className="text-[14px] text-black font-regular leading-5 tracking-[0.06px]">
                 {shelterInfo?.description || t("Saving lives and finding forever home 🐾")}
               </Text>
@@ -564,7 +556,7 @@ export default function ShelterProfileScreen() {
                   style={{ width: 12, height: 12 }}
                   resizeMode="cover"
                 />
-                <Text className="ml-1 text-[14px] text-[#E89B5A] leading-4 tracking-[0.06px]">{shelterInfo?.emailAddress || 'pawlife@example.com'}</Text>
+                <Text className="ml-1 text-[14px] text-[#E89B5A] leading-4 tracking-[0.06px]">{shelterInfo?.emailAddress || t('Not updated')}</Text>
               </View>
 
               <View className="flex-row items-center mt-1">
@@ -573,42 +565,10 @@ export default function ShelterProfileScreen() {
                   style={{ width: 7, height: 9 }}
                   resizeMode="cover"
                 />
-                <Text className="ml-2 text-[12px] text-[#8E8E93] flex-1 leading-4 tracking-[0.06px]">{shelterInfo?.address}</Text>
+                <Text className="ml-2 text-[12px] text-[#8E8E93] flex-1 leading-4 tracking-[0.06px]">{shelterInfo?.address || t('Not updated')}</Text>
               </View>
 
-              <View className="flex-row items-center mt-2">
-                <View className="flex-row items-center">
-                  <View>
-                    <Image
-                      source={{ uri: 'https://i.pravatar.cc/100?img=1' }}
-                      className="w-4 h-4 rounded-full border-[1px] border-white z-10"
-                    />
-                  </View>
 
-                  <View style={{ elevation: 2, marginLeft: -8 }}>
-                    <Image
-                      source={{ uri: 'https://i.pravatar.cc/100?img=2' }}
-                      className="w-4 h-4 rounded-full border-[1px] border-white z-20"
-                    />
-                  </View>
-
-                  <View style={{ elevation: 2, marginLeft: -8 }}>
-                    <Image
-                      source={{ uri: 'https://i.pravatar.cc/100?img=3' }}
-                      className="w-4 h-4 rounded-full border-[1px] border-white z-30"
-                    />
-                  </View>
-                </View>
-
-                <Text className="ml-1 text-[12px] text-[#8E8E93] flex-1">
-                  {t('Followed by')}{' '}
-                  <Text className="font-medium text-black">john doe</Text>,{' '}
-                  <Text className="font-medium text-black">james doe</Text>,{' '}
-                  <Text className="font-medium text-black">jane doe</Text> {t('and')}{' '}
-                  <Text className="font-medium text-black">79 {t('others')}</Text>
-                </Text>
-
-              </View>
             </View>
             <View className="flex-row gap-4 mb-3">
               <TouchableOpacity
@@ -637,7 +597,7 @@ export default function ShelterProfileScreen() {
             <View className="px-[20px]">
               <Text className="text-[16px] font-medium text-black mb-2">{t("About Shelter")}</Text>
               <Text className="text-[14px] text-[#8E8E93] leading-5 mb-5">
-                {shelterInfo?.description || "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a efficitur lorem, a vulputate odio. Vestibulum gravida commodo turpis sed finibus. Quisque vel porttitor quam"}
+                {shelterInfo?.description || t("No description provided.")}
               </Text>
 
               <Text className="text-[16px] font-medium text-black mb-2">{t("Contact Info")}</Text>
@@ -656,7 +616,7 @@ export default function ShelterProfileScreen() {
                     style={{ width: 13, height: 13 }}
                     resizeMode="cover"
                   />
-                  <Text className="text-[14px] text-[#8E8E93]">{shelterInfo?.contactInfo || "(+84) 0912345678"}</Text>
+                  <Text className="text-[14px] text-[#8E8E93]">{shelterInfo?.contactInfo || t("Not updated")}</Text>
                 </TouchableOpacity>
                 <View className="flex-row items-center gap-x-3">
                   <Image
@@ -664,7 +624,7 @@ export default function ShelterProfileScreen() {
                     style={{ width: 13, height: 10 }}
                     resizeMode="cover"
                   />
-                  <Text className="text-[14px] text-[#8E8E93]">{shelterInfo?.emailAddress || "sannhanhieucho@email.com"}</Text>
+                  <Text className="text-[14px] text-[#8E8E93]">{shelterInfo?.emailAddress || t("Not updated")}</Text>
                 </View>
               </View>
 
@@ -672,7 +632,7 @@ export default function ShelterProfileScreen() {
               <View className="gap-y-3">
                 <View className="flex-row items-center gap-x-3">
                   <Image source={require('../assets/icon/earth.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
-                  <Text className="text-[14px] text-[#8E8E93]">{t("Based in")} {shelterInfo?.address || "Vietnam"}</Text>
+                  <Text className="text-[14px] text-[#8E8E93]">{t("Based in")} {shelterInfo?.address || t("Vietnam")}</Text>
                 </View>
                 <View className="flex-row items-center gap-x-3">
                   <Image source={require('../assets/icon/info.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
@@ -701,7 +661,7 @@ export default function ShelterProfileScreen() {
               {filteredPets.length > 0 ? (
                 filteredPets.map((pet: any) => (
                   <View key={pet.id} style={{ width: COLUMN_WIDTH }}>
-                    <PetCard pet={pet} formatBreed={formatBreed} t={t} />
+                    <PetCard pet={pet} formatBreed={formatBreed} t={t} isVi={isVi} />
                   </View>
                 ))
               ) : (
@@ -730,12 +690,12 @@ export default function ShelterProfileScreen() {
               <View className='mx-[20px]'>
                 <View className="">
                   <View className="flex-row items-center justify-between">
-                  <SectionLabel title={t("Pet Type")} />
+                    <SectionLabel title={t("Pet Type")} />
 
-                  <TouchableOpacity onPress={() => setIsFilterVisible(false)} className="p-2.5 -mt-1 -mr-1">
-                    <Feather name="x" size={16} color="#111827" />
-                  </TouchableOpacity>
-                </View>
+                    <TouchableOpacity onPress={() => setIsFilterVisible(false)} className="p-2.5 -mt-1 -mr-1">
+                      <Feather name="x" size={16} color="#111827" />
+                    </TouchableOpacity>
+                  </View>
                   <View className="flex-row justify-between gap-3 mt-3">
                     <FilterChip
                       label={t("All")}
@@ -841,7 +801,7 @@ export default function ShelterProfileScreen() {
 
                 <View className="flex-row items-center justify-between py-6">
                   <TouchableOpacity
-                    onPress={()=> {}}
+                    onPress={() => { }}
                     className="w-full bg-[#E89B5A] py-4 rounded-full items-center active:bg-[#D68A4A]"
                   >
                     <Text className="text-white font-semibold text-[16px]">{t("Apply")}</Text>

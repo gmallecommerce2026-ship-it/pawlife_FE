@@ -2,6 +2,7 @@
 import axiosClient, { setCachedAccessToken } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 // import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Href, useRouter } from 'expo-router';
@@ -30,6 +31,8 @@ const { height } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const [showContent, setShowContent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { setAuth } = useContext(AuthContext) as any;
@@ -79,12 +82,12 @@ export default function WelcomeScreen() {
           router.push('/(tabs)' as Href);
         }
       } else {
-        Alert.alert("Lỗi ứng dụng", "Không thể lưu phiên đăng nhập.");
+        Alert.alert(isVi ? "Lỗi ứng dụng" : "Application Error", isVi ? "Không thể lưu phiên đăng nhập." : "Cannot save login session");
       }
 
     } catch (error: any) {
-      console.error(`Lỗi đăng nhập ${provider}:`, error.response?.data || error.message);
-      Alert.alert('Đăng nhập thất bại', error.response?.data?.message || 'Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại.');
+      console.error(isVi ? `Lỗi đăng nhập ${provider}:` : `Sign in Error ${provider}:`, error.response?.data || error.message);
+      Alert.alert(isVi ? 'Đăng nhập thất bại' : 'Login failed', error.response?.data?.message || 'Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại.');
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +163,7 @@ export default function WelcomeScreen() {
       }
     } catch (e: any) {
       if (e.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert("Lỗi đăng nhập Apple", e.message);
+        Alert.alert(isVi ? "Lỗi đăng nhập Apple" : "Apple sign-in error", e.message);
       }
     }
   };

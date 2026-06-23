@@ -91,7 +91,7 @@ function RootLayoutNavGuard() {
   useEffect(() => {
     const initSocket = async () => {
       if (isAuthenticated && !socket.connected) {
-        const token = await SecureStore.getItemAsync('access_token');
+        const token = await SecureStore.getItemAsync('accessToken');
         if (token) {
           connectSocket(token);
         }
@@ -195,21 +195,21 @@ function RootLayoutNavGuard() {
 
     if (!isAuthenticated) {
       if (inAuthGroup || inIntroScreen || inCompleteProfileScreen) {
-        router.push('/');
+        router.replace('/'); // Đổi sang replace
       }
     } else {
       const isProfileIncomplete = !user?.phone || !user?.dob || !user?.gender;
 
       if (isProfileIncomplete) {
         if (!inCompleteProfileScreen) {
-          router.push('/complete-social-profile');
+          router.replace('/complete-social-profile'); // Đổi sang replace
         }
       } else {
         if (inSignInScreen || inCompleteProfileScreen) {
           if (!hasSeenIntro) {
-            router.push('/intro');
+            router.replace('/intro'); // Đổi sang replace
           } else {
-            router.push('/(tabs)');
+            router.replace('/(tabs)'); // Đổi sang replace giúp vào thẳng app và xóa stack login
           }
         }
       }

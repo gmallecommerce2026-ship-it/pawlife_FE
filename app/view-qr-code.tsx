@@ -9,6 +9,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Sharing from 'expo-sharing';
+
 import React, { useCallback, useRef, useState } from 'react';
 import {
   Alert,
@@ -616,7 +617,7 @@ export default function ViewQrCode() {
                       style={{ marginTop: 0 }}
                     >
                       {isVi
-                        ? `Hãy luôn gắn thẻ QR cho ${petData.name}`
+                        ? `Nhớ luôn đeo thẻ cho ${petData.name}`
                         : `Please always attach QR tag on ${petData.name}`}
                     </Text>
                   </TouchableOpacity>
@@ -641,7 +642,7 @@ export default function ViewQrCode() {
                     >
                       <Image source={require('../assets/icon/qr-transfer.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
                       <Text className="text-[14px] font-medium text-[#1E1E1E] mt-2">
-                        {isVi ? 'Chuyển thú cưng' : 'Transfer pet'}
+                        {isVi ? 'Chuyển chủ' : 'Transfer pet'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -654,7 +655,7 @@ export default function ViewQrCode() {
                       className="flex-row items-center justify-center self-stretch h-[40px] mx-[5px] rounded-[12px] bg-black border border-[#757575]"
                     >
                       <Image source={require('../assets/icon/apple-wallet.png')} style={{ width: 21, height: 15 }} resizeMode="contain" />
-                      <Text className="text-white text-[14px] font-medium ml-2">Add to Apple Wallet</Text>
+                      <Text className="text-white text-[14px] font-medium ml-2">{isVi ? "Thêm vào ví Apple" : "Add to Apple Wallet"}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -664,7 +665,7 @@ export default function ViewQrCode() {
             <View className="items-center pb-4">
               <TouchableOpacity activeOpacity={0.6} onPress={() => setShowReportModal(true)}>
                 <Text className="text-[12px] font-regular text-[#8E8E93] tracking-wide">
-                  {isVi ? 'Báo cáo thẻ bị mất hoặc hỏng' : 'Report lost or damaged tag'}
+                  {isVi ? 'Báo cáo vấn đề với thẻ' : 'Report lost or damaged tag'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -743,7 +744,7 @@ export default function ViewQrCode() {
               activeOpacity={0.8}
               className="absolute flex-row items-center bg-[#FFFFFF]/80 px-8 py-4 rounded-[16px] bottom-24"
             >
-              <Feather name="share" size={20} color="#8E8E93" />
+              <Feather name="download" size={20} color="#8E8E93" />
               <Text className="text-[#8E8E93] font-medium text-[16px] ml-3">
                 {isVi ? 'Tải về' : 'Download'}
               </Text>

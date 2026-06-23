@@ -1,6 +1,11 @@
 // app/search.tsx
+import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { AuthContext } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { memo, useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, Dimensions, FlatList, Image, LayoutAnimation, StatusBar, TouchableOpacity, View } from 'react-native';
@@ -9,26 +14,24 @@ import { eventService } from '../services/eventService';
 import { petService } from '../services/petService';
 import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
-// import FilterModal from '@/components/filter-modal';
-import { Text } from '@/components/AppText';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { useQueryClient } from '@tanstack/react-query';
-import { LinearGradient } from 'expo-linear-gradient';
-import { TextInput } from '@/components/AppTextInput';
+
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
-const getAge = (dobString?: string) => {
-    if (!dobString) return 'Unknown';
+
+// --- CẬP NHẬT HÀM GETAGE HỖ TRỢ SONG NGỮ BẰNG isVi ---
+const getAge = (dobString?: string, isVi?: boolean) => {
+    if (!dobString) return isVi ? 'Không rõ' : 'Unknown';
     const dob = new Date(dobString);
     const diff_ms = Date.now() - dob.getTime();
     const age_dt = new Date(diff_ms);
     const years = Math.abs(age_dt.getUTCFullYear() - 1970);
     const months = age_dt.getUTCMonth();
 
-    if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
-    if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
-    return 'Newborn';
+    if (years > 0) return `${years} ${isVi ? 'tuổi' : (years > 1 ? 'years' : 'year')}`;
+    if (months > 0) return `${months} ${isVi ? 'tháng' : (months > 1 ? 'months' : 'month')}`;
+    return isVi ? 'sơ sinh' : 'newborn';
 };
+
 function useDebounce<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value);
     useEffect(() => {
@@ -39,8 +42,6 @@ function useDebounce<T>(value: T, delay: number): T {
     }, [value, delay]);
     return debouncedValue;
 }
-
-
 
 // =========================================================================
 // 1. PURE COMPONENTS
@@ -60,7 +61,8 @@ const formatBreed = (breed?: string) => {
     return `${breed.substring(0, 15)}...`;
 };
 
-const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => (
+// --- CẬP NHẬT PETCARD NHẬN THÊM PROPS isVi ---
+const PetCard = memo(({ item, onPress, isVi }: { item: any; onPress: (item: any) => void; isVi: boolean }) => (
     <TouchableOpacity
         className="bg-transparent mb-[21px]"
         style={{ width: COLUMN_WIDTH }}
@@ -70,9 +72,7 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
         <View className="relative">
             <Image
                 source={{ uri: item.images?.[0]?.url || item.image || 'https://via.placeholder.com/600' }}
-                // Xóa h-40, thay bằng aspect-square (hoặc dùng height: COLUMN_WIDTH ở dưới)
                 className="w-full aspect-square rounded-[24px] bg-gray-100"
-                // Backup nếu NativeWind bản cũ không nhận aspect-square
                 style={{ height: COLUMN_WIDTH }}
                 resizeMode="cover"
             />
@@ -96,7 +96,7 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
                     className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
                     numberOfLines={1}
                 >
-                    {item.age || getAge(item.dob)} · {formatBreed(item.breed) || 'Unknown'}
+                    {item.age || getAge(item.dob, isVi)} · {formatBreed(item.breed) || (isVi ? 'Không rõ' : 'Unknown')}
                 </Text>
             </View>
         </View>
@@ -106,14 +106,10 @@ const PetCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => vo
 const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
     const { user } = useContext(AuthContext);
     const [isLoading, setIsLoading] = useState(false); 
-
-    // 2. Khai báo queryClient
     const queryClient = useQueryClient(); 
-
     const isFollowed = useEngagementStore(state => state.followedShelters[item.id] ?? item.isFollowed);
     const toggleShelterFollow = useEngagementStore(state => state.toggleShelterFollow);
 
-    // Thêm listener để bắt sự kiện từ chỗ khác (tùy chọn nhưng an toàn cho hệ thống lớn)
     useEffect(() => {
         const subscription = DeviceEventEmitter.addListener('SHELTER_FOLLOW_TOGGLED', (event) => {
             if (event.shelterId === item.id) {
@@ -139,10 +135,7 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
         try {
             await shelterService.toggleFollow(item.id);
             DeviceEventEmitter.emit('SHELTER_FOLLOW_TOGGLED', { shelterId: item.id, isFollowed: !isFollowed });
-            
-            // 3. THÊM DÒNG NÀY: Ép React Query làm mới lại cache của màn Followed Shelters
             queryClient.invalidateQueries({ queryKey: ['followed-shelters'] });
-
         } catch (error) {
             console.error("Lỗi khi toggle follow:", error);
             toggleShelterFollow(item.id); 
@@ -172,7 +165,7 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
 
             <TouchableOpacity
                 onPress={handleToggleFollow}
-                disabled={isLoading} // KHÓA NÚT KHI ĐANG LOADING
+                disabled={isLoading}
                 style={{ zIndex: 10, elevation: 10, opacity: isLoading ? 0.7 : 1 }}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                 className={`px-5 py-[3.5px] rounded-full shadow-sm ${isFollowed ? 'bg-[#F8F8F8]' : 'bg-[#E89B5A]'}`}
@@ -188,8 +181,9 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
 const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
     const { user } = useContext(AuthContext);
     const queryClient = useQueryClient();
+    const { language } = useLanguage();
+    const isVi = language === 'vi';
 
-    // Lấy state từ Zustand
     const isInterested = useEngagementStore(state => state.interestedEvents[item.id] ?? item.isInterested);
     const toggleEventInterest = useEngagementStore(state => state.toggleEventInterest);
 
@@ -209,29 +203,27 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
         try {
             const res = await eventService.toggleInterest(item.id, user?.id || 'guest');
             if (!res.success) throw new Error("API failed");
-            
-            // <-- 2. THÊM DÒNG NÀY: Ép màn Interested Events fetch lại data mới nhất
             queryClient.invalidateQueries({ queryKey: ['interested-events', user?.id] });
-            
         } catch (error) {
             console.error("Lỗi khi bookmark:", error);
-            toggleEventInterest(item.id); // Rollback
+            toggleEventInterest(item.id); 
         }
     };
 
-    let displayDate = 'Đang cập nhật';
+    let displayDate = isVi ? 'Đang cập nhật' : 'Upcoming';
     if (item.startDate) {
         const d = new Date(item.startDate);
-        const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
-        const formattedTime = timePart.replace('am', 'a.m').replace('pm', 'p.m');
-        displayDate = `${datePart} at ${formattedTime}`;
+        if (isVi) {
+            const datePart = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const timePart = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+            displayDate = `${timePart} - ${datePart}`;
+        } else {
+            const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+            const formattedTime = timePart.replace('am', 'a.m').replace('pm', 'p.m');
+            displayDate = `${datePart} at ${formattedTime}`;
+        }
     }
-
-    const mockAvatars = [
-        'https://i.pravatar.cc/100?img=12',
-        'https://i.pravatar.cc/100?img=13'
-    ];
 
     return (
         <TouchableOpacity
@@ -248,10 +240,10 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
             <View className="flex-1 p-[14px] justify-between">
                 <View className="pr-6 relative">
                     <Text className="text-gray-900 font-bold text-[16px] leading-[22px] mb-1 -top-1" numberOfLines={2}>
-                        {item.title || 'Weekend Animal Event'}
+                        {item.title || (isVi ? 'Sự kiện thú cưng' : 'Weekend Animal Event')}
                     </Text>
                     <Text className="text-[#8E8E93] text-[13px] font-regular" numberOfLines={1}>
-                        {item.locationName || item.address || 'District, City'}
+                        {item.locationName || item.address || (isVi ? 'Đang cập nhật vị trí' : 'Unknown location')}
                     </Text>
 
                     <TouchableOpacity
@@ -286,7 +278,8 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
 // 2. SECTIONS CHÍNH
 // =========================================================================
 
-const PetsSection = ({ searchQuery, onDetailPress }: { searchQuery: string, onDetailPress: (item: any) => void }) => {
+// --- TRUYỀN isVi VÀO PETS SECTION VÀ PETCARD ---
+const PetsSection = ({ searchQuery, onDetailPress, isVi }: { searchQuery: string, onDetailPress: (item: any) => void, isVi: boolean }) => {
     const [pets, setPets] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [activeType, setActiveType] = useState<'All' | 'Dog' | 'Cat'>('All');
@@ -310,11 +303,10 @@ const PetsSection = ({ searchQuery, onDetailPress }: { searchQuery: string, onDe
             }
         };
         fetchPets();
-    }, [searchQuery, activeType]); // Thêm activeType vào dependency array để gọi lại API khi đổi filter
+    }, [searchQuery, activeType]); 
 
     return (
         <View className="flex-1 px-6 pt-4">
-            {/* Danh sách Pets */}
             {loading ? (
                 <View className="flex-1 items-center justify-center mt-10">
                     <ActivityIndicator size="large" color="#ffa053" />
@@ -329,10 +321,10 @@ const PetsSection = ({ searchQuery, onDetailPress }: { searchQuery: string, onDe
                     contentContainerStyle={{ paddingBottom: 20 }}
                     ListEmptyComponent={() => (
                         <View className="items-center justify-center mt-10">
-                            <Text className="text-gray-400">No pets found</Text>
+                            <Text className="text-gray-400">{isVi ? 'Không tìm thấy thú cưng nào' : 'No pets found'}</Text>
                         </View>
                     )}
-                    renderItem={({ item }) => <PetCard item={item} onPress={onDetailPress} />}
+                    renderItem={({ item }) => <PetCard item={item} onPress={onDetailPress} isVi={isVi} />}
                 />
             )}
         </View>
@@ -456,7 +448,7 @@ export default function SearchScreen() {
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearchQuery = useDebounce(searchInput, 500);
     
-    // Lấy thêm language để dùng song ngữ nội tuyến
+    // Lấy language để dùng song ngữ nội tuyến
     const { t, language } = useLanguage();
     const isVi = language === 'vi';
     
@@ -519,7 +511,6 @@ export default function SearchScreen() {
     const TabButton = ({ title }: { title: 'Pet' | 'Shelter' | 'Event' }) => {
         const isActive = activeTab === title;
 
-        // Hàm xử lý tên hiển thị song ngữ trực tiếp
         const getDisplayTitle = () => {
             if (isVi) {
                 switch(title) {
@@ -606,7 +597,6 @@ export default function SearchScreen() {
                         onFocus={handleFocus}
                         onBlur={handleBlur}
                     />
-                    {/* Hiển thị nút xoá text khi có chữ trong input */}
                     {searchInput.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchInput('')} activeOpacity={0.6} className="p-1 ml-2">
                             <Feather name="x-circle" size={16} color="#8E8E93" />
@@ -623,7 +613,7 @@ export default function SearchScreen() {
             </View>
 
             <View className="flex-1 bg-white">
-                {activeTab === 'Pet' && <PetsSection searchQuery={debouncedSearchQuery} onDetailPress={handlePetPress} />}
+                {activeTab === 'Pet' && <PetsSection searchQuery={debouncedSearchQuery} onDetailPress={handlePetPress} isVi={isVi} />}
                 {activeTab === 'Shelter' && <SheltersSection searchQuery={debouncedSearchQuery} onProfilePress={handleShelterPress} />}
                 {activeTab === 'Event' && <EventsSection searchQuery={debouncedSearchQuery} onEventPress={handleEventPress} />}
             </View>

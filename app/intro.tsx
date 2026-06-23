@@ -65,7 +65,6 @@ export default function IntroScreen() {
     try {
       await AsyncStorage.setItem('hasSeenIntro', 'true');
     } catch (e) {
-      console.error("Lỗi khi lưu trạng thái intro", e);
     }
     router.push('/(tabs)'); 
   };

@@ -35,13 +35,12 @@
 
         "NSPhotoLibraryUsageDescription": "PawLife cần truy cập thư viện ảnh để cập nhật ảnh hồ sơ cá nhân và thú cưng.",
 
-        "NSPhotoLibraryAddUsageDescription": "PawLife cần lưu QR code và hình ảnh thú cưng vào thư viện ảnh của bạn.",
+        "NSPhotoLibraryAddUsageDescription": "PawLife cần quyền lưu ảnh để bạn có thể tải mã QR, thẻ thú cưng và ảnh hồ sơ y tế về thư viện ảnh trên thiết bị.",
 
         "NSLocationWhenInUseUsageDescription": "PawLife cần quyền vị trí để gửi tọa độ hỗ trợ tìm kiếm thú cưng thất lạc, hiển thị nội dung phù hợp gần bạn và tính toán khoảng cách, chỉ đường chính xác từ bạn đến nơi thú cưng vừa được quét mã.",
 
         "NSLocationAlwaysAndWhenInUseUsageDescription": "PawLife cần quyền vị trí để hỗ trợ các tính năng tìm kiếm thú cưng thất lạc ngay cả khi ứng dụng đang chạy nền.",
 
-        "NSUserTrackingUsageDescription": "Dữ liệu được sử dụng để cải thiện trải nghiệm và đo lường hiệu quả ứng dụng.",
       }
     },
     "android": {

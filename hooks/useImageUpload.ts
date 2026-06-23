@@ -3,6 +3,9 @@ import { useState } from 'react';
 // SỬA QUAN TRỌNG: Import axiosClient thay vì axios mặc định
 import axiosClient from '@/api/axiosClient'; // Đảm bảo đường dẫn này trỏ đúng tới file cấu hình axios của bạn
 
+// Bổ sung import LanguageContext
+import { useLanguage } from '@/contexts/LanguageContext';
+
 interface UploadOptions {
   folder: string;         // 'avatars', 'pets', 'posts'...
   aspect?: [number, number]; // [1, 1] cho avatar vuông, [4, 3] cho ảnh thường
@@ -10,6 +13,10 @@ interface UploadOptions {
 }
 
 export const useImageUpload = () => {
+  // Khởi tạo ngôn ngữ
+  const { language } = useLanguage();
+  const isVi = language === 'vi';
+
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -69,11 +76,13 @@ export const useImageUpload = () => {
       
     } catch (error: any) {
       if (error.response) {
-        console.error('Lỗi Axios chi tiết:', error.response.status, error.response.data);
+        console.error(isVi ? 'Lỗi Axios chi tiết:' : 'Detailed Axios error:', error.response.status, error.response.data);
       } else {
-        console.error('Lỗi upload ảnh:', error.message || error);
+        console.error(isVi ? 'Lỗi upload ảnh:' : 'Image upload error:', error.message || error);
       }
-      setUploadError('Không thể tải ảnh lên. Vui lòng kiểm tra lại máy chủ!');
+      
+      // Xử lý song ngữ cho UI Error Message
+      setUploadError(isVi ? 'Không thể tải ảnh lên. Vui lòng kiểm tra lại máy chủ!' : 'Cannot upload image. Please check the server!');
       return null;
     } finally {
       // BỔ SUNG KHỐI FINALLY: Đảm bảo luôn tắt loading dù thành công hay thất bại

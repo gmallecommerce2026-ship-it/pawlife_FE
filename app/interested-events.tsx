@@ -15,6 +15,7 @@ import { eventService } from '../services/eventService';
 import { useEngagementStore } from '@/store/useEngagementStore';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 const AnimatedFeather = Animated.createAnimatedComponent(Feather);
@@ -23,7 +24,8 @@ export default function InterestedEventsScreen() {
     const router = useRouter();
     const { user } = useContext<any>(AuthContext);
     const queryClient = useQueryClient();
-
+    const { t, language } = useLanguage();
+    const isVi = language === 'vi';
     // --- LOGIC SEARCH & ANIMATION ---
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -61,14 +63,14 @@ export default function InterestedEventsScreen() {
         onMutate: async (eventId) => {
             // Hủy query đang chạy để tránh đè dữ liệu
             await queryClient.cancelQueries({ queryKey: ['interested-events', user?.id] });
-            
+
             // Lấy dữ liệu cũ để chuẩn bị rollback nếu lỗi
             const previousEvents = queryClient.getQueryData(['interested-events', user?.id]);
             const targetEvent = (previousEvents as any[])?.find(e => e.id === eventId);
             const eventTitle = targetEvent?.title || 'This event';
 
             // Optimistic Update: Xóa item ngay lập tức trên UI
-            queryClient.setQueryData(['interested-events', user?.id], (old: any[]) => 
+            queryClient.setQueryData(['interested-events', user?.id], (old: any[]) =>
                 old ? old.filter(e => e.id !== eventId) : []
             );
 
@@ -91,7 +93,7 @@ export default function InterestedEventsScreen() {
             });
         },
         onError: (err, eventId, context) => {
-            console.error("Lỗi khi hủy quan tâm event:", err);
+            console.error(isVi ? "Lỗi khi hủy quan tâm event:" : "Error while unfollowing the event:", err);
             // Rollback lại UI nếu API lỗi
             if (context?.previousEvents) {
                 queryClient.setQueryData(['interested-events', user?.id], context.previousEvents);
@@ -109,7 +111,7 @@ export default function InterestedEventsScreen() {
     };
 
     const renderEventItem = ({ item }: { item: any }) => {
-        let displayDate = 'Đang cập nhật';
+        let displayDate = isVi ? 'Đang cập nhật' : 'Updating';
         if (item.startDate) {
             const d = new Date(item.startDate);
             const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

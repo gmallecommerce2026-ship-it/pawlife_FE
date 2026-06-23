@@ -1,4 +1,5 @@
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import * as Haptics from 'expo-haptics';
@@ -15,14 +16,40 @@ import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient';
 import { groupNotifications } from '../utils/dateUtils';
-// Bật thử nghiệm LayoutAnimation trên Android (Bắt buộc để hiệu ứng dồn lên hoạt động trên Android)
+
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+// =====================================================================
+// 🚀 HELPER DÙNG CHUNG: resolveNotificationText
+// Mọi nơi cần hiển thị title/body của 1 notification PHẢI đi qua hàm này,
+// để đảm bảo dữ liệu động (petName, radius...) luôn được dịch đúng theo
+// ngôn ngữ hiện tại, không bị hard-code tiếng Anh rải rác nhiều nơi.
+// =====================================================================
+const resolveNotificationText = (item: any, t: any) => {
+  const i18n = item?.metadata?.i18n;
+  if (i18n?.titleKey && i18n?.bodyKey && t) {
+    return {
+      title: t(i18n.titleKey, i18n.params || {}),
+      body: t(i18n.bodyKey, i18n.params || {}),
+    };
+  }
+  // Fallback cho noti cũ / không có dữ liệu động: vẫn cố dịch title/body
+  // thô qua t() (nếu nó trùng key tĩnh có sẵn trong dictionary), nếu không
+  // tìm thấy thì t() tự trả lại nguyên văn.
+  return {
+    title: item?.title ? t(item.title) : item?.title,
+    body: item?.body ? t(item.body) : item?.body,
+  };
+};
+
 const getIconByType = (type: string) => {
   const props = { size: 22, color: "#4B5563", strokeWidth: 2 };
   switch (type) {
-    case 'TAG': return <AlertTriangle {...props} color="#EF4444" />;
+    case 'TAG':
+    case 'TAG_SCANNED':
+      return <AlertTriangle {...props} color="#EF4444" />;
     case 'SECURITY': return <ShieldCheck {...props} color="#10B981" />;
     case 'SYSTEM': return <Info {...props} color="#3B82F6" />;
     case 'PASSWORD': return <Lock {...props} color="#F59E0B" />;
@@ -32,36 +59,29 @@ const getIconByType = (type: string) => {
   }
 };
 
-// Tạo Animated Component cho Nút bấm
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 // --- Component Item với hiệu ứng Swipe Premium, Parallax & Border Masking ---
-const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPress: any, onDelete: any, onView: any }) => {
+const NotificationItem = ({ item, onPress, onDelete, onView, t }: { item: any, onPress: any, onDelete: any, onView: any, t: any }) => {
   const swipeableRef = useRef<Swipeable>(null);
   const slideOutAnim = useRef(new Animated.Value(0)).current;
 
-  // Refs quản lý logic rung & hành động
   const hapticTriggeredRight = useRef(false);
   const hapticTriggeredLeft = useRef(false);
-  const isActionFired = useRef(false); 
-  
-  // Ref MỚI: Dùng để đảm bảo ta chỉ gắn listener đúng 1 lần duy nhất cho mỗi item
+  const isActionFired = useRef(false);
+
   const dragXListenerAttached = useRef(false);
   const [dragXNode, setDragXNode] = useState<any>(null);
 
-  // GẮN SỰ KIỆN TRỰC TIẾP KHÔNG QUA USEEFFECT
   const attachGestureListener = (dragX: any) => {
-    // 1. Vẫn lưu dragX vào state để làm UI Opacity (chỉ chạy 1 lần)
     if (!dragXNode) {
       setTimeout(() => setDragXNode(dragX), 0);
     }
 
-    // 2. Gắn sự kiện lắng nghe ĐỒNG BỘ ngay lập tức
     if (!dragXListenerAttached.current && dragX) {
       dragXListenerAttached.current = true;
-      
+
       dragX.addListener(({ value }: { value: number }) => {
-        // === VUỐT SANG PHẢI (NÚT XANH) ===
         if (value >= 80 && !hapticTriggeredRight.current) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           hapticTriggeredRight.current = true;
@@ -71,32 +91,30 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
 
         if (value > 110 && !isActionFired.current) {
           isActionFired.current = true;
-          swipeableRef.current?.close(); 
+          swipeableRef.current?.close();
           setTimeout(() => { onView(item); }, 250);
         }
 
-        // === VUỐT SANG TRÁI (NÚT ĐỎ) ===
         if (value <= -80 && !hapticTriggeredLeft.current) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           hapticTriggeredLeft.current = true;
         } else if (value > -80 && hapticTriggeredLeft.current) {
           hapticTriggeredLeft.current = false;
         }
-        
+
         if (value < -160 && !isActionFired.current) {
           isActionFired.current = true;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
-          
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
           Animated.timing(slideOutAnim, {
-            toValue: -500, 
-            duration: 150, 
+            toValue: -500,
+            duration: 150,
             useNativeDriver: true,
           }).start(() => {
             onDelete(item);
           });
         }
 
-        // === RESET ===
         if (Math.abs(value) < 10) {
           isActionFired.current = false;
         }
@@ -104,11 +122,9 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
     }
   };
 
-  // NÚT XEM (XANH LÁ)
   const renderLeftActions = (progress: any, dragX: any) => {
-    // Gọi thẳng hàm đính kèm sự kiện ngay khi render action
     attachGestureListener(dragX);
-    
+
     const transX = dragX.interpolate({
       inputRange: [0, 80],
       outputRange: [-20, 0],
@@ -144,11 +160,9 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
     );
   };
 
-  // NÚT XÓA (ĐỎ)
   const renderRightActions = (progress: any, dragX: any) => {
-    // Gọi thẳng hàm đính kèm sự kiện ngay khi render action
     attachGestureListener(dragX);
-    
+
     const transX = dragX.interpolate({
       inputRange: [-80, 0],
       outputRange: [0, 20],
@@ -160,7 +174,6 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
         <AnimatedTouchableOpacity
           activeOpacity={0.8}
           onPress={() => {
-            // Khi bấm nút rác, chạy animation bay đi thay vì xoá ngay
             isActionFired.current = true;
             Animated.timing(slideOutAnim, {
               toValue: -500,
@@ -205,6 +218,9 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
     extrapolate: 'clamp',
   }) : 1;
 
+  // 🚀 Dùng helper chung thay cho getLocalizedText riêng lẻ
+  const { body: localizedBody } = resolveNotificationText(item, t);
+
   return (
     <Swipeable
       ref={swipeableRef}
@@ -215,10 +231,9 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
       friction={1}
       overshootFriction={1}
     >
-      {/* ĐỔI VIEW NÀY THÀNH ANIMATED.VIEW VÀ THÊM TRANSFORM */}
-      <Animated.View style={{ 
-        position: 'relative', 
-        transform: [{ translateX: slideOutAnim }] 
+      <Animated.View style={{
+        position: 'relative',
+        transform: [{ translateX: slideOutAnim }]
       }}>
         <Animated.View
           key={dragXNode ? 'left-active' : 'left-static'}
@@ -258,9 +273,9 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
 
             <View className="flex-1 justify-center">
               <Text className={`text-[12px] text-black ${!item.isRead ? 'font-semibold' : 'font-regular'}`} numberOfLines={3}>
-
-                {item.body} {item.emoji}
+                {localizedBody} {item.emoji || ''}
               </Text>
+
               <Text className="text-[10px] text-gray-400 font-medium">
                 {dayjs(item.createdAt).format('hh:mm A')}
               </Text>
@@ -275,6 +290,7 @@ const NotificationItem = ({ item, onPress, onDelete, onView }: { item: any, onPr
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -285,7 +301,6 @@ export default function NotificationsScreen() {
   const [popupConfig, setPopupConfig] = useState({
     visible: false, title: '', message: '', type: 'info', buttonText: 'Close'
   });
-  const [isProcessing, setIsProcessing] = useState(false);
 
   const closePopup = () => setPopupConfig(prev => ({ ...prev, visible: false }));
 
@@ -334,20 +349,17 @@ export default function NotificationsScreen() {
 
   const handleDeleteNotification = async (item: any) => {
     try {
-      // 1. Bật LayoutAnimation với preset mượt mà trước khi thay đổi State
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-      // 2. Thực hiện lọc bỏ item khỏi danh sách
       setSections(prevSections => prevSections.map(section => ({
         ...section,
         data: section.data.filter((note: any) => note.id !== item.id)
-      })).filter(section => section.data.length > 0)); 
-      
-      // 3. Xoá ở database dưới nền
+      })).filter(section => section.data.length > 0));
+
       await axiosClient.delete(`/notifications/${item.id}`);
     } catch (error) {
       console.error("Error deleting notification:", error);
-      fetchNotifications(1, true); 
+      fetchNotifications(1, true);
     }
   };
 
@@ -364,8 +376,11 @@ export default function NotificationsScreen() {
       })));
     }
 
-    const showCustomAlert = (title: string, message: string, type: 'error' | 'feature' | 'system', buttonText: string) => {
-      setPopupConfig({ visible: true, title, message, type, buttonText });
+    // 🚀 Dùng helper chung để có title/body đã dịch + đã chèn dữ liệu động
+    const { title, body } = resolveNotificationText(item, t);
+
+    const showCustomAlert = (alertTitle: string, message: string, type: 'error' | 'feature' | 'system', buttonText: string) => {
+      setPopupConfig({ visible: true, title: alertTitle, message, type, buttonText });
     };
 
     const isTransferNotification =
@@ -388,23 +403,27 @@ export default function NotificationsScreen() {
           pathname: '/tag-report-detail',
           params: {
             reportId: item.referenceId,
-            openFrom: 'notification'
+            openFrom: 'notification',
+            // Truyền kèm i18n để màn chi tiết cũng hiển thị song ngữ đúng dữ liệu động
+            i18nTitleKey: item.metadata?.i18n?.titleKey ?? '',
+            i18nBodyKey: item.metadata?.i18n?.bodyKey ?? '',
+            i18nParams: JSON.stringify(item.metadata?.i18n?.params || {}),
           }
         });
         break;
       case 'TAG':
-        showCustomAlert(item.title, item.body, "system", "Got it"); break;
+        showCustomAlert(title, body, "system", "Got it"); break;
       case 'EVENT':
-        if (!item.referenceId) { showCustomAlert("Event not found", "This event may have been cancelled.", "error", "Close"); return; }
+        if (!item.referenceId) { showCustomAlert(t("Event not found"), t("This event may have been cancelled."), "error", "Close"); return; }
         router.push(`/event-detail?id=${item.referenceId}`); break;
       case 'SECURITY':
       case 'PASSWORD':
         router.push('/account-security'); break;
       case 'FEATURE':
-        if (!item.referenceId) showCustomAlert("New Feature ✨", item.body, "feature", "Awesome"); break;
+        if (!item.referenceId) showCustomAlert(title || t("New Feature ✨"), body, "feature", "Awesome"); break;
       case 'SYSTEM':
-        showCustomAlert("System Notification", item.body, "system", "Got it"); break;
-      default: 
+        showCustomAlert(title || t("System Notification"), body, "system", "Got it"); break;
+      default:
     }
   };
 
@@ -449,47 +468,8 @@ export default function NotificationsScreen() {
             </View>
           </TouchableOpacity>
           <View className="absolute left-0 right-0 items-center justify-center pointer-events-none">
-            <Text className="text-[20px] font-bold text-gray-900 tracking-tight">Notifications</Text>
+            <Text className="text-[20px] font-bold text-gray-900 tracking-tight">{t('Notifications')}</Text>
           </View>
-          {/* <TouchableOpacity
-            onPress={() => console.log("Share")}
-            activeOpacity={0.7}
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 5,
-              elevation: 3,
-            }}
-            className="w-10 h-10 rounded-full items-center justify-center"
-          >
-            <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 28,
-                borderWidth: 0.5,
-                borderTopColor: 'white',
-                borderLeftColor: 'white',
-                borderBottomColor: 'transparent',
-                borderRightColor: 'transparent',
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              }}>
-              <LinearGradient
-                colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                locations={[0, 0.3, 1]}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
-              />
-            <Image
-              source={require('../assets/icon/share.png')}
-                style={{ width: 16, height: 16 }}
-              resizeMode="cover"
-            />
-            </View>
-          </TouchableOpacity> */}
         </View>
 
         {loading ? (
@@ -499,13 +479,19 @@ export default function NotificationsScreen() {
             sections={sections}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <NotificationItem item={item} onPress={handlePressItem} onDelete={handleDeleteNotification} onView={handleViewNotification} />
+              <NotificationItem
+                item={item}
+                onPress={handlePressItem}
+                onDelete={handleDeleteNotification}
+                onView={handleViewNotification}
+                t={t}
+              />
             )}
             renderSectionHeader={({ section: { title } }) => (
               <View className="bg-white px-5 pt-6 pb-3 flex-row justify-between items-end">
                 <Text className="text-gray-900 font-bold text-[18px] capitalize">{title}</Text>
                 <TouchableOpacity onPress={handleMarkAllAsRead}>
-                  <Text className="text-[#ffa053] font-medium text-[14px]">Mark all as read</Text>
+                  <Text className="text-[#ffa053] font-medium text-[14px]">{t('Mark all as read')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -518,7 +504,7 @@ export default function NotificationsScreen() {
             ListEmptyComponent={
               <View className="py-20 items-center justify-center">
                 <View className="w-20 h-20 bg-gray-50 rounded-full items-center justify-center mb-4"><Feather name="bell-off" size={32} color="#D1D5DB" /></View>
-                <Text className="text-gray-500 font-medium text-[15px]">You have no notifications.</Text>
+                <Text className="text-gray-500 font-medium text-[15px]">{t('You have no notifications.')}</Text>
               </View>
             }
           />

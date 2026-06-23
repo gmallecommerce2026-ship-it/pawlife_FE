@@ -51,23 +51,97 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 // ==========================================
-// DỮ LIỆU HARDCODE CHO PHẦN ABOUT
+// DỮ LIỆU HARDCODE CHO PHẦN ABOUT — theo từng kênh YouTube
 // ==========================================
-const ABOUT_DATA = {
+// Lưu ý: KHÔNG gọi useLanguage() ở đây (top-level module) vì hook chỉ được
+// phép gọi bên trong component. isVi sẽ được tính bên trong component và
+// truyền xuống AboutView qua props.
+
+interface ChannelLink {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  url: string;
+}
+
+interface ChannelInfo {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+interface ChannelProfile {
+  name: string;
+  handle: string;
+  logo: string;
+  description: { vi: string; en: string };
+  links: ChannelLink[];
+  info: ChannelInfo[];
+}
+
+const PAWCARE_CHANNELS = {
+  // Dùng cho category: Training (Huấn luyện)
+  bossdog: {
     name: 'BossDog',
     handle: '@bossdogvietnam',
     logo: 'https://img.freepik.com/premium-vector/cool-dog-wearing-sunglasses-hat_23-2148564757.jpg?w=740',
-    description: `BossDog | Phương pháp huấn luyện chó Cơ bản & Vệ sinh đúng chỗ!\n\nĐồ dùng cho người nuôi cún (thức ăn, đồ chơi, chuồng nệm, áo, dây dắt...): https://shopee.vn/bossdogvn`,
+    description: {
+      vi: `BossDog | Phương pháp huấn luyện chó Cơ bản & Vệ sinh đúng chỗ!\n\nĐồ dùng cho người nuôi cún (thức ăn, đồ chơi, chuồng nệm, áo, dây dắt...): https://shopee.vn/bossdogvn`,
+      en: `BossDog | Basic Dog Training & Potty Training Methods!\n\nSupplies for dog owners (food, toys, crates/beds, clothes, leashes...): https://shopee.vn/bossdogvn`,
+    },
     links: [
-        { id: '1', label: 'Instagram', icon: 'instagram', color: '#E1306C', url: 'https://instagram.com' },
-        { id: '2', label: 'Facebook', icon: 'facebook-square', color: '#1877F2', url: 'https://facebook.com' },
-        { id: '3', label: 'Website', icon: 'globe', color: '#EA4335', url: 'https://bossdog.vn' },
+      { id: '1', label: 'Instagram', icon: 'instagram', color: '#E1306C', url: 'https://instagram.com' },
+      { id: '2', label: 'Facebook', icon: 'facebook-square', color: '#1877F2', url: 'https://facebook.com' },
+      { id: '3', label: 'Website', icon: 'globe', color: '#EA4335', url: 'https://bossdog.vn' },
     ],
     info: [
-        { id: '1', label: 'United States', icon: 'location-sharp' },
-        { id: '2', label: 'Joined July, 2018', icon: 'calendar-clear' },
-        { id: '3', label: '2,547,839,201 views', icon: 'eye' },
-    ]
+      { id: '1', label: 'United States', icon: 'location-sharp' },
+      { id: '2', label: 'Joined July, 2018', icon: 'calendar-clear' },
+      { id: '3', label: '2,547,839,201 views', icon: 'eye' },
+    ],
+  },
+  // Dùng cho category: Nutrition, Health, Beauty (Dinh dưỡng, Sức khỏe, Chăm sóc)
+  bacsitrung: {
+    name: 'Bác Sĩ Trung Thú Y',
+    handle: '@bacsitrung',
+    // ⚠️ Đây là link trang ibb.co, KHÔNG render được trong <Image>.
+    // Cần thay bằng link ảnh trực tiếp dạng https://i.ibb.co/xxxxxxx/ten-file.jpg
+    // (vào trang ibb.co -> chuột phải ảnh -> Copy image address).
+    logo: 'https://ibb.co/bj90shZJ',
+    description: {
+      vi: `Kênh youtube của Bác Sĩ Trung Thú Y - Là nơi chia sẻ các thông tin về chăm sóc sức khỏe thú cưng, điều trị bệnh chó mèo, công việc của bác sĩ thú y, các thông tin thú vị liên quan đến chó mèo... Bằng kiến thức về sức khỏe thú cưng và hành vi thú cưng, tôi đã và đang giúp đỡ cộng đồng những người nuôi thú cưng có thể chăm sóc sức khỏe chó mèo của họ tại nhà chuẩn chuyên gia và biết cách điều trị các bệnh đơn giản và xử lý cấp cứu cho thú cưng trong các tình huống khẩn cấp.\n\nTôi mong nỗ lực để xây dựng một cộng đồng người nuôi thú cưng có kiến thức về thú y và có trách nhiệm trong việc chăm sóc thú cưng qua đó sẽ giúp hàng triệu thú cưng ở Việt Nam có cuộc sống tốt hơn`,
+      en: `The Dr. Trung Pet Vet YouTube Channel is a hub for sharing insights on pet healthcare, treating canine and feline diseases, the daily life of a veterinarian, and fascinating facts about cats and dogs.Drawing on my expertise in pet health and behavior, I empower the pet-owning community to care for their pets at home like a pro. This includes guiding them on treating common ailments and handling emergency situations.My mission is to build a knowledgeable, responsible pet-owning community, ultimately helping millions of pets across Vietnam enjoy a better quality of life.`,
+    },
+    // Link đã giải mã từ youtube.com/redirect?...&q=... của bạn (tránh dùng link redirect
+    // có token vì token có thể hết hạn / chỉ đúng trong phiên YouTube tạo ra nó).
+    links: [
+      { id: '1', label: 'Tiktok', icon: 'tiktok', color: '#000000', url: 'https://www.tiktok.com/@bstytrung' },
+      { id: '2', label: 'Facebook', icon: 'facebook-square', color: '#1877F2', url: 'https://www.facebook.com/bacsitrungeravet' },
+    ],
+    // ⚠️ info bên dưới đang là placeholder giống hệt kênh BossDog (United States,
+    // Joined July 2018, 2.5 tỷ views) — gần như chắc chắn không đúng với kênh
+    // Bác Sĩ Trung. Gửi mình số liệu thật nếu muốn hiển thị chính xác.
+    info: [
+      { id: '1', label: 'United States', icon: 'location-sharp' },
+      { id: '2', label: 'Joined July, 2018', icon: 'calendar-clear' },
+      { id: '3', label: '2,547,839,201 views', icon: 'eye' },
+    ],
+  },
+} satisfies Record<string, ChannelProfile>;
+
+type ChannelKey = keyof typeof PAWCARE_CHANNELS;
+
+// Map category (param truyền vào màn hình) -> kênh YouTube tương ứng.
+// So sánh không phân biệt hoa/thường và chấp nhận cả key tiếng Anh lẫn nhãn tiếng Việt,
+// để không bị vỡ nếu phía điều hướng (router) truyền 'Training' hay 'Huấn luyện'.
+const getChannelKeyForCategory = (category?: string): ChannelKey => {
+  const normalized = (category || '').toLowerCase().trim();
+  const isTraining =
+    normalized === 'training' ||
+    normalized.includes('huấn luyện') ||
+    normalized.includes('huan luyen');
+  return isTraining ? 'bossdog' : 'bacsitrung';
 };
 
 // ==========================================
@@ -212,20 +286,22 @@ const PlaylistsView = ({ playlists, loading, searchQuery, onPlayVideo, t }: { pl
 // ==========================================
 // 3. ABOUT TAB CONTENT
 // ==========================================
-const AboutView = () => {
+// Nhận `channel` (profile theo category) và `isVi` từ component cha,
+// thay vì đọc thẳng 1 ABOUT_DATA cố định như trước.
+const AboutView = ({ channel, isVi }: { channel: ChannelProfile; isVi: boolean }) => {
     return (
         <ScrollView className="flex-1 bg-white" contentContainerStyle={{ padding: 24, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
             <View className="items-center mb-8">
-                <View className="w-20 h-20 mb-4 rounded-full border border-gray-100 shadow-sm overflow-hidden bg-white">
-                     <Image source={{ uri: ABOUT_DATA.logo }} className="w-full h-full" resizeMode="contain" />
+                 <View className="w-20 h-20 mb-4 rounded-full border border-gray-100 shadow-sm overflow-hidden bg-white">
+                     <Image source={{ uri: channel.logo }} className="w-full h-full" resizeMode="contain" />
                 </View>
-                <Text className="text-xl font-bold text-gray-900 mb-1">{ABOUT_DATA.name}</Text>
-                <Text className="text-blue-500 font-medium text-sm">{ABOUT_DATA.handle}</Text>
+                <Text className="text-xl font-bold text-gray-900 mb-1">{channel.name}</Text>
+                <Text className="text-blue-500 font-medium text-sm">{channel.handle}</Text>
             </View>
 
             <View className="mb-8">
                 <Text className="text-base font-bold text-gray-900 mb-3">Description</Text>
-                <Text className="text-gray-600 text-sm leading-6">{ABOUT_DATA.description}</Text>
+                <Text className="text-gray-600 text-sm leading-6">{isVi ? channel.description.vi : channel.description.en}</Text>
             </View>
         </ScrollView>
     );
@@ -239,9 +315,17 @@ export default function PawcareCategoryScreen() {
   const { category } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
 
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
   const categoryTitle = typeof category === 'string' ? category : 'Training';
+
+  // Chọn kênh About theo category hiện tại: Training -> BossDog,
+  // Nutrition / Health / Beauty -> Bác Sĩ Trung Thú Y.
+  const aboutChannel = useMemo(
+    () => PAWCARE_CHANNELS[getChannelKeyForCategory(categoryTitle)],
+    [categoryTitle],
+  );
 
   const [activeTab, setActiveTab] = useState('Videos');
   const [videos, setVideos] = useState([]);
@@ -356,7 +440,7 @@ export default function PawcareCategoryScreen() {
         setVideos(finalVideos); 
         setPlaylists(finalPlaylists);
       } catch (error) {
-        console.error("Lỗi fetch pawcare data:", error);
+        // console.error("Lỗi fetch pawcare data:", error);
       } finally {
         setLoading(false);
       }
@@ -385,7 +469,7 @@ export default function PawcareCategoryScreen() {
   // HÀM: Xử lý khi user bấm nút Play
   const handlePlayVideo = useCallback((url?: string) => {
       if (!url) {
-          Alert.alert("Thông báo", "Video này đang được cập nhật đường dẫn, vui lòng quay lại sau!");
+          Alert.alert(isVi ? "Thông báo" : "Notification", isVi ? "Video này đang được cập nhật đường dẫn, vui lòng quay lại sau!": "This video link is currently being updated, please check back later!");
           return;
       }
       const ytId = extractYoutubeId(url);
@@ -394,7 +478,7 @@ export default function PawcareCategoryScreen() {
       } else {
           Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
       }
-  }, []);
+  }, [isVi]);
 
   return (
     <View className="flex-1 bg-white">
@@ -506,7 +590,7 @@ export default function PawcareCategoryScreen() {
         <View className="flex-1 bg-white">
             {activeTab === 'Videos' && <VideosView data={filteredVideos} category={categoryTitle} loading={loading} onPlayVideo={handlePlayVideo} t={t} />}
             {activeTab === 'Playlists' && <PlaylistsView playlists={filteredPlaylists} loading={loading} searchQuery={searchQuery} onPlayVideo={handlePlayVideo} t={t} />}
-            {activeTab === 'About' && <AboutView />}
+            {activeTab === 'About' && <AboutView channel={aboutChannel} isVi={isVi} />}
         </View>
 
         {/* ==========================================

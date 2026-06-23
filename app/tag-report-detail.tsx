@@ -9,6 +9,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getLocalizedField } from '@/utils/localization';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -34,7 +35,28 @@ import { petService } from '../services/petService';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAP_WIDTH = Math.round(SCREEN_WIDTH);
 const BACKGROUND_MAP_HEIGHT = SCREEN_HEIGHT;
-
+const MINIMAL_MAP_STYLE = [
+  {
+    "featureType": "poi", // Ẩn các điểm đánh dấu (Points of Interest)
+    "elementType": "labels",
+    "stylers": [{ "visibility": "off" }]
+  },
+  {
+    "featureType": "transit", // Ẩn các trạm giao thông công cộng
+    "elementType": "labels",
+    "stylers": [{ "visibility": "off" }]
+  },
+  {
+    "featureType": "road", // Giảm độ nổi bật của đường xá
+    "elementType": "geometry",
+    "stylers": [{ "lightness": 100 }, { "visibility": "simplified" }]
+  },
+  {
+    "featureType": "landscape", // Chuyển nền đất thành màu xám nhạt/trắng sạch sẽ
+    "elementType": "geometry",
+    "stylers": [{ "color": "#f5f5f5" }]
+  }
+];
 // ─────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────
@@ -138,9 +160,10 @@ const TimelineItem = ({
           </Text>
         </View>
 
-        {item.location && (
+        {/* Đã thêm !! để chặn lỗi chuỗi rỗng */}
+        {!!item.location && (
           <TouchableOpacity
-            className="flex-row items-center mt-1.5" // Đổi items-start -> items-center, tăng mt lên xíu cho thoáng
+            className="flex-row items-center mt-1.5"
             activeOpacity={item.routeData ? 0.6 : 1}
             onPress={() => item.routeData && onLocationPress && onLocationPress(item)}
           >
@@ -155,8 +178,9 @@ const TimelineItem = ({
           </TouchableOpacity>
         )}
 
-        {item.note && (
-          <View className="flex-row items-center mt-1.5"> {/* Đổi items-start -> items-center */}
+        {/* Đã thêm !! để chặn lỗi chuỗi rỗng */}
+        {!!item.note && (
+          <View className="flex-row items-center mt-1.5">
             <Image
               source={require('../assets/icon/note-gray.png')}
               style={{ width: 9, height: 9 }}
@@ -168,20 +192,21 @@ const TimelineItem = ({
           </View>
         )}
 
-        {item.contactPhone && (
+        {/* Đã thêm !! để chặn lỗi chuỗi rỗng */}
+        {!!item.contactPhone && (
           <TouchableOpacity
             className="flex-row items-center mt-1.5"
             onPress={handleCallPress}
             activeOpacity={0.6}
           >
             <Image
-              className="mr-[2px]" // Xóa top-[1px]
+              className="mr-[2px]"
               source={require('../assets/icon/phone-gray.png')}
               style={{ width: 10, height: 10 }}
               resizeMode="contain"
             />
             <Image
-              className="mr-[2px]" // Xóa top-[1px]
+              className="mr-[2px]"
               source={require('../assets/icon/message-gray.png')}
               style={{ width: 10, height: 10 }}
               resizeMode="contain"
@@ -192,7 +217,8 @@ const TimelineItem = ({
           </TouchableOpacity>
         )}
 
-        {item.type === 'LOCATION' && item.images && item.images.length > 0 && (
+        {/* Chỉnh lại logic kiểm tra mảng an toàn hơn */}
+        {item.type === 'LOCATION' && Array.isArray(item.images) && item.images.length > 0 && (
           <ScrollView
             horizontal={true}
             showsHorizontalScrollIndicator={false}
@@ -318,10 +344,7 @@ const PinIcon = React.memo(({
       onPress={handlePress}
       zIndex={1000}
     >
-      {/* SỬA Ở ĐÂY: Thêm width: 60, height: 60
-        Vòng tròn w-11 h-11 của bạn tương đương khoảng 44x44px. 
-        Khi set wrapper 60x60, nó sẽ có dư dả không gian xung quanh để không bao giờ bị cắt khuyết.
-      */}
+
       <View
         collapsable={false}
         style={{
@@ -380,10 +403,6 @@ const PinBadge = React.memo(({
       zIndex={9999}
       onPress={onPress}
     >
-      {/* SỬA Ở ĐÂY: Thêm paddingTop: 16 và paddingHorizontal: 16 
-        Việc này tạo ra vùng đệm trong suốt xung quanh Badge, 
-        giúp bóng mờ (shadow) và chấm đỏ (top: -6, right: -6) có không gian hiển thị, không bị gọt mất cạnh.
-      */}
       <View collapsable={false} style={{ alignItems: 'center', width: 260, paddingBottom: 28, paddingTop: 16, paddingHorizontal: 16 }}>
         <View
           style={{ maxWidth: 220 }} // Đã có vùng đệm 16px hai bên nên giảm max-width một chút để cân đối
@@ -613,6 +632,9 @@ export default function TagReportDetailScreen() {
   };
 
   const pet = reportData?.tag?.pet || {};
+  const breedText = getLocalizedField(pet.breed, isVi ? 'vi' : 'en');
+  const lostDetailsText = getLocalizedField(pet.lostDetails, isVi ? 'vi' : 'en');
+
   const lat = parseFloat(reportData?.latitude || reportData?.lat || '10.762622');
   const lng = parseFloat(reportData?.longitude || reportData?.lng || '106.660172');
   const lostLat = pet?.lostLatitude ? parseFloat(pet.lostLatitude) : null;
@@ -1017,7 +1039,7 @@ export default function TagReportDetailScreen() {
         centerLng: lostLng.toString(),
         radius: rawRadius.toString(),
         scannerName: displayContactName,
-        scannerMessage: pet.lostDetails || 'Reported pet as lost here.',
+        scannerMessage: lostDetailsText || 'Reported pet as lost here.',
         scannerPhone: displayContactPhone,
         timeAgo: lostTimeAgo,
         pageTitle: 'Reported as Lost',
@@ -1061,7 +1083,6 @@ export default function TagReportDetailScreen() {
   // ─────────────────────────────────────────────
   return (
     <View className="flex-1 bg-white relative">
-      {/* Back button */}
       <TouchableOpacity
         className="absolute top-12 left-5 z-50 w-10 h-10 rounded-full items-center justify-center shadow-sm"
         onPress={() => router.back()}
@@ -1102,6 +1123,7 @@ export default function TagReportDetailScreen() {
       <View style={{ height: BACKGROUND_MAP_HEIGHT, width: MAP_WIDTH, position: 'absolute', top: 0 }}>
         <MapView
           ref={mapRef}
+          customMapStyle={isZoomedIn ? [] : MINIMAL_MAP_STYLE}
           provider={PROVIDER_GOOGLE}
           style={{ flex: 1 }}
           onRegionChange={() => {
@@ -1378,7 +1400,7 @@ export default function TagReportDetailScreen() {
                   </View>
                 </View>
                 <Text className="text-[12px] text-[#757575] font-regular mb-2">
-                  {getAge(pet.dob)} • {pet.breed || 'Unknown breed'}
+                  {getAge(pet.dob)} • {breedText || (isVi ? 'Chưa rõ giống' : 'Unknown breed')}
                 </Text>
                 <TouchableOpacity onPress={() => {
                   if (pet?.id) router.push(`/edit-pet?id=${pet.id}`);

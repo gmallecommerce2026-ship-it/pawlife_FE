@@ -45,7 +45,14 @@ const SectionHeader = ({ title, onLinkPress, t }: { title: string, onLinkPress?:
         </TouchableOpacity>
     </View>
 );
+const VI_MONTHS_SHORT = ['Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'];
 
+const formatMonthShort = (date: Date, isVi: boolean) => {
+    if (isVi) {
+        return VI_MONTHS_SHORT[date.getMonth()];
+    }
+    return date.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+};
 // Component hiển thị loading inline mượt mà không phá vỡ UI
 const SectionLoader = () => (
     <View className="w-full h-32 items-center justify-center">
@@ -56,7 +63,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function HomeScreen() {
     const { t, language } = useLanguage();
     const router = useRouter();
-
+    const isVi = language === 'vi';
     const [data, setData] = useState(null);
     const insets = useSafeAreaInsets();
     const { user } = useContext(AuthContext);
@@ -289,7 +296,7 @@ export default function HomeScreen() {
                     const notifications = res.data.data || [];
                     setHasUnread(notifications.some((item: any) => !item.isRead));
                 } catch (error) {
-                    console.error("Lỗi thông báo:", error);
+                    // console.error("Lỗi thông báo:", error);
                 }
             };
             checkUnreadNotifications();
@@ -387,7 +394,7 @@ export default function HomeScreen() {
             displayCity = addressParts[addressParts.length - 1].trim();
         }
 
-        const isFemale = pet.gender?.toUpperCase() === 'FEMALE' || pet.gender?.toUpperCase() === 'CÁ';
+        const isFemale = pet.gender?.toUpperCase() === 'FEMALE' || pet.gender?.toUpperCase() === 'CÁI';
         const displayAge = (() => {
             if (pet.age) {
                 if (typeof pet.age === 'number' || !isNaN(Number(pet.age))) return `${pet.age}`;
@@ -537,14 +544,14 @@ export default function HomeScreen() {
                                             key={shelter.id}
                                             className="w-72 bg-white -ml-1 p-3 rounded-[20px] mb-3 mt-1 flex-row items-center active:opacity-70"
                                             style={{ shadowColor: '#E89B5A', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 6 }}
-                                            onPress={() => router.push({ pathname: '/shelter-profile', params: { id: shelter.id, name: shelter.name, address: shelter.address || 'Đang cập nhật', image: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' } })}
+                                            onPress={() => router.push({ pathname: '/shelter-profile', params: { id: shelter.id, name: shelter.name, address: shelter.address || 'Updating', image: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' } })}
                                         >
                                             <Image source={{ uri: shelter.avatarUrl || shelter.coverUrl || 'https://via.placeholder.com/150' }} className="w-14 h-14 rounded-full bg-gray-200 mr-3" resizeMode="cover" />
                                             <View className="flex-1">
                                                 <Text className="font-medium text-black text-[14px]" numberOfLines={1}>{shelter.name}</Text>
                                                 <View className="flex-row items-center mt-2">
                                                     <Image source={require('../../assets/icon/location-solid-gray.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                                                    <Text className="text-[#8E8E93] font-regular text-[12px] ml-1 flex-1" numberOfLines={1}>{shelter.address || 'Đang cập nhật'}</Text>
+                                                    <Text className="text-[#8E8E93] font-regular text-[12px] ml-1 flex-1" numberOfLines={1}>{shelter.address || (isVi ? 'Đang cập nhật' : 'Updating')}</Text>
                                                 </View>
                                             </View>
                                         </TouchableOpacity>
@@ -586,7 +593,7 @@ export default function HomeScreen() {
                                                         </View>
                                                         <View className="items-center justify-center shrink-0 min-w-[32px]">
                                                             <Text className="text-[20px] font-semibold text-black leading-tight">{d.getDate().toString().padStart(2, '0')}</Text>
-                                                            <Text className="text-[12px] font-regular text-[#8E8E93] tracking-[0.06px] mt-0.5">{d.toLocaleString('en-US', { month: 'short' }).toUpperCase()}</Text>
+                                                            <Text className="text-[12px] font-regular text-[#8E8E93] tracking-[0.06px] mt-0.5">{formatMonthShort(d, isVi)}</Text>
                                                         </View>
                                                     </View>
                                                 </View>

@@ -2,16 +2,21 @@
 import { Text } from '@/components/AppText';
 import { TextInput } from '@/components/AppTextInput';
 import { AuthContext } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Lock, Mail, User } from 'lucide-react-native';
-import React, { useContext, useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Dimensions,
+  Easing,
   FlatList,
   Image,
   Keyboard,
@@ -24,6 +29,8 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ==========================================
 // 1. COMPONENT INPUT & DATA
@@ -97,31 +104,27 @@ type SignupStep = 'ACCOUNT' | 'PROFILE' | 'SUCCESS';
 // ==========================================
 export default function FillProfileScreen() {
   const router = useRouter();
-
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const { requestOtp } = useContext(AuthContext);
   const { pickAndUploadImage, isUploading: isImageUploading, uploadError } = useImageUpload();
 
-  // --- UI STATE (From old file) ---
+  // --- UI STATE ---
   const [currentStep, setCurrentStep] = useState<SignupStep>('ACCOUNT');
 
-  // --- FORM STATES (From new file + old UI requirements) ---
+  // --- FORM STATES ---
   const [avatar, setAvatar] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState(''); // Added for old UI
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [isAgree, setIsAgree] = useState(false); // Added for old UI
+  const [isAgree, setIsAgree] = useState(false);
 
   // Gender
   const [gender, setGender] = useState('');
   const [showGenderModal, setShowGenderModal] = useState(false);
   const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
-
-  // DOB
-  const [dob, setDob] = useState(new Date());
-  const [hasSelectedDate, setHasSelectedDate] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
 
   // Country Code
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[0]);
@@ -131,9 +134,59 @@ export default function FillProfileScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- HANDLERS (From new file) ---
-  const handleOpenDatePicker = () => setShowPicker(true);
+  // --- NÂNG CẤP: DATE PICKER STATES & REFS ---
+  const [dob, setDob] = useState(new Date());
+  const [hasSelectedDate, setHasSelectedDate] = useState(false);
+  const [showPicker, setShowPicker] = useState(false); // Dành cho Android
 
+  const scrollViewRef = useRef<ScrollView>(null);
+  const contentRef = useRef<View>(null);
+  const dobRef = useRef<View>(null);
+
+  const [activePicker, setActivePicker] = useState<'dob' | null>(null);
+  const [pickerLayout, setPickerLayout] = useState({ x: 0, y: 0, width: 340 });
+  const pickerOpacity = useRef(new Animated.Value(0)).current;
+  const pickerTranslateY = useRef(new Animated.Value(-8)).current;
+
+  // --- HANDLERS CHO DROPDOWN KÍNH MỜ ---
+  const openDropdownPicker = (type: 'dob') => {
+    Keyboard.dismiss();
+
+    if (contentRef.current && dobRef.current) {
+      dobRef.current.measureLayout(
+        contentRef.current,
+        (left, top, width, height) => {
+          // Tự động cuộn màn hình để tránh Picker bị che mất
+          scrollViewRef.current?.scrollTo({ y: Math.max(0, top - 120), animated: true });
+
+          setTimeout(() => {
+            dobRef.current?.measureInWindow((x, windowY, w, h) => {
+              const dropdownWidth = 340;
+              const finalX = (SCREEN_WIDTH - dropdownWidth) / 2; // Căn giữa tuyệt đối
+
+              setPickerLayout({ x: finalX, y: windowY + h + 8, width: dropdownWidth });
+              setActivePicker(type);
+
+              Animated.parallel([
+                Animated.timing(pickerOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+                Animated.timing(pickerTranslateY, { toValue: 0, duration: 250, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true })
+              ]).start();
+            });
+          }, 350);
+        },
+        () => console.log(isVi ? 'Lỗi không thể đo kích thước layout' : 'Failed to measure layout')
+      );
+    }
+  };
+
+  const closeDropdownPicker = () => {
+    Animated.parallel([
+      Animated.timing(pickerOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(pickerTranslateY, { toValue: -8, duration: 150, useNativeDriver: true })
+    ]).start(() => setActivePicker(null));
+  };
+
+  // Android Native Date Change
   const onDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false);
 
@@ -159,10 +212,10 @@ export default function FillProfileScreen() {
   };
 
   const handleAgree = async () => {
-    setIsAgree(!isAgree); // Toggle rather than just set true
+    setIsAgree(!isAgree);
   }
 
-  // --- VALIDATION (Combined) ---
+  // --- VALIDATION ---
   const validateAccountStep = () => {
     let newErrors: Record<string, string> = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -186,8 +239,8 @@ export default function FillProfileScreen() {
     }
 
     if (!isAgree) {
-        Alert.alert("Required", "Please agree to the Policy Terms & Privacy Conditions.");
-        return false;
+      Alert.alert("Required", "Please agree to the Policy Terms & Privacy Conditions.");
+      return false;
     }
 
     setErrors(newErrors);
@@ -214,9 +267,9 @@ export default function FillProfileScreen() {
 
   // --- SUBMIT HANDLERS ---
   const handleNextToProfile = () => {
-      if (validateAccountStep()) {
-          setCurrentStep('PROFILE');
-      }
+    if (validateAccountStep()) {
+      setCurrentStep('PROFILE');
+    }
   }
 
   const handleRegister = async () => {
@@ -224,18 +277,15 @@ export default function FillProfileScreen() {
 
     try {
       setIsLoading(true);
-      // 1. Gọi API gửi OTP (Backend sẽ đẩy vào BullMQ chạy ngầm như bạn đã code)
       await requestOtp({
         email: email,
-        type: 'SIGNUP' 
+        type: 'SIGNUP'
       });
 
-      // 2. Format dữ liệu chuẩn trước khi parse sang params
       const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
       const fullPhone = `${selectedCountry.dial_code}${formattedPhone}`;
       const DEFAULT_AVATAR_URL = 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg';
 
-      // 3. Chuyển hướng sang màn hình verify OTP kèm theo toàn bộ Payload
       router.push({
         pathname: '/verify-otp',
         params: {
@@ -244,28 +294,27 @@ export default function FillProfileScreen() {
           name: name.trim(),
           phone: fullPhone,
           gender,
-          dob: dob.toISOString(), // Ép kiểu Date thành ISO String để an toàn qua Params
+          dob: dob.toISOString(),
           avatarUrl: avatar || DEFAULT_AVATAR_URL
         }
       });
     } catch (error: any) {
-      // Xử lý lỗi chuẩn: Backend trả về chuỗi hoặc mảng message, hoặc lỗi 429 Throttle
-      let errorMessage = "Không thể gửi mã OTP. Vui lòng thử lại sau.";
+      let errorMessage = isVi ? "Không thể gửi mã OTP. Vui lòng thử lại sau." : "Cannot send OTP. Please try again later.";
       if (error?.message) {
         errorMessage = Array.isArray(error.message) ? error.message[0] : error.message;
       } else if (error?.statusCode === 429) {
-        errorMessage = "Bạn đã yêu cầu quá nhiều lần. Vui lòng đợi 1 phút.";
+        errorMessage = isVi ? "Bạn đã yêu cầu quá nhiều lần. Vui lòng đợi 1 phút." : "You have made too many requests. Please wait 1 minute.";
       }
-      Alert.alert("Lỗi", errorMessage);
+      Alert.alert(isVi ? "Lỗi" : "Error", errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- RENDERERS (From old UI) ---
+  // --- RENDERERS ---
   const renderSuccess = () => (
     <>
-      <View className='flex-1 items-center justify-center'>
+      <View className='flex-1 items-center justify-center mt-20'>
         <Image
           source={require('../assets/icon/set.png')}
           style={{ width: 105, height: 105 }}
@@ -273,10 +322,10 @@ export default function FillProfileScreen() {
           className='mb-[38px]'
         />
         <Text className='text-[30px] font-semibold mb-[24px]'>
-          You're All Set!
+          {isVi ? "Bạn đã sẵn sàng!" : "You're All Set!"}
         </Text>
         <Text className='text-[16px] font-regular text-[#8E8E93] mb-[24px]'>
-          Your PawLife journey begins now.
+          {isVi ? "Hành trình cùng PawLife của bạn bắt đầu từ bây giờ." : "Your PawLife journey begins now."}
         </Text>
       </View>
     </>
@@ -288,7 +337,7 @@ export default function FillProfileScreen() {
         <TouchableOpacity
           onPress={handlePickImage}
           activeOpacity={0.8}
-          className="relative w-[118px] h-[118px] bg-[#FAFAFA] rounded-full items-center justify-center overflow-hidden"
+          className="relative w-[118px] h-[118px] bg-[#FAFAFA] rounded-full items-center justify-center overflow-hidden border border-[#E5E5E5]"
           disabled={isImageUploading || isLoading}
         >
           {avatar ? (
@@ -331,12 +380,12 @@ export default function FillProfileScreen() {
           />
         </View>
 
-        <View className="flex-1 ml-2">
+        <View className="flex-1 ml-2" ref={dobRef} collapsable={false}>
           <InputField
             label="Date of Birth"
             placeholder="Select DOB"
             value={hasSelectedDate ? dob.toLocaleDateString('en-GB') : ''}
-            onPress={handleOpenDatePicker}
+            onPress={() => Platform.OS === 'ios' ? openDropdownPicker('dob') : setShowPicker(true)}
             error={errors.dob}
             containerStyle=""
             large={false}
@@ -422,9 +471,9 @@ export default function FillProfileScreen() {
             <TouchableOpacity
               onPress={() => {
                 if (currentStep === 'PROFILE') {
-                    setCurrentStep('ACCOUNT');
+                  setCurrentStep('ACCOUNT');
                 } else {
-                    router.back();
+                  router.back();
                 }
               }}
               activeOpacity={0.7}
@@ -469,13 +518,22 @@ export default function FillProfileScreen() {
           </View>
         }
 
-        <ScrollView className="flex-1 px-[20px]" showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-          {currentStep === 'ACCOUNT' && renderSignUp()}
-          {currentStep === 'PROFILE' && renderProfile()}
-          {currentStep === 'SUCCESS' && renderSuccess()}
+        <ScrollView
+          ref={scrollViewRef}
+          className="flex-1 px-[20px]"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View ref={contentRef} collapsable={false} style={{ flex: 1 }}>
+            {currentStep === 'ACCOUNT' && renderSignUp()}
+            {currentStep === 'PROFILE' && renderProfile()}
+            {currentStep === 'SUCCESS' && renderSuccess()}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <View className="mt-auto mx-[22px]">
+
+      <View className="mt-auto mx-[22px] py-4">
         {currentStep === 'ACCOUNT' &&
           <Text className='text-center text-[14px] font-regular mb-4'>Already have an account? <Text onPress={() => router.push('/sign-in')} className='text-[#E89B5A]'>Log in</Text></Text>
         }
@@ -504,54 +562,81 @@ export default function FillProfileScreen() {
             onPress={() => router.push('/')} disabled={isLoading} activeOpacity={0.8}
             style={{ opacity: isLoading ? 0.7 : 1 }}
           >
-             <Text className="text-white font-bold text-[16px]">Let’s PawLife!</Text>
+            <Text className="text-white font-bold text-[16px]">Let’s PawLife!</Text>
           </TouchableOpacity>
         }
       </View>
 
       {/* ================= MODALS & PICKERS ================= */}
-      {Platform.OS === 'ios' ? (
-        <Modal visible={showPicker} transparent animationType="fade">
-          <TouchableWithoutFeedback onPress={() => setShowPicker(false)}>
-            <View className="flex-1 bg-black/40 justify-center px-8">
-              <TouchableWithoutFeedback>
-                <View className="bg-white rounded-3xl overflow-hidden shadow-2xl">
-                  <View className="bg-gray-50 py-4 px-6 flex-row justify-between items-center border-b border-gray-100">
-                    <TouchableOpacity onPress={() => setShowPicker(false)}>
-                      <Text className="text-gray-500 font-medium text-[16px]">Cancel</Text>
-                    </TouchableOpacity>
-                    <Text className="font-bold text-gray-900 text-[18px]">Select Date</Text>
-                    <TouchableOpacity onPress={() => setShowPicker(false)}>
-                      <Text className="text-[#F97316] font-bold text-[16px]">Done</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View className="py-2 bg-white">
-                    <DateTimePicker
-                      value={dob}
-                      mode="date"
-                      display="spinner"
-                      maximumDate={new Date()}
-                      onChange={onDateChange}
-                      textColor="black"
-                    />
-                  </View>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
-      ) : (
-        showPicker && (
-          <DateTimePicker
-            value={dob}
-            mode="date"
-            display="default"
-            maximumDate={new Date()}
-            onChange={onDateChange}
-          />
-        )
+
+      {/* ANDROID NATIVE DATE PICKER */}
+      {Platform.OS === 'android' && showPicker && (
+        <DateTimePicker
+          value={dob}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={onDateChange}
+        />
       )}
 
+      {/* --- KÍNH MỜ DROPDOWN FIX CHIỀU CAO VÀ MÀU CAM (IOS) --- */}
+      {Platform.OS === 'ios' && activePicker === 'dob' && (
+        <View className="absolute inset-0 z-[100]">
+          <TouchableOpacity activeOpacity={1} className="absolute inset-0" onPress={closeDropdownPicker} />
+
+          <Animated.View
+            style={{
+              position: 'absolute',
+              top: pickerLayout.y,
+              left: pickerLayout.x,
+              width: pickerLayout.width,
+              opacity: pickerOpacity,
+              transform: [{ translateY: pickerTranslateY }],
+              borderRadius: 16,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.25,
+              shadowRadius: 16,
+              elevation: 10,
+              overflow: 'hidden'
+            }}
+          >
+            <BlurView tint="dark" intensity={65} style={{ position: 'absolute', inset: 0 }} />
+            <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(15, 15, 15, 0.45)' }} />
+
+            <View className="flex-row justify-between items-center px-[16px] py-[12px] border-b border-white/10 relative z-10">
+              <TouchableOpacity onPress={closeDropdownPicker}>
+                <Text className="text-[16px] text-[#A1A1AA] font-medium">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={closeDropdownPicker}>
+                <Text className="text-[16px] font-semibold text-[#E89B5A]">Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingTop: 4, paddingBottom: 4, paddingHorizontal: 10, alignItems: 'center' }} className="relative z-10">
+              <DateTimePicker
+                value={dob}
+                mode="date"
+                display="inline"
+                themeVariant="dark"
+                maximumDate={new Date()}
+                style={{ width: 320, height: 315, alignSelf: 'center' }}
+                accentColor="#E89B5A"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setDob(selectedDate);
+                    setHasSelectedDate(true);
+                    setErrors({ ...errors, dob: '' });
+                  }
+                }}
+              />
+            </View>
+          </Animated.View>
+        </View>
+      )}
+
+      {/* Gender Modal */}
       <Modal visible={showGenderModal} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setShowGenderModal(false)}>
           <View className="flex-1 bg-black/40 justify-center px-8">
@@ -584,6 +669,7 @@ export default function FillProfileScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Country Code Modal */}
       <Modal visible={showCountryModal} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setShowCountryModal(false)}>
           <View className="flex-1 bg-black/40 justify-center px-8">

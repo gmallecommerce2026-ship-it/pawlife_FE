@@ -2,17 +2,20 @@ import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather } from '@expo/vector-icons';
 import { Slider } from '@miblanchard/react-native-slider';
+import { useIsFocused } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   DeviceEventEmitter,
   Dimensions,
   Image,
+  InteractionManager,
   Keyboard,
+  Platform,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -23,15 +26,51 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Yêu cầu 1: Trên iOS, không ép Google Maps SDK (rất tốn RAM/OpenGL context).
+// Để provider = undefined -> RN Maps tự dùng MKMapView (Apple Maps) native, nhẹ và ổn định hơn nhiều.
+const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
+
 export default function SelectLocationMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
-  const [radius, setRadius] = useState(500); // Bán kính gốc thiết lập từ slider
+  const [radius, setRadius] = useState(500);
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
   const { petAvatar } = params;
+
+  // Yêu cầu 3: chỉ mount MapView sau khi:
+  // 1) Screen đã focus thật sự (useIsFocused)
+  // 2) Animation chuyển trang của Expo Router/React Navigation đã chạy xong (InteractionManager)
+  const isFocused = useIsFocused();
+  const [isReadyToMount, setIsReadyToMount] = useState(false);
+
+  useEffect(() => {
+    let interactionHandle: { cancel: () => void } | null = null;
+
+    if (isFocused) {
+      interactionHandle = InteractionManager.runAfterInteractions(() => {
+        setIsReadyToMount(true);
+      });
+    } else {
+      // Khi screen mất focus (bị che hoặc back), unmount map ngay để giải phóng OpenGL context trên iOS.
+      setIsReadyToMount(false);
+    }
+
+    return () => {
+      interactionHandle?.cancel();
+    };
+  }, [isFocused]);
+
+  // Đề phòng trường hợp dùng push/pop nhiều lần liên tiếp, reset khi unmount hẳn component.
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setIsReadyToMount(false);
+      };
+    }, [])
+  );
 
   const [region, setRegion] = useState({
     latitude: 21.028511,
@@ -40,18 +79,17 @@ export default function SelectLocationMapScreen() {
     longitudeDelta: 0.005,
   });
 
-  const [selectedAddress, setSelectedAddress] = useState('Đang định vị...');
+  const [selectedAddress, setSelectedAddress] = useState(isVi ? 'Đang định vị...' : 'Locating...');
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
   // --- ANIMATION STATES ---
-  const translateY = useRef(new Animated.Value(0)).current; // Di chuyển Pin
-  const radiusScale = useRef(new Animated.Value(1)).current; // Tỉ lệ Radius (1 = 100%, 0 = 0%)
+  const translateY = useRef(new Animated.Value(0)).current;
+  const radiusScale = useRef(new Animated.Value(1)).current;
+  const shadowScale = useRef(new Animated.Value(1)).current;
   const isDragging = useRef(false);
 
-  // State phụ để render mượt radius khi scale
   const [displayRadius, setDisplayRadius] = useState(radius);
 
-  // Lắng nghe sự thay đổi của radiusScale để tính toán lại displayRadius realtime
   useEffect(() => {
     const listenerId = radiusScale.addListener(({ value }) => {
       setDisplayRadius(radius * value);
@@ -59,7 +97,6 @@ export default function SelectLocationMapScreen() {
     return () => radiusScale.removeListener(listenerId);
   }, [radius]);
 
-  // Cập nhật giá trị hiển thị ngay lập tức nếu user kéo thanh slider
   useEffect(() => {
     radiusScale.setValue(1);
     setDisplayRadius(radius);
@@ -83,7 +120,7 @@ export default function SelectLocationMapScreen() {
         mapRef.current?.animateToRegion(newRegion, 1000);
         getAddressFromGoogleMapAPI(loc.coords.latitude, loc.coords.longitude);
       } else {
-        setSelectedAddress('Chưa cấp quyền vị trí');
+        setSelectedAddress(isVi ? 'Chưa cấp quyền vị trí' : 'Location access denied');
       }
     })();
   }, []);
@@ -105,10 +142,10 @@ export default function SelectLocationMapScreen() {
         const cleanAddress = addressParts.join(', ');
         setSelectedAddress(cleanAddress);
       } else {
-        setSelectedAddress('Vị trí không xác định');
+        setSelectedAddress(isVi ? 'Vị trí không xác định' : 'Unknown location');
       }
     } catch (error) {
-      setSelectedAddress('Không thể kết nối máy chủ');
+      setSelectedAddress(isVi ? 'Không thể kết nối máy chủ' : 'Unable to connect to the server');
     } finally {
       setIsLoadingAddress(false);
     }
@@ -120,52 +157,47 @@ export default function SelectLocationMapScreen() {
   });
   const debounceRef: any = useRef<NodeJS.Timeout | null>(null);
 
-  // Sự kiện khi ĐANG KÉO BẢN ĐỒ
-  const onRegionChange = (newRegion: any, details: any) => {
-    // Chỉ nhấc Pin lên nếu đúng là người dùng đang dùng tay vuốt (isGesture: true)
-    if (!isDragging.current && details?.isGesture) {
+  const onMapDragStart = () => {
+    if (!isDragging.current) {
       isDragging.current = true;
 
-      Animated.timing(translateY, {
-        toValue: -20,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-
-      Animated.timing(radiusScale, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: false,
-      }).start();
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: -35, duration: 200, useNativeDriver: true }),
+        Animated.timing(shadowScale, { toValue: 0.3, duration: 200, useNativeDriver: true }),
+        Animated.timing(radiusScale, { toValue: 0, duration: 200, useNativeDriver: false })
+      ]).start();
     }
   };
 
-  // Sự kiện khi THẢ TAY RA
+  // 2. Thả Pin rơi nảy xuống khi kéo xong
   const onRegionChangeComplete = (newRegion: any, details: any) => {
     setRegion(newRegion);
     setCenterCoord({ latitude: newRegion.latitude, longitude: newRegion.longitude });
 
-    // LUÔN LUÔN reset cờ kéo
-    isDragging.current = false;
+    if (isDragging.current) {
+      isDragging.current = false;
 
-    // LUÔN LUÔN ép Pin rơi nảy xuống và Radius bung ra khi bản đồ dừng (Bỏ if đi)
-    Animated.spring(translateY, {
-      toValue: 0,
-      friction: 5,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          friction: 4,   // Tăng nhẹ ma sát để nảy mềm mại hơn
+          tension: 20,   // Giảm mạnh lực rơi (từ 80 xuống 20) để tạo cảm giác "lơ lửng" chậm rãi
+          useNativeDriver: true
+        }),
+        Animated.spring(shadowScale, {
+          toValue: 1,
+          friction: 4,
+          tension: 20,   // Bóng dưới đất cũng to ra chậm chậm khớp với nhịp rơi
+          useNativeDriver: true
+        }),
+        Animated.spring(radiusScale, {
+          toValue: 1,
+          friction: 5,
+          tension: 20,
+          useNativeDriver: false
+        })
+      ]).start();
 
-    Animated.spring(radiusScale, {
-      toValue: 1,
-      friction: 6,
-      tension: 40,
-      useNativeDriver: false,
-    }).start();
-
-    // Đảo bảo chỉ lấy địa chỉ mới nếu người dùng vừa vuốt tay kéo bản đồ
-    // (Tránh spam API khi map đang tự animateToRegion ở useEffect)
-    if (details?.isGesture) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         getAddressFromGoogleMapAPI(newRegion.latitude, newRegion.longitude);
@@ -185,97 +217,112 @@ export default function SelectLocationMapScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <MapView
-        ref={mapRef}
-        provider={PROVIDER_GOOGLE}
-        style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}
-        showsMyLocationButton={false}
-        showsCompass={false}
-        showsBuildings={true}
-        mapPadding={{ top: 120, right: 0, bottom: 350, left: 0 }}
-        initialRegion={{
-          latitude: centerCoord.latitude,
-          longitude: centerCoord.longitude,
-          latitudeDelta: 0.015,
-          longitudeDelta: 0.015,
-        }}
-        onRegionChange={onRegionChange}
-        onRegionChangeComplete={onRegionChangeComplete}
-        showsUserLocation={true}
-      >
-        {/* Render Radius bằng biến displayRadius đã được animation */}
-        {displayRadius > 0 && (
-          <Circle
-            center={{ latitude: centerCoord.latitude, longitude: centerCoord.longitude }}
-            radius={displayRadius}
-            fillColor="rgba(232, 155, 90, 0.2)"
-            strokeColor="rgba(232, 155, 90, 0.8)"
-            strokeWidth={1}
-          />
-        )}
-      </MapView>
+      {isReadyToMount ? (
+        <MapView
+          ref={mapRef}
+          provider={MAP_PROVIDER}
+          mapType="standard" 
+          userInterfaceStyle="light"
+          showsPointsOfInterest={false}
+          style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}
+          showsMyLocationButton={false}
+          showsCompass={false}
+          showsBuildings={true}
+          mapPadding={{ top: 120, right: 0, bottom: 350, left: 0 }}
+          initialRegion={{
+            latitude: centerCoord.latitude,
+            longitude: centerCoord.longitude,
+            latitudeDelta: 0.015,
+            longitudeDelta: 0.015,
+          }}
+
+          onPanDrag={onMapDragStart} // <--- ĐỔI onRegionChange THÀNH onPanDrag
+          onRegionChangeComplete={onRegionChangeComplete}
+
+          showsUserLocation={true}
+        >
+          {displayRadius > 0 && (
+            <Circle
+              center={{ latitude: centerCoord.latitude, longitude: centerCoord.longitude }}
+              radius={displayRadius}
+              fillColor="rgba(232, 90, 90, 0.2)"   // Nền đỏ nhạt (Opacity 20%)
+              strokeColor="rgba(232, 90, 90, 0.8)" // Viền đỏ đậm (Opacity 80%)
+              strokeWidth={1}
+            />
+          )}
+        </MapView>
+      ) : (
+        // Placeholder trong lúc chờ animation chuyển trang kết thúc, tránh 2 MapView cùng tồn tại lúc transition trên iOS.
+        <View
+          style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT, backgroundColor: '#F3F4F6' }}
+          className="items-center justify-center"
+        >
+          <ActivityIndicator size="large" color="#E89B5A" />
+        </View>
+      )}
 
       {/* --- PIN & SHADOW (OVERLAY CỐ ĐỊNH GIỮA MÀN HÌNH) --- */}
-      <View
-        style={{
-          position: 'absolute',
-          top: 120,
-          bottom: 350,
-          left: 0,
-          right: 0,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        pointerEvents="none"
-      >
-        {/* Chấm điểm mốc (Bóng siêu nhỏ) */}
+      {isReadyToMount && (
         <View
           style={{
             position: 'absolute',
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-          }}
-        />
-
-        {/* Pin Container */}
-        <Animated.View
-          style={{
-            position: 'absolute',
+            top: 120,
+            bottom: 350,
+            left: 0,
+            right: 0,
             alignItems: 'center',
-            bottom: '50%', // Đẩy từ dưới lên để điểm dưới cùng vừa khít vào cái chấm
-            transform: [{ translateY }]
+            justifyContent: 'center',
           }}
+          pointerEvents="none"
         >
-          <View className='bg-[#E89B5A] rounded-full border-4 border-[#E89B5A]' style={{ width: 40, height: 40, overflow: 'hidden', zIndex: 10 }}>
-            <Image
-              source={
-                petAvatar
-                  ? { uri: petAvatar as string }
-                  : require('../assets/icon/location-form.png')
-              }
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
-          </View>
-          {/* Đuôi nhọn của Pin - Đẩy lên trên (marginTop âm) và zIndex nhỏ để giấu phần nửa trên vào trong ảnh */}
-          <View
-            className="w-[14px] h-[14px] bg-[#E89B5A] rotate-45"
+          {/* 1. Bóng đổ (Đã chuyển thành Animated.View) */}
+          <Animated.View
             style={{
-              marginTop: -8,
-              zIndex: -1,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 2,
+              position: 'absolute',
+              width: 12, // Làm bóng dẹt và bè ra ngang một chút cho giống thật
+              height: 4,
+              marginTop: 10,
+              borderRadius: 6,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              transform: [{ scale: shadowScale }] // Gắn hiệu ứng thu nhỏ bóng
             }}
           />
-        </Animated.View>
-      </View>
 
+          {/* 2. Cục Pin màu đỏ (Giữ nguyên như lúc nãy bạn vừa sửa) */}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              alignItems: 'center',
+              bottom: '50%',
+              transform: [{ translateY }]
+            }}
+          >
+            <View
+              className='rounded-full border-4'
+              style={{
+                width: 40, height: 40, overflow: 'hidden', zIndex: 10,
+                backgroundColor: '#E85A5A', borderColor: '#E85A5A'
+              }}
+            >
+              <Image
+                source={petAvatar ? { uri: petAvatar as string } : require('../assets/icon/location-form.png')}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            </View>
+            <View
+              className="w-[14px] h-[14px] rotate-45"
+              style={{
+                backgroundColor: '#E85A5A', marginTop: -10, zIndex: -1,
+                shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2, shadowRadius: 2,
+              }}
+            />
+          </Animated.View>
+        </View>
+      )}
 
-      {/* --- FLOATING SEARCH BAR (CHUẨN GOOGLE MAPS) --- */}
+      {/* --- FLOATING SEARCH BAR --- */}
       <View
         style={{
           position: 'absolute',
@@ -331,7 +378,7 @@ export default function SelectLocationMapScreen() {
             },
             description: {
               fontFamily: "Urbanist",
-              fontSize: 15, // Bạn có thể tùy chỉnh size cho hợp mắt
+              fontSize: 15,
               color: '#1F2937',
             },
             row: { padding: 14, minHeight: 48, flexDirection: 'row' },
@@ -343,7 +390,7 @@ export default function SelectLocationMapScreen() {
         />
       </View>
 
-      {/* --- BOTTOM SHEET TÙY CHỈNH LOCATION --- */}
+      {/* --- BOTTOM SHEET --- */}
       <View
         style={{ paddingBottom: insets.bottom }}
         className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[24px] p-6 shadow-2xl"

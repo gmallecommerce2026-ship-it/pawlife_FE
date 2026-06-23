@@ -62,8 +62,8 @@ export default function TransferOwnershipScreen() {
 
 
     } catch (error: any) {
-      console.error("Lỗi tải thông tin:", error);
-      Alert.alert('Lỗi', 'Không thể tải thông tin thú cưng');
+      console.error(isVi ? "Lỗi tải thông tin:" : "Failed to load information:", error);
+      Alert.alert(isVi ? 'Lỗi' : 'Error', isVi ? 'Không thể tải thông tin thú cưng' : 'Failed to load pet information');
     } finally {
       setIsFetchingData(false);
     }
@@ -71,7 +71,7 @@ export default function TransferOwnershipScreen() {
 
   useEffect(() => {
     if (!petId) {
-      Alert.alert('Lỗi', 'Không tìm thấy ID Thú cưng!');
+      Alert.alert(isVi ? 'Lỗi' : 'Error', isVi ? 'Không tìm thấy ID Thú cưng!' : 'Pet ID not found!');
       router.back();
       return;
     }
@@ -106,7 +106,7 @@ export default function TransferOwnershipScreen() {
   const handleSendConfirmation = async () => {
     const inputValue = contactValue.trim();
     if (!inputValue) {
-      Alert.alert(`Vui lòng nhập ${inputType === 'email' ? 'Email' : 'Số điện thoại'} người nhận!`);
+      Alert.alert(isVi ? `Vui lòng nhập ${inputType === 'email' ? 'Email' : 'Số điện thoại'} người nhận!`: `Please enter the recipient's ${inputType === 'email' ? 'email' : 'phone number'}!`);
       return;
     }
 
@@ -121,7 +121,7 @@ export default function TransferOwnershipScreen() {
       await axiosClient.post(`/pets/${petId}/transfer-request`, payload);
       await fetchPetDetails(); // Cập nhật lại thông tin sau khi request thành công
     } catch (error: any) {
-      Alert.alert('Lỗi', error.response?.data?.message || 'Không tìm thấy người dùng hoặc có lỗi xảy ra.');
+      Alert.alert(isVi ? 'Lỗi' : 'Error', error.response?.data?.message || (isVi ? 'Không tìm thấy người dùng hoặc có lỗi xảy ra.' : 'User not found or an error occurred.'));
     } finally {
       setIsSubmitting(false);
       setIsPending(false)
@@ -135,9 +135,9 @@ export default function TransferOwnershipScreen() {
       : "Bạn có chắc chắn muốn hủy yêu cầu chuyển nhượng này không?";
 
     Alert.alert(title, msg, [
-      { text: "Không", style: "cancel" },
+      { text: isVi ? "Không" : "No", style: "cancel" },
       {
-        text: "Có",
+        text: isVi ? "Có" : "Yes",
         style: "destructive",
         onPress: async () => {
           setIsSubmitting(true);
@@ -147,7 +147,7 @@ export default function TransferOwnershipScreen() {
             // Chuyển UI sang trạng thái Unsuccessful
             setIsTransferUnsuccessful(true);
           } catch (error: any) {
-            Alert.alert('Lỗi', error.response?.data?.message || 'Không thể hủy yêu cầu lúc này.');
+            Alert.alert(isVi ? 'Lỗi': 'Error', error.response?.data?.message || (isVi ? 'Không thể hủy yêu cầu lúc này.': 'You cannot cancel the request at this time.'));
           } finally {
             setIsSubmitting(false);
             setIsPending(false)
@@ -169,7 +169,7 @@ export default function TransferOwnershipScreen() {
         params: { showTransferComplete: 'true', transferredPetId: petId }
       });
     } catch (error: any) {
-      Alert.alert('Lỗi', error.response?.data?.message || 'Không thể xác nhận chuyển nhượng lúc này.');
+      Alert.alert(isVi ? 'Lỗi': 'Error', error.response?.data?.message || (isVi ? 'Không thể xác nhận chuyển nhượng lúc này.' : 'The transfer cannot be confirmed at this time.'));
       setIsSubmitting(false);
         setIsPending(false)
     }

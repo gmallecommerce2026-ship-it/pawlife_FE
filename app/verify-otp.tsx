@@ -1,5 +1,6 @@
 // app/verify-otp.tsx
 import { AuthContext } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useModalStore } from '@/store/useModalStore';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -7,11 +8,13 @@ import { CheckCircle } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 // THÊM MỚI: Hằng số thời gian đếm ngược (2 phút = 120 giây)
-const RESEND_OTP_TIME = 120; 
+const RESEND_OTP_TIME = 120;
 
 export default function VerifyOtpScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams(); 
+  const params = useLocalSearchParams();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const showModal = useModalStore((state) => state.showModal);
   // Lưu ý: Đảm bảo trong AuthContext của bạn có hàm xử lý gọi API gửi lại OTP (vd: resendOtp)
   const { register, requestOtp } = useContext(AuthContext) as any; // Thay as any bằng type thật của bạn
@@ -19,11 +22,11 @@ export default function VerifyOtpScreen() {
   const [code, setCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  
+
   // THÊM MỚI: State quản lý đếm ngược
   const [timer, setTimer] = useState<number>(RESEND_OTP_TIME);
-  
-  const CODE_LENGTH = 6; 
+
+  const CODE_LENGTH = 6;
 
   // XỬ LÝ LỖI 1: Ép đóng bàn phím native mặc định từ màn hình trước
   useEffect(() => {
@@ -34,7 +37,7 @@ export default function VerifyOtpScreen() {
   useEffect(() => {
     // SỬA LỖI TYPESCRIPT Ở DÒNG NÀY:
     let interval: ReturnType<typeof setInterval>;
-    
+
     if (timer > 0) {
       interval = setInterval(() => {
         setTimer((prev) => prev - 1);
@@ -56,22 +59,22 @@ export default function VerifyOtpScreen() {
 
   // THÊM MỚI: Hàm xử lý gửi lại OTP
   const handleResendOtp = async () => {
-    if (timer > 0 || isLoading) return; 
+    if (timer > 0 || isLoading) return;
 
     try {
       setIsLoading(true);
       // Gọi lại API Send OTP với type SIGNUP
-      await requestOtp({ 
-        email: params.email as string, 
-        type: 'SIGNUP' 
+      await requestOtp({
+        email: params.email as string,
+        type: 'SIGNUP'
       });
-      
+
       setTimer(RESEND_OTP_TIME);
-      Alert.alert("Thành công", "Mã OTP mới đã được gửi đến email của bạn.");
+      Alert.alert(isVi ? "Thành công" : "Success", isVi ? "Mã OTP mới đã được gửi đến email của bạn." : "Mã OTP mới đã được gửi đến email của bạn.");
     } catch (error: any) {
-      let errorMessage = error?.message || "Không thể gửi lại OTP lúc này.";
-      if (error?.statusCode === 429) errorMessage = "Vui lòng đợi 1 phút trước khi yêu cầu lại.";
-      Alert.alert("Lỗi", errorMessage);
+      let errorMessage = error?.message || (isVi ? "Không thể gửi lại OTP lúc này.": "Cannot resend OTP at this time.");
+      if (error?.statusCode === 429) errorMessage = isVi ? "Vui lòng đợi 1 phút trước khi yêu cầu lại.": "Please wait 1 minute before requesting again.";
+      Alert.alert(isVi ? "Lỗi": "Error", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +99,7 @@ export default function VerifyOtpScreen() {
   const submitRegistration = async (otpCode: string) => {
     try {
       setIsLoading(true);
-      
+
       const payload = {
         email: params.email as string,
         password: params.password as string,
@@ -105,32 +108,32 @@ export default function VerifyOtpScreen() {
         gender: params.gender as string,
         dob: params.dob as string,
         avatarUrl: params.avatarUrl as string,
-        otp: otpCode 
+        otp: otpCode
       };
 
       await register(payload);
 
       // 3. Sử dụng Global Modal khi thành công
       showModal({
-        title: 'Success',
-        message: 'Tài khoản của bạn đã được đăng ký thành công! Hãy bắt đầu hành trình tại PawLife ngay.',
-        buttonText: 'Đăng nhập',
+        title: isVi ? 'Thành công' : 'Success',
+        message: isVi ? 'Tài khoản của bạn đã được đăng ký thành công! Hãy bắt đầu hành trình tại PawLife ngay.': 'Your account has been successfully registered! Start your journey on PawLife now.',
+        buttonText: isVi ? 'Đăng nhập' : "Sign-in",
         onConfirm: () => {
           // Khi người dùng bấm OK, chuyển hướng về trang sign-in
           router.replace({
             pathname: '/sign-in',
-            params: { prefillEmail: params.email as string } 
+            params: { prefillEmail: params.email as string }
           });
         }
       });
 
     } catch (error: any) {
-      const errorMessage = Array.isArray(error?.message) 
-        ? error.message[0] 
-        : (error?.message || "OTP không hợp lệ hoặc đã hết hạn!");
-      
-      Alert.alert("Đăng ký thất bại", errorMessage);
-      setCode(''); 
+      const errorMessage = Array.isArray(error?.message)
+        ? error.message[0]
+        : (error?.message || isVi ? "OTP không hợp lệ hoặc đã hết hạn!" : "The OTP is invalid or has expired!");
+
+      Alert.alert(isVi ? "Đăng ký thất bại" : "Registration failed", errorMessage);
+      setCode('');
     } finally {
       setIsLoading(false);
     }
@@ -138,15 +141,14 @@ export default function VerifyOtpScreen() {
 
   const KeyButton = ({ value, label, icon }: { value: string, label?: string, icon?: React.ReactNode }) => {
     const isEmpty = value === 'empty';
-    
+
     return (
       <TouchableOpacity
         disabled={isEmpty || isLoading}
         onPress={() => handleKeyPress(value)}
         activeOpacity={0.7}
-        className={`w-[30%] h-[60px] justify-center items-center rounded-[16px] mb-3 ${
-          isEmpty ? 'bg-transparent' : 'bg-[#F5F5F5]'
-        }`}
+        className={`w-[30%] h-[60px] justify-center items-center rounded-[16px] mb-3 ${isEmpty ? 'bg-transparent' : 'bg-[#F5F5F5]'
+          }`}
       >
         {icon ? (
           icon
@@ -162,14 +164,14 @@ export default function VerifyOtpScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       {/* XỬ LÝ LỖI 2: Dùng ScrollView chống tràn UI và xử lý chạm mượt mà */}
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View className="px-6 py-4">
-          <TouchableOpacity 
-            onPress={() => router.back()} 
+          <TouchableOpacity
+            onPress={() => router.back()}
             disabled={isLoading}
             className="w-10 h-10 justify-center -ml-2"
           >
@@ -195,9 +197,8 @@ export default function VerifyOtpScreen() {
               return (
                 <View
                   key={index}
-                  className={`w-[45px] h-[55px] rounded-[12px] justify-center items-center border-[1.5px] ${
-                    isActive ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'
-                  } ${digit ? 'border-[#E89B5A] bg-[#FFF8F3]' : 'bg-white'}`}
+                  className={`w-[45px] h-[55px] rounded-[12px] justify-center items-center border-[1.5px] ${isActive ? 'border-[#E89B5A]' : 'border-[#E5E5E5]'
+                    } ${digit ? 'border-[#E89B5A] bg-[#FFF8F3]' : 'bg-white'}`}
                 >
                   <Text className="text-[24px] font-bold text-black">
                     {digit}
@@ -247,9 +248,9 @@ export default function VerifyOtpScreen() {
             <View className="flex-row justify-between w-full">
               <KeyButton value="empty" label="" />
               <KeyButton value="0" label="0" />
-              <KeyButton 
-                value="delete" 
-                icon={<Feather name="arrow-left" size={24} color="#6B7280" />} 
+              <KeyButton
+                value="delete"
+                icon={<Feather name="arrow-left" size={24} color="#6B7280" />}
               />
             </View>
           </View>

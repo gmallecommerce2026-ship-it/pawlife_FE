@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
+import { getLocalizedField } from '@/utils/localization';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,7 +30,9 @@ interface TimelineStep {
 export default function AdoptionStatusScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { t } = useLanguage(); 
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+
 
   const [applicationData, setApplicationData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,7 +45,7 @@ export default function AdoptionStatusScreen() {
   const { width } = useWindowDimensions();
   const imageSize = (width - 116 - 32) / 5;
   const { pickAndUploadImage, isUploading } = useImageUpload();
-  
+
   const getDisplayAge = (dob: string | undefined) => {
     if (!dob) return t('Unknown');
     const birthDate = new Date(dob);
@@ -62,13 +65,13 @@ export default function AdoptionStatusScreen() {
 
   const handleRemovePhoto = (index: number) => {
     setPhotos(photos.filter((_, i) => i !== index));
-    setHasUnsavedPhotos(true); 
+    setHasUnsavedPhotos(true);
   };
 
   const [photos, setPhotos] = useState<string[]>([]);
-  const [hasUnsavedPhotos, setHasUnsavedPhotos] = useState(false); 
-  const [isSubmittingPhotos, setIsSubmittingPhotos] = useState(false); 
-  
+  const [hasUnsavedPhotos, setHasUnsavedPhotos] = useState(false);
+  const [isSubmittingPhotos, setIsSubmittingPhotos] = useState(false);
+
   useEffect(() => {
     if (id) {
       fetchApplicationDetails();
@@ -81,7 +84,7 @@ export default function AdoptionStatusScreen() {
       const response = await axiosClient.get(`/applications/${id}`);
       setApplicationData(response.data.data);
     } catch (error) {
-      console.error('Lỗi khi fetch chi tiết đơn:', error);
+      console.error('Error fetching order details:', error);
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +97,7 @@ export default function AdoptionStatusScreen() {
       setIsWithdrawVisible(false);
       fetchApplicationDetails();
     } catch (error) {
-      console.error('Lỗi khi thu hồi đơn:', error);
+      console.error('Error recalling order:', error);
     } finally {
       setIsWithdrawing(false);
     }
@@ -153,31 +156,31 @@ export default function AdoptionStatusScreen() {
   const handleAddPhoto = async () => {
     if (photos.length >= 5) return;
     const imageUrl = await pickAndUploadImage({
-      folder: 'lost-pets', 
+      folder: 'lost-pets',
       aspect: [4, 3],
       quality: 0.8,
     });
     if (imageUrl) {
       setPhotos((prev) => [...prev, imageUrl]);
-      setHasUnsavedPhotos(true); 
+      setHasUnsavedPhotos(true);
     }
   };
 
   const handleSubmitPhotos = async () => {
     setIsSubmittingPhotos(true);
     try {
-      await axiosClient.patch(`/applications/${id}/verification-photos`, { 
-        photos: photos 
+      await axiosClient.patch(`/applications/${id}/verification-photos`, {
+        photos: photos
       });
-      
+
       Alert.alert(t('Success'), t('Image uploaded successfully!'));
-      setHasUnsavedPhotos(false); 
-      
+      setHasUnsavedPhotos(false);
+
       fetchApplicationDetails();
     } catch (error: any) {
-      console.error('Lỗi khi gửi ảnh xác minh:', error);
+      console.error('Error sending verification image:', error);
       Alert.alert(
-        t('Error'), 
+        t('Error'),
         error?.response?.data?.message || t('An error occurred while uploading the image.')
       );
     } finally {
@@ -234,6 +237,7 @@ export default function AdoptionStatusScreen() {
 
   const pet = applicationData.pet;
   const isClosed = applicationData.status === 'CLOSED';
+  const breedText = getLocalizedField(pet?.breed, isVi ? 'vi' : 'en');
 
   const timelineSteps = generateTimelineSteps(applicationData.status, applicationData.createdAt, applicationData.updatedAt);
   const commitments = applicationData.commitments || {};
@@ -300,8 +304,8 @@ export default function AdoptionStatusScreen() {
         <LinearGradient
           colors={
             pet?.gender === 'FEMALE'
-              ? ['#FBF0F6', '#F8E8F1'] 
-              : ['#F5FBFF', '#E2EFF8']  
+              ? ['#FBF0F6', '#F8E8F1']
+              : ['#F5FBFF', '#E2EFF8']
           }
           locations={[0, 1]}
           start={{ x: 0, y: 0 }}
@@ -309,7 +313,7 @@ export default function AdoptionStatusScreen() {
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 13 }}
         />
         <TouchableOpacity
-          className="flex-row mb-3.5 relative z-10" 
+          className="flex-row mb-3.5 relative z-10"
           activeOpacity={0.7}
           onPress={() => {
             if (pet?.id) {
@@ -332,7 +336,7 @@ export default function AdoptionStatusScreen() {
             </Text>
 
             <Text className="text-[#8E8E93] text-[12px] font-regular mt-[7px]" numberOfLines={1}>
-              {getDisplayAge(pet?.dob)} • {pet?.breed || t('Unknown')}
+              {getDisplayAge(pet?.dob)} • {breedText || t('Unknown')}
             </Text>
           </View>
 
@@ -388,11 +392,11 @@ export default function AdoptionStatusScreen() {
 
                 <View className={`flex-1 ml-4 ${!isLast ? 'pb-8' : 'pb-4'}`}>
                   <Text className={`text-[14px] font-medium mt-1 ${step.state === 'alert' ? 'text-[#F59E0B]' : step.state === 'error' ? 'text-[#EF4444]' : step.state === 'success' ? 'text-[#10B981]' : 'text-gray-900'}`}>{step.title}</Text>
-                  
+
                   {/* SỬA LỖI #2: DÙNG TERNARY ? ĐỂ TRÁNH RENDER LỖI CHUỖI RỖNG NGOÀI THẺ TEXT */}
                   {step.date ? <Text className="text-[12px] font-regular text-[#8E8E93] mt-1">{step.date}</Text> : null}
                   {(isLast && step.description) ? <Text className="text-[12px] font-regular text-[#8E8E93] mt-2 leading-5">{step.description}</Text> : null}
-                  
+
                   {step.actionRequired ? (
                     <View className="flex-col mt-3 w-full">
                       <View className="flex-row justify-between items-center mb-3">
@@ -406,9 +410,9 @@ export default function AdoptionStatusScreen() {
 
                       <View className="flex-row flex-wrap gap-2">
                         {photos.length === 0 ? (
-                          <TouchableOpacity 
-                            className="w-full flex-row h-[60px] border-[1.5px] border-dashed border-[#D1D5DB] rounded-[16px] items-center justify-center" 
-                            activeOpacity={0.7} 
+                          <TouchableOpacity
+                            className="w-full flex-row h-[60px] border-[1.5px] border-dashed border-[#D1D5DB] rounded-[16px] items-center justify-center"
+                            activeOpacity={0.7}
                             onPress={handleAddPhoto}
                           >
                             <Image
@@ -590,7 +594,7 @@ export default function AdoptionStatusScreen() {
 
               <TouchableOpacity
                 onPress={() => setIsDetailsVisible(false)}
-                className="p-2 absolute right-5" 
+                className="p-2 absolute right-5"
                 activeOpacity={0.7}
               >
                 <Feather name="x" size={16} color="#000000" />

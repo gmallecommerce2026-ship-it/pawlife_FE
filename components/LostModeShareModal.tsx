@@ -26,12 +26,21 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import Svg, { Rect } from 'react-native-svg';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import Svg, { Rect } from 'react-native-svg';
 import { TextInput } from './AppTextInput';
+
+// Thêm import LanguageContext
+import { useLanguage } from '@/contexts/LanguageContext';
+
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const MODAL_MAP_WIDTH = Math.round(SCREEN_WIDTH * 0.9 - 48);
 const MODAL_MAP_HEIGHT = 178; // Tương ứng h-[178px]
+
+// Yêu cầu 1: Không ép Google Maps trên iOS. Modal map nhẹ + bản đồ ở report-lost-pet đang active
+// cùng lúc là tổ hợp dễ gây OOM OpenGL nhất trên iOS, nên modal map BẮT BUỘC phải dùng Apple Maps.
+const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
+
 const getMetersPerPixel = (latitude: number, zoom: number) => {
   return (156543.03392 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoom);
 };
@@ -49,7 +58,6 @@ export interface FormData {
   images?: string[];
 }
 
-// Bổ sung Type cho Location thay vì dùng `any`
 export interface LocationCoords {
   latitude: number;
   longitude: number;
@@ -62,10 +70,14 @@ export interface LostModeShareModalProps {
 }
 
 export default function LostModeShareModal({ isVisible, onClose, onConfirm }: LostModeShareModalProps) {
+  // Khởi tạo ngôn ngữ
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+
   const [location, setLocation] = useState<LocationCoords | null>(null);
   const [radius, setRadius] = useState<number>(500);
   const [loadingMap, setLoadingMap] = useState<boolean>(true);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false); // Tránh double-click
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const { width } = useWindowDimensions();
   const imageSize = (width - 40 - 48) / 5;
@@ -84,7 +96,10 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
     const remainingSlots = 4 - photos.length;
 
     if (remainingSlots <= 0) {
-      Alert.alert("Giới hạn ảnh", "Bạn chỉ có thể chọn tối đa 5 ảnh.");
+      Alert.alert(
+        isVi ? "Giới hạn ảnh" : "Photo Limit", 
+        isVi ? "Bạn chỉ có thể chọn tối đa 5 ảnh." : "You can only select up to 5 photos."
+      );
       return;
     }
 
@@ -101,8 +116,11 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
         setPhotos((prev) => [...prev, ...newUris]);
       }
     } catch (error) {
-      console.error("Lỗi khi chọn ảnh: ", error);
-      Alert.alert("Lỗi", "Không thể mở thư viện ảnh.");
+      console.error(isVi ? "Lỗi khi chọn ảnh: " : "Error selecting photo: ", error);
+      Alert.alert(
+        isVi ? "Lỗi" : "Error", 
+        isVi ? "Không thể mở thư viện ảnh." : "Cannot open photo library."
+      );
     }
   };
 
@@ -119,11 +137,11 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
 
       if (status !== 'granted') {
         Alert.alert(
-          "Cấp quyền vị trí",
-          "Ứng dụng cần quyền truy cập vị trí để chia sẻ. Vui lòng bật trong Cài đặt.",
+          isVi ? "Cấp quyền vị trí" : "Location Permission",
+          isVi ? "Ứng dụng cần quyền truy cập vị trí để chia sẻ. Vui lòng bật trong Cài đặt." : "App needs location access to share. Please enable it in Settings.",
           [
-            { text: "Hủy", style: "cancel" },
-            { text: "Mở Cài đặt", onPress: () => Linking.openSettings() }
+            { text: isVi ? "Hủy" : "Cancel", style: "cancel" },
+            { text: isVi ? "Mở Cài đặt" : "Open Settings", onPress: () => Linking.openSettings() }
           ]
         );
         if (isMounted) setLoadingMap(false);
@@ -131,7 +149,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
       }
 
       const locationPromise = Location.getCurrentPositionAsync({});
-      // Giảm timeout xuống 8s để UX tốt hơn, tránh user đợi quá lâu
       const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
 
       const currentLocation: any = await Promise.race([locationPromise, timeoutPromise]);
@@ -144,21 +161,27 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
       }
 
     } catch (error) {
-      console.error("Error getting location:", error);
-      Alert.alert("Lỗi", "Không thể lấy vị trí hiện tại. Vui lòng thử lại.");
+      console.error(isVi ? "Lỗi khi lấy vị trí:" : "Error getting location:", error);
+      Alert.alert(
+        isVi ? "Lỗi" : "Error", 
+        isVi ? "Không thể lấy vị trí hiện tại. Vui lòng thử lại." : "Cannot get current location. Please try again."
+      );
     } finally {
       if (isMounted) setLoadingMap(false);
     }
   };
 
   useEffect(() => {
-    let isMounted = true; // Cleanup function pattern để tránh memory leak
+    let isMounted = true;
     if (isVisible) {
       fetchLocation(isMounted);
     } else {
-      // Reset state khi đóng modal
+      // Reset state khi đóng modal. Vì MapView bên dưới chỉ render khi isVisible === true,
+      // việc set isVisible=false ở component cha sẽ unmount luôn MapView của modal,
+      // giải phóng OpenGL context trên iOS ngay khi đóng.
       setFormData({ scannedBy: '', phoneNumber: '', message: '' });
       setRadius(500);
+      setLocation(null);
     }
 
     return () => {
@@ -167,52 +190,51 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
   }, [isVisible]);
 
   const handleConfirm = async () => {
-    Keyboard.dismiss(); // Ẩn bàn phím trước khi xử lý
+    Keyboard.dismiss();
 
-    // Validate dữ liệu đầu vào bắt buộc
     if (!formData.phoneNumber.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập Số điện thoại để chủ thú cưng có thể liên hệ.");
+      Alert.alert(
+        isVi ? "Thiếu thông tin" : "Missing Info", 
+        isVi ? "Vui lòng nhập Số điện thoại để chủ thú cưng có thể liên hệ." : "Please enter your Phone number so the pet owner can contact you."
+      );
       return;
     }
 
     if (!location) {
-      Alert.alert("Thiếu vị trí", "Đang tải vị trí hoặc không thể lấy vị trí của bạn.");
+      Alert.alert(
+        isVi ? "Thiếu vị trí" : "Missing Location", 
+        isVi ? "Đang tải vị trí hoặc không thể lấy vị trí của bạn." : "Fetching location or cannot get your location."
+      );
       return;
     }
 
-    if (isSubmitting) return; // Chặn spam click
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
 
     try {
-      // 🌟 DUYỆT QUA MẢNG ẢNH ĐỂ UPLOAD LÊN CLOUDFLARE R2 BẰNG PRESIGNED URL
       const uploadedImageUrls: string[] = [];
 
       for (const uri of photos) {
         if (uri.startsWith('http')) {
-          // Nếu đã là link web (do edit hoặc có sẵn) thì giữ nguyên
           uploadedImageUrls.push(uri);
         } else {
-          // 1. Chuẩn bị file name và file type
           const fileName = uri.split('/').pop() || `scan-${Date.now()}.jpg`;
           const match = /\.(\w+)$/.exec(fileName);
           const ext = match ? match[1].toLowerCase() : 'jpg';
           const fileType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
 
-          // 2. Lấy Presigned URL từ Backend của bạn
           const presignedRes = await axiosClient.post('/storage/presigned-url', {
             fileName,
             fileType,
-            folder: 'tag-reports', // Tên folder bạn muốn lưu trên R2
+            folder: 'tag-reports',
           });
-          
+
           const { uploadUrl, fileUrl } = presignedRes.data;
 
-          // 3. Đọc file local thành Blob
           const response = await fetch(uri);
           const blob = await response.blob();
 
-          // 4. Upload trực tiếp lên Cloudflare R2
           const uploadRes = await FileSystem.uploadAsync(uploadUrl, uri, {
             httpMethod: 'PUT',
             headers: {
@@ -224,25 +246,25 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
             throw new Error(`Upload to R2 failed: ${uploadRes.status}`);
           }
 
-          // 5. Thêm link URL công khai vào mảng
           uploadedImageUrls.push(fileUrl);
         }
       }
 
-      // 🌟 SAU KHI UPLOAD ẢNH XONG, GÓI DỮ LIỆU ĐỂ GỬI ĐI
       const finalFormData: FormData = {
         ...formData,
-        images: uploadedImageUrls, // Mảng này giờ toàn chứa link https://...
+        images: uploadedImageUrls,
       };
 
       const locationData = { ...location, radius };
 
-      // Gọi callback để Scanned Pet Screen lưu vào Database
       onConfirm(locationData, finalFormData, false);
 
     } catch (error) {
-      console.error("Lỗi upload ảnh R2:", error);
-      Alert.alert("Lỗi", "Không thể tải ảnh lên hệ thống lưu trữ. Vui lòng thử lại.");
+      console.error(isVi ? "Lỗi upload ảnh R2:" : "Error uploading to R2:", error);
+      Alert.alert(
+        isVi ? "Lỗi" : "Error", 
+        isVi ? "Không thể tải ảnh lên hệ thống lưu trữ. Vui lòng thử lại." : "Failed to upload photos to storage. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -273,7 +295,9 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <View className="bg-white w-[90%] rounded-[30px] relative mt-8 border border-[#FF9C56]">
                 <View className="px-5 items-center mt-6 relative">
-                  <Text className="text-[18px] font-semibold text-black text-center leading-[22px] w-full z-10">Share My Location</Text>
+                  <Text className="text-[18px] font-semibold text-black text-center leading-[22px] w-full z-10">
+                    {isVi ? 'Chia sẻ vị trí của tôi' : 'Share My Location'}
+                  </Text>
                 </View>
                 {/* ICON HEADER */}
                 <View className="absolute -top-[35px] self-center w-[73px] h-[73px] -z-10">
@@ -289,12 +313,10 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                   </View>
                 </View>
 
-
-
                 <ScrollView
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{ paddingBottom: 20, paddingTop: 15 }}
-                  keyboardShouldPersistTaps="handled" // Giúp bấm nút Send không bị miss khi đang mở bàn phím
+                  keyboardShouldPersistTaps="handled"
                 >
                   {/* MAP VIEW */}
                   <View className="px-6">
@@ -303,29 +325,33 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                         {loadingMap ? (
                           <View className="items-center justify-center p-4">
                             <ActivityIndicator color="#FF9C56" size="small" />
-                            <Text className="text-gray-400 text-xs mt-2 text-center">Fetching location...</Text>
+                            <Text className="text-gray-400 text-xs mt-2 text-center">
+                              {isVi ? 'Đang tải vị trí...' : 'Fetching location...'}
+                            </Text>
                           </View>
-                        ) : location ? (
-                          /* SỬA MỚI: DÙNG NATIVE MAPVIEW THAY CHO IMAGE TĨNH */
+                        ) : location && isVisible ? (
+                          // isVisible gate đảm bảo MapView chỉ tồn tại khi modal đang mở thật sự,
+                          // tránh map này tồn tại song song với map full-screen của report-lost-pet trên iOS.
                           <MapView
-                            provider={PROVIDER_GOOGLE}
+                            provider={MAP_PROVIDER}
+                            mapType="standard"
+                            userInterfaceStyle="light"
+                            showsMyLocationButton={false}
+                            showsCompass={false}
+                            showsBuildings={true}
                             style={{ width: '100%', height: '100%' }}
-                            // Dùng thuộc tính region để map tự động zoom mượt mà khi đổi radius
                             region={{
                               latitude: location.latitude,
                               longitude: location.longitude,
-                              // Công thức tính Delta auto scale theo bán kính (có cộng thêm 30% padding)
-                              latitudeDelta: (radius / 111320) * 3, 
+                              latitudeDelta: (radius / 111320) * 3,
                               longitudeDelta: (radius / 111320) * 3,
                             }}
-                            // Khóa tương tác vì đây chỉ là bản đồ xem trước (Preview)
                             scrollEnabled={false}
                             zoomEnabled={false}
                             pitchEnabled={false}
                             rotateEnabled={false}
                             showsUserLocation={false}
                           >
-                            {/* Vòng tròn Radius */}
                             <Circle
                               center={{ latitude: location.latitude, longitude: location.longitude }}
                               radius={radius}
@@ -333,7 +359,6 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                               strokeColor="rgba(255, 156, 86, 0.8)"
                               strokeWidth={1.5}
                             />
-                            {/* Điểm Marker trung tâm */}
                             <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }}>
                               <View className="w-4 h-4 bg-[#EF4444] rounded-full border-2 border-white" style={{ elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3 }} />
                             </Marker>
@@ -343,7 +368,9 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                             <View className="w-12 h-12 rounded-full bg-gray-200/70 items-center justify-center mb-2">
                               <Feather name="map-pin" size={20} color="#9CA3AF" />
                             </View>
-                            <Text className="text-gray-400 text-xs font-medium text-center px-4">Tap to enable location services</Text>
+                            <Text className="text-gray-400 text-xs font-medium text-center px-4">
+                              {isVi ? 'Chạm để bật dịch vụ vị trí' : 'Tap to enable location services'}
+                            </Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -380,15 +407,16 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
 
                   {/* FORM INPUTS */}
                   <View className="px-5 mt-3 gap-y-3">
-                    {/* Phone Number */}
                     <View className="flex-row items-center pr-8">
                       <Image className='mr-3 top-1' source={require('../assets/icon/phone-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
                       <View className='flex-row border-b border-gray-300 w-full pt-2 pb-1'>
-                        <Text className="text-[14px] font-medium text-black">Phone Number<Text className="text-[#EF4444]"> *</Text></Text>
+                        <Text className="text-[14px] font-medium text-black">
+                          {isVi ? 'Số điện thoại' : 'Phone Number'}<Text className="text-[#EF4444]"> *</Text>
+                        </Text>
                         <TextInput
                           placeholder="0123456789"
                           placeholderTextColor="#9CA3AF"
-                          keyboardType="phone-pad" // Hiển thị bàn phím số
+                          keyboardType="phone-pad"
                           className="flex-1 text-[14px] text-[#1C1C1E] p-0 text-right"
                           value={formData.phoneNumber}
                           onChangeText={(t) => setFormData({ ...formData, phoneNumber: t })}
@@ -397,13 +425,14 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                       </View>
                     </View>
 
-                    {/* Name */}
                     <View className="flex-row items-center pr-8 mt-1">
                       <Image className='mr-3 top-1' source={require('../assets/icon/person-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
                       <View className='flex-row border-b border-gray-300 w-full pt-2 pb-1'>
-                        <Text className="text-[14px] font-medium text-black">Your Name</Text>
+                        <Text className="text-[14px] font-medium text-black">
+                          {isVi ? 'Tên của bạn' : 'Your Name'}
+                        </Text>
                         <TextInput
-                          placeholder="Sarah John"
+                          placeholder={isVi ? "Nguyễn Văn A" : "Sarah John"}
                           placeholderTextColor="#9CA3AF"
                           className="flex-1 text-[14px] text-[#1C1C1E] p-0 text-right"
                           value={formData.scannedBy}
@@ -413,13 +442,14 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                       </View>
                     </View>
 
-                    {/* Message */}
                     <View className="flex-row items-center pr-8 mt-2">
                       <Image className='mr-3' source={require('../assets/icon/note-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
                       <View className='flex-row border-b border-gray-300 w-full pt-2 pb-1'>
-                        <Text className="text-[14px] font-medium text-black">Notes</Text>
+                        <Text className="text-[14px] font-medium text-black">
+                          {isVi ? 'Ghi chú' : 'Notes'}
+                        </Text>
                         <TextInput
-                          placeholder="Leave a short note"
+                          placeholder={isVi ? "Để lại một ghi chú ngắn" : "Leave a short note"}
                           placeholderTextColor="#9CA3AF"
                           className="flex-1 text-[14px] text-[#1C1C1E] p-0 text-right"
                           value={formData.message}
@@ -429,44 +459,40 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                       </View>
                     </View>
 
-
                     <View className='mt-1 flex-row flex-wrap gap-3 mt-2"'>
                       {photos.length === 0 ? (
-                      <TouchableOpacity
-                        onPress={handleAddPhoto}
-                        activeOpacity={0.7}
-                        className="bg-white w-full rounded-[12px] items-center justify-center mt-1 relative overflow-hidden"
-                      >
-                        {/* --- BẮT ĐẦU: KHỐI SVG VẼ VIỀN NÉT ĐỨT --- */}
-                        <View className="w-full" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-                          <Svg width="100%" height="100%">
-                            <Rect
-                              width="100%"
-                              height="100%"
-                              fill="none"
-                              stroke="#D1D5DB"
-                              strokeWidth={2}
-                              rx={16}
-                              strokeDasharray="5, 5"
+                        <TouchableOpacity
+                          onPress={handleAddPhoto}
+                          activeOpacity={0.7}
+                          className="bg-white w-full rounded-[12px] items-center justify-center mt-1 relative overflow-hidden"
+                        >
+                          <View className="w-full" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                            <Svg width="100%" height="100%">
+                              <Rect
+                                width="100%"
+                                height="100%"
+                                fill="none"
+                                stroke="#D1D5DB"
+                                strokeWidth={2}
+                                rx={16}
+                                strokeDasharray="5, 5"
+                              />
+                            </Svg>
+                          </View>
+
+                          <View className="flex-row items-center justify-center py-5">
+                            <Image
+                              className='mr-3'
+                              source={require('../assets/icon/upload.png')}
+                              style={{ width: 15, height: 15 }}
+                              resizeMode="cover"
                             />
-                          </Svg>
-                        </View>
-                        {/* --- KẾT THÚC --- */}
+                            <Text className="text-[12px] text-black font-medium">
+                              {isVi ? 'Tải ảnh lên' : 'Upload photos'}
+                            </Text>
+                          </View>
 
-                        {/* Nội dung bên trong giữ nguyên */}
-                        <View className="flex-row items-center justify-center py-5">
-                          <Image
-                            className='mr-3'
-                            source={require('../assets/icon/upload.png')}
-                            style={{ width: 15, height: 15 }}
-                            resizeMode="cover"
-                          />
-                          <Text className="text-[12px] text-black font-medium">
-                            Upload photos
-                          </Text>
-                        </View>
-
-                      </TouchableOpacity>
+                        </TouchableOpacity>
                       ) : (
                         <>
                           {photos.map((uri, index) => (
@@ -520,14 +546,18 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                   {/* BUTTONS */}
                   <View className="px-5 mt-6 flex-row gap-3">
                     <TouchableOpacity onPress={onClose} className="flex-1 rounded-[16px] border border-[#E5E5E5] py-3.5 items-center">
-                      <Text className="text-[#8E8E93] text-[14px] font-regular">Cancel</Text>
+                      <Text className="text-[#8E8E93] text-[14px] font-regular">
+                        {isVi ? 'Hủy' : 'Cancel'}
+                      </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={handleConfirm} className="flex-1 bg-[#E89B5A] py-3.5 rounded-[16px] items-center justify-center" disabled={isSubmitting}>
                       {isSubmitting ? (
                         <ActivityIndicator color="white" size="small" />
                       ) : (
-                        <Text className="text-white text-[14px] font-semibold items-center">Send</Text>
+                        <Text className="text-white text-[14px] font-semibold items-center">
+                          {isVi ? 'Gửi' : 'Send'}
+                        </Text>
                       )}
                     </TouchableOpacity>
                   </View>

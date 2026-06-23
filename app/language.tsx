@@ -1,5 +1,5 @@
 import { useLanguage } from '@/contexts/LanguageContext';
-import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { TouchableOpacity, View } from 'react-native';
@@ -40,7 +40,7 @@ export default function LanguageScreen() {
   const router = useRouter();
   // Lấy thêm hàm t (translate) để dịch trực tiếp trên UI
   const { language, setLanguage, t } = useLanguage();
-
+  const isVi = language === 'vi';
   return (
     <View className="flex-1 bg-[#FFFFFF]">
       <SafeAreaView edges={['top', 'bottom']}>
@@ -66,7 +66,7 @@ export default function LanguageScreen() {
           />
           <LanguageOption
             label={t('Vietnamese')} // Dịch động text hiển thị
-            subLabel="Tiếng Việt"
+            subLabel={isVi ? "Tiếng Việt" : "Vietnamese"}
             isSelected={language === 'vi'}
             onPress={() => setLanguage('vi')}
             isLast={true}

@@ -196,7 +196,7 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" options={{ title: isVi ? 'Trang chủ' : 'Home' }} />
-      <Tabs.Screen name="matching" options={{ title: isVi ? 'Ghép đôi' : 'Pawdoption' }} />
+      <Tabs.Screen name="matching" options={{ title: isVi ? 'Nhận nuôi' : 'Pawdoption' }} />
       <Tabs.Screen name="my-pets" options={{ title: isVi ? 'Thú cưng' : 'My Pets' }} />
       <Tabs.Screen name="profile-settings" options={{ title: isVi ? 'Hồ sơ' : 'Profile' }} />
       

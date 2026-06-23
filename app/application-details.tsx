@@ -55,7 +55,7 @@ export default function ApplicationDetailsScreen() {
       const response = await axiosClient.get(`/applications/${id}`);
       setApplicationData(response.data.data);
     } catch (error) {
-      console.error('Lỗi khi fetch chi tiết đơn:', error);
+      console.error('Error fetching order details:', error);
     } finally {
       setIsLoading(false);
     }

@@ -1,16 +1,19 @@
 // app/change-password.tsx
 import { Text } from '@/components/AppText';
-import { AntDesign, Feather } from '@expo/vector-icons';
+import { TextInput } from '@/components/AppTextInput';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useModalStore } from '@/store/useModalStore';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, InteractionManager, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient'; // Đảm bảo đường dẫn này đúng với dự án của bạn
-import { useModalStore } from '@/store/useModalStore';
-import { TextInput } from '@/components/AppTextInput';
 export default function ChangePasswordScreen() {
   const router = useRouter();
 
+  const { language } = useLanguage(); // <--- Khởi tạo hook
+  const isVi = language === 'vi';
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -23,41 +26,62 @@ export default function ChangePasswordScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const showModal = useModalStore((state) => state.showModal);
+  const isMounted = useRef(true);
 
+  useEffect(() => {
+    return () => { isMounted.current = false; };
+  }, []);
   const handleChangePassword = async () => {
-    // Validate form
+    // 1. Validate form
     let newErrors: Record<string, string> = {};
-    if (!currentPassword) newErrors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại.';
-    if (!newPassword || newPassword.length < 6) newErrors.newPassword = 'Mật khẩu mới phải có ít nhất 6 ký tự.';
-    if (newPassword !== confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp.';
+    if (!currentPassword) newErrors.currentPassword = isVi ? 'Vui lòng nhập mật khẩu hiện tại.' : 'Please enter your current password.';
+    if (!newPassword || newPassword.length < 6) newErrors.newPassword = isVi ? 'Mật khẩu mới phải có ít nhất 6 ký tự.' : 'The new password must be at least 6 characters long.';
+    if (newPassword !== confirmPassword) newErrors.confirmPassword = isVi ? 'Mật khẩu xác nhận không khớp.' : 'The confirmation password does not match.';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
+    // 2. Hạ bàn phím ngay lập tức để giải phóng UI thread
+    Keyboard.dismiss();
+
     try {
       setIsLoading(true);
       setErrors({});
 
-      // GỌI API ĐỔI MẬT KHẨU Ở ĐÂY (Cập nhật endpoint theo backend NestJS của bạn)
-      // Ví dụ: await axiosClient.post('/auth/change-password', { currentPassword, newPassword });
       await axiosClient.post('/auth/change-password', {
-        currentPassword: currentPassword,
-        newPassword: newPassword
+        currentPassword,
+        newPassword
       });
 
-      showModal({
-        title: 'Success',
-        message: 'Password updated successfully! ',
-        buttonText: 'Back',
-        onConfirm: () => router.back(),
-      });
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Không thể thay đổi mật khẩu lúc này. Vui lòng thử lại.';
-      setErrors({ form: errorMessage });
-    } finally {
+      // 3. Guard: Chặn thực thi nếu user đã thoát màn hình trong lúc gọi API
+      if (!isMounted.current) return;
+
       setIsLoading(false);
+
+      // 4. Đảm bảo mọi animation (như đóng bàn phím, ẩn loading) hoàn tất 
+      // trước khi show một UI block mới (Modal)
+      InteractionManager.runAfterInteractions(() => {
+        showModal({
+          title: isVi ? 'Thành công' : 'Success',
+          message: isVi ? 'Cập nhật mật khẩu thành công' : 'Password updated successfully!',
+          buttonText: isVi ? 'Trở lại' : 'Back',
+          onConfirm: () => {
+            // Guard khi trigger navigation từ modal toàn cục
+            if (isMounted.current) {
+              router.back();
+            }
+          },
+        });
+      });
+
+    } catch (error: any) {
+      if (!isMounted.current) return; // Guard
+
+      setIsLoading(false);
+      const errorMessage = error.response?.data?.message || (isVi ? 'Đã có lỗi xảy ra.' : 'An error occurred.');
+      setErrors({ form: errorMessage });
     }
   };
 
@@ -95,7 +119,7 @@ export default function ChangePasswordScreen() {
                   secureTextEntry={!showCurrentPassword}
                   value={currentPassword}
                   onChangeText={(text) => { setCurrentPassword(text); setErrors({ ...errors, currentPassword: '' }); }}
-                  placeholder="Enter current password"
+                  placeholder={isVi ? "Nhập mật khẩu hiện tại" : "Enter current password"}
                   placeholderTextColor="#B8B8B8"
                 />
                 <TouchableOpacity onPress={() => setShowCurrentPassword(!showCurrentPassword)} className="ml-2 p-1">
@@ -115,7 +139,7 @@ export default function ChangePasswordScreen() {
                   secureTextEntry={!showNewPassword}
                   value={newPassword}
                   onChangeText={(text) => { setNewPassword(text); setErrors({ ...errors, newPassword: '' }); }}
-                  placeholder="Enter new password"
+                  placeholder={isVi ? "Nhập mật khẩu mới" : "Enter new password"}
                   placeholderTextColor="#B8B8B8"
                 />
                 <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} className="ml-2 p-1">
@@ -135,7 +159,7 @@ export default function ChangePasswordScreen() {
                   secureTextEntry={!showConfirmPassword}
                   value={confirmPassword}
                   onChangeText={(text) => { setConfirmPassword(text); setErrors({ ...errors, confirmPassword: '' }); }}
-                  placeholder="Confirm new password"
+                  placeholder={isVi ? "Xác nhận mật khẩu mới" : "Confirm new password"}
                   placeholderTextColor="#B8B8B8"
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="ml-2 p-1">
@@ -154,7 +178,7 @@ export default function ChangePasswordScreen() {
             >
               {isLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
               <Text className="text-white font-bold text-lg">
-                {isLoading ? 'Updating...' : 'Update Password'}
+                {isLoading ? 'Updating...' : 'Update'}
               </Text>
             </TouchableOpacity>
 

@@ -15,10 +15,24 @@ import { WebView } from 'react-native-webview';
 import { eventService } from '../services/eventService';
 import { useEngagementStore } from '../store/useEngagementStore';
 // BỔ SUNG: Import React Query
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const { width } = Dimensions.get('window');
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const VI_MONTHS_SHORT = ['Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'];
+
+const formatMonthShort = (date: Date, isVi: boolean) => {
+    if (isVi) {
+        return VI_MONTHS_SHORT[date.getMonth()];
+    }
+    return date.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+};
+// Dùng cho câu văn dài (không uppercase: Jun / Th6)
+const formatMonthInline = (date: Date, isVi: boolean) => {
+    if (isVi) return VI_MONTHS_SHORT[date.getMonth()];
+    return date.toLocaleString('en-US', { month: 'short' });
+};
 
 export default function EventDetailScreen() {
     const router = useRouter();
@@ -26,7 +40,8 @@ export default function EventDetailScreen() {
     const params = useLocalSearchParams();
     const eventId = params.id as string;
     const { user } = useContext(AuthContext);
-    
+    const { t, language } = useLanguage();
+    const isVi = language === 'vi';
     const queryClient = useQueryClient();
 
     const bottomSheetRef = useRef<BottomSheet>(null);
@@ -83,12 +98,12 @@ export default function EventDetailScreen() {
         if (!eventData) return;
 
         const startDate = new Date(eventData.startDate);
+        const monthName = formatMonthInline(startDate, isVi);
         const day = startDate.getDate();
-        const monthName = startDate.toLocaleDateString('en-US', { month: 'short' });
         const year = startDate.getFullYear();
-        const timeString = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const timeString = startDate.toLocaleTimeString(isVi ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
 
-        const title = eventData.title || 'Sự kiện từ PawLife';
+        const title = eventData.title || (isVi ? 'Sự kiện từ PawLife' : 'PawLife Events');
         const organizer = eventData.organizer?.name || 'PawLife';
         const location = [eventData.locationName, eventData.address].filter(Boolean).join(', ');
         const date = `${day} ${monthName}, ${year} at ${timeString}`;
@@ -115,7 +130,7 @@ export default function EventDetailScreen() {
                 { dialogTitle: `Share: ${title}`, subject: `PawLife Event: ${title}`, tintColor: '#ffa053' }
             );
         } catch (error: any) {
-            Alert.alert('Lỗi', 'Không thể chia sẻ lúc này. Vui lòng thử lại sau.');
+            Alert.alert(isVi ? 'Lỗi' : 'Error', isVi ? 'Không thể chia sẻ lúc này. Vui lòng thử lại sau.' : 'Cannot share right now. Please try again later.');
         }
     };
 
@@ -140,9 +155,9 @@ export default function EventDetailScreen() {
             // Hiện Toast lập tức
             Toast.show({
                 type: 'custom_badge',
-                props: { 
-                    petName: eventData?.title || 'This event', 
-                    actionText: !previousState ? ' has been added to Interested' : ' has been removed from Interested' 
+                props: {
+                    petName: eventData?.title || 'This event',
+                    actionText: !previousState ? ' has been added to Interested' : ' has been removed from Interested'
                 },
                 visibilityTime: 2500, autoHide: true,
             });
@@ -211,11 +226,12 @@ export default function EventDetailScreen() {
     }
 
     const startDate = new Date(eventData.startDate);
-    const dayName = startDate.toLocaleDateString('en-US', { weekday: 'long' });
-    const monthName = startDate.toLocaleDateString('en-US', { month: 'short' });
     const day = startDate.getDate();
+    const monthName = formatMonthInline(startDate, isVi);
     const year = startDate.getFullYear();
-    const timeString = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const timeString = startDate.toLocaleTimeString(isVi ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+    const date = `${day} ${monthName}, ${year} ${isVi ? 'lúc' : 'at'} ${timeString}`;
+
 
     const bannerImage = eventData.bannerUrl || eventData.images?.[0]?.url;
 
@@ -224,14 +240,14 @@ export default function EventDetailScreen() {
     const handleOpenMap = async () => {
         const lat = mapLatitude;
         const lng = mapLongitude;
-        
+
         const rawLabel = eventData.locationName || eventData.address || "Event Location";
         const label = encodeURIComponent(rawLabel);
-        
+
         // 1. URL Scheme gọi App Native
         const iosUrl = `maps:0,0?q=${label}&ll=${lat},${lng}`;
         const androidUrl = `geo:0,0?q=${lat},${lng}(${label})`;
-        
+
         // 2. URL Fallback CHUẨN HTTPS (Sẽ mở trình duyệt web)
         // Link chuẩn của Google Maps API:
         const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
@@ -240,7 +256,7 @@ export default function EventDetailScreen() {
 
         try {
             const supported = await Linking.canOpenURL(url);
-            
+
             if (supported) {
                 // Mở app Native (Google Maps/Apple Maps)
                 await Linking.openURL(url);
@@ -249,11 +265,11 @@ export default function EventDetailScreen() {
                 await Linking.openURL(fallbackUrl);
             }
         } catch (error) {
-            console.warn("Lỗi khi mở bản đồ: ", error);
-            Alert.alert("Lỗi", "Không thể khởi chạy bản đồ trên thiết bị này.");
+            console.warn(isVi ? "Lỗi khi mở bản đồ: " : "Error opening map: ", error);
+            Alert.alert(isVi ? "Lỗi" : "Error", isVi ? "Không thể khởi chạy bản đồ trên thiết bị này." : "Cannot launch the map on this device.");
         }
     };
-    
+
     const mapHtml = `
     <html>
         <head>
@@ -463,7 +479,7 @@ export default function EventDetailScreen() {
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-[#E89B5A] font-regular text-[14px]">
-                                        {day} {monthName}, {year} at {timeString}
+                                        {day} {monthName}, {year} {isVi ? 'lúc' : 'at'} {timeString}
                                     </Text>
                                 </View>
                             </View>
@@ -472,7 +488,7 @@ export default function EventDetailScreen() {
                         <View className="mb-[30px]">
                             <Text className="text-[16px] font-medium text-black mb-[12px]">About Event</Text>
                             <Text className="text-[#8E8E93] font-regular leading-relaxed text-[14px] text-justify">
-                                {eventData.description || "Chưa có mô tả cho sự kiện này."}
+                                {eventData.description || (isVi ? "Chưa có mô tả cho sự kiện này." : "There is no description for this event.")}
                             </Text>
                         </View>
 
@@ -504,7 +520,7 @@ export default function EventDetailScreen() {
                                         </Text>
                                     </View>
 
-                                      {/* <TouchableOpacity
+                                    {/* <TouchableOpacity
                                         activeOpacity={0.7}
                                         className="w-[36px] h-[36px] items-center justify-center ml-2"
                                         onPress={() => router.push({
@@ -545,8 +561,8 @@ export default function EventDetailScreen() {
                                     showsVerticalScrollIndicator={false}
                                     bounces={false}
                                 />
-                                <TouchableOpacity 
-                                    className="absolute inset-0 z-10" 
+                                <TouchableOpacity
+                                    className="absolute inset-0 z-10"
                                     activeOpacity={0.8}
                                     onPress={handleOpenMap}
                                 />
@@ -627,7 +643,7 @@ export default function EventDetailScreen() {
                                                         </View>
                                                         <View className="items-center justify-center shrink-0 min-w-[32px]">
                                                             <Text className="text-[20px] font-semibold text-black leading-tight">{evDate.getDate().toString().padStart(2, '0')}</Text>
-                                                            <Text className="text-[12px] font-regular text-[#8E8E93] tracking-[0.06px] mt-0.5">{evDate.toLocaleString('en-US', { month: 'short' }).toUpperCase()}</Text>
+                                                            <Text className="text-[12px] font-regular text-[#8E8E93] tracking-[0.06px] mt-0.5">{formatMonthShort(evDate, isVi)}</Text>
                                                         </View>
                                                     </View>
                                                 </View>

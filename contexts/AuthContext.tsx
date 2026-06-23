@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useEffect, useState } from 'react';
 import { authService, LoginPayload, RegisterPayload, SendOtpPayload } from '../services/authService';
+// Import socket từ utils (Đảm bảo đường dẫn này khớp với project của bạn)
+import { socket } from '@/utils/socket';
 
 interface User {
   id: string;
@@ -20,11 +22,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (data: LoginPayload) => Promise<void>;
-  register: (data: RegisterPayload) => Promise<void>;
+  register: (data: RegisterPayload) => Promise<any>;
   requestOtp: (data: SendOtpPayload) => Promise<any>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
-  // BỔ SUNG: Định nghĩa hàm setAuth
   setAuth: (token: string, userData: User) => Promise<void>;
 }
 
@@ -40,12 +41,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const token = await SecureStore.getItemAsync('accessToken');
         const userData = await SecureStore.getItemAsync('userData');
-        
+
         if (token && userData) {
+          // BỔ SUNG: Gắn lại token vào Header của Axios Client ngay lập tức
+          axiosClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
           setUser(JSON.parse(userData));
         }
       } catch (error) {
-        console.error('Lỗi khi load session:', error);
+        console.error('Lỗi khi load session / Error loading session:', error);
       } finally {
         setIsLoading(false);
       }
@@ -53,20 +57,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loadSession();
   }, []);
 
-  
   const login = async (data: LoginPayload) => {
     const response = await authService.loginAPI(data);
-    if (response.accessToken && response.user) {
-      // Lưu vào SecureStore
-      await SecureStore.setItemAsync('accessToken', response.accessToken);
-      await SecureStore.setItemAsync('userData', JSON.stringify(response.user));
-      setUser(response.user);
+
+    // ĐÃ FIX: Lấy dữ liệu thực từ response.data của Axios
+    const responseData = response.data ? response.data : response;
+
+    if (responseData.accessToken && responseData.user) {
+      await SecureStore.setItemAsync('accessToken', responseData.accessToken);
+      await SecureStore.setItemAsync('userData', JSON.stringify(responseData.user));
+      setUser(responseData.user);
     }
   };
 
   const register = async (data: RegisterPayload) => {
-    // Trả về response để component xử lý alert hoặc điều hướng
-    return await authService.registerAPI(data); 
+    return await authService.registerAPI(data);
   };
 
   const requestOtp = async (data: SendOtpPayload) => {
@@ -74,47 +79,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    if (socket && socket.connected) {
+      socket.disconnect();
+    }
+
+    // ĐÃ FIX: Đồng nhất key xóa và xóa cả userData
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('userData');
+
+    delete axiosClient.defaults.headers.common['Authorization'];
+
+    // ĐÃ FIX: Xóa user state trực tiếp thay vì gọi setAuth("", null)
     setUser(null);
   };
 
   const updateUser = async (updatePayload: any) => {
     try {
-      // 1. Gửi request lên server
       const response = await axiosClient.patch('/auth/me/profile', updatePayload);
-      
-      // 2. Lấy user data mới nhất từ response
       const updatedUserData = response.data.user;
 
-      // 3. Update state trên UI
-      setUser((prev) => ({ ...prev, ...updatedUserData }));
+      setUser((prev) => ({ ...prev, ...updatedUserData }) as User);
 
-      // 4. Update AsyncStorage để lần mở app sau không bị lấy data cũ dưới local
       const currentStorageStr = await AsyncStorage.getItem('user_data');
       if (currentStorageStr) {
         const currentStorage = JSON.parse(currentStorageStr);
         await AsyncStorage.setItem('user_data', JSON.stringify({ ...currentStorage, ...updatedUserData }));
       }
     } catch (error) {
-      console.error("Lỗi cập nhật profile:", error);
+      console.error("Lỗi cập nhật profile / Error updating profile:", error);
       throw error;
     }
   };
 
-  // BỔ SUNG: Hàm setAuth dùng cho 2FA và Social Login
   const setAuth = async (token: string, userData: User) => {
     try {
       await SecureStore.setItemAsync('accessToken', token);
       await SecureStore.setItemAsync('userData', JSON.stringify(userData));
       setUser(userData);
     } catch (error) {
-      console.error('Lỗi khi lưu thông tin setAuth:', error);
+      console.error('Lỗi khi lưu thông tin setAuth / Error saving setAuth info:', error);
     }
   };
 
   return (
-    // BỔ SUNG: Truyền setAuth vào Provider
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, requestOtp, logout, updateUser, setAuth }}>
       {children}
     </AuthContext.Provider>

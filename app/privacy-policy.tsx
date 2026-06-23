@@ -103,7 +103,7 @@ export default function PrivacyPolicyScreen() {
                     <BulletPoint title={t("Right to rectification")} text={t("update account information and pet profiles at any time.")} />
                     <BulletPoint title={t("Right to erasure")} text={t("delete your account and all related data via Settings → Delete Account.")} />
                     <BulletPoint title={t("Right to withdraw consent")} text={t("disable Camera, Location, Bluetooth, and Notification access at any time in OS Settings.")} />
-                    <BulletPoint title={t("Right to object")} text={t("send a complaint to support@pawlife.vn if you believe your data is being misused.")} />
+                    <BulletPoint title={t("Right to object")} text={t("send a complaint to hello@pawlife.vn if you believe your data is being misused.")} />
                 </View>
 
                 <View className="mb-6">

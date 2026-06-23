@@ -1,7 +1,10 @@
 // app/(tabs)/matching.tsx
 import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/localization';
+import { normalizePet } from '@/utils/petNormalize';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
@@ -27,7 +30,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message';
 import { useLocation } from '../../hooks/useLocation';
 import { petService } from '../../services/petService';
-import { TextInput } from '@/components/AppTextInput';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.3;
@@ -203,9 +205,6 @@ const SwipeableCard = ({
         return { transform: [{ translateX: sharedTranslateX.value }, { translateY: sharedTranslateY.value }, { rotate: `${rotate}deg` }, { scale: scale.value }] };
     });
 
-    const likeOpacity = useAnimatedStyle(() => ({ opacity: interpolate(sharedTranslateX.value, [0, width / 4], [0, 1]) }));
-    const nopeOpacity = useAnimatedStyle(() => ({ opacity: interpolate(sharedTranslateX.value, [-width / 4, 0], [1, 0]) }));
-
     const heartAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: popScale.value }],
         opacity: interpolate(popScale.value, [0, 0.2, 1], [0, 1, 1], Extrapolation.CLAMP)
@@ -250,40 +249,6 @@ const SwipeableCard = ({
                                 />
                             </View>
                         </GestureDetector>
-
-                        <Animated.View
-                            style={[
-                                likeOpacity,
-                                {
-                                    position: 'absolute',
-                                    top: isTutorialCard ? height * 0.12 : 64,
-                                    left: 32,
-                                    zIndex: 50,
-                                    transform: [{ rotate: '-12deg' }]
-                                }
-                            ]}
-                            className="border-[6px] border-green-400 rounded-xl px-4 py-2 pointer-events-none"
-                            pointerEvents="none"
-                        >
-                            <Text className="text-green-400 font-extrabold text-5xl uppercase tracking-widest">{t('LIKE')}</Text>
-                        </Animated.View>
-
-                        <Animated.View
-                            style={[
-                                nopeOpacity,
-                                {
-                                    position: 'absolute',
-                                    top: isTutorialCard ? height * 0.12 : 64,
-                                    right: 32,
-                                    zIndex: 50,
-                                    transform: [{ rotate: '12deg' }]
-                                }
-                            ]}
-                            className="border-[6px] border-red-500 rounded-xl px-4 py-2 pointer-events-none"
-                            pointerEvents="none"
-                        >
-                            <Text className="text-red-500 font-extrabold text-5xl uppercase tracking-widest">{t('NOPE')}</Text>
-                        </Animated.View>
 
                         <Animated.View
                             style={[
@@ -404,8 +369,8 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
 
                                     <View className="flex-row justify-between gap-3">
                                         {[
-                                            { id: 'dog', label: t('Dogs'), icon: require('../../assets/images/dog-icon.png') }, 
-                                            { id: 'cat', label: t('Cats'), icon: require('../../assets/images/cat-icon.png') }, 
+                                            { id: 'dog', label: t('Dogs'), icon: require('../../assets/images/dog-icon.png') },
+                                            { id: 'cat', label: t('Cats'), icon: require('../../assets/images/cat-icon.png') },
                                             { id: 'both', label: t('Both'), icon: require('../../assets/images/both-icon.png') }
                                         ].map((item) => (
                                             <TouchableOpacity
@@ -969,10 +934,12 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
             let petsData = response?.data?.data || response?.data || response || [];
 
             if (filters?.type && filters.type !== 'both') {
-                petsData = petsData.filter((p: any) =>
-                    p.species?.toUpperCase() === filters.type.toUpperCase() ||
-                    p.type?.toUpperCase() === filters.type.toUpperCase()
-                );
+                petsData = petsData.filter((p: any) => {
+                    const speciesEn = getLocalizedField(p.species, 'en').toUpperCase();
+                    const typeEn = getLocalizedField(p.type, 'en').toUpperCase();
+                    return speciesEn === filters.type.toUpperCase() || typeEn === filters.type.toUpperCase();
+                });
+
             }
 
             if (filters?.age && filters.age !== 'Any Age') {
@@ -1055,7 +1022,7 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
             setLoading(false);
         }
     };
-    
+
     const handleOpenViewer = (images: string[]) => {
         if (images && images.length > 0) {
             setViewerImages(images);
@@ -1094,7 +1061,7 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
         return { transform: [{ scale }], opacity };
     });
     const [selectedPet, setSelectedPet] = useState<any>(null);
-    
+
     const handleMainSwipe = (dir: 'left' | 'right' | 'up' | 'reload' | 'heart') => {
         if (!activeCard) return;
 
@@ -1119,8 +1086,8 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 
                 Toast.show({
                     type: 'custom_badge',
-                    props: { 
-                        petName: activeCard.name || t('This pet'), 
+                    props: {
+                        petName: activeCard.name || t('This pet'),
                         actionText: isVi ? ' đã được xóa khỏi Thú cưng đã lưu' : ' has been removed from Saved Pet'
                     },
                     visibilityTime: 2500, autoHide: true,
@@ -1134,8 +1101,8 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
 
                 Toast.show({
                     type: 'custom_badge',
-                    props: { 
-                        petName: activeCard.name || t('This pet'), 
+                    props: {
+                        petName: activeCard.name || t('This pet'),
                         actionText: isVi ? ' đã được thêm vào Thú cưng đã lưu' : ' has been added to Saved Pet'
                     },
                     visibilityTime: 2500, autoHide: true,
@@ -1336,7 +1303,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
         if (isVisible && pet?.id) {
             setIsLoading(true);
             petService.getPetById(pet.id)
-                .then(res => setFullPet(res.data || res))
+                .then(res => setFullPet(normalizePet(res.data || res, language)))
                 .catch(err => console.error("Lỗi lấy chi tiết popup:", err))
                 .finally(() => setIsLoading(false));
             translateY.value = withSpring(0, { damping: 35, stiffness: 250, mass: 0.8 });
@@ -1389,7 +1356,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
     const displayWeight = fullPet?.weight
         ? `${fullPet.weight} kg`
         : (currentPet?.weight ? `${currentPet.weight} kg` : t('Unknown'));
-        
+
     return (
         <Animated.View
             style={[
@@ -1485,7 +1452,10 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                 <View className="flex-row gap-2 mt-[6px]">
                                     {displayTraits.map((trait: any, index: number) => {
 
-                                        const traitName = typeof trait === 'string' ? trait : trait?.name;
+                                        const traitName = typeof trait === 'string'
+                                            ? trait
+                                            : getLocalizedField(trait?.name, language);
+
 
                                         if (!traitName) return null;
 
@@ -1501,7 +1471,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                                 key={index}
                                                 className={`${style.bg} ${style.border} border px-3.5 py-1 rounded-full`}
                                             >
-                                                <Text className={`${style.text} text-[12px] font-medium`}>{t(traitName)}</Text>
+                                                <Text className={`${style.text} text-[12px] font-medium`}>{traitName}</Text>
                                             </View>
                                         );
                                     })}
@@ -1512,43 +1482,41 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                         <View className="mb-4">
                             <Text className="font-medium text-black text-[16px] mb-2">{isVi ? `Thói quen của ${currentPet.name}` : `${currentPet.name}'s Behavior`}</Text>
 
-                            {((fullPet?.goodWith || currentPet?.goodWith)?.length > 0 || (fullPet?.badWith || currentPet?.badWith)?.length > 0) ? (
-                                <View>
-                                    {/* --- Good With --- */}
-                                    {(fullPet?.goodWith || currentPet?.goodWith)?.length > 0 && (
-                                        <View className="flex-row items-start">
-                                            <View className="flex-row items-center mr-1 mt-[2px]">
-                                                <Image source={require('../../assets/icon/Check.png')} style={{ width: 12, height: 12 }} contentFit="cover" />
-                                                <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">{t("Good with:")}</Text>
-                                            </View>
-                                            <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                                                {Array.isArray(fullPet?.goodWith || currentPet?.goodWith)
-                                                    ? (fullPet?.goodWith || currentPet?.goodWith).join(', ')
-                                                    : (fullPet?.goodWith || currentPet?.goodWith)}
-                                            </Text>
-                                        </View>
-                                    )}
+                            {(() => {
+                                const goodWithText = fullPet?.goodWith || currentPet?.goodWith || '';
+                                const badWithText = fullPet?.badWith || currentPet?.badWith || '';
 
-                                    {/* --- Bad With / Not Suitable --- */}
-                                    {(fullPet?.badWith || currentPet?.badWith)?.length > 0 && (
-                                        <View className="flex-row items-start">
-                                            <View className="flex-row items-center mr-1 mt-[2px]">
-                                                <Image source={require('../../assets/icon/X.png')} style={{ width: 12, height: 12 }} contentFit="cover" />
-                                                <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">{t("Not suitable:")}</Text>
+                                if (!goodWithText && !badWithText) {
+                                    return (
+                                        <Text className="text-[14px] text-[#8E8E93] italic leading-[22px]">
+                                            {t("Behavioral details have not been updated.")}
+                                        </Text>
+                                    );
+                                }
+
+                                return (
+                                    <View>
+                                        {!!goodWithText && (
+                                            <View className="flex-row items-start">
+                                                <View className="flex-row items-center mr-1 mt-[2px]">
+                                                    <Image source={require('../../assets/icon/Check.png')} style={{ width: 12, height: 12 }} contentFit="cover" />
+                                                    <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">{t("Good with:")}</Text>
+                                                </View>
+                                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">{goodWithText}</Text>
                                             </View>
-                                            <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
-                                                {Array.isArray(fullPet?.badWith || currentPet?.badWith)
-                                                    ? (fullPet?.badWith || currentPet?.badWith).join(', ')
-                                                    : (fullPet?.badWith || currentPet?.badWith)}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            ) : (
-                                <Text className="text-[14px] text-[#8E8E93] italic leading-[22px]">
-                                    {t("Behavioral details have not been updated.")}
-                                </Text>
-                            )}
+                                        )}
+                                        {!!badWithText && (
+                                            <View className="flex-row items-start">
+                                                <View className="flex-row items-center mr-1 mt-[2px]">
+                                                    <Image source={require('../../assets/icon/X.png')} style={{ width: 12, height: 12 }} contentFit="cover" />
+                                                    <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">{t("Not suitable:")}</Text>
+                                                </View>
+                                                <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">{badWithText}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                );
+                            })()}
                         </View>
 
                         <View className="mb-6">

@@ -4,93 +4,42 @@ import { Text } from '@/components/AppText';
 import { TextInput } from '@/components/AppTextInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useModalStore } from '@/store/useModalStore';
-import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+// 🚀 FIX 1: Import thêm useCallback và memo từ React
+import { buildBreedBilingual, getBreedOptions, resolveBreedValue, resolveSpeciesValue, SPECIES_BILINGUAL } from '@/constants/breedData';
+import { buildBilingualOnSubmit } from '@/utils/autoTranslate';
+import { displayBilingual, parseBilingual } from '@/utils/bilingualField';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  Animated,
+  Dimensions,
+  Easing,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   ScrollView,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { petService } from '../services/petService';
-
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
 type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
 
-// 1. ĐỒNG BỘ DANH SÁCH BREED
-const BREED_OPTIONS: Record<string, { label: string; value: string }[]> = {
-  Dog: [
-    { label: 'Unknown Breed', value: 'Unknown Breed' },
-    { label: 'Mixed Breed', value: 'Mixed Breed' },
-    { label: 'VN Local Dog', value: 'VN Local Dog' },
-    { label: 'Poodle', value: 'Poodle' },
-    { label: 'Pomeranian', value: 'Pomeranian' },
-    { label: 'Corgi', value: 'Corgi' },
-    { label: 'Golden Retriever', value: 'Golden Retriever' },
-    { label: 'Labrador Retriever', value: 'Labrador Retriever' },
-    { label: 'Chihuahua', value: 'Chihuahua' },
-    { label: 'French Bulldog', value: 'French Bulldog' },
-    { label: 'Husky', value: 'Husky' }, 
-    { label: 'Shiba Inu', value: 'Shiba Inu' },
-    { label: 'Samoyed', value: 'Samoyed' },
-    { label: 'Dachshund', value: 'Dachshund' },
-    { label: 'Beagle', value: 'Beagle' },
-    { label: 'Pug', value: 'Pug' },
-    { label: 'Border Collie', value: 'Border Collie' },
-    { label: 'Maltese', value: 'Maltese' },
-    { label: 'Yorkshire Terrier', value: 'Yorkshire Terrier' },
-    { label: 'Schnauzer', value: 'Schnauzer' },
-    { label: 'Chow Chow', value: 'Chow Chow' },
-    { label: 'Alaskan Malamute', value: 'Alaskan Malamute' },
-    { label: 'Akita', value: 'Akita' },
-    { label: 'Doberman', value: 'Doberman' },
-    { label: 'Rottweiler', value: 'Rottweiler' },
-    { label: 'German Shepherd', value: 'German Shepherd' },
-    { label: 'Phu Quoc Ridgeback', value: 'Phu Quoc Ridgeback' },
-    { label: 'Bac Ha Dog', value: 'Bac Ha Dog' },
-    { label: 'H’Mong Bobtail', value: 'H’Mong Bobtail' },
-  ],
-  Cat: [
-    { label: 'Unknown Breed', value: 'Unknown Breed' },
-    { label: 'Mixed Breed', value: 'Mixed Breed' },
-    { label: 'Domestic Cat', value: 'Domestic Cat' },
-    { label: 'British Shorthair', value: 'British Shorthair' },
-    { label: 'Scottish Fold', value: 'Scottish Fold' },
-    { label: 'Munchkin', value: 'Munchkin' },
-    { label: 'Persian', value: 'Persian' },
-    { label: 'Ragdoll', value: 'Ragdoll' },
-    { label: 'Maine Coon', value: 'Maine Coon' },
-    { label: 'Bengal', value: 'Bengal' },
-    { label: 'Sphynx', value: 'Sphynx' },
-    { label: 'Russian Blue', value: 'Russian Blue' },
-    { label: 'Siamese', value: 'Siamese' },
-    { label: 'Exotic Shorthair', value: 'Exotic Shorthair' },
-    { label: 'Tabby Cat', value: 'Tabby Cat' },
-    { label: 'Orange Cat', value: 'Orange Cat' },
-    { label: 'Black Cat', value: 'Black Cat' },
-    { label: 'White Cat', value: 'White Cat' },
-    { label: 'Calico Cat', value: 'Calico Cat' },
-    { label: 'Tuxedo Cat', value: 'Tuxedo Cat' },
-    { label: 'Siamese Mix', value: 'Siamese Mix' },
-    { label: 'Long Hair', value: 'Long Hair' },
-    { label: 'Short Hair', value: 'Short Hair' },
-  ]
-};
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+
+// 🚀 NÂNG CẤP 1: Thêm các trường ngày tháng vào interface
 interface EditPetFormData {
   name: string;
   species: SpeciesType | string;
@@ -108,8 +57,28 @@ interface EditPetFormData {
   contactAddress: string;
   qrCodeUrl: string;
   sterilized: boolean | null;
+  createdAt?: string;
+  adoptedAt?: string;
+  nameLastUpdatedAt?: string;
+  status?: string;
 }
+function resolveErrorMessage(error: any, t: (key: string, params?: Record<string, string | number>) => string): string | null {
+  const data = error;
+  if (!data) return null;
 
+  // BE trả { message, i18n: { key, params? } } NGAY ở top-level của response.data
+  // (NestJS dùng trực tiếp object exception, không lồng thêm 1 lớp .message)
+  const i18nKey = data.i18n?.key;
+  if (i18nKey) {
+    return t(i18nKey, data.i18n?.params || {});
+  }
+
+  // Không có i18n -> rơi về message gốc (luôn tiếng Anh, ví dụ lỗi validate DTO của class-validator)
+  if (Array.isArray(data.message)) return data.message.join('\n');
+  if (typeof data.message === 'string') return data.message;
+
+  return null;
+}
 const Label = ({ text, required = false }: { text: string; required?: boolean }) => (
   <Text className="text-[#8E8E93] text-[14px] font-medium mb-2 mt-4">
     {text} {required && <Text className="text-red-500">*</Text>}
@@ -130,63 +99,120 @@ const CustomInput = ({ value, onChangeText, placeholder }: { value?: string; onC
 );
 
 const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeholder: string; value?: string; options?: string[]; onSelect?: (val: string) => void }) => {
-  const [visible, setVisible] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <View>
       <TouchableOpacity
-        onPress={() => setVisible(true)}
+        onPress={() => setIsOpen((prev) => !prev)}
         activeOpacity={0.7}
-        className={`w-full bg-white border border-[#E5E5E5] rounded-[16px] h-14 px-4 flex-row items-center justify-between ${visible ? 'border-[#E89B5A]' : ''}`}
+        className={`w-full bg-white border border-[#E5E5E5] rounded-[16px] h-14 px-4 flex-row items-center justify-between ${isOpen ? 'border-[#E89B5A]' : ''}`}
       >
         <Text className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <Feather name={visible ? "chevron-up" : "chevron-down"} size={20} color="#9CA3AF" />
+        <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#9CA3AF" />
       </TouchableOpacity>
 
-      <Modal visible={visible} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => setVisible(false)}>
-          <View className="flex-1 bg-black/40 justify-center px-6">
-            <TouchableWithoutFeedback>
-              <View className="bg-white rounded-3xl max-h-[60%] overflow-hidden shadow-2xl">
-                <View className="px-5 py-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
-                  <Text className="font-bold text-gray-700 text-base">{placeholder}</Text>
-                  <TouchableOpacity onPress={() => setVisible(false)}>
-                    <AntDesign name="close" size={20} color="#9CA3AF" />
+      {isOpen && (
+        <View
+          className="w-full bg-white border border-[#E5E5E5] rounded-[16px] mt-2 overflow-hidden"
+          style={{ maxHeight: 220 }}
+        >
+          {options.length === 0 ? (
+            <View className="px-4 py-4">
+              <Text className="text-[13px] text-[#9CA3AF] italic">Không có lựa chọn nào</Text>
+            </View>
+          ) : (
+            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+              {options.map((item) => {
+                const isSelected = item === value;
+                return (
+                  <TouchableOpacity
+                    key={item}
+                    className={`px-4 py-3.5 border-b border-gray-50 flex-row items-center justify-between ${isSelected ? 'bg-orange-50' : ''}`}
+                    onPress={() => {
+                      if (onSelect) onSelect(item);
+                      setIsOpen(false);
+                    }}
+                  >
+                    <Text className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}>
+                      {item}
+                    </Text>
+                    {isSelected && <Ionicons name="checkmark" size={18} color="#E89B5A" />}
                   </TouchableOpacity>
-                </View>
-
-                <FlatList
-                  data={options}
-                  keyExtractor={(item) => item}
-                  showsVerticalScrollIndicator={false}
-                  renderItem={({ item }) => {
-                    const isSelected = item === value;
-                    return (
-                      <TouchableOpacity
-                        className={`px-5 py-4 border-b border-gray-50 flex-row items-center justify-between ${isSelected ? 'bg-orange-50' : 'active:bg-gray-50'}`}
-                        onPress={() => {
-                          if (onSelect) onSelect(item);
-                          setVisible(false);
-                        }}
-                      >
-                        <Text className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}>
-                          {item}
-                        </Text>
-                        {isSelected && <Ionicons name="checkmark" size={18} color="#E89B5A" />}
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      )}
     </View>
   );
 };
+
+// =====================================================================
+// 🚀 FIX 2: Tách riêng Component MedicalRecordItem và bọc React.memo
+// Component này chỉ render lại khi props của chính nó thay đổi,
+// giúp tránh việc tính toán Date nặng nề khi người dùng đang gõ tên.
+// =====================================================================
+interface MedicalRecordItemProps {
+  record: any;
+  index: number;
+  isVi: boolean;
+  onDelete: (index: number) => void;
+}
+
+const MedicalRecordItem = memo(({ record, index, isVi, onDelete }: MedicalRecordItemProps) => {
+  const formattedRecordDate = record.recordDate ? new Date(record.recordDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
+  const formattedNextDueDate = record.nextDueDate ? new Date(record.nextDueDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
+  const displayRecordName = displayBilingual(parseBilingual(record.recordName), isVi);
+  const displayNextDueName = displayBilingual(parseBilingual(record.nextDueName), isVi);
+
+
+  return (
+    <View className="p-4 bg-[#FAFAFA] rounded-[12px] mb-3 border border-[#E5E5EA] flex-row items-center justify-between">
+      <View className="flex-1">
+        <Text className="font-semibold text-[#111827] text-[15px] mb-1">
+          {displayRecordName || (isVi ? "Hồ sơ không tên" : "Unnamed Record")}
+        </Text>
+        <Text className="text-[#6B7280] text-[13px]">
+          {isVi ? 'Loại' : 'Type'}: {record.type} | {isVi ? 'Ngày' : 'Date'}: {formattedRecordDate}
+        </Text>
+
+        {record.images && record.images.length > 0 && (
+          <Text className="text-[#9CA3AF] text-[12px] mt-1">
+            {isVi ? `Đính kèm: ${record.images.length} ảnh` : `Attachments: ${record.images.length} photos`}
+          </Text>
+        )}
+
+        {record.hasNextDueDate && (
+          <Text className="text-[#E89B5A] text-[12px] mt-1 font-medium">
+            {isVi ? 'Lịch tiếp theo' : 'Next due'}: {formattedNextDueDate} ({displayNextDueName})
+          </Text>
+        )}
+      </View>
+
+      <View className="flex-row items-center gap-2">
+        <TouchableOpacity
+          onPress={() => onDelete(index)}
+          className="p-2"
+        >
+          <Ionicons name="trash-outline" size={12} color="rgb(121, 121, 121)" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}, (prevProps, nextProps) => {
+  // Chỉ re-render nếu record thay đổi, isVi thay đổi
+  return (
+    prevProps.record === nextProps.record &&
+    prevProps.isVi === nextProps.isVi &&
+    prevProps.index === nextProps.index
+  );
+});
+// =====================================================================
+
 
 export default function EditPetScreen() {
   const router = useRouter();
@@ -194,27 +220,42 @@ export default function EditPetScreen() {
   const showModal = useModalStore((state) => state.showModal);
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
-  
+
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // State Android Picker
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+  const [isCustomBreed, setIsCustomBreed] = useState(false);
+
   // State quản lý Medical Records mới
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [medicalRecords, setMedicalRecords] = useState<any[]>([]);
   const [isUploadingRecords, setIsUploadingRecords] = useState(false);
 
+  // 🚀 FIX 3: Khai báo hàm xoá record với useCallback để tránh tạo function mới mỗi lần render
+  const handleDeleteMedicalRecord = useCallback((indexToDelete: number) => {
+    setMedicalRecords(prev => prev.filter((_, i) => i !== indexToDelete));
+  }, []);
+
+  // 🚀 NÂNG CẤP 2: Thêm state quản lý UI khóa
+  const [lockStatus, setLockStatus] = useState({
+    isCoreLocked: false,
+    isNameLocked: false,
+    nameLockDaysLeft: 0
+  });
+
   // 2. ĐỒNG BỘ POPUP ADDRESS (API V2)
   const [showAddressPopup, setShowAddressPopup] = useState(false);
   const [provinces, setProvinces] = useState<any[]>([]);
   const [wardOptions, setWardOptions] = useState<string[]>([]);
-  
+
   const [tempCity, setTempCity] = useState('');
   const [tempWard, setTempWard] = useState('');
   const [tempDetail, setTempDetail] = useState('');
-  
+
   const speciesData = [
     { label: isVi ? 'Chó' : 'Dog', value: 'Dog' },
     { label: isVi ? 'Mèo' : 'Cat', value: 'Cat' },
@@ -223,10 +264,53 @@ export default function EditPetScreen() {
   const genderData = [
     { label: isVi ? 'Đực' : 'Male', value: 'MALE' },
     { label: isVi ? 'Cái' : 'Female', value: 'FEMALE' },
-    { label: isVi ? 'Không rõ' : 'Unknown', value: 'UNKNOWN' },
   ];
 
-  // Fetch Tỉnh/Thành
+  const scrollViewRef = useRef<ScrollView>(null);
+  const contentRef = useRef<View>(null);
+  const dobRef = useRef<View>(null);
+
+  const [activePicker, setActivePicker] = useState<'dob' | null>(null);
+  const [pickerLayout, setPickerLayout] = useState({ x: 0, y: 0, width: 340 });
+  const pickerOpacity = useRef(new Animated.Value(0)).current;
+  const pickerTranslateY = useRef(new Animated.Value(-8)).current;
+
+  const openDropdownPicker = (type: 'dob') => {
+    Keyboard.dismiss();
+
+    if (contentRef.current && dobRef.current) {
+      dobRef.current.measureLayout(
+        contentRef.current,
+        (left, top, width, height) => {
+          scrollViewRef.current?.scrollTo({ y: Math.max(0, top - 120), animated: true });
+
+          setTimeout(() => {
+            dobRef.current?.measureInWindow((x, windowY, w, h) => {
+              const dropdownWidth = 340;
+              const finalX = (SCREEN_WIDTH - dropdownWidth) / 2;
+
+              setPickerLayout({ x: finalX, y: windowY + h + 8, width: dropdownWidth });
+              setActivePicker(type);
+
+              Animated.parallel([
+                Animated.timing(pickerOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+                Animated.timing(pickerTranslateY, { toValue: 0, duration: 250, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true })
+              ]).start();
+            });
+          }, 350);
+        },
+        () => console.log('Lỗi không thể đo kích thước layout')
+      );
+    }
+  };
+
+  const closeDropdownPicker = () => {
+    Animated.parallel([
+      Animated.timing(pickerOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(pickerTranslateY, { toValue: -8, duration: 150, useNativeDriver: true })
+    ]).start(() => setActivePicker(null));
+  };
+
   useEffect(() => {
     fetch('https://provinces.open-api.vn/api/v2/p/')
       .then(res => res.json())
@@ -247,15 +331,14 @@ export default function EditPetScreen() {
 
   const cityOptions = provinces.map((c: any) => c.name);
 
-  // Fetch Phường/Xã (Đã sort Alphabet)
   useEffect(() => {
     if (!tempCity) {
       setWardOptions([]);
       return;
     }
-    
+
     const selectedProvince = provinces.find((p: any) => p.name === tempCity);
-    
+
     if (selectedProvince && selectedProvince.code) {
       fetch(`https://provinces.open-api.vn/api/v2/w/?province=${selectedProvince.code}`)
         .then(res => res.json())
@@ -264,7 +347,7 @@ export default function EditPetScreen() {
             const sortedWards = data
               .sort((a: any, b: any) => a.name.localeCompare(b.name, 'vi'))
               .map((ward: any) => ward.name);
-              
+
             setWardOptions(sortedWards);
           }
         })
@@ -275,12 +358,12 @@ export default function EditPetScreen() {
   const handleConfirmAddress = () => {
     if (!tempCity || !tempWard) {
       Alert.alert(
-        isVi ? "Thiếu thông tin" : "Missing Information", 
+        isVi ? "Thiếu thông tin" : "Missing Information",
         isVi ? "Vui lòng chọn Tỉnh/Thành phố và Phường/Xã." : "Please select City/Province and Ward/District."
       );
       return;
     }
-    let fullAddress = `${tempWard}, ${tempCity}`; 
+    let fullAddress = `${tempWard}, ${tempCity}`;
     if (tempDetail.trim()) {
       fullAddress = `${tempDetail.trim()}, ${fullAddress}`;
     }
@@ -290,7 +373,7 @@ export default function EditPetScreen() {
 
   const [formData, setFormData] = useState<EditPetFormData>({
     name: '',
-    species: 'Dog',
+    species: 'UNKNOWN',
     breed: '',
     color: '',
     weight: '',
@@ -306,6 +389,10 @@ export default function EditPetScreen() {
     qrCodeUrl: '',
     sterilized: null,
   });
+  const [originalBilingual, setOriginalBilingual] = useState<{ color: BilingualValue; description: BilingualValue }>({
+    color: { vi: '', en: '' },
+    description: { vi: '', en: '' },
+  });
 
   const inputFontStyle = { fontFamily: 'Urbanist-Regular' };
 
@@ -314,16 +401,24 @@ export default function EditPetScreen() {
     const fetchPet = async () => {
       try {
         const data = await petService.getPetById(id as string);
+        const colorBi = parseBilingual(data.color);
+        const descBi = parseBilingual(data.description);
+        setOriginalBilingual({ color: colorBi, description: descBi });
+
+        const resolvedSpecies = resolveSpeciesValue(data.species);
+        const resolvedBreed = resolveBreedValue(data.breed, resolvedSpecies);
+
+
         setFormData({
           name: data.name || '',
-          species: data.species || 'Dog',
-          breed: data.breed || '',
-          color: data.color || '',
+          species: resolvedSpecies,
+          breed: resolvedBreed.value,
+          color: displayBilingual(colorBi, isVi),
           size: data.size || 'MEDIUM',
           weight: data.weight ? data.weight.toString() : '',
           dob: data.dob ? new Date(data.dob).toISOString() : '',
           microchip: data.microchipNumber || '',
-          description: data.description || '',
+          description: displayBilingual(descBi, isVi),
           gender: (data.gender as GenderType) || 'UNKNOWN',
           imageUrl: data.avatarUrl || data.images?.[0]?.url || '',
           contactName: data.contactName || '',
@@ -331,12 +426,44 @@ export default function EditPetScreen() {
           contactAddress: data.contactAddress || '',
           qrCodeUrl: data.qrCodeUrl || '',
           sterilized: data.isSpayedNeutered !== undefined ? data.isSpayedNeutered : null,
+          createdAt: data.createdAt,
+          adoptedAt: data.adoptedAt,
+          nameLastUpdatedAt: data.nameLastUpdatedAt,
+          status: data.status,
         });
+        setIsCustomBreed(resolvedBreed.isCustom);
 
-        // Set danh sách medical records nếu backend trả về
         if (data.medicalRecords && Array.isArray(data.medicalRecords)) {
           setMedicalRecords(data.medicalRecords);
         }
+
+        // 🚀 NÂNG CẤP 3: Xử lý tính toán ngày và trạng thái khóa
+        const now = new Date();
+        const createdAtDate = new Date(data.createdAt || now);
+        const daysSinceCreation = Math.floor((now.getTime() - createdAtDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        const isCoreLocked = daysSinceCreation >= 7;
+
+        let isNameLocked = false;
+        let nameLockDaysLeft = 0;
+
+        const isAdopted = data.status === 'ADOPTED';
+        const daysSinceAdoption = data.adoptedAt
+          ? Math.floor((now.getTime() - new Date(data.adoptedAt).getTime()) / (1000 * 60 * 60 * 24))
+          : 999;
+
+        if (!(isAdopted && daysSinceAdoption <= 30)) {
+          if (data.nameLastUpdatedAt) {
+            const daysSinceNameUpdate = Math.floor((now.getTime() - new Date(data.nameLastUpdatedAt).getTime()) / (1000 * 60 * 60 * 24));
+            if (daysSinceNameUpdate < 14) {
+              isNameLocked = true;
+              nameLockDaysLeft = 14 - daysSinceNameUpdate;
+            }
+          }
+        }
+
+        setLockStatus({ isCoreLocked, isNameLocked, nameLockDaysLeft });
+
       } catch (error) {
         Alert.alert(isVi ? "Lỗi" : "Error", isVi ? "Không thể tải thông tin thú cưng." : "Could not load pet information.");
         router.back();
@@ -352,10 +479,12 @@ export default function EditPetScreen() {
     if (uploadedUrl) handleChange('imageUrl', uploadedUrl);
   };
 
-  const handleChange = (field: keyof EditPetFormData, value: any) => {
+  const handleChange = useCallback((field: keyof EditPetFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
+  }, []);
+  const currentBreedOptions = useMemo(() => {
+    return getBreedOptions((formData.species as string) || 'Dog', isVi);
+  }, [formData.species, isVi]);
   const onDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
     if (event.type === 'set' && selectedDate) {
@@ -374,82 +503,83 @@ export default function EditPetScreen() {
     try {
       setIsSubmitting(true);
       setIsUploadingRecords(true);
+      const species = (formData.species as 'Dog' | 'Cat') || 'Dog';
+      const [colorBilingual, descriptionBilingual, breedBilingual] = await Promise.all([
+        buildBilingualOnSubmit(formData.color, originalBilingual.color, isVi),
+        buildBilingualOnSubmit(formData.description, originalBilingual.description, isVi),
+        formData.breed
+          ? (buildBreedBilingual(formData.breed, species) ??
+            buildBilingualOnSubmit(formData.breed, { vi: '', en: '' }, isVi))
+          : Promise.resolve(null),
+      ]);
 
-      // 3. THỰC THI UPLOAD FILE:// CHO TỪNG BẢN GHI Y TẾ
       const finalMedicalRecords = await Promise.all(
         medicalRecords.map(async (record) => {
-          if (!record.images || record.images.length === 0) return record;
+          // 🚀 FIX: Chủ động stringify các object đa ngôn ngữ
+          const formattedRecordName = typeof record.recordName === 'object' ? JSON.stringify(record.recordName) : record.recordName;
+          const formattedNextDueName = record.nextDueName && typeof record.nextDueName === 'object' ? JSON.stringify(record.nextDueName) : record.nextDueName;
+
+          if (!record.images || record.images.length === 0) {
+            return { ...record, recordName: formattedRecordName, nextDueName: formattedNextDueName };
+          }
 
           const uploadedImages = await Promise.all(
             record.images.map(async (uri: string) => {
-              if (uri.startsWith('http')) return uri; // Đã là link mạng thì bỏ qua
-              
+              if (uri.startsWith('http')) return uri;
               try {
                 const filename = uri.split('/').pop() || `medical-record-${Date.now()}.jpg`;
                 const match = /\.(\w+)$/.exec(filename);
                 const ext = match ? match[1].toLowerCase() : 'jpeg';
-
                 let type = 'image/jpeg';
                 if (ext === 'png') type = 'image/png';
                 else if (ext === 'webp') type = 'image/webp';
 
-                // Gọi API lấy Presigned URL
                 const presignedRes = await axiosClient.post('/storage/presigned-url', {
-                  fileName: filename,
-                  fileType: type,
-                  folder: 'medical-records'
+                  fileName: filename, fileType: type, folder: 'medical-records'
                 });
-
                 const { uploadUrl, fileUrl } = presignedRes.data;
-
                 const localFileFetch = await fetch(uri);
                 const fileBlob = await localFileFetch.blob();
-
-                // PUT thẳng lên R2
                 const uploadRes = await fetch(uploadUrl, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': type },
-                  body: fileBlob
+                  method: 'PUT', headers: { 'Content-Type': type }, body: fileBlob
                 });
-
                 if (!uploadRes.ok) throw new Error('Upload R2 failed');
-
                 return fileUrl;
               } catch (fileError) {
                 console.error(`[Upload Lỗi] Không thể upload ảnh ${uri}:`, fileError);
-                return null; // Bỏ qua file bị lỗi
+                return null;
               }
             })
           );
-          
-          return { ...record, images: uploadedImages.filter(Boolean) };
+
+          return {
+            ...record,
+            images: uploadedImages.filter(Boolean),
+            recordName: formattedRecordName,
+            nextDueName: formattedNextDueName
+          };
         })
       );
 
-      // Cập nhật state để không bị upload lại nếu bấm Submit lần sau
       setMedicalRecords(finalMedicalRecords);
-
-      // ----------------------------------------------------------- //
 
       const payload: any = {
         name: formData.name,
-        species: formData.species,
-        breed: formData.breed || null,
+        species: SPECIES_BILINGUAL[species],
+        breed: breedBilingual,
         gender: formData.gender !== 'UNKNOWN' ? formData.gender : null,
-        color: formData.color || null,
+        color: colorBilingual,
         weight: formData.weight ? parseFloat(formData.weight) : null,
         size: formData.size || null,
         microchipNumber: formData.microchip || null,
-        description: formData.description || null,
+        description: descriptionBilingual,
         contactName: formData.contactName || null,
         contactPhone: formData.contactPhone || null,
         contactAddress: formData.contactAddress || null,
         images: formData.imageUrl ? [formData.imageUrl] : [],
         qrCodeUrl: formData.qrCodeUrl || null,
         isSpayedNeutered: formData.sterilized !== null ? formData.sterilized : null,
-        
-        // Đẩy thẳng mảng record vào đây, backend sẽ lo phần update
-        medicalRecords: finalMedicalRecords.length > 0 ? finalMedicalRecords : undefined, 
+        medicalRecords: finalMedicalRecords,
       };
 
       if (formData.dob) {
@@ -466,7 +596,9 @@ export default function EditPetScreen() {
       });
 
     } catch (error: any) {
-      Alert.alert(isVi ? 'Lỗi' : 'Error', error.message || (isVi ? 'Cập nhật thất bại. Vui lòng thử lại.' : 'Failed to update pet. Please try again.'));
+      // Bắt lỗi từ Backend và hiển thị Alert lên UI
+      const displayMsg = resolveErrorMessage(error, t) || error.message || (isVi ? 'Cập nhật thất bại. Vui lòng thử lại.' : 'Failed to update pet. Please try again.');
+      Alert.alert(isVi ? 'Lỗi' : 'Error', displayMsg);
     } finally {
       setIsSubmitting(false);
       setIsUploadingRecords(false);
@@ -502,383 +634,417 @@ export default function EditPetScreen() {
           </View>
 
           <ScrollView
+            ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 20 }}
             className="flex-1"
           >
-            {/* Avatar Section */}
-            <View className="items-center mt-6 mb-8">
-              <TouchableOpacity
-                onPress={handlePickAvatar}
-                disabled={isUploadingAvatar}
-                className="w-32 h-32 rounded-full bg-[#FAFAFA] border border-gray-200 items-center justify-center overflow-hidden shadow-sm"
-              >
-                {isUploadingAvatar ? (
-                  <ActivityIndicator size="large" color="#EFA062" />
-                ) : formData.imageUrl ? (
-                  <Image
-                    source={{ uri: formData.imageUrl }}
-                    className="w-full h-full"
-                  />
-                ) : (
-                  <Feather name="camera" size={32} color="#9CA3AF" />
-                )}
-              </TouchableOpacity>
-            </View>
+            {/* Wrapper lấy tọa độ để căn scroll */}
+            <View ref={contentRef} collapsable={false}>
 
-            {/* Pet Information Section */}
-            <View className="mb-6">
-              <Text className="text-[16px] font-semibold text-black mb-3">{isVi ? 'Thông tin thú cưng' : 'Pet Information'}</Text>
-
-              <View className="bg-white p-6 rounded-[20px] border border-gray-200">
-
-                {/* 1. Name & Type Row */}
-                <View className="flex-row gap-3 mb-5">
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Tên' : 'Name'}</Text>
-                    <TextInput
-                      style={inputFontStyle}
-                      className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
-                      value={formData.name}
-                      onChangeText={(text) => handleChange('name', text)}
-                      placeholder={isVi ? "Tên thú cưng" : "Pet name"}
-                      placeholderTextColor="#A1A1AA"
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Loài' : 'Type'}</Text>
-                    <Dropdown
-                      style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
-                      containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
-                      placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                      selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                      itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                      data={speciesData}
-                      maxHeight={200}
-                      labelField="label"
-                      valueField="value"
-                      placeholder={isVi ? 'Chọn loài' : 'Select type'}
-                      value={formData.species}
-                      onChange={(item) => {
-                        handleChange('species', item.value);
-                        handleChange('breed', ''); // Reset breed khi đổi loại
-                      }}
-                    />
-                  </View>
-                </View>
-
-                {/* 2. Gender & Sterilized Row */}
-                <View className="flex-row gap-3 mb-5">
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Giới tính' : 'Gender'}</Text>
-                    <Dropdown
-                      style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
-                      containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 4, borderColor: '#E5E7EB', borderWidth: 1 }}
-                      placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                      selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                      itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                      data={genderData}
-                      maxHeight={200}
-                      labelField="label"
-                      valueField="value"
-                      placeholder={isVi ? 'Chọn giới tính' : 'Select gender'}
-                      value={formData.gender}
-                      onChange={(item) => handleChange('gender', item.value)}
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-2.5">{isVi ? 'Đã triệt sản' : 'Sterilized'}</Text>
-                    <View className="flex-row items-center gap-8 h-[30px]">
-                      <TouchableOpacity onPress={() => handleChange('sterilized', true)} className="flex-row items-center">
-                        <View className={`w-4 h-4 rounded-full border items-center justify-center mr-2 ${formData.sterilized === true ? 'border-[#EFA062]' : ' border-[#E5E7EB]'}`}>
-                          {formData.sterilized === true && <View className="w-2.5 h-2.5 rounded-full bg-[#EFA062]" />}
-                        </View>
-                        <Text className="text-[14px] text-black">{isVi ? 'Có' : 'Yes'}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleChange('sterilized', false)} className="flex-row items-center">
-                        <View className={`w-4 h-4 rounded-full border items-center justify-center mr-2 ${formData.sterilized === false ? 'border-[#EFA062]' : ' border-[#E5E7EB]'}`}>
-                          {formData.sterilized === false && <View className="w-2.5 h-2.5 rounded-full bg-[#EFA062]" />}
-                        </View>
-                        <Text className="text-[14px] text-black">{isVi ? 'Không' : 'No'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-
-                {/* 3. Breed & Color Row */}
-                <View className="flex-row gap-3 mb-5">
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Giống' : 'Breed'}</Text>
-                    <Dropdown
-                      style={{ height: 34, borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#FFFFFF' }}
-                      containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
-                      placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                      selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                      itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                      data={BREED_OPTIONS[formData.species as string] || BREED_OPTIONS['Dog']}
-                      maxHeight={250}
-                      labelField="label"
-                      valueField="value"
-                      placeholder={isVi ? 'Chọn giống' : 'Select breed'}
-                      value={formData.breed}
-                      onChange={(item) => handleChange('breed', item.value)}
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Màu sắc' : 'Color'}</Text>
-                    <TextInput
-                      style={inputFontStyle}
-                      className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
-                      value={formData.color}
-                      onChangeText={(text) => handleChange('color', text)}
-                      placeholder={isVi ? "Màu sắc" : "Color"}
-                      placeholderTextColor="#A1A1AA"
-                    />
-                  </View>
-                </View>
-
-                {/* 4. Birthday & Weight Row */}
-                <View className="flex-row gap-3 mb-5">
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Ngày sinh' : 'Birthday'}</Text>
-                    <TouchableOpacity onPress={() => setShowDatePicker(true)} className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 justify-center bg-white">
-                      <Text className={`text-[14px] ${formData.dob ? 'text-black' : 'text-[#A1A1AA]'}`}>
-                        {formData.dob ? new Date(formData.dob).toLocaleDateString('en-GB') : 'DD/MM/YYYY'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Cân nặng' : 'Weight'}</Text>
-                    <TextInput
-                      style={inputFontStyle}
-                      className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
-                      value={formData.weight}
-                      onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
-                      keyboardType="decimal-pad"
-                      placeholder={isVi ? "Cân nặng (kg)" : "Weight (kg)"}
-                      placeholderTextColor="#A1A1AA"
-                    />
-                  </View>
-                </View>
-
-                <View className="h-[1px] bg-gray-100 my-5" />
-
-                <View>
-                  <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Ghi chú' : 'Notes'}</Text>
-                  <TextInput
-                    style={[inputFontStyle, { paddingTop: 12 }]}
-                    className="border border-[#E5E5E5] rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
-                    value={formData.description}
-                    onChangeText={(text) => handleChange('description', text)}
-                    placeholder={isVi ? "Thích được xoa bụng và chơi trò ném đồ..." : "Loves belly rubs and playing fetch..."}
-                    placeholderTextColor="#A1A1AA"
-                    multiline
-                    textAlignVertical="top"
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Owner Information Section */}
-            <View className="mb-6">
-              <Text className="text-[16px] font-semibold text-black mb-3">{isVi ? 'Thông tin chủ nuôi' : 'Owner Information'}</Text>
-
-              <View className="bg-white rounded-[20px] border border-gray-200 px-4 py-2">
-                <View className="flex-row items-center py-3 border-b border-gray-100">
-                  <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'Tên' : 'Name'}</Text>
-                  <TextInput
-                    style={inputFontStyle}
-                    className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
-                    value={formData.contactName}
-                    onChangeText={(text) => handleChange('contactName', text)}
-                    placeholder={isVi ? "Họ Và Tên" : "Full Name"}
-                    placeholderTextColor="#A1A1AA"
-                  />
-                </View>
-
-                <View className="flex-row items-center py-3 border-b border-gray-100">
-                  <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'SĐT' : 'Phone'}</Text>
-                  <TextInput
-                    style={inputFontStyle}
-                    className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
-                    value={formData.contactPhone}
-                    onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
-                    keyboardType="phone-pad"
-                    placeholder={isVi ? "Số Điện Thoại" : "Phone Number"}
-                    placeholderTextColor="#A1A1AA"
-                    maxLength={15}
-                  />
-                </View>
-
-                <View className="flex-row items-center py-4">
-                  <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
-                  <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
-                    <Text 
-                      style={inputFontStyle}
-                      className={`text-right text-[14px] p-0 ${formData.contactAddress ? 'text-[#8E8E93]' : 'text-[#A1A1AA]'}`} 
-                      numberOfLines={1}
-                    >
-                      {formData.contactAddress || (isVi ? "Địa chỉ của bạn" : "Street Address, District, City")}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            {/* MEDICAL RECORDS SECTION */}
-            <View className="mb-8">
-              <View className="flex-row justify-between items-center mb-[20px]">
-                <Text className="text-[16px] font-semibold text-[#111827] tracking-[0.06px]">
-                  {isVi ? 'Hồ sơ y tế' : 'Medical Records'} ({medicalRecords.length})
-                </Text>
-                <TouchableOpacity 
-                  onPress={() => setShowMedicalModal(true)}
-                  className="bg-[#FFF8F0] px-4 py-2 rounded-full border border-[#E89B5A]/30"
+              {/* Avatar Section */}
+              <View className="items-center mt-6 mb-8">
+                <TouchableOpacity
+                  onPress={handlePickAvatar}
+                  disabled={isUploadingAvatar}
+                  className="w-32 h-32 rounded-full bg-[#FAFAFA] border border-gray-200 items-center justify-center overflow-hidden shadow-sm"
                 >
-                  <Text className="text-[#E89B5A] font-medium text-[13px]">{isVi ? '+ Thêm hồ sơ' : '+ Add Record'}</Text>
+                  {isUploadingAvatar ? (
+                    <ActivityIndicator size="large" color="#EFA062" />
+                  ) : formData.imageUrl ? (
+                    <Image
+                      source={{ uri: formData.imageUrl }}
+                      className="w-full h-full"
+                    />
+                  ) : (
+                    <Feather name="camera" size={32} color="#9CA3AF" />
+                  )}
                 </TouchableOpacity>
               </View>
 
-              {/* Progress UI hiển thị khi ấn Save Changes và đang upload */}
-              {isUploadingRecords && (
-                <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mb-4">
-                  <View className='flex-row items-center mb-3'>
-                    <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
-                    <View className="flex-1 ml-3">
-                      <View className="flex-row justify-between items-center">
-                        <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
-                          {isVi ? 'Đang tải ảnh y tế lên...' : 'Uploading medical photos...'}
-                        </Text>
-                      </View>
-                      <View className="flex-row items-center mt-1">
-                        <ActivityIndicator color="#E89B5A" style={{ transform: [{ scaleX: 0.6 }, { scaleY: 0.6 }] }} />
-                        <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">
-                          {isVi ? 'Vui lòng đợi...' : 'Please wait...'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View className="h-1.5 bg-[#E3E3E4] rounded-full ">
-                    <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '100%' }} />
-                  </View>
-                </View>
-              )}
+              {/* Pet Information Section */}
+              <View className="mb-6">
+                <Text className="text-[16px] font-semibold text-black mb-3">{isVi ? 'Thông tin thú cưng' : 'Pet Information'}</Text>
 
-              {/* Danh sách các record */}
-              {medicalRecords.length === 0 ? (
-                <Text className="text-gray-400 text-[14px] italic">
-                  {isVi ? 'Chưa có hồ sơ y tế nào.' : 'No medical records yet.'}
-                </Text>
-              ) : (
-                medicalRecords.map((record, index) => (
-                  <View key={index} className="p-4 bg-[#FAFAFA] rounded-[12px] mb-3 border border-[#E5E5EA] flex-row items-center justify-between">
+                <View className="bg-white p-6 rounded-[20px] border border-gray-200">
+
+                  {/* 1. Name & Type Row */}
+                  <View className="flex-row gap-3 mb-5">
                     <View className="flex-1">
-                      <Text className="font-semibold text-[#111827] text-[15px] mb-1">
-                        {record.recordName || (isVi ? "Hồ sơ không tên" : "Unnamed Record")}
-                      </Text>
-                      <Text className="text-[#6B7280] text-[13px]">
-                        {isVi ? 'Loại' : 'Type'}: {record.type} | {isVi ? 'Ngày' : 'Date'}: {new Date(record.recordDate).toLocaleDateString('vi-VN')}
-                      </Text>
-                      
-                      {/* Trạng thái ảnh */}
-                      {record.images && record.images.length > 0 && (
-                        <Text className="text-[#9CA3AF] text-[12px] mt-1">
-                          {isVi ? `Đính kèm: ${record.images.length} ảnh` : `Attachments: ${record.images.length} photos`}
-                        </Text>
-                      )}
-
-                      {record.hasNextDueDate && (
-                        <Text className="text-[#E89B5A] text-[12px] mt-1 font-medium">
-                          {isVi ? 'Lịch tiếp theo' : 'Next due'}: {new Date(record.nextDueDate).toLocaleDateString('vi-VN')} ({record.nextDueName})
+                      {/* 🚀 NÂNG CẤP 4: UI báo hiệu KHÓA TÊN */}
+                      <View className="flex-row items-center mb-1.5">
+                        <Text className="text-[14px] text-black font-medium">{isVi ? 'Tên' : 'Name'}</Text>
+                        {lockStatus.isNameLocked && <Feather name="lock" size={12} color="#9CA3AF" style={{ marginLeft: 4 }} />}
+                      </View>
+                      <TextInput
+                        style={inputFontStyle}
+                        editable={!lockStatus.isNameLocked}
+                        className={`h-[34px] border rounded-[12px] px-3.5 text-[14px] ${lockStatus.isNameLocked ? 'bg-[#F9FAFB] border-transparent text-[#9CA3AF]' : 'bg-white border-[#E5E5E5] text-black'}`}
+                        value={formData.name}
+                        onChangeText={(text) => handleChange('name', text)}
+                        placeholder={isVi ? "Tên thú cưng" : "Pet name"}
+                        placeholderTextColor="#A1A1AA"
+                      />
+                      {lockStatus.isNameLocked && (
+                        <Text className="text-[10px] text-[#E89B5A] mt-1 font-medium italic">
+                          {isVi ? `Có thể đổi sau ${lockStatus.nameLockDaysLeft} ngày nữa` : `Changeable in ${lockStatus.nameLockDaysLeft} days`}
                         </Text>
                       )}
                     </View>
+                    <View className="flex-1">
+                      {/* 🚀 NÂNG CẤP 5: UI báo hiệu KHÓA LOÀI */}
+                      <View className="flex-row items-center mb-1.5">
+                        <Text className="text-[14px] text-black font-medium">{isVi ? 'Loài' : 'Type'}</Text>
+                        {(lockStatus.isCoreLocked && formData.species && formData.species !== 'UNKNOWN') && <Feather name="lock" size={12} color="#9CA3AF" style={{ marginLeft: 4 }} />}
+                      </View>
+                      <Dropdown
+                        disable={lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN'}
+                        style={{ height: 34, borderColor: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? 'transparent' : '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? '#F9FAFB' : '#FFFFFF' }}
+                        containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
+                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? '#9CA3AF' : '#000000', fontFamily: 'Urbanist' }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        data={speciesData}
+                        maxHeight={200}
+                        labelField="label"
+                        valueField="value"
+                        placeholder={isVi ? 'Chọn loài' : 'Select type'}
+                        value={formData.species}
+                        onChange={(item) => {
+                          handleChange('species', item.value);
+                          handleChange('breed', '');
+                        }}
+                      />
+                    </View>
+                  </View>
 
-                    <View className="flex-row items-center gap-2">
-                      {/* Nút Xem Chi Tiết Nếu Có Link */}
-                      {record.images && record.images.length > 0 && record.images[0].startsWith('http') && (
-                        <TouchableOpacity 
-                          onPress={() => Linking.openURL(record.images[0]).catch(() => Alert.alert("Lỗi", "Không thể mở file."))}
-                          className="p-2 bg-gray-100 rounded-full"
-                        >
-                          <Feather name="eye" size={18} color="#6B7280" />
+                  {/* 2. Gender & Sterilized Row */}
+                  <View className="flex-row gap-3 mb-5">
+                    <View className="flex-1">
+                      {/* 🚀 NÂNG CẤP 6: UI báo hiệu KHÓA GIỚI TÍNH */}
+                      <View className="flex-row items-center mb-1.5">
+                        <Text className="text-[14px] text-black font-medium">{isVi ? 'Giới tính' : 'Gender'}</Text>
+                        {(lockStatus.isCoreLocked && formData.gender && formData.gender !== 'UNKNOWN') && <Feather name="lock" size={12} color="#9CA3AF" style={{ marginLeft: 4 }} />}
+                      </View>
+                      <Dropdown
+                        disable={lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN'}
+                        style={{ height: 34, borderColor: (lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN') ? 'transparent' : '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: (lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN') ? '#F9FAFB' : '#FFFFFF' }}
+                        containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 4, borderColor: '#E5E7EB', borderWidth: 1 }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
+                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN') ? '#9CA3AF' : '#000000', fontFamily: 'Urbanist' }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        data={genderData}
+                        maxHeight={200}
+                        labelField="label"
+                        valueField="value"
+                        placeholder={isVi ? 'Chọn giới tính' : 'Select gender'}
+                        value={formData.gender}
+                        onChange={(item) => handleChange('gender', item.value)}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[14px] text-black font-medium mb-2.5">{isVi ? 'Đã triệt sản' : 'Sterilized'}</Text>
+                      <View className="flex-row items-center gap-8 h-[30px]">
+                        <TouchableOpacity onPress={() => handleChange('sterilized', true)} className="flex-row items-center">
+                          <View className={`w-4 h-4 rounded-full border items-center justify-center mr-2 ${formData.sterilized === true ? 'border-[#EFA062]' : ' border-[#E5E7EB]'}`}>
+                            {formData.sterilized === true && <View className="w-2.5 h-2.5 rounded-full bg-[#EFA062]" />}
+                          </View>
+                          <Text className="text-[14px] text-black">{isVi ? 'Có' : 'Yes'}</Text>
                         </TouchableOpacity>
-                      )}
+                        <TouchableOpacity onPress={() => handleChange('sterilized', false)} className="flex-row items-center">
+                          <View className={`w-4 h-4 rounded-full border items-center justify-center mr-2 ${formData.sterilized === false ? 'border-[#EFA062]' : ' border-[#E5E7EB]'}`}>
+                            {formData.sterilized === false && <View className="w-2.5 h-2.5 rounded-full bg-[#EFA062]" />}
+                          </View>
+                          <Text className="text-[14px] text-black">{isVi ? 'Không' : 'No'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
 
-                      {/* Nút Xóa Record */}
-                      <TouchableOpacity 
-                        onPress={() => setMedicalRecords(prev => prev.filter((_, i) => i !== index))}
-                        className="p-2 bg-red-50 rounded-full"
+                  {/* 3. Breed & Color Row */}
+                  <View className="flex-row gap-3 mb-5">
+                    <View className="flex-1">
+                      {/* 🚀 NÂNG CẤP 7: UI báo hiệu KHÓA GIỐNG */}
+                      <View className="flex-row items-center mb-1.5">
+                        <Text className="text-[14px] text-black font-medium">{isVi ? 'Giống' : 'Breed'}</Text>
+                        {(lockStatus.isCoreLocked && !!formData.breed) && <Feather name="lock" size={12} color="#9CA3AF" style={{ marginLeft: 4 }} />}
+                      </View>
+                      <Dropdown
+                        disable={lockStatus.isCoreLocked && !!formData.breed}
+                        style={{ height: 34, borderColor: (lockStatus.isCoreLocked && !!formData.breed) ? 'transparent' : '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: (lockStatus.isCoreLocked && !!formData.breed) ? '#F9FAFB' : '#FFFFFF' }}
+                        containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
+                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.breed) ? '#9CA3AF' : '#000000', fontFamily: 'Urbanist' }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        data={currentBreedOptions}
+                        maxHeight={250}
+                        labelField="label"
+                        valueField="value"
+                        placeholder={isVi ? 'Chọn giống' : 'Select breed'}
+                        value={formData.breed}
+                        onChange={(item) => handleChange('breed', item.value)}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Màu sắc' : 'Color'}</Text>
+                      <TextInput
+                        style={inputFontStyle}
+                        className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
+                        value={formData.color}
+                        onChangeText={(text) => handleChange('color', text)}
+                        placeholder={isVi ? "Màu sắc" : "Color"}
+                        placeholderTextColor="#A1A1AA"
+                      />
+                    </View>
+                  </View>
+
+                  {/* 4. Birthday & Weight Row */}
+                  <View className="flex-row gap-3 mb-5">
+                    <View className="flex-1" ref={dobRef} collapsable={false}>
+                      {/* 🚀 NÂNG CẤP 8: UI báo hiệu KHÓA NGÀY SINH */}
+                      <View className="flex-row items-center mb-1.5">
+                        <Text className="text-[14px] text-black font-medium">{isVi ? 'Ngày sinh' : 'Birthday'}</Text>
+                        {(lockStatus.isCoreLocked && !!formData.dob) && <Feather name="lock" size={12} color="#9CA3AF" style={{ marginLeft: 4 }} />}
+                      </View>
+                      <TouchableOpacity
+                        disabled={lockStatus.isCoreLocked && !!formData.dob}
+                        onPress={() => Platform.OS === 'ios' ? openDropdownPicker('dob') : setShowDatePicker(true)}
+                        className={`h-[34px] border rounded-[12px] px-3.5 justify-center ${(lockStatus.isCoreLocked && !!formData.dob) ? 'bg-[#F9FAFB] border-transparent' : 'bg-white border-[#E5E5E5]'}`}
                       >
-                        <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                        <Text className={`text-[14px] ${formData.dob ? ((lockStatus.isCoreLocked && !!formData.dob) ? 'text-[#9CA3AF]' : 'text-black') : 'text-[#A1A1AA]'}`}>
+                          {formData.dob ? new Date(formData.dob).toLocaleDateString('en-GB') : 'DD/MM/YYYY'}
+                        </Text>
                       </TouchableOpacity>
                     </View>
+                    <View className="flex-1">
+                      <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Cân nặng' : 'Weight'}</Text>
+                      <TextInput
+                        style={inputFontStyle}
+                        className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 text-black text-[14px]"
+                        value={formData.weight}
+                        onChangeText={(text) => handleChange('weight', text.replace(/[^0-9.]/g, ''))}
+                        keyboardType="decimal-pad"
+                        placeholder={isVi ? "Cân nặng (kg)" : "Weight (kg)"}
+                        placeholderTextColor="#A1A1AA"
+                      />
+                    </View>
                   </View>
-                ))
-              )}
-            </View>
 
-            <View className="space-y-3 mb-10">
-              <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={isSubmitting || isUploadingAvatar || isUploadingRecords}
-                className={`bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm ${(isSubmitting || isUploadingRecords) ? 'opacity-70' : ''}`}
-              >
-                {(isSubmitting || isUploadingRecords) ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text className="text-white font-semibold text-[16px]">{isVi ? 'Lưu thay đổi' : 'Save Changes'}</Text>
+                  <View className="h-[1px] bg-gray-100 my-5" />
+
+                  <View>
+                    <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Ghi chú' : 'Notes'}</Text>
+                    <TextInput
+                      style={[inputFontStyle, { paddingTop: 12 }]}
+                      className="border border-[#E5E5E5] rounded-[12px] px-3.5 pb-3 text-black text-[14px] min-h-[80px]"
+                      value={formData.description}
+                      onChangeText={(text) => handleChange('description', text)}
+                      placeholder={isVi ? "Thích được xoa bụng và chơi trò ném đồ..." : "Loves belly rubs and playing fetch..."}
+                      placeholderTextColor="#A1A1AA"
+                      multiline
+                      textAlignVertical="top"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Owner Information Section */}
+              <View className="mb-6">
+                <Text className="text-[16px] font-semibold text-black mb-3">{isVi ? 'Thông tin chủ nuôi' : 'Owner Information'}</Text>
+
+                <View className="bg-white rounded-[20px] border border-gray-200 px-4 py-2">
+                  <View className="flex-row items-center py-3 border-b border-gray-100">
+                    <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'Tên' : 'Name'}</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
+                      value={formData.contactName}
+                      onChangeText={(text) => handleChange('contactName', text)}
+                      placeholder={isVi ? "Họ Và Tên" : "Full Name"}
+                      placeholderTextColor="#A1A1AA"
+                    />
+                  </View>
+
+                  <View className="flex-row items-center py-3 border-b border-gray-100">
+                    <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'SĐT' : 'Phone'}</Text>
+                    <TextInput
+                      style={inputFontStyle}
+                      className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
+                      value={formData.contactPhone}
+                      onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
+                      keyboardType="phone-pad"
+                      placeholder={isVi ? "Số Điện Thoại" : "Phone Number"}
+                      placeholderTextColor="#A1A1AA"
+                      maxLength={15}
+                    />
+                  </View>
+
+                  <View className="flex-row items-center py-4">
+                    <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
+                    <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
+                      <Text
+                        style={inputFontStyle}
+                        className={`text-right text-[14px] p-0 ${formData.contactAddress ? 'text-[#8E8E93]' : 'text-[#A1A1AA]'}`}
+                        numberOfLines={1}
+                      >
+                        {formData.contactAddress || (isVi ? "Địa chỉ của bạn" : "Street Address, District, City")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              {/* MEDICAL RECORDS SECTION */}
+              <View className="mb-8">
+                <View className="flex-row justify-between items-center mb-[20px]">
+                  <Text className="text-[16px] font-semibold text-[#111827] tracking-[0.06px]">
+                    {isVi ? 'Hồ sơ y tế' : 'Medical Records'} ({medicalRecords.length})
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowMedicalModal(true)}
+                    className="bg-[#FFF8F0] px-4 py-2 rounded-full border border-[#E89B5A]/30"
+                  >
+                    <Text className="text-[#E89B5A] font-medium text-[13px]">{isVi ? '+ Thêm hồ sơ' : '+ Add Record'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Progress UI */}
+                {isUploadingRecords && (
+                  <View className="h-[73px] rounded-[16px] p-3 bg-[#F8F8F8] mb-4">
+                    <View className='flex-row items-center mb-3'>
+                      <Image source={require('../assets/icon/file.png')} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                      <View className="flex-1 ml-3">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-[12px] text-[#000000] font-medium leading-[13px]" numberOfLines={1}>
+                            {isVi ? 'Đang tải ảnh y tế lên...' : 'Uploading medical photos...'}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center mt-1">
+                          <ActivityIndicator color="#E89B5A" style={{ transform: [{ scaleX: 0.6 }, { scaleY: 0.6 }] }} />
+                          <Text className="text-[10px] text-black ml-1 font-regular tracking-[0.5px] leading-[13px]">
+                            {isVi ? 'Vui lòng đợi...' : 'Please wait...'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <View className="h-1.5 bg-[#E3E3E4] rounded-full ">
+                      <View className="h-full bg-[#EFA062] rounded-full" style={{ width: '100%' }} />
+                    </View>
+                  </View>
                 )}
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => router.back()}
-                disabled={isSubmitting || isUploadingRecords}
-                className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-5"
-              >
-                <Text className="text-[#9CA3AF] font-medium text-[16px]">{isVi ? 'Hủy' : 'Cancel'}</Text>
-              </TouchableOpacity>
+                {/* 🚀 FIX 4: Thay thế khối code cũ bằng Component MedicalRecordItem đã được memoize */}
+                {medicalRecords.length === 0 ? (
+                  <Text className="text-gray-400 text-[14px] italic">
+                    {isVi ? 'Chưa có hồ sơ y tế nào.' : 'No medical records yet.'}
+                  </Text>
+                ) : (
+                  medicalRecords.map((record, index) => (
+                    <MedicalRecordItem
+                      key={record.id || `medical-record-${index}`}
+                      record={record}
+                      index={index}
+                      isVi={isVi}
+                      onDelete={handleDeleteMedicalRecord}
+                    />
+                  ))
+                )}
+              </View>
+
+              <View className="space-y-3 mb-10">
+                <TouchableOpacity
+                  onPress={handleSubmit}
+                  disabled={isSubmitting || isUploadingAvatar || isUploadingRecords}
+                  className={`bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm ${(isSubmitting || isUploadingRecords) ? 'opacity-70' : ''}`}
+                >
+                  {(isSubmitting || isUploadingRecords) ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text className="text-white font-semibold text-[16px]">{isVi ? 'Lưu thay đổi' : 'Save Changes'}</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  disabled={isSubmitting || isUploadingRecords}
+                  className="bg-white border border-gray-200 h-[52px] rounded-2xl items-center justify-center mt-5"
+                >
+                  <Text className="text-[#9CA3AF] font-medium text-[16px]">{isVi ? 'Hủy' : 'Cancel'}</Text>
+                </TouchableOpacity>
+              </View>
+
             </View>
-
+            {/* Hết Wrapper */}
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
 
       {/* ================= MODALS & PICKERS ================= */}
-      {Platform.OS === 'ios' ? (
-        <Modal visible={showDatePicker} transparent animationType="slide">
-          <View className="flex-1 justify-end bg-black/40">
-            <View className="bg-white rounded-t-3xl p-4 pb-8">
-              <View className="flex-row justify-between items-center mb-4 border-b border-gray-100 pb-3">
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text className="text-gray-500 font-medium text-lg px-2">{isVi ? 'Hủy' : 'Cancel'}</Text>
-                </TouchableOpacity>
-                <Text className="font-bold text-gray-900 text-lg">{isVi ? 'Ngày sinh' : 'Date of Birth'}</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text className="text-[#EFA062] font-bold text-lg px-2">{isVi ? 'Xong' : 'Done'}</Text>
-                </TouchableOpacity>
-              </View>
+
+      {/* ANDROID NATIVE DATE PICKER */}
+      {Platform.OS === 'android' && showDatePicker && (
+        <DateTimePicker
+          value={formData.dob ? new Date(formData.dob) : new Date()}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={onDateChange}
+        />
+      )}
+
+      {/* --- IOS GLASSMORPHISM DATE PICKER --- */}
+      {Platform.OS === 'ios' && activePicker === 'dob' && (
+        <View className="absolute inset-0 z-[100]">
+          <TouchableOpacity activeOpacity={1} className="absolute inset-0" onPress={closeDropdownPicker} />
+
+          <Animated.View
+            style={{
+              position: 'absolute',
+              top: pickerLayout.y,
+              left: pickerLayout.x,
+              width: pickerLayout.width,
+              opacity: pickerOpacity,
+              transform: [{ translateY: pickerTranslateY }],
+              borderRadius: 16,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.25,
+              shadowRadius: 16,
+              elevation: 10,
+              overflow: 'hidden'
+            }}
+          >
+            <BlurView tint="dark" intensity={65} style={{ position: 'absolute', inset: 0 }} />
+            <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(15, 15, 15, 0.45)' }} />
+
+            <View className="flex-row justify-between items-center px-[16px] py-[12px] border-b border-white/10 relative z-10">
+              <TouchableOpacity onPress={closeDropdownPicker}>
+                <Text className="text-[16px] text-[#A1A1AA] font-medium">{isVi ? 'Huỷ' : 'Cancel'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={closeDropdownPicker}>
+                <Text className="text-[16px] font-semibold text-[#E89B5A]">{isVi ? 'Xong' : 'Done'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingTop: 4, paddingBottom: 4, paddingHorizontal: 10, alignItems: 'center' }} className="relative z-10">
               <DateTimePicker
                 value={formData.dob ? new Date(formData.dob) : new Date()}
                 mode="date"
-                display="spinner"
+                display="inline"
+                themeVariant="dark"
+                locale={isVi ? "vi-VN" : "en-US"}
                 maximumDate={new Date()}
-                onChange={onDateChange}
-                textColor="black"
+                style={{ width: 320, height: 315, alignSelf: 'center' }}
+                accentColor="#E89B5A"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    handleChange('dob', selectedDate.toISOString());
+                  }
+                }}
               />
             </View>
-          </View>
-        </Modal>
-      ) : (
-        showDatePicker && (
-          <DateTimePicker
-            value={formData.dob ? new Date(formData.dob) : new Date()}
-            mode="date"
-            display="default"
-            maximumDate={new Date()}
-            onChange={onDateChange}
-          />
-        )
+          </Animated.View>
+        </View>
       )}
 
       {/* --- POPUP ADDRESS MODAL (API V2) --- */}
@@ -889,7 +1055,7 @@ export default function EditPetScreen() {
               <Text className="text-[20px] font-semibold text-black mb-2 text-center">
                 {isVi ? 'Địa chỉ của bạn' : 'Your Address'}
               </Text>
-              
+
               <Label text={isVi ? "Thành phố / Tỉnh" : "City / Province"} required />
               <CustomDropdown
                 placeholder={isVi ? "Chọn Tỉnh/Thành phố" : "Select City/Province"}
@@ -897,7 +1063,7 @@ export default function EditPetScreen() {
                 options={cityOptions}
                 onSelect={(val) => {
                   setTempCity(val);
-                  setTempWard(''); 
+                  setTempWard('');
                 }}
               />
 
@@ -936,8 +1102,8 @@ export default function EditPetScreen() {
       </Modal>
 
       {/* Gọi component Modal Medical Record */}
-      <AddMedicalRecordModal 
-        visible={showMedicalModal} 
+      <AddMedicalRecordModal
+        visible={showMedicalModal}
         onClose={() => setShowMedicalModal(false)}
         species={formData.species as 'Dog' | 'Cat'}
         onSubmit={(data) => {

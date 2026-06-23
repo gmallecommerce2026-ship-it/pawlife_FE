@@ -1,9 +1,11 @@
 // app/favorite-pets.tsx
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { getLocalizedField } from '@/utils/localization';
 import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Image, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -30,18 +32,18 @@ const AnimatedFeather = Animated.createAnimatedComponent(Feather);
 // 1. PURE COMPONENTS (Tối ưu render lại với memo)
 // =========================================================================
 
-const FavoritePetCard = memo(({ item, onPress, onUnfavorite }: { item: any; onPress: (item: any) => void; onUnfavorite: (id: string) => void }) => {
-  
+const FavoritePetCard = memo(({ item, onPress, onUnfavorite, isVi }: { item: any; onPress: (item: any) => void; onUnfavorite: (id: string) => void; isVi: boolean }) => {
+
   // 1. TÍNH TOÁN TUỔI TỪ NGÀY SINH (dob)
   const petAge = useMemo(() => {
     if (!item.dob) return 'Unknown age';
-    
+
     const dob = new Date(item.dob);
     const today = new Date();
-    
+
     let years = today.getFullYear() - dob.getFullYear();
     let months = today.getMonth() - dob.getMonth();
-    
+
     if (months < 0 || (months === 0 && today.getDate() < dob.getDate())) {
       years--;
       months += 12;
@@ -49,7 +51,7 @@ const FavoritePetCard = memo(({ item, onPress, onUnfavorite }: { item: any; onPr
 
     if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
     if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
-    
+
     // Nếu dưới 1 tháng tuổi
     const days = Math.floor((today.getTime() - dob.getTime()) / (1000 * 60 * 60 * 24));
     return days > 0 ? `${days} day${days > 1 ? 's' : ''}` : 'Newborn';
@@ -57,6 +59,7 @@ const FavoritePetCard = memo(({ item, onPress, onUnfavorite }: { item: any; onPr
 
   // 2. CHUẨN HÓA GIỚI TÍNH (Đưa về IN HOA để khớp với DB Enum MALE/FEMALE)
   const isMale = item.gender?.toUpperCase() === 'MALE';
+  const breedText = getLocalizedField(item.breed, isVi ? 'vi' : 'en');
 
   return (
     <TouchableOpacity
@@ -93,17 +96,17 @@ const FavoritePetCard = memo(({ item, onPress, onUnfavorite }: { item: any; onPr
           {item.name}
         </Text>
         <View className="flex-row items-center">
-          
+
           <Image
             source={isMale ? require('../assets/icon/male.png') : require('../assets/icon/female.png')}
             style={{ width: 10, height: 10 }}
             resizeMode="cover"
           />
-          
+
           <Text className="text-gray-400 text-[12px] font-regular mt-0.5 ml-1.5" numberOfLines={1}>
-            {petAge} · {item.breed || 'Unknown'}
+            {petAge} · {breedText || 'Unknown'}
           </Text>
-          
+
         </View>
       </View>
     </TouchableOpacity>
@@ -131,7 +134,8 @@ const FilterTab = memo(({ title, isActive, onPress }: { title: TabType; isActive
 export default function FavoritePetsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const [activeTab, setActiveTab] = useState<TabType>('All');
   // 1. State cho Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -218,13 +222,13 @@ export default function FavoritePetsScreen() {
   // 4. Lọc dữ liệu
   const filteredPets = useMemo(() => {
     return favorites.filter((pet: any) => {
-      const matchesTab = activeTab === 'All' 
-        ? true 
-        : (pet.species || pet.type)?.toUpperCase() === activeTab.toUpperCase();
-      
+      const matchesTab = activeTab === 'All'
+        ? true
+        : getLocalizedField(pet.species || pet.type, 'en').toUpperCase() === activeTab.toUpperCase();
+
       const safeName = pet.name || '';
       const matchesSearch = safeName.toLowerCase().includes(searchQuery.toLowerCase().trim());
-      
+
       return matchesTab && matchesSearch;
     });
   }, [favorites, activeTab, searchQuery]);
@@ -243,14 +247,14 @@ export default function FavoritePetsScreen() {
       // Lưu lại cache cũ
       const previousFavorites = queryClient.getQueryData(['favorite-pets']);
       // Cập nhật Optimistic
-      queryClient.setQueryData(['favorite-pets'], (old: any[]) => 
+      queryClient.setQueryData(['favorite-pets'], (old: any[]) =>
         old ? old.filter((pet) => pet.id !== deletedId) : []
       );
       return { previousFavorites };
     },
     onError: (err, variables, context) => {
       // Rollback nếu có lỗi
-      console.error('Lỗi khi bỏ yêu thích:', err);
+      console.error(isVi ? 'Lỗi khi bỏ yêu thích:' : 'Error removing from favorites', err);
       if (context?.previousFavorites) {
         queryClient.setQueryData(['favorite-pets'], context.previousFavorites);
       }
@@ -344,7 +348,7 @@ export default function FavoritePetsScreen() {
                   />
                   <Text className="text-black text-[16px] font-medium mt-6">You don't have any pets yet</Text>
                   <Text className="text-[#8E8E93] text-[14px] text-center mt-2 mb-8">Add your pet or adopt a new friend!</Text>
-    
+
                   <TouchableOpacity
                     className="px-10 bg-white py-5 rounded-[16px] border border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50"
                     activeOpacity={0.7}
@@ -361,6 +365,7 @@ export default function FavoritePetsScreen() {
               item={item}
               onPress={handlePetPress}
               onUnfavorite={handleUnfavorite}
+              isVi={isVi}
             />
           )}
         />

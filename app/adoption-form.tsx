@@ -1,30 +1,29 @@
 // app/adoption-form.tsx
 import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
+import { TextInput } from '@/components/AppTextInput';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { petService } from '@/services/petService';
 import { calculateAge } from '@/utils/dateHelper';
-import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
+import { getLocalizedField } from '@/utils/localization';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useModalStore } from '../store/useModalStore';
-import { TextInput } from '@/components/AppTextInput';
 
 // --- DATA CONSTANTS ---
 const HOUSING_TYPES_EN = [
@@ -88,6 +87,47 @@ const ADOPTION_REASONS_VI = [
   "Vì tôi muốn cho chúng một mái ấm mãi mãi",
   "Khác"
 ];
+const ERROR_MESSAGES: Record<string, { vi: string; en: string }> = {
+  'error.application_limit_reached': {
+    vi: 'Bạn đang có 5 đơn đăng ký chờ xử lý. Vui lòng đợi kết quả hoặc đóng đơn cũ trước khi nộp đơn mới.',
+    en: 'You have 5 pending applications. Please wait for the results or close your old applications before submitting a new one.',
+  },
+  'error.application_already_submitted': {
+    vi: 'Bạn đã gửi đơn đăng ký cho thú cưng này rồi.',
+    en: 'You have already submitted an application for this pet.',
+  },
+  'error.application_not_found': {
+    vi: 'Không tìm thấy đơn đăng ký nhận nuôi này.',
+    en: 'This adoption application was not found!',
+  },
+  'error.application_no_info_needed': {
+    vi: 'Đơn đăng ký hiện không yêu cầu bổ sung thông tin.',
+    en: 'The application currently requires no additional information.',
+  },
+  'error.application_cannot_withdraw': {
+    vi: 'Không thể rút đơn ở trạng thái hiện tại.',
+    en: 'The application cannot be withdrawn in this status!',
+  },
+};
+
+/** Đọc lỗi từ response BE, ưu tiên i18n.key qua t() có sẵn; fallback message gốc nếu không có i18n. */
+function resolveErrorMessage(error: any, t: (key: string, params?: Record<string, string | number>) => string): string | null {
+  const data = error?.response?.data;
+  if (!data) return null;
+
+  // BE trả { message, i18n: { key, params? } } NGAY ở top-level của response.data
+  // (NestJS dùng trực tiếp object exception, không lồng thêm 1 lớp .message)
+  const i18nKey = data.i18n?.key;
+  if (i18nKey) {
+    return t(i18nKey, data.i18n?.params || {});
+  }
+
+  // Không có i18n -> rơi về message gốc (luôn tiếng Anh, ví dụ lỗi validate DTO của class-validator)
+  if (Array.isArray(data.message)) return data.message.join('\n');
+  if (typeof data.message === 'string') return data.message;
+
+  return null;
+}
 
 // --- COMPONENTS ---
 const SectionTitle = ({ title }: { title: string }) => (
@@ -121,9 +161,8 @@ const CustomInput = ({
 }) => (
   <View className="">
     <TextInput
-      className={`w-full bg-white border border-gray-200 rounded-2xl px-4 ${
-        isPristine ? 'text-gray-400' : 'text-gray-800'
-      } ${multiline ? 'h-24 py-3' : 'h-14'}`}
+      className={`w-full bg-white border border-gray-200 rounded-2xl px-4 ${isPristine ? 'text-gray-400' : 'text-gray-800'
+        } ${multiline ? 'h-24 py-3' : 'h-14'}`}
       placeholder={placeholder}
       placeholderTextColor="#9CA3AF"
       value={value}
@@ -147,63 +186,58 @@ const CustomDropdown = ({
   options?: string[];
   onSelect?: (val: string) => void;
 }) => {
-  const [visible, setVisible] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <View className="">
       <TouchableOpacity
-        onPress={() => setVisible(true)}
+        onPress={() => setIsOpen((prev) => !prev)}
         activeOpacity={0.7}
-        className={`w-full bg-white border border-gray-200 rounded-2xl h-14 px-4 flex-row items-center justify-between ${visible ? 'border-orange-400' : ''}`}
+        className={`w-full bg-white border border-gray-200 rounded-2xl h-14 px-4 flex-row items-center justify-between ${isOpen ? 'border-orange-400' : ''}`}
       >
         <Text className={`${value ? 'text-gray-900' : 'text-gray-400'} text-sm font-medium`} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <Feather name={visible ? "chevron-up" : "chevron-down"} size={20} color="#9CA3AF" />
+        <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#9CA3AF" />
       </TouchableOpacity>
 
-      <Modal visible={visible} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => setVisible(false)}>
-          <View className="flex-1 bg-black/40 justify-center px-6">
-            <TouchableWithoutFeedback>
-              <View className="bg-white rounded-3xl max-h-[60%] overflow-hidden shadow-2xl">
-                <View className="px-5 py-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
-                  <Text className="font-bold text-gray-700 text-base">{placeholder}</Text>
-                  <TouchableOpacity onPress={() => setVisible(false)}>
-                    <AntDesign name="close" size={20} color="#9CA3AF" />
+      {isOpen && (
+        <View
+          className="w-full bg-white border border-gray-200 rounded-2xl mt-2 overflow-hidden"
+          style={{ maxHeight: 220 }}
+        >
+          {options.length === 0 ? (
+            <View className="px-4 py-4">
+              <Text className="text-[13px] text-gray-400 italic">Không có lựa chọn nào</Text>
+            </View>
+          ) : (
+            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+              {options.map((item) => {
+                const isSelected = item === value;
+                return (
+                  <TouchableOpacity
+                    key={item}
+                    className={`px-4 py-3.5 border-b border-gray-50 flex-row items-center justify-between ${isSelected ? 'bg-blue-50' : ''}`}
+                    onPress={() => {
+                      if (onSelect) onSelect(item);
+                      setIsOpen(false);
+                    }}
+                  >
+                    <Text className={`text-sm ${isSelected ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                      {item}
+                    </Text>
+                    {isSelected && <Ionicons name="checkmark" size={18} color="#2563EB" />}
                   </TouchableOpacity>
-                </View>
-
-                <FlatList
-                  data={options}
-                  keyExtractor={(item) => item}
-                  showsVerticalScrollIndicator={false}
-                  renderItem={({ item }) => {
-                    const isSelected = item === value;
-                    return (
-                      <TouchableOpacity
-                        className={`px-5 py-4 border-b border-gray-50 flex-row items-center justify-between ${isSelected ? 'bg-blue-50' : 'active:bg-gray-50'}`}
-                        onPress={() => {
-                          if (onSelect) onSelect(item);
-                          setVisible(false);
-                        }}
-                      >
-                        <Text className={`text-sm ${isSelected ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
-                          {item}
-                        </Text>
-                        {isSelected && <Ionicons name="checkmark" size={18} color="#2563EB" />}
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      )}
     </View>
   );
 };
+
 
 const PolicyItem = ({ number, title, content }: { number: string; title: string; content: string }) => (
   <View className="flex-row items-start mb-5">
@@ -248,7 +282,7 @@ const OptionGroup = ({
 
 export default function AdoptionFormScreen() {
   const { user } = useContext(AuthContext);
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const showModal = useModalStore((state) => state.showModal);
   const router = useRouter();
   const rawParams = useLocalSearchParams();
@@ -427,7 +461,7 @@ export default function AdoptionFormScreen() {
   const petInfo = {
     name: petData?.name || 'Pet',
     age: petData?.dob ? calculateAge(petData.dob) : (isVi ? 'Không rõ' : 'Unknown'),
-    breed: petData?.breed || (isVi ? 'Không rõ' : 'Unknown'),
+    breed: getLocalizedField(petData?.breed, isVi ? 'vi' : 'en') || (isVi ? 'Không rõ' : 'Unknown'),
     shelterName: petData?.shelter?.name || 'Sân Nhà Nhiều Chó',
     image: petData?.avatarUrl || 'https://images.unsplash.com/default_pet.jpg',
   };
@@ -487,12 +521,14 @@ export default function AdoptionFormScreen() {
         }
       });
     } catch (error: any) {
-      const serverMsg = error.response?.data?.message;
-      const displayMsg = Array.isArray(serverMsg) ? serverMsg.join('\n') : serverMsg;
+      console.log('FULL ERROR:', JSON.stringify(error.response?.data, null, 2));
+
+      const displayMsg = resolveErrorMessage(error, t);
       Alert.alert(
         isVi ? 'Gửi đơn thất bại' : 'Submission Failed',
         displayMsg || (isVi ? 'Đã có lỗi xảy ra. Vui lòng thử lại sau.' : 'Something went wrong. Please try again.')
       );
+
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsLoading(false);

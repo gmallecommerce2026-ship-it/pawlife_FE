@@ -20,6 +20,9 @@ import ReportIssueModal from '@/components/ReportIssueModal';
 import ShelterContactModal from '@/components/ShelterContactModal';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Bổ sung import LanguageContext
+import { useLanguage } from '@/contexts/LanguageContext';
+
 const { width } = Dimensions.get('window');
 
 // --- COMPONENT XỬ LÝ ẢNH CÓ LOADING (MỚI) ---
@@ -51,6 +54,10 @@ export default function ScannedPetScreen() {
   const router = useRouter();
   const { tagId } = useLocalSearchParams();
 
+  // Khởi tạo các biến ngôn ngữ
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+
   const [pet, setPet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -77,7 +84,7 @@ export default function ScannedPetScreen() {
           images = parsed.filter(url => typeof url === 'string' && url.trim() !== '');
         }
       } catch (e) {
-        console.warn("Lỗi parse lostPhotos:", e);
+        console.warn(isVi ? "Lỗi parse lostPhotos:" : "Error parsing lostPhotos:", e);
       }
     }
 
@@ -98,13 +105,14 @@ export default function ScannedPetScreen() {
     return images.length > 0
       ? images
       : ['https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop'];
-  }, [pet]);
+  }, [pet, isVi]);
+
   const calculateAgeDisplay = (dob: string | Date | undefined | null): string => {
-    if (!dob) return 'Unknown age';
+    if (!dob) return isVi ? 'Không rõ tuổi' : 'Unknown age';
 
     const birthDate = new Date(dob);
     // Validate date hợp lệ
-    if (isNaN(birthDate.getTime())) return 'Unknown age';
+    if (isNaN(birthDate.getTime())) return isVi ? 'Không rõ tuổi' : 'Unknown age';
 
     const today = new Date();
     let years = today.getFullYear() - birthDate.getFullYear();
@@ -115,16 +123,16 @@ export default function ScannedPetScreen() {
       months += 12;
     }
 
-    if (years > 0) return `${years} year${years > 1 ? 's' : ''} old`;
-    if (months > 0) return `${months} month${months > 1 ? 's' : ''} old`;
-    return 'Less than 1 month old';
+    if (years > 0) return isVi ? `${years} tuổi` : `${years} year${years > 1 ? 's' : ''} old`;
+    if (months > 0) return isVi ? `${months} tháng tuổi` : `${months} month${months > 1 ? 's' : ''} old`;
+    return isVi ? 'Dưới 1 tháng tuổi' : 'Less than 1 month old';
   };
 
   const formatBirthday = (dob: string | Date | undefined | null): string => {
-    if (!dob) return 'Unknown';
+    if (!dob) return isVi ? 'Không rõ' : 'Unknown';
     const birthDate = new Date(dob);
-    if (isNaN(birthDate.getTime())) return 'Unknown';
-    return birthDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    if (isNaN(birthDate.getTime())) return isVi ? 'Không rõ' : 'Unknown';
+    return birthDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
 
   useFocusEffect(
@@ -143,7 +151,6 @@ export default function ScannedPetScreen() {
 
           const petData = response.data;
 
-
           setShelterData(petData.owner);
           setPet(petData);
 
@@ -161,7 +168,6 @@ export default function ScannedPetScreen() {
       };
     }, [tagId])
   );
-
 
   const handleShareLocation = async (location: any, formData: FormData, isSkipped: boolean) => {
     if (isSubmitting) return;
@@ -196,18 +202,24 @@ export default function ScannedPetScreen() {
 
       if (!isSkipped) {
         Alert.alert(
-          'Thành công',
-          'Đã gửi thông báo cùng vị trí GPS của bạn đến ứng dụng của chủ thú cưng!',
-          [{ text: 'Đóng' }]
+          isVi ? 'Thành công' : 'Success',
+          isVi ? 'Đã gửi thông báo cùng vị trí GPS của bạn đến ứng dụng của chủ thú cưng!' : 'Successfully sent notification with your GPS location to the pet owner!',
+          [{ text: isVi ? 'Đóng' : 'Close' }]
         );
       } else {
-        Alert.alert('Đã báo cáo', 'Vị trí ẩn danh đã được ghi nhận.');
+        Alert.alert(
+          isVi ? 'Đã báo cáo' : 'Reported',
+          isVi ? 'Vị trí ẩn danh đã được ghi nhận.' : 'Anonymous location has been recorded.'
+        );
       }
     } catch (error: any) {
       const errorData = error.response?.data;
       const serverMsg = errorData?.message;
       const displayMsg = Array.isArray(serverMsg) ? serverMsg.join('\n') : serverMsg;
-      Alert.alert('Gửi thất bại', displayMsg || 'Không thể gửi thông báo. Vui lòng thử lại sau.');
+      Alert.alert(
+        isVi ? 'Gửi thất bại' : 'Failed to send',
+        displayMsg || (isVi ? 'Không thể gửi thông báo. Vui lòng thử lại sau.' : 'Cannot send notification. Please try again later.')
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -217,7 +229,10 @@ export default function ScannedPetScreen() {
     if (pet?.owner?.phone) {
       Linking.openURL(`tel:${pet.owner.phone}`);
     } else {
-      Alert.alert('Lỗi', 'Không tìm thấy số điện thoại của chủ nhân.');
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        isVi ? 'Không tìm thấy số điện thoại của chủ nhân.' : 'Owner phone number not found.'
+      );
     }
   };
 
@@ -231,7 +246,7 @@ export default function ScannedPetScreen() {
     return (
       <View className="flex-1 bg-white items-center justify-center">
         <ActivityIndicator size="large" color="#ffa053" />
-        <Text className="text-gray-500 font-medium mt-4">Loading...</Text>
+        <Text className="text-gray-500 font-medium mt-4">{isVi ? 'Đang tải...' : 'Loading...'}</Text>
       </View>
     );
   }
@@ -240,15 +255,17 @@ export default function ScannedPetScreen() {
     return (
       <View className="flex-1 bg-white items-center justify-center px-6">
         <AntDesign name="close" size={60} color="#F43F5E" />
-        <Text className="text-2xl font-bold text-gray-800 mt-4 text-center">Không tìm thấy</Text>
+        <Text className="text-2xl font-bold text-gray-800 mt-4 text-center">
+          {isVi ? 'Không tìm thấy' : 'Not found'}
+        </Text>
         <Text className="text-gray-500 text-center mt-2 mb-8">
-          Mã QR này không hợp lệ hoặc vòng cổ chưa được đăng ký trên hệ thống.
+          {isVi ? 'Mã QR này không hợp lệ hoặc vòng cổ chưa được đăng ký trên hệ thống.' : 'This QR code is invalid or the collar has not been registered on the system.'}
         </Text>
         <TouchableOpacity
           onPress={() => router.replace('/')}
           className="bg-gray-100 px-8 py-3 rounded-full"
         >
-          <Text className="text-gray-700 font-bold">Quay lại</Text>
+          <Text className="text-gray-700 font-bold">{isVi ? 'Quay lại' : 'Go back'}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -263,17 +280,10 @@ export default function ScannedPetScreen() {
 
   const displayAge = calculateAgeDisplay(rawDob);
 
-
-
-  const displayOwnerName = pet?.lostInfo?.ownerName || pet?.ownerName || pet?.owner?.name || 'Unknown Owner';
+  const displayOwnerName = pet?.lostInfo?.ownerName || pet?.ownerName || pet?.owner?.name || (isVi ? 'Không rõ chủ nhân' : 'Unknown Owner');
   const displayOwnerPhone = pet?.lostInfo?.ownerPhone || pet?.ownerPhone || pet?.owner?.phone || null;
-  const displayOwnerAddress = pet?.lostInfo?.ownerAddress || pet?.ownerAddress || pet?.owner?.address || 'No address provided';
-  const displayNote = pet?.lostInfo?.note || pet?.note || "Please contact me ASAP";
-
-
-
-
-
+  const displayOwnerAddress = pet?.lostInfo?.ownerAddress || pet?.ownerAddress || pet?.owner?.address || (isVi ? 'Chưa cung cấp địa chỉ' : 'No address provided');
+  const displayNote = pet?.lostInfo?.note || pet?.note || (isVi ? 'Vui lòng liên hệ tôi sớm nhất' : 'Please contact me ASAP');
 
   const lostImageWidth = width - 40;
   const safeImageWidth = width - 48;
@@ -351,16 +361,18 @@ export default function ScannedPetScreen() {
 
                 {/* Badge Lost */}
                 <View className="absolute top-5 right-5 bg-[#E89B5A] px-4 py-1 rounded-full z-20" pointerEvents="none">
-                  <Text className="text-white font-extrabold text-[16px] tracking-[0.5px] leading-5 uppercase">Lost</Text>
+                  <Text className="text-white font-extrabold text-[16px] tracking-[0.5px] leading-5 uppercase">
+                    {isVi ? 'Thất lạc' : 'Lost'}
+                  </Text>
                 </View>
 
                 {/* Tên & Tuổi thú cưng */}
                 <View className="absolute bottom-0 left-0 right-0 mb-4 items-center z-20" pointerEvents="none">
                   <Text className="text-white text-[24px] font-bold text-center capitalize mb-2">
-                    {pet?.name?.toLowerCase() || 'pet'}
+                    {pet?.name?.toLowerCase() || (isVi ? 'thú cưng' : 'pet')}
                   </Text>
                   <Text className="text-white text-[14px] font-regular text-center tracking-[0.5px]">
-                    {displayAge !== 'Unknown' ? `${displayAge}` : 'Age unknown'} • {pet?.breed || 'Unknown breed'}
+                    {displayAge !== (isVi ? 'Không rõ tuổi' : 'Unknown age') ? `${displayAge}` : (isVi ? 'Không rõ tuổi' : 'Age unknown')} • {pet?.breed || (isVi ? 'Không rõ giống' : 'Unknown breed')}
                   </Text>
                 </View>
               </View>
@@ -404,7 +416,9 @@ export default function ScannedPetScreen() {
               </View>
             </View>
             <View className='items-center'>
-              <Text className="text-[24px] font-medium text-gray-800 py-5">Meet {pet?.name}!</Text>
+              <Text className="text-[24px] font-medium text-gray-800 py-5">
+                {isVi ? `Bé ${pet?.name} nè!` : `Meet ${pet?.name}!`}
+              </Text>
             </View>
           </View>
         )}
@@ -413,7 +427,9 @@ export default function ScannedPetScreen() {
         <View className="px-5">
           {isLost ? (
             <View className="bg-white">
-              <Text className="text-[18px] font-semibold text-[#AB5C1A] my-[21px]">Owner Information</Text>
+              <Text className="text-[18px] font-semibold text-[#AB5C1A] my-[21px]">
+                {isVi ? 'Thông tin chủ nhân' : 'Owner Information'}
+              </Text>
               <View className="flex justify-center items-center mb-4">
                 <View className='bg-white border w-full border-[#E89B5A] rounded-[16px] px-4 pt-[21px] pb-[23.15px]'>
                   <View className="space-y-5 mx-4">
@@ -426,7 +442,9 @@ export default function ScannedPetScreen() {
                         />
                       </View>
                       <View className="flex-1 justify-center">
-                        <Text className="text-[#AB5C1A] text-[16px] font-semibold leading-[16px] mb-[7px]">Owner Name</Text>
+                        <Text className="text-[#AB5C1A] text-[16px] font-semibold leading-[16px] mb-[7px]">
+                          {isVi ? 'Tên chủ nhân' : 'Owner Name'}
+                        </Text>
                         <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">{displayOwnerName}</Text>
                       </View>
                     </View>
@@ -441,7 +459,9 @@ export default function ScannedPetScreen() {
                           />
                         </View>
                         <View className="flex-1 justify-center">
-                          <Text className="text-[#AB5C1A] text-[16px] font-semibold  leading-[16px] mb-[7px]">Phone Number</Text>
+                          <Text className="text-[#AB5C1A] text-[16px] font-semibold  leading-[16px] mb-[7px]">
+                            {isVi ? 'Số điện thoại' : 'Phone Number'}
+                          </Text>
                           <Text className="text-[#8E8E93] text-[14px] font-regular mt leading-[16px]">{displayOwnerPhone}</Text>
                         </View>
                       </View>
@@ -456,7 +476,9 @@ export default function ScannedPetScreen() {
                         />
                       </View>
                       <View className="flex-1 justify-center -mx-1">
-                        <Text className="text-[#AB5C1A] text-[16px] font-semibold leading-[16px] mb-[7px]">Address</Text>
+                        <Text className="text-[#AB5C1A] text-[16px] font-semibold leading-[16px] mb-[7px]">
+                          {isVi ? 'Địa chỉ' : 'Address'}
+                        </Text>
                         <Text className="text-[#8E8E93] text-[14px] font-regular leading-[16px]">
                           {displayOwnerAddress}
                         </Text>
@@ -476,22 +498,25 @@ export default function ScannedPetScreen() {
               <View className="bg-white border border-[#D9D9D9] rounded-[16px] px-7 pt-5 pb-9">
                 <View className="flex-row justify-between gap-2 mb-7">
                   <View className="w-1/2">
-                    <Text className="font-medium text-[16px] mb-[12.5px]" >Gender</Text>
-                    <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">{pet.gender?.toLowerCase() || 'Unknown'}</Text>
+                    <Text className="font-medium text-[16px] mb-[12.5px]">{isVi ? 'Giới tính' : 'Gender'}</Text>
+                    <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">
+                      {pet.gender?.toLowerCase() || (isVi ? 'không rõ' : 'unknown')}
+                    </Text>
                   </View>
                   <View className="w-1/2">
-                    <Text className="font-medium text-[16px] mb-[12.5px] ">Breed</Text>
-                    <Text className="text-[#8E8E93] font-regular text-[14px]">{pet.breed}</Text>
+                    <Text className="font-medium text-[16px] mb-[12.5px] ">{isVi ? 'Giống' : 'Breed'}</Text>
+                    <Text className="text-[#8E8E93] font-regular text-[14px]">{pet.breed || (isVi ? 'Không rõ' : 'Unknown')}</Text>
                   </View>
                 </View >
                 <View className="flex-row justify-between items-center gap-2">
                   <View className="w-1/2">
-                    <Text className="font-medium text-[16px] mb-[12.5px]" >Color</Text>
-                    <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">{pet.color?.toLowerCase() || 'Unknown'}</Text>
+                    <Text className="font-medium text-[16px] mb-[12.5px]">{isVi ? 'Màu sắc' : 'Color'}</Text>
+                    <Text className="text-[#8E8E93] font-regular text-[14px] capitalize">
+                      {pet.color?.toLowerCase() || (isVi ? 'không rõ' : 'unknown')}
+                    </Text>
                   </View>
                   <View className="w-1/2">
-                    <Text className="font-medium text-[16px] mb-[12.5px]" >Birthday</Text>
-                    {/* SỬA DÒNG DƯỚI ĐÂY ĐỂ TRUYỀN rawDob VÀO THAY VÌ HARDCODE */}
+                    <Text className="font-medium text-[16px] mb-[12.5px]">{isVi ? 'Ngày sinh' : 'Birthday'}</Text>
                     <Text className="text-[#8E8E93] font-regular text-[14px]">
                       {formatBirthday(rawDob)}
                     </Text>
@@ -500,8 +525,8 @@ export default function ScannedPetScreen() {
               </View>
 
               <View className="flex items-center w-4/5 bg-[#FAFAFA] px-2.5 py-[6px] rounded-full border border-[#D9D9D9] bottom-5" >
-                <Text className="text-[#757575] text-[14px] font-regular leading-5">
-                  This pet is safe and sound with their owner
+                <Text className="text-[#757575] text-[14px] text-center font-regular leading-5">
+                  {isVi ? 'Thú cưng này đang an toàn bên chủ nhân' : 'This pet is safe and sound with their owner'}
                 </Text>
               </View>
             </View>
@@ -520,7 +545,9 @@ export default function ScannedPetScreen() {
                     style={{ width: 16, height: 16 }}
                     resizeMode="cover"
                   />
-                  <Text className="text-white font-semibold text-[16px] ml-2">Contact Owner</Text>
+                  <Text className="text-white font-semibold text-[16px] ml-2">
+                    {isVi ? 'Liên hệ chủ nhân' : 'Contact Owner'}
+                  </Text>
                 </TouchableOpacity>
 
                 {!hasReported && (
@@ -534,14 +561,16 @@ export default function ScannedPetScreen() {
                       resizeMode="cover"
                       className='bottom-[2px]'
                     />
-                    <Text className="text-[#8E8E93] font-medium text-[16px] leading-5 ml-2">Share My Location</Text>
+                    <Text className="text-[#8E8E93] font-medium text-[16px] leading-5 ml-2">
+                      {isVi ? 'Chia sẻ vị trí của tôi' : 'Share My Location'}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
             ) : (
               <View className="bg-[#FAFAFA] w-full px-9 py-[13px] rounded-[16px] border border-[#D9D9D9] items-center mt-5">
                 <Text className="text-center text-[#757575] font-regular text-[14px] leading-6 tracking-[0.5px] ">
-                  For privacy, owner’s contact information is only available when a pet is marked as lost.
+                  {isVi ? 'Vì lý do bảo mật, thông tin liên hệ của chủ nhân chỉ hiển thị khi thú cưng bị báo mất.' : 'For privacy, owner’s contact information is only available when a pet is marked as lost.'}
                 </Text>
               </View>
             )}
@@ -550,7 +579,7 @@ export default function ScannedPetScreen() {
             onPress={() => setIsReportVisible(true)}
             className="items-center justify-center">
             <Text className="text-center text-[#8E8E93] text-[14px] font-regular leading-13 underline">
-              Something isn't right? Report here
+              {isVi ? 'Có gì đó không đúng? Báo cáo tại đây' : "Something isn't right? Report here"}
             </Text>
           </TouchableOpacity>
         </View>

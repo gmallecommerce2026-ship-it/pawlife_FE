@@ -11,6 +11,7 @@ import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
 
 import { Text } from '@/components/AppText';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { TextInput } from './AppTextInput';
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 15) / 2;
@@ -85,7 +86,7 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
         try {
             await shelterService.toggleFollow(item.id);
         } catch (error) {
-            console.error("Lỗi khi toggle follow:", error);
+            // console.error("Lỗi khi toggle follow:", error);
             toggleShelterFollow(item.id); // Rollback nếu lỗi
         }
     };
@@ -128,7 +129,8 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
 
 const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => void }) => {
     const { user } = useContext(AuthContext);
-
+    const { t, language } = useLanguage();
+    const isVi = language === 'vi';
     // Lấy state từ Zustand
     const isInterested = useEngagementStore(state => state.interestedEvents[item.id] ?? item.isInterested);
     const toggleEventInterest = useEngagementStore(state => state.toggleEventInterest);
@@ -154,13 +156,13 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
             const res = await eventService.toggleInterest(item.id, user?.id || 'guest');
             if (!res.success) throw new Error("API failed");
         } catch (error) {
-            console.error("Lỗi khi bookmark:", error);
+            // console.error("Lỗi khi bookmark:", error);
             // Rollback nếu API báo lỗi
             toggleEventInterest(item.id);
         }
     };
 
-    let displayDate = 'Đang cập nhật';
+    let displayDate = isVi ? 'Đang cập nhật' : 'Updating';
     if (item.startDate) {
         const d = new Date(item.startDate);
         const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -355,7 +357,7 @@ const EventsSection = ({ searchQuery, onEventPress }: { searchQuery: string, onE
                 throw new Error("API failed");
             }
         } catch (error) {
-            console.error("Lỗi khi toggle interest:", error);
+            // console.error("Lỗi khi toggle interest:", error);
             setEvents(prev => prev.map(ev =>
                 ev.id === eventId
                     ? {

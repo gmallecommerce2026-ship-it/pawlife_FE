@@ -1,10 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  Dimensions,
+  Easing,
   Image,
+  Keyboard,
   Modal,
   Platform,
   StyleSheet,
@@ -15,7 +20,16 @@ import {
 } from 'react-native';
 import { TextInput } from './AppTextInput';
 
+// Bổ sung import LanguageContext
+import { useLanguage } from '@/contexts/LanguageContext';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 export default function VaccinationSection() {
+  // Khởi tạo biến ngôn ngữ
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+
   const [images, setImages] = useState<string[]>([]);
   const [isModalVisible, setModalVisible] = useState(false);
   
@@ -23,6 +37,42 @@ export default function VaccinationSection() {
   const [nextDate, setNextDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [vaccineName, setVaccineName] = useState('');
+
+  // --- NÂNG CẤP: STATE VÀ REF CHO IOS GLASSMORPHISM DATE PICKER ---
+  const dateRef = useRef<View>(null);
+  const [activePicker, setActivePicker] = useState<'date' | null>(null);
+  const [pickerLayout, setPickerLayout] = useState({ x: 0, y: 0, width: 340 });
+  const pickerOpacity = useRef(new Animated.Value(0)).current;
+  const pickerTranslateY = useRef(new Animated.Value(-8)).current;
+
+  // Xử lý mở Picker Kính Mờ (iOS)
+  const openDropdownPicker = () => {
+    Keyboard.dismiss(); // Hạ bàn phím nếu đang nhập text
+
+    // Đợi 150ms để bàn phím hạ hẳn trước khi đo tọa độ
+    setTimeout(() => {
+      dateRef.current?.measureInWindow((x, windowY, w, h) => {
+        const dropdownWidth = 340;
+        const finalX = (SCREEN_WIDTH - dropdownWidth) / 2; // Căn giữa tuyệt đối
+
+        setPickerLayout({ x: finalX, y: windowY + h + 8, width: dropdownWidth });
+        setActivePicker('date');
+
+        Animated.parallel([
+          Animated.timing(pickerOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(pickerTranslateY, { toValue: 0, duration: 250, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true })
+        ]).start();
+      });
+    }, 150);
+  };
+
+  const closeDropdownPicker = () => {
+    Animated.parallel([
+      Animated.timing(pickerOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(pickerTranslateY, { toValue: -8, duration: 150, useNativeDriver: true })
+    ]).start(() => setActivePicker(null));
+  };
+  // --------------------------------------------------------------
 
   // Xử lý mở Camera hoặc Thư viện ảnh
   const handlePickImage = async (mode: 'camera' | 'gallery') => {
@@ -32,7 +82,10 @@ export default function VaccinationSection() {
     if (mode === 'camera') {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Lỗi', 'Cần cấp quyền truy cập máy ảnh!');
+        Alert.alert(
+          isVi ? 'Lỗi' : 'Error', 
+          isVi ? 'Cần cấp quyền truy cập máy ảnh!' : 'Camera access permission is required!'
+        );
         return;
       }
       result = await ImagePicker.launchCameraAsync({
@@ -41,12 +94,15 @@ export default function VaccinationSection() {
     } else {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Lỗi', 'Cần cấp quyền truy cập thư viện ảnh!');
+        Alert.alert(
+          isVi ? 'Lỗi' : 'Error', 
+          isVi ? 'Cần cấp quyền truy cập thư viện ảnh!' : 'Photo library access permission is required!'
+        );
         return;
       }
       result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true, // Cho phép chọn nhiều
+        allowsMultipleSelection: true,
         quality: 0.8,
       });
     }
@@ -62,14 +118,17 @@ export default function VaccinationSection() {
   };
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
-    const currentDate = selectedDate || nextDate;
-    setShowDatePicker(Platform.OS === 'ios');
-    setNextDate(currentDate);
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setNextDate(selectedDate);
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Vaccination record</Text>
+      <Text style={styles.sectionTitle}>
+        {isVi ? 'Hồ sơ tiêm phòng' : 'Vaccination record'}
+      </Text>
 
       {/* Nút Upload */}
       <TouchableOpacity 
@@ -77,10 +136,12 @@ export default function VaccinationSection() {
         onPress={() => setModalVisible(true)}
       >
         <Ionicons name="cloud-upload-outline" size={24} color="#666" />
-        <Text style={styles.uploadText}>Chọn tệp để tải lên</Text>
+        <Text style={styles.uploadText}>
+          {isVi ? 'Chọn tệp để tải lên' : 'Select files to upload'}
+        </Text>
       </TouchableOpacity>
 
-      {/* Lưới hiển thị ảnh đã tải lên (Tối đa 3 hình/hàng) */}
+      {/* Lưới hiển thị ảnh đã tải lên */}
       {images.length > 0 && (
         <View style={styles.imageGrid}>
           {images.map((uri, index) => (
@@ -101,41 +162,41 @@ export default function VaccinationSection() {
       {images.length > 0 && (
         <View style={styles.recordDetails}>
           <View style={styles.switchRow}>
-            <Text style={styles.label}>Next due date</Text>
+            <Text style={styles.label}>
+              {isVi ? 'Ngày đến hạn tiếp theo' : 'Next due date'}
+            </Text>
             <Switch
               value={hasNextDueDate}
               onValueChange={setHasNextDueDate}
-              trackColor={{ false: '#E5E5EA', true: '#34C759' }}
+              trackColor={{ false: '#E5E5EA', true: '#E89B5A' }}
             />
           </View>
 
           {/* Hiển thị Input và DatePicker khi Switch được bật */}
           {hasNextDueDate && (
             <View style={styles.expandedForm}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.subLabel}>Ngày tiêm dự kiến</Text>
+              <View style={styles.inputGroup} ref={dateRef} collapsable={false}>
+                <Text style={styles.subLabel}>
+                  {isVi ? 'Ngày tiêm dự kiến' : 'Expected vaccination date'}
+                </Text>
                 <TouchableOpacity 
                   style={styles.dateInput}
-                  onPress={() => setShowDatePicker(true)}
+                  onPress={() => Platform.OS === 'ios' ? openDropdownPicker() : setShowDatePicker(true)}
                 >
-                  <Text>{nextDate.toLocaleDateString('vi-VN')}</Text>
+                  <Text style={{ fontSize: 14, color: '#1C1C1E' }}>
+                    {nextDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US')}
+                  </Text>
                   <Ionicons name="calendar-outline" size={20} color="#666" />
                 </TouchableOpacity>
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={nextDate}
-                    mode="date"
-                    display="default"
-                    onChange={onChangeDate}
-                  />
-                )}
               </View>
 
               <View style={[styles.inputGroup, { flex: 1, marginLeft: 12 }]}>
-                <Text style={styles.subLabel}>Tên vaccine</Text>
+                <Text style={styles.subLabel}>
+                  {isVi ? 'Tên vaccine' : 'Vaccine name'}
+                </Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Nhập tên..."
+                  placeholder={isVi ? 'Nhập tên...' : 'Enter name...'}
                   value={vaccineName}
                   onChangeText={setVaccineName}
                 />
@@ -153,19 +214,100 @@ export default function VaccinationSection() {
           onPress={() => setModalVisible(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Tải ảnh lên</Text>
+            <Text style={styles.modalTitle}>
+              {isVi ? 'Tải ảnh lên' : 'Upload photo'}
+            </Text>
             <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('camera')}>
               <Ionicons name="camera-outline" size={24} color="#333" />
-              <Text style={styles.modalOptionText}>Chụp ảnh mới</Text>
+              <Text style={styles.modalOptionText}>
+                {isVi ? 'Chụp ảnh mới' : 'Take new photo'}
+              </Text>
             </TouchableOpacity>
             <View style={styles.divider} />
             <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('gallery')}>
               <Ionicons name="images-outline" size={24} color="#333" />
-              <Text style={styles.modalOptionText}>Chọn từ thư viện</Text>
+              <Text style={styles.modalOptionText}>
+                {isVi ? 'Chọn từ thư viện' : 'Choose from library'}
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* ================= MODALS & PICKERS ================= */}
+
+      {/* ANDROID NATIVE DATE PICKER */}
+      {Platform.OS === 'android' && showDatePicker && (
+        <DateTimePicker
+          value={nextDate}
+          mode="date"
+          display="default"
+          minimumDate={new Date()}
+          onChange={onChangeDate}
+        />
+      )}
+
+      {/* --- KÍNH MỜ DROPDOWN FIX CHIỀU CAO VÀ MÀU CAM (IOS) --- */}
+      {Platform.OS === 'ios' && activePicker === 'date' && (
+        <Modal transparent visible={true} animationType="none">
+          <View style={{ flex: 1, zIndex: 100 }}>
+            <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={closeDropdownPicker} />
+
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: pickerLayout.y,
+                left: pickerLayout.x,
+                width: pickerLayout.width,
+                opacity: pickerOpacity,
+                transform: [{ translateY: pickerTranslateY }],
+                borderRadius: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.25,
+                shadowRadius: 16,
+                elevation: 10,
+                overflow: 'hidden'
+              }}
+            >
+              <BlurView tint="dark" intensity={65} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+              <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(15, 15, 15, 0.45)' }} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', zIndex: 10 }}>
+                <TouchableOpacity onPress={closeDropdownPicker}>
+                  <Text style={{ fontSize: 16, color: '#A1A1AA', fontWeight: '500' }}>
+                    {isVi ? 'Huỷ' : 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={closeDropdownPicker}>
+                  <Text style={{ fontSize: 16, color: '#E89B5A', fontWeight: '600' }}>
+                    {isVi ? 'Xong' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ paddingTop: 4, paddingBottom: 4, paddingHorizontal: 10, alignItems: 'center', zIndex: 10 }}>
+                <DateTimePicker
+                  value={nextDate}
+                  mode="date"
+                  display="inline"
+                  themeVariant="dark"
+                  locale={isVi ? "vi-VN" : "en-US"}
+                  minimumDate={new Date()}
+                  style={{ width: 320, height: 315, alignSelf: 'center' }} 
+                  accentColor="#E89B5A" 
+                  onChange={(event, selectedDate) => {
+                    if (selectedDate) {
+                      setNextDate(selectedDate);
+                    }
+                  }}
+                />
+              </View>
+            </Animated.View>
+          </View>
+        </Modal>
+      )}
+
     </View>
   );
 }
@@ -184,7 +326,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E5EA',
     borderStyle: 'dashed',
-    borderRadius: 4, // Bo góc tinh tế, chuẩn minimalism
+    borderRadius: 4,
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
@@ -199,10 +341,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 16,
-    gap: 8, // Yêu cầu React Native > 0.71, nếu dùng bản cũ đổi sang margin
+    gap: 8,
   },
   imageWrapper: {
-    width: '31%', // Đảm bảo đúng 3 ảnh trên 1 hàng với gap
+    width: '31%', 
     aspectRatio: 1,
     position: 'relative',
     borderRadius: 4,

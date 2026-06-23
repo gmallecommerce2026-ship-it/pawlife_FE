@@ -55,7 +55,10 @@ const MenuItem = ({ icon, label, value, isDestructive = false, onPress, hideBord
 export default function ProfileSettingsScreen() {
     const router = useRouter();
     const { user } = useContext(AuthContext);
+    
+    // Khởi tạo các biến ngôn ngữ theo yêu cầu
     const { t, language } = useLanguage();
+    const isVi = language === 'vi';
 
     const [pets, setPets] = useState<Pet[]>([]);
     const [isLoadingPets, setIsLoadingPets] = useState(true);
@@ -64,17 +67,20 @@ export default function ProfileSettingsScreen() {
     const availableWidth = width - 80;
     // Chia đúng 5 phần bằng nhau
     const itemWidth = availableWidth / 5;
+    
     const fetchMyPets = async () => {
         if (!user) return;
         try {
             const data = await petService.getMyPets();
             setPets(data);
         } catch (err) {
-            console.error('Lỗi khi tải danh sách pet trong settings:', err);
+            // Sửa lại cú pháp lỗi ở console.error
+            console.error(isVi ? 'Lỗi khi tải danh sách pet trong settings:' : 'Error fetching pets in settings:', err);
         } finally {
             setIsLoadingPets(false);
         }
     };
+    
     const getAvatarSource = (avatarUrl: any) => {
         if (!avatarUrl || avatarUrl === '/assets/images/default-avatar.jpg') {
             // Trả về require cục bộ của React Native nếu là ảnh mặc định
@@ -83,6 +89,7 @@ export default function ProfileSettingsScreen() {
         // Trả về uri mạng nếu là ảnh người dùng upload lên đám mây
         return { uri: avatarUrl };
     };
+    
     useFocusEffect(
         useCallback(() => {
             fetchMyPets();
@@ -118,7 +125,8 @@ export default function ProfileSettingsScreen() {
                         />
                         <View className="flex-1 justify-center">
                             <Text className="font-medium text-gray-900 text-[16px] mb-[7px] tracking-tight">
-                                {user?.name || 'User Name'}
+                                {/* Áp dụng isVi cho tên mặc định */}
+                                {user?.name || (isVi ? 'Tên người dùng' : 'User Name')}
                             </Text>
                             <Text className="text-gray-500 text-[12px] font-regular">
                                 {t('Account Settings')}
@@ -194,8 +202,10 @@ export default function ProfileSettingsScreen() {
                                 <View className="w-[50px] h-[50px] rounded-full bg-[#F4F5F7] items-center justify-center mb-2">
                                     <Feather name="plus" size={24} color="#D9D9D9" />
                                 </View>
-                                {/* Có thể thêm text rỗng để giữ độ cao bằng với pet có tên */}
-                                <Text className="text-gray-500 text-[12px] w-full text-center px-1" numberOfLines={1}>Add</Text>
+                                {/* Áp dụng isVi cho nút Add */}
+                                <Text className="text-gray-500 text-[12px] w-full text-center px-1" numberOfLines={1}>
+                                    {isVi ? 'Thêm' : 'Add'}
+                                </Text>
                             </TouchableOpacity>
                         </ScrollView>
                     </View>

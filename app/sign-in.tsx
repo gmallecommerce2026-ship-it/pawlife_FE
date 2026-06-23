@@ -195,7 +195,7 @@ export default function SignInScreen() {
       }
     } catch (e: any) {
       if (e.code !== 'ERR_REQUEST_CANCELED') {
-        setErrors({ form: e.message || "Lỗi xác thực Apple" });
+        setErrors({ form: e.message || isVi ? "Lỗi xác thực Apple" : "Apple authentication error"});
       }
     }
   };
@@ -222,7 +222,7 @@ export default function SignInScreen() {
         
         connectSocket(accessToken); 
       } else {
-        Alert.alert("Lỗi", "Không thể lưu phiên đăng nhập.");
+        Alert.alert(isVi ? "Lỗi" : "Error", isVi ? "Không thể lưu phiên đăng nhập." : "Cannot save login session.");
         return;
       }
 
@@ -233,7 +233,7 @@ export default function SignInScreen() {
       }
 
     } catch (error: any) {
-      setErrors({ form: error.response?.data?.message || `Lỗi đăng nhập ${provider}` });
+      setErrors({ form: error.response?.data?.message || (isVi ? `Lỗi đăng nhập ${provider}` : `Login error with ${provider}`) });
     } finally {
       setIsLoading(false);
     }
@@ -314,17 +314,17 @@ export default function SignInScreen() {
 
       if (isEnabled !== 'true') {
         Alert.alert(
-          'Tính năng chưa kích hoạt',
-          'Đăng nhập bằng Face ID/Vân tay đang bị tắt hoặc chưa được thiết lập.\n\nVui lòng đăng nhập bằng mật khẩu, sau đó vào phần Cài đặt Bảo mật (Account & Security) để bật tính năng này.',
-          [{ text: 'Đã hiểu', style: 'default' }]
+          isVi ? 'Tính năng chưa kích hoạt' : 'Feature not activated yet',
+          isVi ? 'Đăng nhập bằng Face ID/Vân tay đang bị tắt hoặc chưa được thiết lập.\n\nVui lòng đăng nhập bằng mật khẩu, sau đó vào phần Cài đặt Bảo mật (Account & Security) để bật tính năng này.': 'Face ID/Fingerprint login is disabled or has not been set up.\n\nPlease log in using your password, then go to Account & Security Settings to enable this feature.',
+          [{ text: isVi ? 'Đã hiểu' : "Got it", style: 'default' }]
         );
         return;
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Xác thực để đăng nhập vào ứng dụng',
-        fallbackLabel: 'Dùng mật khẩu',
-        cancelLabel: 'Hủy',
+        promptMessage: isVi ? 'Xác thực để đăng nhập vào ứng dụng' : 'Authenticate to log in to the application',
+        fallbackLabel:  isVi ? 'Dùng mật khẩu' : 'Use a password',
+        cancelLabel: isVi ? 'Hủy' : 'Cancel',
       });
 
       if (result.success) {
@@ -335,14 +335,14 @@ export default function SignInScreen() {
           executeLogin(savedEmail, savedPass);
         } else {
           Alert.alert(
-            'Lỗi xác thực', 
-            'Phiên đăng nhập đã hết hạn hoặc thiết bị đã bị xóa dữ liệu an toàn. Vui lòng đăng nhập lại bằng mật khẩu.'
+            isVi ? 'Lỗi xác thực' : 'Authentication error', 
+            isVi ? 'Phiên đăng nhập đã hết hạn hoặc thiết bị đã bị xóa dữ liệu an toàn. Vui lòng đăng nhập lại bằng mật khẩu.': 'Your login session has expired or the device has been securely wiped. Please log in again using your password.'
           );
           await AsyncStorage.removeItem('isFaceIdEnabled');
         }
       }
     } catch (error) { 
-      console.error('Lỗi Biometric:', error); 
+      console.error(isVi ? 'Lỗi Biometric:': 'Biometric Error:', error); 
     }
   };
 
@@ -421,8 +421,6 @@ export default function SignInScreen() {
 
       <View className="flex-row justify-between items-center mb-[2px] mt-[-8px]">
         <TouchableOpacity className="flex-row items-center py-2" onPress={() => setIsRememberMe(!isRememberMe)} activeOpacity={0.7}>
-          <MaterialCommunityIcons name={isRememberMe ? "checkbox-marked" : "checkbox-blank-outline"} size={22} color={isRememberMe ? "#E89B5A" : "#9CA3AF"} />
-          <Text className="text-black font-medium ml-2 text-[14px] tracking-[0.06px]">{t('Remember me')}</Text>
         </TouchableOpacity>
         <TouchableOpacity className="py-2" onPress={() => { setErrors({}); setCurrentView('FORGOT_PASSWORD'); }}>
           <Text className="text-[#E89B5A] font-medium text-[14px] tracking-[0.06px]">{t('Forgot password?')}</Text>

@@ -2,6 +2,8 @@
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/localization';
+import { normalizePets } from '@/utils/petNormalize';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -25,7 +27,7 @@ interface Pet {
   dob?: string | null;
   avatarUrl?: string | null;
   status: string;
-  isLost?: boolean; 
+  isLost?: boolean;
 }
 
 const calculateAge = (dobString: string | null | undefined, t: any, isVi: boolean): string => {
@@ -56,7 +58,7 @@ export default function MyPetsScreen() {
   const { user } = useContext(AuthContext);
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
-  
+
   const [pets, setPets] = useState<Pet[]>([]);
   // Đổi thành isInitialLoading để chỉ load lúc đầu
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -74,11 +76,11 @@ export default function MyPetsScreen() {
     if (!isSilentRefresh && pets.length === 0) {
       setIsInitialLoading(true);
     }
-    
+
     setError(null);
     try {
       const data = await petService.getMyPets();
-      setPets(data);
+      setPets(normalizePets(data, language));
     } catch (err: any) {
       if (err?.response?.status === 401) {
         setPets([]);
@@ -99,9 +101,9 @@ export default function MyPetsScreen() {
         fetchMyPets(true);
       }
       return () => {
-        isActive = false; 
+        isActive = false;
       };
-    }, [user?.id]) 
+    }, [user?.id])
   );
 
   const onRefresh = () => {
@@ -116,7 +118,7 @@ export default function MyPetsScreen() {
       style={{
         shadowColor: '#000000',
         shadowOpacity: 0.06,
-        shadowRadius: 4, 
+        shadowRadius: 4,
         elevation: 6,
       }}
       onPress={() => router.push({
@@ -151,7 +153,10 @@ export default function MyPetsScreen() {
         <View>
           <View className="flex-row items-center mb-1">
             <Image
-              source={pet.species?.toLowerCase() === 'cat' ? require('../../assets/icon/cat-side.png') : require('../../assets/icon/dog-side.png')}
+              source={getLocalizedField(pet.species, 'en').toLowerCase() === 'cat'
+                ? require('../../assets/icon/cat-side.png')
+                : require('../../assets/icon/dog-side.png')}
+
               style={{ width: 14, height: 11 }}
               resizeMode="contain"
             />
@@ -185,7 +190,7 @@ export default function MyPetsScreen() {
         end={{ x: 1, y: 1 }}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 32 }}
       />
-      
+
       {/* --- HEADER --- */}
       <View className="flex-row justify-between items-center px-6 pt-[28px] pb-[21px] z-10 bg-transparent">
         <View className="flex-row items-center">
@@ -197,8 +202,8 @@ export default function MyPetsScreen() {
         className="flex-1"
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl 
-            refreshing={isRefreshing} 
+          <RefreshControl
+            refreshing={isRefreshing}
             onRefresh={onRefresh}
             tintColor="#E89B5A"
             colors={['#E89B5A']}
@@ -214,14 +219,14 @@ export default function MyPetsScreen() {
         {isInitialLoading && pets.length === 0 ? (
           <View className="flex-1 justify-center items-center mt-10">
             <View className="w-[84px] h-[84px] bg-white rounded-full items-center justify-center shadow-lg shadow-orange-100 mb-6 border border-orange-50">
-               <ActivityIndicator size="large" color="#E89B5A" />
+              <ActivityIndicator size="large" color="#E89B5A" />
             </View>
             <Text className="text-gray-500 font-medium text-lg">{t("Loading your pets...")}</Text>
           </View>
         ) : error ? (
           <View className="flex-1 justify-center items-center mt-10">
             <Text className="text-red-500">{error}</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => fetchMyPets()}
               className="mt-4 px-6 py-2 bg-white border border-gray-200 rounded-full"
             >
@@ -256,9 +261,9 @@ export default function MyPetsScreen() {
           <TouchableOpacity
             className="w-full bg-white py-5 rounded-[24px] border border-dashed border-[#E5E5E5] flex-row justify-center items-center active:bg-orange-50 mt-2 mb-6"
             activeOpacity={0.7}
-            onPress={() => router.push({ 
-              pathname: '/(tabs)/scan', 
-              params: { isAddingPet: 'true' } 
+            onPress={() => router.push({
+              pathname: '/(tabs)/scan',
+              params: { isAddingPet: 'true' }
             })}
           >
             <View className=" rounded-full mr-2">

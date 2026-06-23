@@ -13,13 +13,13 @@ const dictionaries: Record<Language, Record<string, string>> = {
 type LanguageContextType = {
   language: Language;
   setLanguage: (lang: Language) => Promise<void>;
-  t: (key: string) => string; // Hàm dùng để dịch string
-  isInitialized: boolean;     // Cờ kiểm tra trạng thái load dữ liệu
+  t: (key: string, params?: Record<string, string | number>) => string; // 👈 thêm params
+  isInitialized: boolean;
 };
 
 const LanguageContext = createContext<LanguageContextType>({
   language: 'en',
-  setLanguage: async () => {},
+  setLanguage: async () => { },
   t: (key: string) => key,
   isInitialized: false,
 });
@@ -36,12 +36,13 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
           setLangState(savedLang);
         }
       } catch (error) {
-        console.error('Lỗi khi đọc ngôn ngữ từ storage:', error);
+        // Cập nhật song ngữ cho log lỗi
+        console.error('Lỗi khi đọc ngôn ngữ từ storage / Error reading language from storage:', error);
       } finally {
         setIsInitialized(true);
       }
     };
-    
+
     loadLanguage();
   }, []);
 
@@ -50,21 +51,27 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
     try {
       await AsyncStorage.setItem('app_language', lang);
     } catch (error) {
-      console.error('Lỗi khi lưu ngôn ngữ:', error);
+      // Cập nhật song ngữ cho log lỗi
+      console.error('Lỗi khi lưu ngôn ngữ / Error saving language:', error);
     }
   };
 
   // Hàm dịch (t) được bọc bằng useCallback để tối ưu re-render trên hệ thống lớn
   const t = useCallback(
-    (key: string) => {
-      // Fallback: Tìm trong từ điển hiện tại -> từ điển tiếng Anh -> trả về chính key nếu không thấy
-      return dictionaries[language]?.[key] || dictionaries['en']?.[key] || key;
+    (key: string, params?: Record<string, string | number>) => {
+      let result = dictionaries[language]?.[key] || dictionaries['en']?.[key] || key;
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          result = result.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+        });
+      }
+      return result;
     },
     [language]
   );
 
   // Chờ load xong từ AsyncStorage mới render UI để tránh chớp giật ngôn ngữ
-  if (!isInitialized) return null; 
+  if (!isInitialized) return null;
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t, isInitialized }}>
