@@ -372,28 +372,30 @@ export default function RootLayout() {
                 <GlobalOverlay />
 
                 {/* OVERLAY VIDEO SPLASH */}
-                {!isVideoFinished && (
-                  <Animated.View
-                    style={[
-                      StyleSheet.absoluteFill,
-                      { opacity: fadeAnim, zIndex: 9999, elevation: 9999, backgroundColor: '#000' }
-                    ]}
-                  >
-                    <Video
-                      source={require('../assets/video/splash.mp4')}
-                      style={StyleSheet.absoluteFill}
-                      resizeMode={ResizeMode.COVER}
-                      shouldPlay={true}
-                      isLooping={false}
-                      isMuted={true}
-                      onPlaybackStatusUpdate={(status) => {
-                        if (status.isLoaded && status.didJustFinish) {
-                          handleVideoFinish();
-                        }
-                      }}
-                    />
-                  </Animated.View>
-                )}
+                {/* <>
+                  {!isVideoFinished && (
+                    <Animated.View
+                      style={[
+                        StyleSheet.absoluteFill,
+                        { opacity: fadeAnim, zIndex: 9999, elevation: 9999, backgroundColor: '#000' }
+                      ]}
+                    >
+                      <Video
+                        source={require('../assets/video/splash.mp4')}
+                        style={StyleSheet.absoluteFill}
+                        resizeMode={ResizeMode.COVER}
+                        shouldPlay={true}
+                        isLooping={false}
+                        isMuted={true}
+                        onPlaybackStatusUpdate={(status) => {
+                          if (status.isLoaded && status.didJustFinish) {
+                            handleVideoFinish();
+                          }
+                        }}
+                      />
+                    </Animated.View>
+                  )}
+                </> */}
 
               </LanguageProvider>
             </AuthProvider>

@@ -41,27 +41,39 @@ const formatShortDate = (date: Date, isVi: boolean) => {
 const RECORD_OPTIONS = [
   {
     id: 'vaccination',
-    titleEn: 'Vaccination', descEn: 'Core & non-core vaccines',
-    titleVi: 'Tiêm phòng', descVi: 'Vaccine cơ bản & mở rộng',
-    icon: 'medkit-outline',
+    titleEn: 'Vaccination',
+    descEn: 'Shots, booster, and immunizations',
+    titleVi: 'Tiêm phòng',
+    descVi: 'Vaccine cơ bản & mở rộng',
+    iconUnselected: require('../assets/icon/vacc-icon.png'),
+    iconSelected: require('../assets/icon/vacc-icon-selected.png'),
   },
   {
     id: 'examination',
-    titleEn: 'Examination', descEn: 'Regular check-ups and exam',
-    titleVi: 'Khám bệnh', descVi: 'Khám và kiểm tra sức khỏe định kỳ',
-    icon: 'stethoscope-outline',
+    titleEn: 'Examination',
+    descEn: 'Regular check-ups and exam',
+    titleVi: 'Khám bệnh',
+    descVi: 'Khám và kiểm tra sức khỏe định kỳ',
+    iconUnselected: require('../assets/icon/exam-vacc-icon.png'),
+    iconSelected: require('../assets/icon/exam-icon-selected.png'),
   },
   {
     id: 'dental',
-    titleEn: 'Dental', descEn: 'Teeth cleaning and dental care',
-    titleVi: 'Răng miệng', descVi: 'Vệ sinh và chăm sóc răng miệng',
-    icon: 'happy-outline',
+    titleEn: 'Dental',
+    descEn: 'Teeth cleaning and dental care',
+    titleVi: 'Răng miệng',
+    descVi: 'Vệ sinh và chăm sóc răng miệng',
+    iconUnselected: require('../assets/icon/dental-vacc-icon.png'),
+    iconSelected: require('../assets/icon/dental-icon-selected.png'),
   },
   {
     id: 'other',
-    titleEn: 'Other', descEn: 'Other medical records',
-    titleVi: 'Khác', descVi: 'Các hồ sơ y tế khác',
-    icon: 'document-text-outline',
+    titleEn: 'Other',
+    descEn: 'Other medical records',
+    titleVi: 'Khác',
+    descVi: 'Các hồ sơ y tế khác',
+    iconUnselected: require('../assets/icon/other-vacc-icon.png'),
+    iconSelected: require('../assets/icon/other-icon-selected.png'),
   },
 ];
 
@@ -358,7 +370,7 @@ export default function AddMedicalRecordModal({
           </TouchableOpacity>
 
           <View className="flex-row items-center justify-center pt-[26px]">
-            <Text className="text-[18px] font-semibold text-[#000000]">
+            <Text className="text-[22px] font-semibold text-[#000000]">
               {isVi ? 'Thêm hồ sơ y tế' : 'Add Medical Record'}
             </Text>
           </View>
@@ -387,14 +399,18 @@ export default function AddMedicalRecordModal({
                     }}
                     className={`flex-row items-center px-[12px] py-[11px] rounded-[12px] border ${isActive ? 'border-[#E89B5A]/50 bg-[#FFD0A8]/25' : 'border-[#E89B5A]/0 bg-white'}`}
                   >
-                    <View className={`w-9 h-9 rounded-[100px] items-center justify-center mr-3 ${isActive ? 'bg-[#E89B5A]/20' : 'bg-gray-100'}`}>
-                      <Ionicons name={item.icon as any} size={18} color={isActive ? '#E89B5A' : '#6B7280'} />
+                    <View className={`w-[24px] h-[24px] rounded-[100px] items-center justify-center mr-3`}>
+                      <Image
+                        source={isActive ? item.iconSelected : item.iconUnselected}
+                        style={{ width: 24, height: 24 }}
+                        resizeMode="contain"
+                      />
                     </View>
                     <View className="flex-1">
-                      <Text className={`text-[12px] font-medium mb-0.5 ${isActive ? 'text-[#E89B5A]' : 'text-[#111827]'}`}>
+                      <Text className={`text-[14px] font-medium mb-0.5 text-black ${isActive ? 'font-semibold' : 'font-medium'}`}>
                         {isVi ? item.titleVi : item.titleEn}
                       </Text>
-                      <Text className="text-[10px] font-regular text-[#8E8E93]">{isVi ? item.descVi : item.descEn}</Text>
+                      <Text className="text-[12px] font-regular text-[#8E8E93]">{isVi ? item.descVi : item.descEn}</Text>
                     </View>
                   </TouchableOpacity>
                 </Animated.View>
@@ -404,7 +420,7 @@ export default function AddMedicalRecordModal({
             <Animated.View style={{ opacity: detailsFade }}>
               {selectedType && (
                 <>
-                  <Text className="text-[14px] font-semibold text-[#111827] mb-[9px] mt-[14px]">
+                  <Text className="text-[14px] font-semibold text-black mb-[9px] mt-[14px]">
                     {isVi ? 'Chi tiết hồ sơ' : 'Vaccination Details'}
                   </Text>
 
@@ -500,23 +516,25 @@ export default function AddMedicalRecordModal({
                     </View>
                   )}
 
-                  <TouchableOpacity
-                    onPress={handleUploadPhotos}
-                    activeOpacity={0.7}
-                    className="flex-row border border-dashed border-[#E5E5E5] rounded-[12px] py-[12px] items-center justify-center mb-[17px]"
-                  >
-                    <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
-                    <Text className="text-[12px] text-[#000000] font-regular ml-2">
-                      {isVi ? 'Tải ảnh lên (Tối đa 3)' : 'Upload Photos (Max 3)'}
-                    </Text>
-                  </TouchableOpacity>
+                  {images.length < 3 && (
+                    <TouchableOpacity
+                      onPress={handleUploadPhotos}
+                      activeOpacity={0.7}
+                      className="flex-row border border-dashed border-[#E5E5E5] rounded-[12px] py-[12px] items-center justify-center mb-[17px]"
+                    >
+                      <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
+                      <Text className="text-[12px] text-[#000000] font-regular ml-2">
+                        {isVi ? 'Tải ảnh lên (Tối đa 3)' : 'Upload Photos (Max 3)'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
                   <Animated.View style={{ opacity: imagesFade }}>
                     {images.length > 0 && (
-                      <View className="flex-row flex-wrap gap-2 mb-3">
+                      <View className="flex-row flex-wrap gap-2 mb-3 ">
                         {images.map((url, index) => (
                           <View key={index} style={{ width: '31%', aspectRatio: 1 }} className="relative">
-                            <Image source={{ uri: url }} className="w-full h-full rounded-[4px] border border-[#E5E5EA]" />
+                            <Image source={{ uri: url }} className="w-full h-full rounded-[12px]" />
                             <TouchableOpacity
                               onPress={() => setImages(prev => prev.filter((_, i) => i !== index))}
                               className="absolute -top-1.5 -right-1.5 bg-white rounded-full"
@@ -582,7 +600,7 @@ export default function AddMedicalRecordModal({
                 disabled={isSubmitting}
                 className={`h-[37px] w-2/3 rounded-[1000px] items-center justify-center bg-[#E89B5A] ${isSubmitting ? 'opacity-60' : ''}`}
               >
-                <Text className="font-medium text-[14px] text-white">
+                <Text className="font-semibold text-[14px] text-white">
                   {isSubmitting ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Lưu hồ sơ' : 'Submit Record')}
                 </Text>
               </TouchableOpacity>

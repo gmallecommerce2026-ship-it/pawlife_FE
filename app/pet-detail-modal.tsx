@@ -19,6 +19,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { petService } from '../services/petService';
+import { ImageSourcePropType } from 'react-native';
 
 const getAge = (pet?: any, isVi?: boolean) => {
   if (pet?.dob) {
@@ -128,6 +129,249 @@ export default function PetDetailModal() {
         return { icon: 'history', color: '#8E8E93', bgColor: '#F5F5F5' };
     }
   };
+
+  const ADOPTION_REQUIREMENTS = [
+    {
+      id: 'house_with_yard',
+      label_en: 'House with yard',
+      label_vi: 'Có sân vườn',
+      icon: require('../assets/icon/home-icon.png'),
+    },
+    {
+      id: 'daily_walk',
+      label_en: 'Daily Walk',
+      label_vi: 'Đi dạo thường xuyên',
+      icon: require('../assets/icon/dog-walk.png'),
+    },
+    {
+      id: 'advance_experience',
+      label_en: 'Advance Experience',
+      label_vi: 'Chủ có kinh nghiệm',
+      icon: require('../assets/icon/experience-icon.png'),
+    },
+    {
+      id: 'no_cat',
+      label_en: 'No cat',
+      label_vi: 'Không chó khác',
+      icon: require('../assets/icon/no-cat-icon.png'),
+    },
+    {
+      id: 'no_dog',
+      label_en: 'No dog',
+      label_vi: 'Không mèo khác',
+      icon: require('../assets/icon/no-dog-icon.png'),
+    },
+    {
+      id: 'no_other_pet',
+      label_en: 'No other pet',
+      label_vi: 'Không pet khác',
+      icon: require('../assets/icon/no-dog-icon.png'),
+    },
+    {
+      id: 'no_small_animal',
+      label_en: 'No small animal',
+      label_vi: 'Không động vật nhỏ',
+      icon: require('../assets/icon/no-small-pet-icon.png'),
+    },
+    {
+      id: 'indoor_raise',
+      label_en: 'Indoor raise',
+      label_vi: 'Nuôi trong nhà',
+      icon: require('../assets/icon/home-icon.png'),
+    },
+    {
+      id: 'spacious_living',
+      label_en: 'Spacious Living',
+      label_vi: 'Không gian rộng',
+      icon: require('../assets/icon/home-icon.png'),
+    },
+    {
+      id: 'quiet_home',
+      label_en: 'Quiet Home',
+      label_vi: 'Nhà yên tĩnh',
+      icon: require('../assets/icon/home-icon.png'),
+    },
+    {
+      id: 'often_at_home',
+      label_en: 'Often at Home',
+      label_vi: 'Có thời gian ở nhà',
+      icon: require('../assets/icon/home-icon.png'),
+    },
+    {
+      id: 'stable_routine',
+      label_en: 'Stable Routine',
+      label_vi: 'Lịch sinh hoạt ổn định',
+      icon: require('../assets/icon/calendar-icon.png'),
+    },
+  ];
+
+  type BilingualText = {
+    vi: string;
+    en: string;
+  };
+  type TimelineItem = {
+    id: string;
+    title: BilingualText;
+    description: BilingualText;
+    date: string;
+    icon: ImageSourcePropType;
+    iconBgColor: string;
+    lineColor: string;
+  };
+
+  const DEFAULT_TIMELINE_ITEMS: TimelineItem[] = [
+    {
+      id: 'dental-care',
+      title: {
+        vi: 'Khám răng miệng',
+        en: 'Dental Care',
+      },
+      description: {
+        vi: 'Đã hoàn thành khám tại {clinicName}',
+        en: 'Teeth cleaning was completed',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/teeth-icon.png'),
+      iconBgColor: '#E8FFD8',
+      lineColor: '#D5F5C6',
+    },
+    {
+      id: 'annual-checkup',
+      title: {
+        vi: 'Khám tổng quát định kỳ',
+        en: 'Annual Checkup',
+      },
+      description: {
+        vi: 'Đã hoàn thành khám tại {clinicName}',
+        en: 'Checkup was completed at {clinicName}',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/anual-icon.png'),
+      iconBgColor: '#E8FFD8',
+      lineColor: '#D5F5C6',
+    },
+    {
+      id: 'under-shelter-care',
+      title: {
+        vi: 'Đang ở trạm cứu hộ',
+        en: "Under Shelter's Care",
+      },
+      description: {
+        vi: 'Hiện đang được chăm sóc tại {shelterName}',
+        en: 'Currently under the care of {shelterName}',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/home-heart.png'),
+      iconBgColor: '#FFE4F0',
+      lineColor: '#F8BBD0',
+    },
+    {
+      id: 'was-under-shelter-care',
+      title: {
+        vi: 'Từng ở trạm cứu hộ',
+        en: "Was Under Shelter's Care",
+      },
+      description: {
+        vi: 'Trước đây được chăm sóc tại {shelterName}',
+        en: 'Previously cared by {shelterName}',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/home-heart-2.png'),
+      iconBgColor: '#FFE4F0',
+      lineColor: '#F8BBD0',
+    },
+    {
+      id: 'current-owner',
+      title: {
+        vi: 'Chủ sở hữu hiện tại',
+        en: 'Current Owner',
+      },
+      description: {
+        vi: 'Quyền sở hữu đã được chuyển giao cho {name}',
+        en: 'Ownership transferred to Jane Doe',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/owner.png'),
+      iconBgColor: '#FFE9B8',
+      lineColor: '#FFD88A',
+    },
+    {
+      id: 'previous-owner',
+      title: {
+        vi: 'Chủ trước',
+        en: 'Previous Owner',
+      },
+      description: {
+        vi: 'Từng được chăm sóc bởi {name}',
+        en: 'Previously cared for by Jane Doe',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/owner-2.png'),
+      iconBgColor: '#FFE9B8',
+      lineColor: '#FFD88A',
+    },
+    {
+      id: 'rabies-vaccination',
+      title: {
+        vi: 'Tiêm phòng dại',
+        en: 'Rabies Vaccination',
+      },
+      description: {
+        vi: 'Đã hoàn thành mũi phòng dại',
+        en: 'Annual rabies vaccination completed',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/vaccine.png'),
+      iconBgColor: '#E3F0FF',
+      lineColor: '#BFD9FF',
+    },
+    {
+      id: 'dhpp-vaccination',
+      title: {
+        vi: 'Tiêm phòng DHP',
+        en: 'DHP Vaccination',
+      },
+      description: {
+        vi: 'Đã hoàn thành mũi DHP 5/7in1',
+        en: '1st dose of DHPP 5/7in1 completed',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/vaccine.png'),
+      iconBgColor: '#E3F0FF',
+      lineColor: '#BFD9FF',
+    },
+    {
+      id: 'qr-registered',
+      title: {
+        vi: 'Kích hoạt thẻ QR PawLife',
+        en: 'QR Tag Registered',
+      },
+      description: {
+        vi: 'Thẻ đã được kích hoạt và sẵn sàng sử dụng',
+        en: 'PawLife QR tag is now active and ready to use',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/qr-icon.png'),
+      iconBgColor: '#EAE7FF',
+      lineColor: '#D3CCFF',
+    },
+    {
+      id: 'date-of-birth',
+      title: {
+        vi: 'Ngày sinh',
+        en: 'Date of Birth',
+      },
+      description: {
+        vi: 'Mừng ngày {petName} chào đời',
+        en: 'Celebrate {petName} was born',
+      },
+      date: '01/01/2026',
+      icon: require('../assets/icon/birth-date.png'),
+      iconBgColor: '#DFFFF7',
+      lineColor: '#BDF5EA',
+    },
+  ];
+
 
   const { data: pet, isLoading } = useQuery({
     queryKey: ['pet-detail', params.id],
@@ -378,7 +622,7 @@ export default function PetDetailModal() {
                     <View className="flex-row items-start">
                       <View className="flex-row items-center mr-1 mt-[2px]">
                         <Image source={require('../assets/icon/Check.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                        <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">{isVi ? 'Hợp với:' : 'Good with:'}</Text>
+                        <Text className="ml-1.5 text-[14px] text-[#77C852] font-medium">{isVi ? 'Thân thiện:' : 'Good with:'}</Text>
                       </View>
                       <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
                         {Array.isArray(pet.goodWith)
@@ -392,7 +636,7 @@ export default function PetDetailModal() {
                     <View className="flex-row items-start mt-2">
                       <View className="flex-row items-center mr-1 mt-[2px]">
                         <Image source={require('../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                        <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">{isVi ? 'Không hợp với:' : 'Not suitable:'}</Text>
+                        <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">{isVi ? 'Nên cân nhắc:' : 'Not suitable:'}</Text>
                       </View>
                       <Text className="flex-1 text-[14px] text-[#8E8E93] leading-[22px]">
                         {Array.isArray(pet.badWith)
@@ -409,11 +653,122 @@ export default function PetDetailModal() {
               )}
             </View>
 
-            <View className="mt-6 mb-6">
-              <Text className="text-[16px] font-medium text-black mb-2">{isVi ? 'Ngôi nhà lý tưởng' : 'Ideal Home'}</Text>
-              <Text className="text-[14px] text-[#8E8E93] leading-[22px]">
-                {l(pet?.idealHome) || (isVi ? "Trạm cứu hộ chưa thiết lập tiêu chí nhà ở cho bé. Hãy liên hệ trực tiếp để biết thêm chi tiết." : "The shelter hasn't specified the ideal home conditions for this pet yet. Contact them for more details.")}
+            <View className="mt-6">
+              <Text className="text-[16px] font-medium text-black mb-4">
+                {isVi ? 'Chăm sóc sức khỏe' : 'Health Care'}
               </Text>
+
+              <View className="flex-row gap-2 w-full">
+                <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
+                  <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
+                    <Image
+                      source={require('../assets/icon/fully-icon.png')}
+                      style={{ width: 20, height: 20 }}
+                      resizeMode="cover"
+                    />
+                  </View>
+
+                  <View className="ml-[5px] flex-1">
+                    <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
+                      {isVi ? 'Tiêm chủng' : 'Vaccination'}
+                    </Text>
+                    <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
+                      {isVi ? 'Đầy đủ' : 'Fully vaccinated'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
+                  <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
+                    <Image
+                      source={require('../assets/icon/neutered-icon.png')}
+                      style={{ width: 20, height: 20 }}
+                      resizeMode="cover"
+                    />
+                  </View>
+
+                  <View className="ml-[5px] flex-1">
+                    <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
+                      {isVi ? 'Trạng thái' : 'Status'}
+                    </Text>
+                    <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
+                      {isVi ? 'Đã triệt sản' : 'Neutered'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View className="flex-row gap-2 w-full mt-2 mb-6">
+                <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
+                  <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
+                    <Image
+                      source={require('../assets/icon/missing-icon.png')}
+                      style={{ width: 20, height: 20 }}
+                      resizeMode="cover"
+                    />
+                  </View>
+
+                  <View className="ml-[5px] flex-1">
+                    <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
+                      {isVi ? 'Tiêm chủng' : 'Vaccination'}
+                    </Text>
+                    <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
+                      Missing 1
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
+                  <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
+                    <Image
+                      source={require('../assets/icon/intact-icon.png')}
+                      style={{ width: 20, height: 20 }}
+                      resizeMode="cover"
+                    />
+                  </View>
+
+                  <View className="ml-[5px] flex-1">
+                    <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
+                      {isVi ? 'Trạng thái' : 'Status'}
+                    </Text>
+                    <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
+                      {isVi ? 'Chưa triệt sản' : 'Intact'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View className="mt-3 mb-6">
+              <Text className="text-[17px] font-medium text-black mb-3">
+               {isVi? 'Yêu cầu nhận nuôi' : 'Adoption Requirements'}
+              </Text>
+
+              <View className="flex-row flex-wrap gap-2">
+                {ADOPTION_REQUIREMENTS.map((item) => (
+                  <View
+                    key={item.id}
+                    className="flex-row items-center px-3 h-[25px] rounded-full bg-white border border-[#E5E5E5]"
+                    style={{
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 1,
+                    }}
+                  >
+                    <Image
+                      source={item.icon}
+                      style={{ width: 12, height: 12 }}
+                      resizeMode="contain"
+                    />
+
+                    <Text className="text-[11px] text-[#8E8E93] font-regular ml-1.5">
+                      {isVi ? item.label_vi : item.label_en}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
 
             <View className="mb-10">
@@ -428,53 +783,61 @@ export default function PetDetailModal() {
               </View>
 
               {showHistory && pet?.pawHistory && (
+
                 <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
-                  {pet.pawHistory.map((item: any, index: number) => {
-                    const isLastItem = index === pet.pawHistory.length - 1;
-                    const uiConfig = getHistoryUIConfig(item.type);
-                    const formattedDate = new Date(item.date).toLocaleDateString(isVi ? 'vi-VN' : 'en-GB');
+                  {DEFAULT_TIMELINE_ITEMS.map((item, index) => {
+                    const isLast = index === DEFAULT_TIMELINE_ITEMS.length - 1;
 
                     return (
-                      <View key={item.id} className="flex-row">
-                        {(() => {
-                          const { title: resolvedTitle, description: resolvedDesc } = resolvePawHistoryItem(item, t, l, language);
-                          return (
-                            <>
-                              <View className="items-center mr-4 w-[32px]">
-                                <View className="w-[32px] h-[32px] rounded-full items-center justify-center z-10" style={{ backgroundColor: uiConfig.bgColor }}>
-                                  <FontAwesome5 name={uiConfig.icon} size={13} color={uiConfig.color} />
-                                </View>
-                                {!isLastItem && <View className="w-[2px] flex-1 my-1" style={{ backgroundColor: uiConfig.color }} />}
-                              </View>
-                              <View className={`flex-1 pt-1 ${!isLastItem ? 'pb-6' : ''}`}>
-                                <View className="flex-row justify-between items-start gap-2">
-                                  {/* Thêm flex-1 để title tự động bẻ dòng, không đẩy date ra ngoài */}
-                                  <Text className="flex-1 text-[16px] font-medium text-black">
-                                    {resolvePawHistoryItem(item, t, l, language).title}
-                                  </Text>
+                      <View key={item.id} className="flex-row min-h-[54px]">
+                        <View className="w-[40px] relative">
+                          {!isLast && (
+                            <View
+                              className="absolute w-[1.5px]"
+                              style={{
+                                top: 24,
+                                bottom: -2,
+                                left: 10.25,
+                                backgroundColor: item.lineColor,
+                              }}
+                            />
+                          )}
 
-                                  {/* Có thể thêm mt-[2px] nếu date bị lệch so với title do line-height */}
-                                  <Text className="text-[13px] text-[#8E8E93] font-regular mt-[2px]">
-                                    {formattedDate}
-                                  </Text>
-                                </View>
-                                {/* Chuyển từ t() sang l() để đọc JSON */}
-                                <Text className="text-[13px] text-[#8E8E93] mt-1 leading-[18px]">{resolvePawHistoryItem(item, t, l, language).description}</Text>
-                              </View>
-                            </>
-                          );
-                        })()}
+                          <View
+                            className="w-[22px] h-[22px] rounded-full items-center justify-center z-10"
+                            style={{ backgroundColor: item.iconBgColor }}
+                          >
+                            <Image
+                              source={item.icon}
+                              style={{ width: 12, height: 12 }}
+                              resizeMode="contain"
+                            />
+                          </View>
+                        </View>
+
+                        <View className="flex-1 pb-4 pr-3">
+                          <Text
+                            className="text-[15px] font-medium text-black leading-[18px]"
+                            numberOfLines={1}
+                          >
+                            {isVi ? item.title.vi : item.title.en}
+                          </Text>
+
+                          <Text
+                            className="text-[12px] font-regular text-[#9B9B9B] mt-[2px] leading-[15px]"
+                            numberOfLines={1}
+                          >
+                            {isVi ? item.description.vi : item.description.en}
+                          </Text>
+                        </View>
+
+                        <Text className="text-[11px] font-regular text-[#8E8E93] pt-[2px]">
+                          {item.date}
+                        </Text>
                       </View>
                     );
                   })}
-
-                  {pet.pawHistory.length === 0 && (
-                    <Text className="text-center text-gray-400 py-4 font-regular text-[13px]">
-                      {isVi ? 'Chưa có lịch sử hoạt động.' : 'No history available yet.'}
-                    </Text>
-                  )}
-
-                  <View className='flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px]'>
+                  <View className='flex-row py-[8px] items-center justify-center gap-2 bg-[#F5F5F5] rounded-[8px]'>
                     <Image source={require('../assets/icon/lock.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                     <Text className='font-regular text-[12px] text-[#8E8E93]'>
                       {isVi ? 'Dòng thời gian này được tạo tự động và không thể chỉnh sửa.' : 'This timeline is auto-generated and append-only.'}
@@ -482,6 +845,56 @@ export default function PetDetailModal() {
                   </View>
                 </View>
               )}
+              {/* <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
+                {pet.pawHistory.map((item: any, index: number) => {
+                  const isLastItem = index === pet.pawHistory.length - 1;
+                  const uiConfig = getHistoryUIConfig(item.type);
+                  const formattedDate = new Date(item.date).toLocaleDateString(isVi ? 'vi-VN' : 'en-GB');
+
+                  return (
+                    <View key={item.id} className="flex-row">
+                      {(() => {
+                        const { title: resolvedTitle, description: resolvedDesc } = resolvePawHistoryItem(item, t, l, language);
+                        return (
+                          <>
+                            <View className="items-center mr-4 w-[32px]">
+                              <View className="w-[32px] h-[32px] rounded-full items-center justify-center z-10" style={{ backgroundColor: uiConfig.bgColor }}>
+                                <FontAwesome5 name={uiConfig.icon} size={13} color={uiConfig.color} />
+                              </View>
+                              {!isLastItem && <View className="w-[2px] flex-1 my-1" style={{ backgroundColor: uiConfig.color }} />}
+                            </View>
+                            <View className={`flex-1 pt-1 ${!isLastItem ? 'pb-6' : ''}`}>
+                              <View className="flex-row justify-between items-start gap-2">
+                                <Text className="flex-1 text-[16px] font-medium text-black">
+                                  {resolvePawHistoryItem(item, t, l, language).title}
+                                </Text>
+
+                                <Text className="text-[13px] text-[#8E8E93] font-regular mt-[2px]">
+                                  {formattedDate}
+                                </Text>
+                              </View>
+                              <Text className="text-[13px] text-[#8E8E93] mt-1 leading-[18px]">{resolvePawHistoryItem(item, t, l, language).description}</Text>
+                            </View>
+                          </>
+                        );
+                      })()}
+                    </View>
+                  );
+                })}
+
+                {pet.pawHistory.length === 0 && (
+                  <Text className="text-center text-gray-400 py-4 font-regular text-[13px]">
+                    {isVi ? 'Chưa có lịch sử hoạt động.' : 'No history available yet.'}
+                  </Text>
+                )}
+
+                <View className='flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px]'>
+                  <Image source={require('../assets/icon/lock.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
+                  <Text className='font-regular text-[12px] text-[#8E8E93]'>
+                    {isVi ? 'Dòng thời gian này được tạo tự động và không thể chỉnh sửa.' : 'This timeline is auto-generated and append-only.'}
+                  </Text>
+                </View>
+              </View> */}
             </View>
 
           </View>

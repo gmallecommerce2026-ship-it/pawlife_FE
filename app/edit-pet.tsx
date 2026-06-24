@@ -7,8 +7,9 @@ import { useModalStore } from '@/store/useModalStore';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BlurView } from 'expo-blur';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-// 🚀 FIX 1: Import thêm useCallback và memo từ React
 import { buildBreedBilingual, getBreedOptions, resolveBreedValue, resolveSpeciesValue, SPECIES_BILINGUAL } from '@/constants/breedData';
 import { buildBilingualOnSubmit } from '@/utils/autoTranslate';
 import { displayBilingual, parseBilingual } from '@/utils/bilingualField';
@@ -29,7 +30,7 @@ import {
   View
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { petService } from '../services/petService';
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
@@ -160,45 +161,74 @@ interface MedicalRecordItemProps {
   record: any;
   index: number;
   isVi: boolean;
-  onDelete: (index: number) => void;
+  onOpenMenu: (index: number, images: string[], pageY: number) => void;
 }
 
-const MedicalRecordItem = memo(({ record, index, isVi, onDelete }: MedicalRecordItemProps) => {
+const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalRecordItemProps) => {
+  console.log(record);
+
   const formattedRecordDate = record.recordDate ? new Date(record.recordDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
   const formattedNextDueDate = record.nextDueDate ? new Date(record.nextDueDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
   const displayRecordName = displayBilingual(parseBilingual(record.recordName), isVi);
-  const displayNextDueName = displayBilingual(parseBilingual(record.nextDueName), isVi);
-
+  const isPending = record.verificationStatus === 'PENDING' || !record.verificationStatus;
+  const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
 
   return (
-    <View className="p-4 bg-[#FAFAFA] rounded-[12px] mb-3 border border-[#E5E5EA] flex-row items-center justify-between">
-      <View className="flex-1">
-        <Text className="font-semibold text-[#111827] text-[15px] mb-1">
-          {displayRecordName || (isVi ? "Hồ sơ không tên" : "Unnamed Record")}
-        </Text>
-        <Text className="text-[#6B7280] text-[13px]">
+
+    <View className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
+      <View className={`w-[30px] h-[30px] rounded-[100px] items-center justify-center`}>
+        <Image
+          source={require('../assets/icon/vacc-icon-report.png')}
+          style={{ width: 30, height: 30 }}
+          resizeMode="contain"
+        />
+      </View>
+      <View className="flex-1 mx-3">
+        <View className="flex-1 flex-row flex-wrap items-center pr-2">
+          <Text className="text-[14px] text-[#000000] font-medium leading-[16px] mr-2" numberOfLines={1}>
+            {displayRecordName || (isVi ? "Hồ sơ không tên" : "Unnamed Record")}
+          </Text>
+
+          <View
+            className="flex-row items-center px-2 py-[3px] rounded-full"
+            style={{ backgroundColor: isPending ? '#FBF7EB' : '#EBFFE2', borderColor: isPending ? "#E8A53C/25" : "#D1F5BF" }}
+          >
+            <Feather
+              name={isPending ? 'info' : 'check-circle'}
+              size={10}
+              color={isPending ? '#E8A53C' : '#77C852'}
+            />
+            <Text
+              className="text-[10px] font-medium ml-1"
+              style={{ color: isPending ? '#E8A53C' : '#77C852' }}
+            >
+              {isPending
+                ? (isVi ? 'Đang xác minh' : 'Reviewing')
+                : (isVi ? 'Đã xác minh' : 'Verified')}
+            </Text>
+          </View>
+        </View>
+        <Text className="text-[#6B7280] text-[12px]">
           {isVi ? 'Loại' : 'Type'}: {record.type} | {isVi ? 'Ngày' : 'Date'}: {formattedRecordDate}
         </Text>
-
-        {record.images && record.images.length > 0 && (
-          <Text className="text-[#9CA3AF] text-[12px] mt-1">
-            {isVi ? `Đính kèm: ${record.images.length} ảnh` : `Attachments: ${record.images.length} photos`}
-          </Text>
-        )}
-
         {record.hasNextDueDate && (
-          <Text className="text-[#E89B5A] text-[12px] mt-1 font-medium">
-            {isVi ? 'Lịch tiếp theo' : 'Next due'}: {formattedNextDueDate} ({displayNextDueName})
+          <Text className="text-[#E89B5A] text-[12px] mt-1 font-regular">
+            {isVi ? 'Lịch tiếp theo' : 'Next due date'}: {formattedNextDueDate}
           </Text>
         )}
       </View>
 
       <View className="flex-row items-center gap-2">
         <TouchableOpacity
-          onPress={() => onDelete(index)}
+          onPress={(e) => {
+            e.stopPropagation();
+            const { pageY } = e.nativeEvent;
+            onOpenMenu(index, imageList, pageY);
+          }}
           className="p-2"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="trash-outline" size={12} color="rgb(121, 121, 121)" />
+          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
         </TouchableOpacity>
       </View>
     </View>
@@ -216,10 +246,19 @@ const MedicalRecordItem = memo(({ record, index, isVi, onDelete }: MedicalRecord
 
 export default function EditPetScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+
+  const id = params.id as string;
+
+  const openMedicalModalParam = Array.isArray(params.openMedicalModal)
+    ? params.openMedicalModal[0]
+    : params.openMedicalModal;
+
+  const shouldAutoOpenMedicalModal = openMedicalModalParam === '1';
   const showModal = useModalStore((state) => state.showModal);
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const insets = useSafeAreaInsets();
 
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
 
@@ -234,11 +273,132 @@ export default function EditPetScreen() {
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [medicalRecords, setMedicalRecords] = useState<any[]>([]);
   const [isUploadingRecords, setIsUploadingRecords] = useState(false);
+  const hasAutoOpenedMedicalModal = useRef(false);
+  const [showMedicalRecordMenu, setShowMedicalRecordMenu] = useState(false);
+  const [medicalRecordMenuPosition, setMedicalRecordMenuPosition] = useState({ top: 0, right: 32 });
+  const [selectedMedicalRecordIndex, setSelectedMedicalRecordIndex] = useState<number | null>(null);
+  const [currentMedicalRecordImages, setCurrentMedicalRecordImages] = useState<string[]>([]);
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!shouldAutoOpenMedicalModal) return;
+    if (hasAutoOpenedMedicalModal.current) return;
+
+    hasAutoOpenedMedicalModal.current = true;
+
+    requestAnimationFrame(() => {
+      setShowMedicalModal(true);
+    });
+  }, [isLoading, shouldAutoOpenMedicalModal]);
 
   // 🚀 FIX 3: Khai báo hàm xoá record với useCallback để tránh tạo function mới mỗi lần render
   const handleDeleteMedicalRecord = useCallback((indexToDelete: number) => {
     setMedicalRecords(prev => prev.filter((_, i) => i !== indexToDelete));
   }, []);
+
+  const handleOpenMedicalRecordMenu = useCallback((index: number, images: string[], pageY: number) => {
+    setMedicalRecordMenuPosition({ top: pageY + 10, right: 32 });
+    setSelectedMedicalRecordIndex(index);
+    setCurrentMedicalRecordImages(images);
+    setCurrentImageIndex(0);
+    setShowMedicalRecordMenu(true);
+  }, []);
+
+  const handleDownloadMedicalRecordImage = async (url: string, fileName: string) => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          isVi ? 'Thiếu quyền' : 'Permission Required',
+          isVi
+            ? 'Cần cấp quyền truy cập thư viện ảnh để lưu ảnh.'
+            : 'Photo library permission is required to save the image.'
+        );
+        return;
+      }
+
+      if (url.startsWith('file://') || url.startsWith('content://')) {
+        await MediaLibrary.saveToLibraryAsync(url);
+      } else {
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+        await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
+      }
+
+      Alert.alert(
+        isVi ? 'Thành công' : 'Success',
+        isVi ? 'Ảnh đã được lưu vào thư viện ảnh!' : 'Image has been saved to your photos!'
+      );
+    } catch (error) {
+      console.error('Lỗi tải file:', error);
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        isVi ? 'Không thể tải xuống ảnh này lúc này.' : 'Unable to download this image right now.'
+      );
+    }
+  };
+
+  const handleDownloadMedicalRecordImages = async (urls: string[]) => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          isVi ? 'Thiếu quyền' : 'Permission Required',
+          isVi
+            ? 'Cần cấp quyền truy cập thư viện ảnh để lưu ảnh.'
+            : 'Photo library permission is required to save images.'
+        );
+        return;
+      }
+
+      let successCount = 0;
+
+      for (let i = 0; i < urls.length; i++) {
+        try {
+          const url = urls[i];
+          if (url.startsWith('file://') || url.startsWith('content://')) {
+            await MediaLibrary.saveToLibraryAsync(url);
+          } else {
+            const fileUri = `${FileSystem.documentDirectory}medical_record_${Date.now()}_${i}.jpg`;
+            const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+            await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
+          }
+          successCount++;
+        } catch (err) {
+          console.error(`Lỗi tải ảnh ${i}:`, err);
+        }
+      }
+
+      if (successCount === urls.length) {
+        Alert.alert(
+          isVi ? 'Thành công' : 'Success',
+          isVi
+            ? `Đã lưu ${successCount} ảnh vào thư viện ảnh!`
+            : `Saved ${successCount} image(s) to your photos!`
+        );
+      } else if (successCount > 0) {
+        Alert.alert(
+          isVi ? 'Hoàn tất một phần' : 'Partially Completed',
+          isVi
+            ? `Đã lưu ${successCount}/${urls.length} ảnh. Một số ảnh không thể tải.`
+            : `Saved ${successCount}/${urls.length} image(s). Some images failed to download.`
+        );
+      } else {
+        Alert.alert(
+          isVi ? 'Lỗi' : 'Error',
+          isVi ? 'Không thể tải xuống ảnh.' : 'Unable to download images.'
+        );
+      }
+    } catch (error) {
+      console.error('Lỗi tải nhiều ảnh:', error);
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        isVi ? 'Không thể tải xuống ảnh lúc này.' : 'Unable to download images right now.'
+      );
+    }
+  };
 
   // 🚀 NÂNG CẤP 2: Thêm state quản lý UI khóa
   const [lockStatus, setLockStatus] = useState({
@@ -613,6 +773,13 @@ export default function EditPetScreen() {
     );
   }
 
+  const selectedMedicalRecord = selectedMedicalRecordIndex !== null
+    ? medicalRecords[selectedMedicalRecordIndex]
+    : null;
+  const selectedMedicalRecordIsPending = !!selectedMedicalRecord && (
+    selectedMedicalRecord.verificationStatus === 'PENDING' || !selectedMedicalRecord.verificationStatus
+  );
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView
@@ -904,7 +1071,7 @@ export default function EditPetScreen() {
                     onPress={() => setShowMedicalModal(true)}
                     className="bg-[#FFF8F0] px-4 py-2 rounded-full border border-[#E89B5A]/30"
                   >
-                    <Text className="text-[#E89B5A] font-medium text-[13px]">{isVi ? '+ Thêm hồ sơ' : '+ Add Record'}</Text>
+                    <Text className="text-[#E89B5A] font-medium text-[13px]">{isVi ? 'Thêm hồ sơ' : 'Add Record'}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -945,7 +1112,7 @@ export default function EditPetScreen() {
                       record={record}
                       index={index}
                       isVi={isVi}
-                      onDelete={handleDeleteMedicalRecord}
+                      onOpenMenu={handleOpenMedicalRecordMenu}
                     />
                   ))
                 )}
@@ -1101,13 +1268,191 @@ export default function EditPetScreen() {
         </View>
       </Modal>
 
+      {/* --- MEDICAL RECORD MENU MODAL --- */}
+      <Modal
+        visible={showMedicalRecordMenu}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => {
+          setShowMedicalRecordMenu(false);
+          setSelectedMedicalRecordIndex(null);
+        }}
+      >
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={() => {
+            setShowMedicalRecordMenu(false);
+            setSelectedMedicalRecordIndex(null);
+          }}
+        >
+          <View
+            className="absolute bg-white rounded-xl border border-gray-100 w-44"
+            style={{
+              top: medicalRecordMenuPosition.top,
+              right: medicalRecordMenuPosition.right,
+              elevation: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 10
+            }}
+          >
+            {currentMedicalRecordImages.length > 0 && (
+              <>
+                <TouchableOpacity
+                  className="flex-row items-center px-4 py-3"
+                  activeOpacity={0.6}
+                  onPress={() => {
+                    setShowMedicalRecordMenu(false);
+                    setIsImageViewerVisible(true);
+                  }}
+                >
+                  <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                    {isVi ? 'Xem hồ sơ' : 'View record'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {!selectedMedicalRecordIsPending && (
+              <TouchableOpacity
+                className="flex-row items-center px-4 py-3 border-t border-gray-50"
+                activeOpacity={0.6}
+                onPress={() => {
+                  // TODO: handle report record
+                }}
+              >
+                <Text className="text-[14px] text-red-600 ml-3 font-medium">
+                  {isVi ? 'Báo cáo' : 'Report'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {selectedMedicalRecordIsPending && (
+              <TouchableOpacity
+                className={`flex-row items-center px-4 py-3 ${currentMedicalRecordImages.length > 0 ? 'border-t border-gray-50' : ''}`}
+                activeOpacity={0.6}
+                onPress={() => {
+                  // TODO: handle edit medical record
+                }}
+              >
+                <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                  {isVi ? 'Sửa hồ sơ' : 'Edit Record'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {selectedMedicalRecordIndex !== null && (
+              <TouchableOpacity
+                className="flex-row items-center px-4 py-3 border-t border-gray-50"
+                activeOpacity={0.6}
+                onPress={() => {
+                  const indexToDelete = selectedMedicalRecordIndex;
+                  setShowMedicalRecordMenu(false);
+                  setSelectedMedicalRecordIndex(null);
+                  handleDeleteMedicalRecord(indexToDelete);
+                }}
+              >
+                <Text className="text-[14px] text-red-500 ml-3 font-medium">
+                  {isVi ? 'Xóa' : 'Delete'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- IN-APP FULLSCREEN IMAGE VIEWER MODAL --- */}
+      <Modal
+        visible={isImageViewerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsImageViewerVisible(false)}
+      >
+        <View className="flex-1 bg-black/95 justify-center items-center">
+          <View
+            className="absolute top-0 w-full z-50 flex-row justify-between items-center px-4 pb-4"
+            style={{
+              paddingTop: Math.max(insets.top, 20),
+              backgroundColor: 'rgba(0,0,0,0.3)'
+            }}
+          >
+            <Text className="text-white font-medium text-lg drop-shadow-md">
+              {isVi ? 'Hồ sơ y tế' : 'Medical Record'}
+              {currentMedicalRecordImages.length > 1 ? `  ${currentImageIndex + 1}/${currentMedicalRecordImages.length}` : ''}
+            </Text>
+            <View className="flex-row items-center gap-3">
+              <TouchableOpacity
+                className="p-2.5 bg-white/20 rounded-full"
+                onPress={async () => {
+                  const currentUri = currentMedicalRecordImages[currentImageIndex];
+                  if (currentUri) {
+                    await handleDownloadMedicalRecordImage(currentUri, `medical_record_${Date.now()}.jpg`);
+                  }
+                }}
+              >
+                <Feather name="download" size={22} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="p-2.5 bg-white/20 rounded-full"
+                onPress={() => setIsImageViewerVisible(false)}
+              >
+                <Feather name="x" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {currentMedicalRecordImages.length > 0 && (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              contentOffset={{ x: currentImageIndex * Dimensions.get('window').width, y: 0 }}
+              onMomentumScrollEnd={(e) => {
+                const newIndex = Math.round(
+                  e.nativeEvent.contentOffset.x / Dimensions.get('window').width
+                );
+                setCurrentImageIndex(newIndex);
+              }}
+              style={{ width: '100%' }}
+            >
+              {currentMedicalRecordImages.map((uri, idx) => (
+                <View
+                  key={idx}
+                  style={{ width: Dimensions.get('window').width, justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <Image
+                    source={{ uri }}
+                    style={{ width: '100%', height: '80%' }}
+                    resizeMode="contain"
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          {currentMedicalRecordImages.length > 1 && (
+            <View className="absolute bottom-10 flex-row gap-2">
+              {currentMedicalRecordImages.map((_, idx) => (
+                <View
+                  key={idx}
+                  className={`w-2 h-2 rounded-full ${idx === currentImageIndex ? 'bg-white' : 'bg-white/30'}`}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </Modal>
+
       {/* Gọi component Modal Medical Record */}
       <AddMedicalRecordModal
         visible={showMedicalModal}
         onClose={() => setShowMedicalModal(false)}
-        species={formData.species as 'Dog' | 'Cat'}
-        onSubmit={(data) => {
-          setMedicalRecords(prev => [...prev, data]);
+        species={(formData.species as 'Dog' | 'Cat') || 'Dog'}
+        onSubmit={(record) => {
+          setMedicalRecords(prev => [...prev, record]);
+          setShowMedicalModal(false);
         }}
       />
     </SafeAreaView>

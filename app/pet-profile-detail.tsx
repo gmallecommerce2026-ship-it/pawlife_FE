@@ -126,6 +126,8 @@ export default function PetProfileDetailScreen() {
 
   const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop';
   const displayAvatar = petData?.avatarUrl || petData?.images?.[0]?.url || FALLBACK_AVATAR;
+  console.log(petData);
+
 
   const getHistoryUIConfig = (type: string) => {
     switch (type) {
@@ -362,7 +364,6 @@ export default function PetProfileDetailScreen() {
     }
   };
 
-
   const toggleHistory = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowHistory(!showHistory);
@@ -370,6 +371,7 @@ export default function PetProfileDetailScreen() {
 
   const combinedHistory = React.useMemo(() => {
     if (!petData) return [];
+
 
     const baseHistory = petData.pawHistory || [];
 
@@ -466,6 +468,13 @@ export default function PetProfileDetailScreen() {
 
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId.substring(0, 8).toUpperCase();
   const hasValidQRCode = !!petData.qrCodeUrl && petData.qrVerificationStatus === 'VERIFIED';
+  const selectedMedicalRecord = selectedVaccineIndex !== null
+    ? petData?.medicalRecords?.[selectedVaccineIndex]
+    : null;
+  const selectedMedicalRecordIsPending = !!selectedMedicalRecord && (
+    selectedMedicalRecord.verificationStatus === 'PENDING' || !selectedMedicalRecord.verificationStatus
+  );
+
   const handleDownloadImage = async (url: string, fileName: string) => {
     try {
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
@@ -549,6 +558,7 @@ export default function PetProfileDetailScreen() {
         isVi ? 'Không thể tải xuống ảnh lúc này.' : 'Unable to download images right now.'
       );
     }
+
   };
 
   return (
@@ -1013,7 +1023,25 @@ export default function PetProfileDetailScreen() {
 
           {/* --- VACCINATION & MEDICAL RECORD SECTION --- */}
           <View className="mx-[20px] mb-8">
-            <Text className="font-semibold text-[16px] text-black mb-3">{isVi ? "Hồ sơ y tế" : "Medical Records"}</Text>
+            <View className="flex-row justify-between items-center mb-[20px]">
+              <Text className="text-[16px] font-semibold text-[#111827] tracking-[0.06px]">
+                {isVi ? 'Hồ sơ y tế' : 'Medical Records'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  router.push({
+                    pathname: '/edit-pet' as any,
+                    params: {
+                      id: petId,
+                      openMedicalModal: '1',
+                    },
+                  });
+                }}
+                className="bg-[#FFF8F0] px-4 py-2 rounded-full border border-[#E89B5A]/30"
+              >
+                <Text className="text-[#E89B5A] font-medium text-[13px]">{isVi ? 'Thêm hồ sơ' : 'Add Record'}</Text>
+              </TouchableOpacity>
+            </View>
 
             {petData?.medicalRecords && petData.medicalRecords.length > 0 ? (
               <View className="flex-col gap-3">
@@ -1021,15 +1049,26 @@ export default function PetProfileDetailScreen() {
                   const isPending = record.verificationStatus === 'PENDING' || !record.verificationStatus;
                   const iconConfig = getMedicalRecordIconConfig(record.type);
 
+                  const formattedRecordDate = record.recordDate
+                    ? new Date(record.recordDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US')
+                    : '';
+
+                  const formattedNextDueDate = record.nextDueDate
+                    ? new Date(record.nextDueDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US')
+                    : '';
+
+                  const shouldShowNextDueDate = record.hasNextDueDate && !!record.nextDueDate;
+
                   return (
                     <View key={record.id || index} className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
 
                       {/* ICON TRUNG TÍNH: border ghi đậm, nền ghi nhạt, không tô màu theo loại */}
-                      <View
-                        className="w-[40px] h-[40px] px-[12px] py-[10px] rounded-full items-center justify-center"
-                        style={{ borderColor: '#9CA3AF', backgroundColor: '#F3F4F6' }}
-                      >
-                        <FontAwesome5 name={iconConfig.icon} size={15} color="#4B5563" />
+                      <View className={`w-[30px] h-[30px] rounded-[100px] items-center justify-center`}>
+                        <Image
+                          source={require('../assets/icon/vacc-icon-report.png')}
+                          style={{ width: 30, height: 30 }}
+                          resizeMode="contain"
+                        />
                       </View>
 
                       <View className="flex-1 mx-3">
@@ -1045,7 +1084,7 @@ export default function PetProfileDetailScreen() {
                               style={{ backgroundColor: isPending ? '#FBF7EB' : '#EBFFE2', borderColor: isPending ? "#E8A53C/25" : "#D1F5BF" }}
                             >
                               <Feather
-                                name={isPending ? 'clock' : 'check-circle'}
+                                name={isPending ? 'info' : 'check-circle'}
                                 size={10}
                                 color={isPending ? '#E8A53C' : '#77C852'}
                               />
@@ -1054,39 +1093,39 @@ export default function PetProfileDetailScreen() {
                                 style={{ color: isPending ? '#E8A53C' : '#77C852' }}
                               >
                                 {isPending
-                                  ? (isVi ? 'Đang xác minh' : 'Verifying')
+                                  ? (isVi ? 'Đang xác minh' : 'Reviewing')
                                   : (isVi ? 'Đã xác minh' : 'Verified')}
                               </Text>
                             </View>
                           </View>
 
-                          {/* NÚT MORE OPTIONS (Đã xử lý tải ảnh bên trong mảng record.images) */}
-                          {record.images && record.images.length > 0 && (
+                          {/* NÚT MORE OPTIONS: hiện khi có ảnh hoặc record đang pending để có thể Edit Record */}
+                          {((record.images && record.images.length > 0) || isPending) && (
                             <TouchableOpacity
                               onPress={(e) => {
                                 e.stopPropagation();
                                 const { pageY } = e.nativeEvent;
+                                const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
                                 setMenuPosition({ top: pageY + 10, right: 32 });
-                                setCurrentImageList(record.images);
+                                setSelectedVaccineIndex(index);
+                                setCurrentImageList(imageList);
                                 setCurrentImageIndex(0);
                                 setShowVaccineMenu(true);
                               }}
 
                               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             >
-                              <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
+                              <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
                             </TouchableOpacity>
                           )}
                         </View>
 
-                        <View className="flex-row items-center mt-1.5 justify-between">
-                          <Text className="text-[11px] text-[#8E8E93] tracking-[0.5px]">
-                            {isVi ? 'Loại:' : 'Type:'} {record.type}
-                          </Text>
-                          <Text className="text-[11px] text-[#8E8E93] tracking-[0.5px]">
-                            {new Date(record.recordDate).toLocaleDateString('en-GB')}
-                          </Text>
-                        </View>
+                        <Text className="text-[12px] text-[#8E8E93] tracking-[0.5px]">
+                          {isVi ? 'Loại:' : 'Type:'} {record.type} | {isVi ? 'Ngày:' : 'Date:'} {new Date(record.recordDate).toLocaleDateString('en-GB')}
+                        </Text>
+                        <Text className="text-[12px] text-[#E89B5A] tracking-[0.5px] mt-1">
+                          {isVi ? 'Lịch tiếp theo' : 'Next due date'}: {formattedNextDueDate}
+                        </Text>
                       </View>
                     </View>
                   );
@@ -1204,15 +1243,21 @@ export default function PetProfileDetailScreen() {
         visible={showVaccineMenu}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setShowVaccineMenu(false)}
+        onRequestClose={() => {
+          setShowVaccineMenu(false);
+          setSelectedVaccineIndex(null);
+        }}
       >
         <TouchableOpacity
           style={{ flex: 1 }}
           activeOpacity={1}
-          onPress={() => setShowVaccineMenu(false)}
+          onPress={() => {
+            setShowVaccineMenu(false);
+            setSelectedVaccineIndex(null);
+          }}
         >
           <View
-            className="absolute bg-white rounded-xl border border-gray-100 w-36"
+            className="absolute bg-white rounded-xl border border-gray-100 w-44"
             style={{
               top: menuPosition.top,
               right: menuPosition.right,
@@ -1223,37 +1268,67 @@ export default function PetProfileDetailScreen() {
               shadowRadius: 10
             }}
           >
-            <TouchableOpacity
-              className="flex-row items-center px-4 py-3"
-              activeOpacity={0.6}
-              onPress={() => {
-                setShowVaccineMenu(false);
-                if (currentImageList.length > 0) {
-                  setIsImageViewerVisible(true);
-                }
-              }}
-            >
-              <Feather name="eye" size={16} color="#374151" />
-              <Text className="text-[14px] text-gray-700 ml-3 font-medium">View image</Text>
-            </TouchableOpacity>
+            {currentImageList.length > 0 && (
+              <>
+                <TouchableOpacity
+                  className="flex-row items-center px-4 py-3"
+                  activeOpacity={0.6}
+                  onPress={() => {
+                    setShowVaccineMenu(false);
+                    if (currentImageList.length > 0) {
+                      setIsImageViewerVisible(true);
+                    }
+                  }}
+                >
+                  <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                    {isVi ? 'Xem hồ sơ' : 'View record'}
+                  </Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              className="flex-row items-center px-4 py-3 border-t border-gray-50"
-              activeOpacity={0.6}
-              onPress={async () => {
-                setShowVaccineMenu(false);
-                if (currentImageList.length > 0) {
-                  await handleDownloadMultipleImages(currentImageList);
-                }
-              }}
-            >
-              <Feather name="download" size={16} color="#374151" />
-              <Text className="text-[14px] text-gray-700 ml-3 font-medium">
-                {currentImageList.length > 1
-                  ? (isVi ? `Tải xuống` : `Download`)
-                  : 'Download'}
-              </Text>
-            </TouchableOpacity>
+              </>
+            )}
+
+            {!selectedMedicalRecordIsPending && (
+              <TouchableOpacity
+                className="flex-row items-center px-4 py-3 border-t border-gray-50"
+                activeOpacity={0.6}
+                onPress={() => {
+                  // TODO: handle report record
+                }}
+              >
+                <Text className="text-[14px] text-red-600 ml-3 font-medium">
+                  {isVi ? 'Báo cáo' : 'Report'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {selectedMedicalRecordIsPending && (
+              <>
+                <TouchableOpacity
+                  className={`flex-row items-center px-4 py-3 ${currentImageList.length > 0 ? 'border-t border-gray-50' : ''}`}
+                  activeOpacity={0.6}
+                  onPress={() => {
+                    // TODO: handle edit medical record
+                  }}
+                >
+                  <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                    {isVi ? 'Sửa hồ sơ' : 'Edit Record'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className={`flex-row items-center px-4 py-3 ${currentImageList.length > 0 ? 'border-t border-gray-50' : ''}`}
+                  activeOpacity={0.6}
+                  onPress={() => {
+                    // TODO: handle delete medical record
+                  }}
+                >
+                  <Text className="text-[14px] text-red-600 ml-3 font-medium">
+                    {isVi ? 'Xóa' : 'Delete'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+
+            )}
 
           </View>
         </TouchableOpacity>

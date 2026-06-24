@@ -1357,6 +1357,39 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
         ? `${fullPet.weight} kg`
         : (currentPet?.weight ? `${currentPet.weight} kg` : t('Unknown'));
 
+    const healthCareItems = [
+        {
+            id: 'vaccination',
+            label: isVi ? 'Tiêm chủng' : 'Vaccination',
+            value: isVi ? 'Đầy đủ' : 'Fully vaccinated',
+            icon: require('../../assets/icon/fully-icon.png'),
+        },
+        {
+            id: 'neutered',
+            label: isVi ? 'Trạng thái' : 'Status',
+            value: isVi ? 'Đã triệt sản' : 'Neutered',
+            icon: require('../../assets/icon/neutered-icon.png'),
+        },
+    ];
+
+    const adoptionRequirementItems = [
+        {
+            id: 'house_with_yard',
+            label: isVi ? 'Có sân vườn' : 'House with yard',
+            icon: require('../../assets/icon/home-icon.png'),
+        },
+        {
+            id: 'daily_walk',
+            label: isVi ? 'Đi dạo thường xuyên' : 'Daily Walk',
+            icon: require('../../assets/icon/dog-walk.png'),
+        },
+        {
+            id: 'advance_experience',
+            label: isVi ? 'Chủ có kinh nghiệm' : 'Advance Experience',
+            icon: require('../../assets/icon/experience-icon.png'),
+        },
+    ];
+
     return (
         <Animated.View
             style={[
@@ -1533,8 +1566,80 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                         </View>
 
                         <View className="mb-6">
-                            <Text className="font-medium text-black text-lg mb-1">{t("Ideal Home")}</Text>
-                            <Text className="text-[14px] text-[#8E8E93] leading-6">{idealHome}</Text>
+                            <Text className="text-[16px] font-medium text-black mb-4">
+                                {isVi ? 'Chăm sóc sức khỏe' : 'Health Care'}
+                            </Text>
+
+                            <View className="flex-row gap-2 w-full">
+                                {healthCareItems.map((item) => (
+                                    <View
+                                        key={item.id}
+                                        className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]"
+                                    >
+                                        <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
+                                            <Image
+                                                source={item.icon}
+                                                style={{ width: 20, height: 20 }}
+                                                contentFit="contain"
+                                            />
+                                        </View>
+
+                                        <View className="ml-[5px] flex-1">
+                                            <Text
+                                                className="font-regular text-[12px] text-[#8E8E93]"
+                                                numberOfLines={1}
+                                            >
+                                                {item.label}
+                                            </Text>
+
+                                            <Text
+                                                className="font-medium text-[14px] text-black"
+                                                numberOfLines={1}
+                                            >
+                                                {item.value}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Section: Adoption Requirements */}
+                        <View className="mb-6">
+                            <Text className="text-[16px] font-medium text-black mb-3">
+                                {isVi ? 'Yêu cầu nhận nuôi' : 'Adoption Requirements'}
+                            </Text>
+
+                            <View className="flex-row flex-wrap">
+                                {adoptionRequirementItems.map((item) => (
+                                    <View
+                                        key={item.id}
+                                        className="flex-row items-center px-3 h-[25px] rounded-full bg-white border border-[#E5E5E5]"
+                                        style={{
+                                            marginRight: 8,
+                                            marginBottom: 8,
+                                            shadowColor: '#000',
+                                            shadowOffset: { width: 0, height: 2 },
+                                            shadowOpacity: 0.08,
+                                            shadowRadius: 4,
+                                            elevation: 2,
+                                        }}
+                                    >
+                                        <Image
+                                            source={item.icon}
+                                            style={{ width: 12, height: 12 }}
+                                            contentFit="contain"
+                                        />
+
+                                        <Text
+                                            className="text-[11px] text-[#8E8E93] font-regular ml-1.5"
+                                            numberOfLines={1}
+                                        >
+                                            {item.label}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
                         </View>
 
                         <View style={{ height: 20 }} />

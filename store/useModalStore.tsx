@@ -14,13 +14,24 @@ export const useModalStore = create<ModalState>((set) => ({
   isOpen: false,
   title: '',
   message: '',
-  buttonText: 'Submit', // Default text
+  buttonText: 'Submit',
   onConfirm: undefined,
-  
-  // Action để gọi Modal ở bất kỳ đâu
-  showModal: ({ title, message, buttonText, onConfirm }) => 
-    set({ isOpen: true, title, message, buttonText: buttonText || 'Submit', onConfirm }),
-    
-  // Action để đóng Modal
-  hideModal: () => set({ isOpen: false, onConfirm: undefined }),
+
+  showModal: ({ title, message, buttonText, onConfirm }) =>
+    set({
+      isOpen: true,
+      title,
+      message,
+      buttonText: buttonText || 'Submit',
+      onConfirm,
+    }),
+
+  hideModal: () =>
+    set({
+      isOpen: false,
+      title: '',
+      message: '',
+      buttonText: 'Submit',
+      onConfirm: undefined,
+    }),
 }));

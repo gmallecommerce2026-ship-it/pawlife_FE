@@ -190,22 +190,54 @@ export default function ViewQrCode() {
   const [otherDetail, setOtherDetail] = useState('');
   const cardRef = useRef<ViewShot>(null);
   const RadioOption = ({ label, subLabel, selected, onPress }: RadioOptionProps) => (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={onPress}
-      className="flex-row items-start mb-4 mx-2"
+  <TouchableOpacity
+    activeOpacity={0.7}
+    onPress={onPress}
+    className="flex-row mb-4 mx-2"
+    style={{
+      alignItems: subLabel ? 'flex-start' : 'center',
+    }}
+  >
+    <View
+      className={`w-[16px] h-[16px] rounded-full border-[1px] items-center justify-center ${selected ? 'border-[#E89B5A]' : 'border-[#757575]'}`}
+      style={{
+        marginTop: subLabel ? 0 : 0,
+      }}
     >
-      <View
-        className={`w-[16px] h-[16px] rounded-full border-[1px] items-center justify-center bottom-[1px] ${selected ? 'border-[#E89B5A]' : 'border-[#757575]'}`}
+      {selected && <View className="w-[10px] h-[10px] rounded-full bg-[#E89B5A]" />}
+    </View>
+
+    <View
+      className="ml-2"
+      style={{
+        flexShrink: 1,
+      }}
+    >
+      <Text
+        className="text-[14px] font-medium text-black"
+        style={{
+          lineHeight: 16,
+          includeFontPadding: false,
+          textAlignVertical: 'center',
+        }}
       >
-        {selected && <View className="w-[10px] h-[10px] rounded-full bg-[#E89B5A]" />}
-      </View>
-      <View className="ml-2">
-        <Text className="text-[14px] font-medium text-black">{label}</Text>
-        {subLabel && <Text className="text-[12px] text-gray-400 mt-0.5">{subLabel}</Text>}
-      </View>
-    </TouchableOpacity>
-  );
+        {label}
+      </Text>
+
+      {subLabel && (
+        <Text
+          className="text-[12px] text-gray-400 mt-0.5"
+          style={{
+            lineHeight: 14,
+            includeFontPadding: false,
+          }}
+        >
+          {subLabel}
+        </Text>
+      )}
+    </View>
+  </TouchableOpacity>
+);
   const handleShareCard = async () => {
     try {
       if (!cardRef.current || !cardRef.current.capture) {
