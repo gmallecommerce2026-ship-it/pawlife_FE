@@ -1,9 +1,12 @@
+import AddMedicalRecordModal from '@/components/AddMedicalRecordModal';
 import { Text } from '@/components/AppText';
+import ReportIssueModal, { ReportSubmitData } from '@/components/ReportIssueModal';
+import { getMedicalRecordIcon } from '@/constants/medicalRecordIcons';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalizedData } from '@/hooks/useLocalizedData';
-import { resolvePawHistoryItem } from '@/utils/pawHistory';
+import { useTotalImageSize } from '@/hooks/useTotalImageSize';
 import { normalizePet } from '@/utils/petNormalize';
-import { Feather, FontAwesome5, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,61 +14,150 @@ import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, Dimensions, Image, InteractionManager, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, Dimensions, Image, ImageSourcePropType, InteractionManager, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
+
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const MOCK_PAW_HISTORY = [
-  {
-    id: '1',
-    title: 'Current Owner',
-    date: '01/01/2026',
-    description: 'Ownership transferred to Jane Doe',
-    icon: 'user',
-    color: '#F2A465', // Cam
-    bgColor: '#FFF4EC'
+type PawHistoryUIType =
+  | 'CREATED'
+  | 'BIRTH'
+  | 'QR_LINKED'
+  | 'TRANSFER'
+  | 'VACCINE'
+  | 'DENTAL_CARE'
+  | 'ANNUAL_CHECKUP'
+  | 'UNDER_SHELTER_CARE'
+  | 'WAS_UNDER_SHELTER_CARE'
+  | 'CURRENT_OWNER'
+  | 'PREVIOUS_OWNER';
+
+type PawHistoryUIConfig = {
+  icon: ImageSourcePropType;
+  iconBgColor: string;
+  lineColor: string;
+};
+
+const PAW_HISTORY_UI_CONFIG: Record<PawHistoryUIType, PawHistoryUIConfig> = {
+  DENTAL_CARE: {
+    icon: require('../assets/icon/teeth-icon.png'),
+    iconBgColor: '#E8FFD8',
+    lineColor: '#D5F5C6',
   },
-  {
-    id: '2',
-    title: 'Annual Checkup',
-    date: '01/01/2026',
-    description: 'Health examination completed',
-    icon: 'check',
-    color: '#77C582', // Xanh lá
-    bgColor: '#EBFFE2'
+  ANNUAL_CHECKUP: {
+    icon: require('../assets/icon/anual-icon.png'),
+    iconBgColor: '#E8FFD8',
+    lineColor: '#D5F5C6',
   },
-  {
-    id: '3',
-    title: 'DHPP Vaccination',
-    date: '01/01/2026',
-    description: 'Vaccinated: hepatitis, rabies, parvo, and parainfluenza',
-    icon: 'syringe',
-    color: '#5A90DA', // Xanh dương
-    bgColor: '#E8F1FF'
+  UNDER_SHELTER_CARE: {
+    icon: require('../assets/icon/home-heart.png'),
+    iconBgColor: '#FFE4F0',
+    lineColor: '#F8BBD0',
   },
-  {
-    id: '4',
-    title: 'QR Code Registered',
-    date: '01/01/2026',
-    description: 'PawLife QR tag activated and linked to Luna',
-    icon: 'expand',
-    color: '#885BF2', // Tím
-    bgColor: '#EAE7FB'
+  WAS_UNDER_SHELTER_CARE: {
+    icon: require('../assets/icon/home-heart-2.png'),
+    iconBgColor: '#FFE4F0',
+    lineColor: '#F8BBD0',
   },
-  {
-    id: '5',
-    title: 'Date of Birth',
-    date: '01/01/2026',
-    description: 'Luna was born',
-    icon: 'user',
-    color: '#F2A465', // Vàng cam
-    bgColor: '#FFF4EC'
+  CURRENT_OWNER: {
+    icon: require('../assets/icon/owner.png'),
+    iconBgColor: '#FFE9B8',
+    lineColor: '#FFD88A',
+  },
+  PREVIOUS_OWNER: {
+    icon: require('../assets/icon/owner-2.png'),
+    iconBgColor: '#FFE9B8',
+    lineColor: '#FFD88A',
+  },
+  VACCINE: {
+    icon: require('../assets/icon/vaccine.png'),
+    iconBgColor: '#E3F0FF',
+    lineColor: '#BFD9FF',
+  },
+  QR_LINKED: {
+    icon: require('../assets/icon/qr-icon.png'),
+    iconBgColor: '#EAE7FF',
+    lineColor: '#D3CCFF',
+  },
+  BIRTH: {
+    icon: require('../assets/icon/birth-date.png'),
+    iconBgColor: '#DFFFF7',
+    lineColor: '#BDF5EA',
+  },
+  CREATED: {
+    icon: require('../assets/icon/qr-icon.png'),
+    iconBgColor: '#EAE7FF',
+    lineColor: '#D3CCFF',
+  },
+  TRANSFER: {
+    icon: require('../assets/icon/home-heart.png'),
+    iconBgColor: '#E8FFD8',
+    lineColor: '#D5F5C6',
+  },
+};
+
+const DEFAULT_HISTORY_UI: PawHistoryUIConfig = {
+  icon: require('../assets/icon/birth-date.png'),
+  iconBgColor: '#F5F5F5',
+  lineColor: '#E0E0E0',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BƯỚC 2: Thêm helper resolvePawHistoryText (giống pet-detail-modal)
+// Đặt sau PAW_HISTORY_UI_CONFIG, trước component
+// ─────────────────────────────────────────────────────────────────────────────
+
+const I18N_MAP: Record<string, { vi: string; en: string }> = {
+  'pawHistory.current_owner_title': { vi: 'Chủ sở hữu hiện tại', en: 'Current Owner' },
+  'pawHistory.current_owner_body': { vi: 'Quyền sở hữu đã chuyển cho {name}', en: 'Ownership transferred to {name}' },
+  'pawHistory.previous_owner_title': { vi: 'Chủ trước', en: 'Previous Owner' },
+  'pawHistory.previous_owner_body': { vi: 'Từng được chăm sóc bởi {name}', en: 'Previously cared for by {name}' },
+  'pawHistory.under_shelter_title': { vi: 'Đang ở trạm cứu hộ', en: "Under Shelter's Care" },
+  'pawHistory.under_shelter_body': { vi: 'Đang được chăm sóc tại {shelterName}', en: 'Currently under the care of {shelterName}' },
+  'pawHistory.was_under_shelter_title': { vi: 'Từng ở trạm cứu hộ', en: "Was Under Shelter's Care" },
+  'pawHistory.was_under_shelter_body': { vi: 'Trước đây chăm sóc tại {shelterName}', en: 'Previously cared by {shelterName}' },
+  'pawHistory.transfer_title': { vi: 'Chuyển giao quyền sở hữu', en: 'Ownership Transferred' },
+  'pawHistory.transfer_body': { vi: 'Đã chuyển giao cho {receiverName}', en: 'Transferred to {receiverName}' },
+  'pawHistory.vaccine_title': { vi: '{recordNameVi}', en: '{recordNameEn}' },
+  'pawHistory.vaccine_body': { vi: 'Đã hoàn thành mũi tiêm', en: 'Vaccination completed' },
+  'pawHistory.dental_title': { vi: 'Khám răng miệng', en: 'Dental Care' },
+  'pawHistory.dental_body': { vi: 'Đã hoàn thành khám tại {clinicName}', en: 'Completed at {clinicName}' },
+  'pawHistory.checkup_title': { vi: 'Khám tổng quát định kỳ', en: 'Annual Checkup' },
+  'pawHistory.checkup_body': { vi: 'Đã hoàn thành khám tại {clinicName}', en: 'Completed at {clinicName}' },
+  'pawHistory.qr_registered_title': { vi: 'Kích hoạt thẻ QR PawLife', en: 'QR Tag Registered' },
+  'pawHistory.qr_registered_body': { vi: 'Thẻ đã được kích hoạt', en: 'PawLife QR tag is now active' },
+  'pawHistory.qr_replaced_title': { vi: 'Thay thẻ QR PawLife', en: 'QR Tag Replaced' },
+  'pawHistory.qr_replaced_body': { vi: 'Thẻ QR cũ đã được thay thế', en: 'Old QR tag has been replaced' },
+  'pawHistory.birth_title': { vi: 'Ngày sinh', en: 'Date of Birth' },
+  'pawHistory.birth_body': { vi: 'Mừng ngày {petName} chào đời', en: 'Celebrate {petName} was born' },
+  'pawHistory.joined_title': { vi: 'Gia nhập PawLife', en: 'Joined PawLife' },
+  'pawHistory.joined_body': { vi: 'Hồ sơ {petName} được tạo', en: 'Profile for {petName} was created' },
+};
+
+const interpolate = (template: string, params: Record<string, any> = {}): string =>
+  template.replace(/\{(\w+)\}/g, (_, key) => params[key] ?? `{${key}}`);
+
+const resolvePawHistoryText = (
+  item: any,
+  isVi: boolean,
+): { title: string; description: string } => {
+  if (item?.i18n?.titleKey) {
+    const titleTpl = I18N_MAP[item.i18n.titleKey];
+    const bodyTpl = I18N_MAP[item.i18n.bodyKey];
+    return {
+      title: titleTpl ? interpolate(isVi ? titleTpl.vi : titleTpl.en, item.i18n.params ?? {}) : (item.title ?? ''),
+      description: bodyTpl ? interpolate(isVi ? bodyTpl.vi : bodyTpl.en, item.i18n.params ?? {}) : (item.description ?? ''),
+    };
   }
-];
+  // Fallback: dùng resolvePawHistoryItem từ utils nếu không có i18n key
+  return { title: item.title ?? '', description: item.description ?? '' };
+};
+
+
 const getSafeBilingualText = (val: any, isVi: boolean, logPrefix: string = '') => {
   console.log(`\n[DEBUG_MEDICAL_RECORD - ${logPrefix}] Type: ${typeof val} | Value:`, val);
 
@@ -91,6 +183,22 @@ const getSafeBilingualText = (val: any, isVi: boolean, logPrefix: string = '') =
   }
   return String(val);
 };
+const MedicalRecordSubtitle = ({
+  images, recordDate, isVi
+}: {
+  images: string[]; recordDate: string; isVi: boolean;
+}) => {
+  const sizeKB = useTotalImageSize(images);
+  const formatted = recordDate
+    ? new Date(recordDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US')
+    : '';
+  return (
+    <Text className="text-[10px] font-regular text-[#8E8E93] tracking-[0.5px]">
+      {sizeKB !== null ? `${sizeKB}KB • ` : ''}
+      {isVi ? 'Gửi lúc' : 'Submitted on'} {formatted}
+    </Text>
+  );
+};
 export default function PetProfileDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -114,6 +222,15 @@ export default function PetProfileDetailScreen() {
   const [showVaccineMenu, setShowVaccineMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 28 });
   const [selectedVaccineIndex, setSelectedVaccineIndex] = useState<number | null>(null);
+  const [showEditMedicalModal, setShowEditMedicalModal] = useState(false);
+  const [showViewMedicalModal, setShowViewMedicalModal] = useState(false);
+  const [viewingMedicalRecord, setViewingMedicalRecord] = useState<any | null>(null);
+  const [editingMedicalRecord, setEditingMedicalRecord] = useState<any | null>(null);
+  const [isSavingMedicalRecord, setIsSavingMedicalRecord] = useState(false);
+  const [showReportMedicalRecordModal, setShowReportMedicalRecordModal] = useState(false);
+  const [reportingMedicalRecord, setReportingMedicalRecord] = useState<any | null>(null);
+
+
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
   const [tooltipAnchor, setTooltipAnchor] = useState({ x: 0, y: 0 });
 
@@ -145,6 +262,49 @@ export default function PetProfileDetailScreen() {
         return { icon: 'history', color: '#8E8E93', bgColor: '#F5F5F5' };
     }
   };
+
+  const handleUpdateNextDueOnly = async (
+    recordId: string,
+    payload: { nextDueName: any; nextDueDate: string }
+  ) => {
+    try {
+      setIsSavingMedicalRecord(true);
+
+      await petService.updateMedicalRecord(petId, recordId, {
+        nextDueName: payload.nextDueName,
+        nextDueDate: payload.nextDueDate,
+        hasNextDueDate: true, // luôn true ở nhánh này vì chỉ submit khi switch đang ON
+      });
+
+      setPetData((prev: any) => {
+        if (!prev) return prev;
+        const updatedRecords = (prev.medicalRecords || []).map((r: any) =>
+          r.id === recordId
+            ? { ...r, nextDueName: payload.nextDueName, nextDueDate: payload.nextDueDate }
+            : r
+        );
+        return { ...prev, medicalRecords: updatedRecords };
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['pet', petId] });
+
+      Alert.alert(
+        isVi ? 'Thành công' : 'Success',
+        isVi ? 'Đã cập nhật lịch hẹn tiếp theo!' : 'Next due date updated!'
+      );
+    } catch (error: any) {
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        error?.response?.data?.message || error?.message ||
+        (isVi ? 'Không thể cập nhật lịch tiếp theo.' : 'Unable to update next due date.')
+      );
+    } finally {
+      setIsSavingMedicalRecord(false);
+      setViewingMedicalRecord(null);
+    }
+  };
+
+
   const getMedicalRecordIconConfig = (type: string) => {
     const t = (type || '').toUpperCase();
     switch (t) {
@@ -161,6 +321,35 @@ export default function PetProfileDetailScreen() {
         return { icon: 'file-medical' };
     }
   };
+  const getMedicalRecordBadgeConfig = (status: string | undefined, isVi: boolean) => {
+    if (status === 'DISPUTED') {
+      return {
+        bgColor: '#FFEAF2',
+        borderColor: '#F7BFD8',
+        color: '#D6447A',
+        icon: 'alert-triangle' as const,
+        label: isVi ? 'Cần xem xét' : 'Disputed',
+      };
+    }
+    if (status === 'VERIFIED') {
+      return {
+        bgColor: '#EBFFE2',
+        borderColor: '#D1F5BF',
+        color: '#77C852',
+        icon: 'check-circle' as const,
+        label: isVi ? 'Đã xác minh' : 'Verified',
+      };
+    }
+    // PENDING hoặc chưa có status
+    return {
+      bgColor: '#FBF7EB',
+      borderColor: '#F3E1AE',
+      color: '#E8A53C',
+      icon: 'info' as const,
+      label: isVi ? 'Đang xác minh' : 'Reviewing',
+    };
+  };
+
 
   const handleRemovePet = () => {
     Alert.alert(
@@ -370,41 +559,32 @@ export default function PetProfileDetailScreen() {
   };
 
   const combinedHistory = React.useMemo(() => {
-    if (!petData) return [];
+    if (!petData?.pawHistory?.length) return [];
 
+    return petData.pawHistory
+      .map((item: any) => {
+        const { title, description } = resolvePawHistoryText(item, isVi);
 
-    const baseHistory = petData.pawHistory || [];
-
-    return baseHistory.map((item: any) => {
-      let isPending = false;
-      const resolved = resolvePawHistoryItem(item, t, l, language);
-      let displayTitle = resolved.title;
-      let displayDescription = resolved.description;
-
-
-      // Nếu đây là sự kiện VACCINE do Backend trả về
-      if (item.type === 'VACCINE') {
-        displayTitle = isVi ? `Tiêm phòng • ${resolved.title}` : `Vaccination • ${resolved.title}`;
-
-        const matchingRecord = petData.medicalRecords?.find((mr: any) => {
-          // Ép sang chữ an toàn trước khi so sánh
-          const mrName = getSafeBilingualText(mr.recordName, isVi);
-          return mrName === resolved.title || resolved.title.includes(mrName);
-        });
-
-        if (matchingRecord && (matchingRecord.verificationStatus === 'PENDING' || !matchingRecord.verificationStatus)) {
-          isPending = true;
+        // Pending check: chỉ áp dụng cho VACCINE — khớp với medical record
+        let isPending = false;
+        if (item.type === 'VACCINE' || item.type === 'DENTAL_CARE' || item.type === 'ANNUAL_CHECKUP') {
+          const matchingRecord = petData.medicalRecords?.find((mr: any) => {
+            const mrName = getSafeBilingualText(mr.recordName, isVi, 'pawHistory_match');
+            return mrName === title || title.includes(mrName);
+          });
+          if (matchingRecord) {
+            isPending =
+              matchingRecord.verificationStatus === 'PENDING' ||
+              matchingRecord.verificationStatus === 'DISPUTED' || // 🆕
+              !matchingRecord.verificationStatus;
+          }
         }
-      }
 
-      return {
-        ...item,
-        displayTitle,
-        displayDescription,
-        isPending
-      };
-    }).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [petData, t, l, isVi]);
+        return { ...item, displayTitle: title, displayDescription: description, isPending };
+      })
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [petData, isVi]);
+
 
   // --- SUB-COMPONENTS ---
   const InfoRow = ({ label1, value1, label2, value2 }: any) => (
@@ -474,6 +654,9 @@ export default function PetProfileDetailScreen() {
   const selectedMedicalRecordIsPending = !!selectedMedicalRecord && (
     selectedMedicalRecord.verificationStatus === 'PENDING' || !selectedMedicalRecord.verificationStatus
   );
+  const selectedMedicalRecordIsVerified = selectedMedicalRecord?.verificationStatus === 'VERIFIED';
+  const selectedMedicalRecordIsDisputed = selectedMedicalRecord?.verificationStatus === 'DISPUTED';
+
 
   const handleDownloadImage = async (url: string, fileName: string) => {
     try {
@@ -560,6 +743,115 @@ export default function PetProfileDetailScreen() {
     }
 
   };
+  const handleUpdateMedicalRecord = async (recordId: string, payload: any) => {
+    try {
+      setIsSavingMedicalRecord(true);
+
+      // Upload các ảnh local (file://) lên storage trước khi gửi lên BE,
+      // giữ nguyên các ảnh http(s) cũ
+      const uploadedImages: string[] = [];
+      for (const uri of payload.images) {
+        if (uri.startsWith('http')) {
+          uploadedImages.push(uri);
+          continue;
+        }
+        try {
+          const filename = uri.split('/').pop() || `medical-record-${Date.now()}.jpg`;
+          const match = /\.(\w+)$/.exec(filename);
+          const ext = match ? match[1].toLowerCase() : 'jpeg';
+          let type = 'image/jpeg';
+          if (ext === 'png') type = 'image/png';
+          else if (ext === 'webp') type = 'image/webp';
+
+          const presignedRes = await axiosClient.post('/storage/presigned-url', {
+            fileName: filename, fileType: type, folder: 'medical-records',
+          });
+          const { uploadUrl, fileUrl } = presignedRes.data;
+          const localFileFetch = await fetch(uri);
+          const fileBlob = await localFileFetch.blob();
+          const uploadRes = await fetch(uploadUrl, {
+            method: 'PUT', headers: { 'Content-Type': type }, body: fileBlob,
+          });
+          if (!uploadRes.ok) throw new Error('Upload R2 failed');
+          uploadedImages.push(fileUrl);
+        } catch (err) {
+          console.error(`[Upload Lỗi] Không thể upload ảnh ${uri}:`, err);
+        }
+      }
+
+      await petService.updateMedicalRecord(petId, recordId, {
+        type: payload.type,
+        recordName: payload.recordName,
+        recordDate: payload.recordDate,
+        images: uploadedImages,
+        hasNextDueDate: payload.hasNextDueDate,
+        nextDueDate: payload.hasNextDueDate ? payload.nextDueDate : null,
+        nextDueName: payload.hasNextDueDate ? payload.nextDueName : null,
+      });
+
+      // Cập nhật lại UI tại chỗ, không cần load lại cả trang
+      setPetData((prev: any) => {
+        if (!prev) return prev;
+        const updatedRecords = (prev.medicalRecords || []).map((r: any) =>
+          r.id === recordId
+            ? {
+              ...r,
+              type: payload.type,
+              recordName: payload.recordName,
+              recordDate: payload.recordDate,
+              images: uploadedImages,
+              hasNextDueDate: payload.hasNextDueDate,
+              nextDueDate: payload.hasNextDueDate ? payload.nextDueDate : null,
+              nextDueName: payload.hasNextDueDate ? payload.nextDueName : null,
+              verificationStatus: 'PENDING', // BE đã set lại PENDING sau khi sửa
+            }
+            : r
+        );
+        return { ...prev, medicalRecords: updatedRecords };
+      });
+
+      // Pet detail cache ở BE đã bị invalidate (redisService.del trong service),
+      // invalidate luôn react-query cache nếu bạn dùng nó cho list khác
+      queryClient.invalidateQueries({ queryKey: ['pet', petId] });
+
+      Alert.alert(
+        isVi ? 'Thành công' : 'Success',
+        isVi ? 'Đã cập nhật hồ sơ y tế!' : 'Medical record updated!'
+      );
+    } catch (error: any) {
+      Alert.alert(
+        isVi ? 'Lỗi' : 'Error',
+        error?.response?.data?.message || error?.message ||
+        (isVi ? 'Không thể cập nhật hồ sơ.' : 'Unable to update the record.')
+      );
+    } finally {
+      setIsSavingMedicalRecord(false);
+      setEditingMedicalRecord(null);
+    }
+  };
+  const handleReportMedicalRecord = async (data: ReportSubmitData) => {
+    if (!reportingMedicalRecord) return;
+
+    await petService.reportMedicalRecord(petId, reportingMedicalRecord.id, {
+      reason: data.reason,
+      details: data.details,
+    });
+
+    // 🆕 Optimistic update: verified -> disputed ngay tại UI, không cần đợi refetch
+    setPetData((prev: any) => {
+      if (!prev) return prev;
+      const updatedRecords = (prev.medicalRecords || []).map((r: any) =>
+        r.id === reportingMedicalRecord.id
+          ? { ...r, verificationStatus: 'DISPUTED' }
+          : r
+      );
+      return { ...prev, medicalRecords: updatedRecords };
+    });
+
+    queryClient.invalidateQueries({ queryKey: ['pet', petId] });
+  };
+
+
 
   return (
     <View
@@ -892,10 +1184,12 @@ export default function PetProfileDetailScreen() {
           <View className="mx-[20px] mb-8">
             <View className="flex-row justify-between items-center mb-5">
               <View className="flex-row items-center">
-                <Text className="text-[16px] font-semibold text-black">Paw History</Text>
+                <Text className="text-[16px] font-semibold text-black">
+                  {isVi ? 'Lịch sử hoạt động' : 'Paw History'}
+                </Text>
                 <Text className="text-[16px] font-semibold text-[#D1D1D6] mx-2">|</Text>
                 <Text className="text-[16px] font-regular text-[#8E8E93]">
-                  {isVi ? "Hành trình" : "Journey"}
+                  {isVi ? 'Hành trình' : 'Journey'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -903,120 +1197,148 @@ export default function PetProfileDetailScreen() {
                 activeOpacity={0.6}
                 className="flex-row items-center px-3 py-1.5 rounded-full"
               >
-                <Text className="text-[13px] text-[#F2A465] font-medium mr-1">{showHistory ? 'Hide' : 'View'}</Text>
-                <Feather name={showHistory ? "chevron-up" : "chevron-down"} size={16} color="#F2A465" />
+                <Text className="text-[13px] text-[#F2A465] font-medium mr-1">
+                  {showHistory ? (isVi ? 'Ẩn' : 'Hide') : (isVi ? 'Xem' : 'View')}
+                </Text>
+                <Feather name={showHistory ? 'chevron-up' : 'chevron-down'} size={16} color="#F2A465" />
               </TouchableOpacity>
             </View>
 
             {showHistory && (
-              <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
+              <View className="py-[20px] px-[12px] border border-[#E5E5EA] rounded-[20px] bg-white">
 
-                {combinedHistory.map((item: any, index: number) => {
-                  const isLastItem = index === combinedHistory.length - 1;
-                  const uiConfig = getHistoryUIConfig(item.type);
-                  const formattedDate = new Date(item.date).toLocaleDateString('en-GB');
+                {combinedHistory.length > 0 ? (
+                  combinedHistory.map((item: any, index: number) => {
+                    const isLastItem = index === combinedHistory.length - 1;
+                    const uiConfig = PAW_HISTORY_UI_CONFIG[item.type as PawHistoryUIType] ?? DEFAULT_HISTORY_UI;
+                    const formattedDate = new Date(item.date).toLocaleDateString(
+                      isVi ? 'vi-VN' : 'en-GB',
+                      { day: '2-digit', month: '2-digit', year: 'numeric' },
+                    );
 
-                  return (
-                    <View key={item.id} className="flex-row">
-                      {/* Cột Icon Timeline */}
-                      {/* Cột Icon Timeline */}
-                      <View className="items-center mr-4 w-[32px]">
-                        <View
-                          className="w-[32px] h-[32px] rounded-full items-center justify-center z-10"
-                          style={{ backgroundColor: uiConfig.bgColor }}
-                        >
-                          <FontAwesome5 name={uiConfig.icon} size={13} color={uiConfig.color} />
-                        </View>
+                    return (
+                      <View key={item.id ?? index} className="flex-row min-h-[54px]">
 
-                        {/* SỬA LẠI LINE Ở ĐÂY: Hiển thị nét đứt nếu isPending */}
-                        {/* SỬA LẠI LINE Ở ĐÂY: Custom nét đứt thủ công để tuỳ chỉnh độ mau/thưa */}
-                        {!isLastItem && (
-                          item.isPending ? (
-                            // NÉT ĐỨT (PENDING)
-                            <View className="flex-1 my-1 overflow-hidden w-[2px] items-center">
-                              {/* Thêm absolute để các vạch không đẩy khung dài ra */}
-                              <View className="absolute top-0 bottom-0 left-0 right-0">
-                                {Array.from({ length: 25 }).map((_, i) => (
+                        {/* Cột trái: icon + line */}
+                        <View className="w-[36px] relative">
+
+                          {/* Vertical line — nét đứt nếu pending, nét liền bình thường */}
+                          {!isLastItem && (
+                            item.isPending ? (
+                              <View
+                                className="absolute overflow-hidden items-center"
+                                style={{ top: 24, bottom: -2, left: 10.25, width: 1.5 }}
+                              >
+                                {Array.from({ length: 20 }).map((_, i) => (
                                   <View
                                     key={i}
                                     style={{
-                                      width: 2,
-                                      height: 4, // Chiều dài 1 gạch
-                                      backgroundColor: uiConfig.color,
-                                      marginBottom: 4, // Khoảng cách thưa
+                                      width: 1.5,
+                                      height: 4,
+                                      backgroundColor: uiConfig.lineColor,
+                                      marginBottom: 4,
                                     }}
                                   />
                                 ))}
                               </View>
-                            </View>
-                          ) : (
-                            // NÉT LIỀN (BÌNH THƯỜNG)
-                            <View
-                              className="flex-1 my-1"
-                              style={{
-                                width: 2,
-                                backgroundColor: uiConfig.color,
-                              }}
+                            ) : (
+                              <View
+                                className="absolute w-[1.5px]"
+                                style={{
+                                  top: 24,
+                                  bottom: -2,
+                                  left: 10.25,
+                                  backgroundColor: uiConfig.lineColor,
+                                }}
+                              />
+                            )
+                          )}
+
+                          {/* Icon tròn */}
+                          <View
+                            className="w-[22px] h-[22px] rounded-full items-center justify-center z-10"
+                            style={{ backgroundColor: uiConfig.iconBgColor }}
+                          >
+                            <Image
+                              source={uiConfig.icon}
+                              style={{ width: 12, height: 12 }}
+                              resizeMode="contain"
                             />
-                          )
-                        )}
-                      </View>
+                          </View>
+                        </View>
 
-                      {/* Nội dung Paw History */}
-                      <View className={`flex-1 pt-1 ${!isLastItem ? 'pb-6' : ''}`}>
-                        <View className="flex-row justify-between items-start">
+                        {/* Cột phải: nội dung */}
+                        {/* Đã xóa pr-3 ở đây để ngày tháng bo sát mép 12px của khung ngoài */}
+                        <View className={`flex-1 ${!isLastItem ? 'pb-4' : ''}`}>
 
-                          {/* Title + icon chấm than gói chung 1 khối, được phép wrap xuống dòng cùng nhau */}
-                          <View className="flex-1 flex-row flex-wrap items-center pr-2">
-                            <Text className="text-[16px] font-medium text-black">
-                              {item.displayTitle || item.title}
-                              {item.isPending && (
-                                <Text> </Text>
-                              )}
+                          {/* Title + pending badge + date */}
+                          <View className="flex-row justify-between items-start">
+                            <View className="flex-1 flex-row flex-wrap items-center pr-2">
+                              <Text
+                                className="text-[15px] font-medium text-black leading-[18px]"
+                                numberOfLines={1}
+                              >
+                                {item.displayTitle}
+                              </Text>
+
+                              {/* Icon chấm than (pending) */}
                               {item.isPending && (
                                 <Text
-                                  suppressHighlighting={true}
+                                  suppressHighlighting
                                   onPress={(e) => {
                                     const { pageX, pageY } = e.nativeEvent;
-                                    // pageX/pageY ở đây là điểm chạm, nhưng vì icon rất nhỏ (16px)
-                                    // và luôn đứng độc lập cuối dòng, sai số không đáng kể về mặt thị giác
                                     handleToggleTooltip(item.id, pageX, pageY);
                                   }}
+                                  style={{ marginLeft: 4 }}
                                 >
                                   <Feather
                                     name="alert-circle"
-                                    size={16}
+                                    size={13}
                                     color="#BBB4B5"
-                                    style={{ transform: [{ rotate: '180deg' }] }}
                                   />
                                 </Text>
                               )}
+                            </View>
+
+                            <Text
+                              className="text-[11px] font-regular text-[#8E8E93] pt-[2px]"
+                              style={{ flexShrink: 0 }}
+                            >
+                              {formattedDate}
                             </Text>
                           </View>
 
-                          {/* Date đứng riêng, không co giãn, không bị title đẩy */}
-                          <Text className="text-[13px] text-[#8E8E93] font-regular" style={{ flexShrink: 0 }}>
-                            {formattedDate}
+                          {/* Description */}
+                          <Text
+                            className="text-[12px] font-regular text-[#9B9B9B] mt-[2px] leading-[15px]"
+                          >
+                            {item.displayDescription}
                           </Text>
                         </View>
-
-                        {/* Đổi màu description thành màu cam nếu đang pending */}
-                        <Text className="text-[13px] mt-1 leading-[18px]">
-                          {item.displayDescription}
-                        </Text>
                       </View>
-                    </View>
-                  );
-                })}
-
-                {(!petData?.pawHistory || petData.pawHistory.length === 0) && (
-                  <Text className="text-center text-gray-400 py-4">No history available.</Text>
+                    );
+                  })
+                ) : (
+                  <Text className="text-center text-[#8E8E93] py-4 font-regular text-[13px] italic">
+                    {isVi ? 'Chưa có lịch sử hoạt động.' : 'No history available yet.'}
+                  </Text>
                 )}
 
-                <View className='flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px]'>
-                  <Image source={require('../assets/icon/lock.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                  <Text className='font-regular text-[12px] text-[#8E8E93]'>This timeline is auto-generated and append-only.</Text>
+                {/* Footer badge */}
+                {/* Thêm mx-[8px] để bo gọn lại xíu */}
+                <View className="flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px] mx-[8px]">
+                  <Image
+                    source={require('../assets/icon/lock.png')}
+                    style={{ width: 12, height: 12 }}
+                    resizeMode="cover"
+                  />
+                  <Text className="font-regular text-[12px] text-[#8E8E93]">
+                    {isVi
+                      ? 'Dòng thời gian này được tạo tự động và không thể chỉnh sửa.'
+                      : 'This timeline is auto-generated and append-only.'}
+                  </Text>
                 </View>
+
               </View>
             )}
           </View>
@@ -1027,27 +1349,16 @@ export default function PetProfileDetailScreen() {
               <Text className="text-[16px] font-semibold text-[#111827] tracking-[0.06px]">
                 {isVi ? 'Hồ sơ y tế' : 'Medical Records'}
               </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  router.push({
-                    pathname: '/edit-pet' as any,
-                    params: {
-                      id: petId,
-                      openMedicalModal: '1',
-                    },
-                  });
-                }}
-                className="bg-[#FFF8F0] px-4 py-2 rounded-full border border-[#E89B5A]/30"
-              >
-                <Text className="text-[#E89B5A] font-medium text-[13px]">{isVi ? 'Thêm hồ sơ' : 'Add Record'}</Text>
-              </TouchableOpacity>
             </View>
 
             {petData?.medicalRecords && petData.medicalRecords.length > 0 ? (
               <View className="flex-col gap-3">
                 {petData.medicalRecords.map((record: any, index: number) => {
                   const isPending = record.verificationStatus === 'PENDING' || !record.verificationStatus;
-                  const iconConfig = getMedicalRecordIconConfig(record.type);
+                  const isDisputed = record.verificationStatus === 'DISPUTED';
+                  const badge = getMedicalRecordBadgeConfig(record.verificationStatus, isVi);
+                  const recordIcon = getMedicalRecordIcon(record.type);
+
 
                   const formattedRecordDate = record.recordDate
                     ? new Date(record.recordDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US')
@@ -1058,15 +1369,19 @@ export default function PetProfileDetailScreen() {
                     : '';
 
                   const shouldShowNextDueDate = record.hasNextDueDate && !!record.nextDueDate;
+                  const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
 
                   return (
                     <View key={record.id || index} className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
 
                       {/* ICON TRUNG TÍNH: border ghi đậm, nền ghi nhạt, không tô màu theo loại */}
-                      <View className={`w-[30px] h-[30px] rounded-[100px] items-center justify-center`}>
+                      <View
+                        className="w-[30px] h-[30px] rounded-[100px] items-center justify-center"
+                        style={{ backgroundColor: '#EDEDED' }}
+                      >
                         <Image
-                          source={require('../assets/icon/vacc-icon-report.png')}
-                          style={{ width: 30, height: 30 }}
+                          source={getMedicalRecordIcon(record.type)}
+                          style={{ width: 18, height: 18, tintColor: '#999999' }}
                           resizeMode="contain"
                         />
                       </View>
@@ -1080,52 +1395,47 @@ export default function PetProfileDetailScreen() {
                             </Text>
 
                             <View
-                              className="flex-row items-center px-2 py-[3px] rounded-full"
-                              style={{ backgroundColor: isPending ? '#FBF7EB' : '#EBFFE2', borderColor: isPending ? "#E8A53C/25" : "#D1F5BF" }}
+                              className="flex-row items-center px-2 py-[3px] rounded-full border"
+                              style={{ backgroundColor: badge.bgColor, borderColor: badge.borderColor }}
                             >
                               <Feather
-                                name={isPending ? 'info' : 'check-circle'}
+                                name={badge.icon}
                                 size={10}
-                                color={isPending ? '#E8A53C' : '#77C852'}
+                                color={badge.color}
                               />
                               <Text
                                 className="text-[10px] font-medium ml-1"
-                                style={{ color: isPending ? '#E8A53C' : '#77C852' }}
+                                style={{ color: badge.color }}
                               >
-                                {isPending
-                                  ? (isVi ? 'Đang xác minh' : 'Reviewing')
-                                  : (isVi ? 'Đã xác minh' : 'Verified')}
+                                {badge.label}
                               </Text>
                             </View>
                           </View>
 
                           {/* NÚT MORE OPTIONS: hiện khi có ảnh hoặc record đang pending để có thể Edit Record */}
-                          {((record.images && record.images.length > 0) || isPending) && (
-                            <TouchableOpacity
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                const { pageY } = e.nativeEvent;
-                                const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
-                                setMenuPosition({ top: pageY + 10, right: 32 });
-                                setSelectedVaccineIndex(index);
-                                setCurrentImageList(imageList);
-                                setCurrentImageIndex(0);
-                                setShowVaccineMenu(true);
-                              }}
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              const { pageY } = e.nativeEvent;
+                              const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
+                              setMenuPosition({ top: pageY + 10, right: 32 });
+                              setSelectedVaccineIndex(index);
+                              setCurrentImageList(imageList);
+                              setCurrentImageIndex(0);
+                              setShowVaccineMenu(true);
+                            }}
 
-                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            >
-                              <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
-                            </TouchableOpacity>
-                          )}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
+                          </TouchableOpacity>
                         </View>
 
-                        <Text className="text-[12px] text-[#8E8E93] tracking-[0.5px]">
-                          {isVi ? 'Loại:' : 'Type:'} {record.type} | {isVi ? 'Ngày:' : 'Date:'} {new Date(record.recordDate).toLocaleDateString('en-GB')}
-                        </Text>
-                        <Text className="text-[12px] text-[#E89B5A] tracking-[0.5px] mt-1">
-                          {isVi ? 'Lịch tiếp theo' : 'Next due date'}: {formattedNextDueDate}
-                        </Text>
+                        <MedicalRecordSubtitle
+                          images={Array.isArray(record.images) ? record.images.filter(Boolean) : []}
+                          recordDate={record.recordDate}
+                          isVi={isVi}
+                        />
                       </View>
                     </View>
                   );
@@ -1268,32 +1578,38 @@ export default function PetProfileDetailScreen() {
               shadowRadius: 10
             }}
           >
-            {currentImageList.length > 0 && (
-              <>
-                <TouchableOpacity
-                  className="flex-row items-center px-4 py-3"
-                  activeOpacity={0.6}
-                  onPress={() => {
-                    setShowVaccineMenu(false);
-                    if (currentImageList.length > 0) {
-                      setIsImageViewerVisible(true);
-                    }
-                  }}
-                >
-                  <Text className="text-[14px] text-gray-700 ml-3 font-medium">
-                    {isVi ? 'Xem hồ sơ' : 'View record'}
-                  </Text>
-                </TouchableOpacity>
+            {/* View record: LUÔN hiện, dùng chung cho cả record pending và verified */}
+            <TouchableOpacity
+              className="flex-row items-center px-4 py-3"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowVaccineMenu(false);
+                const record = selectedVaccineIndex !== null ? petData?.medicalRecords?.[selectedVaccineIndex] : null;
+                if (record) {
+                  setViewingMedicalRecord(record);
+                  setShowViewMedicalModal(true);
+                }
+                setSelectedVaccineIndex(null);
+              }}
+            >
+              <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                {isVi ? 'Xem hồ sơ' : 'View record'}
+              </Text>
+            </TouchableOpacity>
 
-              </>
-            )}
-
-            {!selectedMedicalRecordIsPending && (
+            {/* Record đã VERIFIED -> chỉ cho Report */}
+            {selectedMedicalRecordIsVerified && (
               <TouchableOpacity
                 className="flex-row items-center px-4 py-3 border-t border-gray-50"
                 activeOpacity={0.6}
                 onPress={() => {
-                  // TODO: handle report record
+                  setShowVaccineMenu(false);
+                  const record = selectedVaccineIndex !== null ? petData?.medicalRecords?.[selectedVaccineIndex] : null;
+                  if (record) {
+                    setReportingMedicalRecord(record);
+                    setShowReportMedicalRecordModal(true);
+                  }
+                  setSelectedVaccineIndex(null);
                 }}
               >
                 <Text className="text-[14px] text-red-600 ml-3 font-medium">
@@ -1302,13 +1618,20 @@ export default function PetProfileDetailScreen() {
               </TouchableOpacity>
             )}
 
+            {/* Record đang PENDING -> cho Edit + Delete */}
             {selectedMedicalRecordIsPending && (
               <>
                 <TouchableOpacity
-                  className={`flex-row items-center px-4 py-3 ${currentImageList.length > 0 ? 'border-t border-gray-50' : ''}`}
+                  className="flex-row items-center px-4 py-3 border-t border-gray-50"
                   activeOpacity={0.6}
                   onPress={() => {
-                    // TODO: handle edit medical record
+                    setShowVaccineMenu(false);
+                    const record = selectedVaccineIndex !== null ? petData?.medicalRecords?.[selectedVaccineIndex] : null;
+                    if (record) {
+                      setEditingMedicalRecord(record);
+                      setShowEditMedicalModal(true);
+                    }
+                    setSelectedVaccineIndex(null);
                   }}
                 >
                   <Text className="text-[14px] text-gray-700 ml-3 font-medium">
@@ -1316,10 +1639,12 @@ export default function PetProfileDetailScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className={`flex-row items-center px-4 py-3 ${currentImageList.length > 0 ? 'border-t border-gray-50' : ''}`}
+                  className="flex-row items-center px-4 py-3 border-t border-gray-50"
                   activeOpacity={0.6}
                   onPress={() => {
+                    setShowVaccineMenu(false);
                     // TODO: handle delete medical record
+                    setSelectedVaccineIndex(null);
                   }}
                 >
                   <Text className="text-[14px] text-red-600 ml-3 font-medium">
@@ -1327,9 +1652,17 @@ export default function PetProfileDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               </>
-
             )}
 
+            {selectedMedicalRecordIsDisputed && (
+              <View className="px-4 py-3 border-t border-gray-50">
+                <Text className="text-[12px] text-[#8E8E93] italic leading-[16px]">
+                  {isVi
+                    ? 'Hồ sơ đang được PawLife xem xét lại sau báo cáo của bạn.'
+                    : 'This record is being reviewed by PawLife following your report.'}
+                </Text>
+              </View>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -1475,6 +1808,47 @@ export default function PetProfileDetailScreen() {
           />
         </Animated.View>
       )}
+      <AddMedicalRecordModal
+        visible={showEditMedicalModal}
+        mode="edit"
+        initialRecord={editingMedicalRecord}
+        species={(petData?.species as 'Dog' | 'Cat') || 'Dog'}
+        onClose={() => {
+          setShowEditMedicalModal(false);
+          setEditingMedicalRecord(null);
+        }}
+        onSubmit={() => { }} // không dùng ở edit mode, nhưng prop bắt buộc nên truyền no-op
+        onSubmitEdit={(recordId, payload) => {
+          setShowEditMedicalModal(false);
+          handleUpdateMedicalRecord(recordId, payload);
+        }}
+      />
+      <AddMedicalRecordModal
+        visible={showViewMedicalModal}
+        mode="view"
+        initialRecord={viewingMedicalRecord}
+        species={(petData?.species as 'Dog' | 'Cat') || 'Dog'}
+        onClose={() => {
+          setShowViewMedicalModal(false);
+          setViewingMedicalRecord(null);
+        }}
+        onSubmit={() => { }}
+        onSubmitNextDueOnly={(recordId, payload) => {
+          setShowViewMedicalModal(false);
+          handleUpdateNextDueOnly(recordId, payload);
+        }}
+      />
+      <ReportIssueModal
+        isVisible={showReportMedicalRecordModal}
+        context="medicalRecord"
+        targetName={reportingMedicalRecord ? getSafeBilingualText(reportingMedicalRecord.recordName, isVi) : undefined}
+        onClose={() => {
+          setShowReportMedicalRecordModal(false);
+          setReportingMedicalRecord(null);
+        }}
+        onSubmit={handleReportMedicalRecord}
+        onSuccessModalClose={() => setReportingMedicalRecord(null)}
+      />
     </View>
   );
 }

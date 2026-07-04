@@ -7,7 +7,7 @@ import { getLocalizedField } from '@/utils/localization';
 import { normalizePet } from '@/utils/petNormalize';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query'; // useQueryClient đã có sẵn, thêm useMutation
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -28,9 +28,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
+import ReportIssueModal from '../../components/ReportIssueModal';
+import { ADOPTION_REQUIREMENT_ICONS, DEFAULT_REQUIREMENT_ICON } from '../../constants/adoptionRequirementIcons';
 import { useLocation } from '../../hooks/useLocation';
 import { petService } from '../../services/petService';
-
+import { shelterService } from '../../services/shelterService'; // ⬅️ THÊM MỚI
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.3;
 const TAB_BAR_HEIGHT = 65;
@@ -926,7 +928,6 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
     const activeTranslationX = currentIndex % 2 === 0 ? translateX_Even : translateX_Odd;
     const activeTranslationY = currentIndex % 2 === 0 ? translateY_Even : translateY_Odd;
     const [likeCount, setLikeCount] = useState(0);
-
     const loadPets = async () => {
         setLoading(true);
         try {
@@ -1277,6 +1278,10 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
                             isVisible={!!selectedPet}
                             onClose={() => setSelectedPet(null)}
                             onAdopt={onAdopt}
+                            onPetRemovedFromFeed={(petId: string) => {        // ⬅️ chỉ lọc data, KHÔNG đóng overlay
+                                setPets(prev => prev.filter(p => p.id !== petId));
+                                setLastSwipe(null);
+                            }}
                         />
                     </View>
                 )}
@@ -1291,14 +1296,25 @@ const MainSwipeScreen = ({ filters, onBack, onDetail, onAdopt }: { filters: any,
     )
 };
 
-const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVisible: boolean, onClose: () => void, onAdopt: (pet: any) => void }) => {
+const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt, onPetRemovedFromFeed }: {
+    pet: any;
+    isVisible: boolean;
+    onClose: () => void;
+    onAdopt: (pet: any) => void;
+    onPetRemovedFromFeed: (petId: string) => void;   // ⬅️ đổi tên khớp với nơi gọi
+}) => {
     const { t, language } = useLanguage();
     const isVi = language === 'vi';
     const translateY = useSharedValue(height);
 
     const [fullPet, setFullPet] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
-
+    const [showHideModal, setShowHideModal] = useState(false); // ⬅️ THÊM MỚI
+    const queryClient = useQueryClient();
+    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+    const [menuPosition, setMenuPosition] = useState({ top: 0, right: 25 });
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [showBlockModal, setShowBlockModal] = useState(false);
     useEffect(() => {
         if (isVisible && pet?.id) {
             setIsLoading(true);
@@ -1312,6 +1328,83 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
             setTimeout(() => setFullPet(null), 300);
         }
     }, [isVisible, pet?.id]);
+    const hidePetMutation = useMutation({
+        mutationFn: () => {
+            if (!currentPet?.id) throw new Error("Pet ID missing");
+            return petService.hidePet(currentPet.id);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['feed'] });
+            setShowHideModal(false);
+            Toast.show({
+                type: 'success',
+                text1: isVi ? 'Đã ẩn thú cưng' : 'Pet Hidden',
+            });
+            onRemoved(currentPet.id);
+        },
+        onError: (error) => {
+            console.error("Hide Pet Error:", error);
+            setShowHideModal(false);
+            Toast.show({
+                type: 'error',
+                text1: isVi ? 'Có lỗi xảy ra' : 'An error occurred',
+                text2: isVi ? 'Không thể ẩn lúc này.' : 'Cannot hide right now.',
+            });
+        }
+    });
+
+    // 2. Mutation Chặn Shelter
+    const blockShelterMutation = useMutation({
+        mutationFn: () => shelterService.blockShelter(shelterId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['feed'] });
+            setShowBlockModal(false);
+            Toast.show({
+                type: 'success',
+                text1: isVi ? 'Đã chặn trạm cứu hộ' : 'Shelter Blocked',
+                text2: isVi ? `Đã chặn ${shelterName}` : `Blocked ${shelterName}`,
+            });
+            onRemoved(currentPet.id);
+        },
+        onError: () => {
+            setShowBlockModal(false);
+            Toast.show({
+                type: 'error',
+                text1: isVi ? 'Có lỗi xảy ra' : 'An error occurred',
+                text2: isVi ? 'Không thể chặn trạm lúc này.' : 'Cannot block shelter right now.',
+            });
+        }
+    });
+
+    // 3. Mutation Báo cáo
+    const reportPetMutation = useMutation({
+        mutationFn: (data: { reason: string; detail?: string; isBlockRequested?: boolean }) =>
+            petService.reportPet(currentPet.id, {
+                reason: data.reason,
+                detail: data.detail,
+                isBlockRequested: data.isBlockRequested,
+            }),
+        onSuccess: (_res, variables) => {
+            if (variables.isBlockRequested) {
+                queryClient.setQueryData(['feed'], (oldData: any) => {
+                    return oldData?.filter((p: any) => p.id !== currentPet.id) || [];
+                });
+            }
+            queryClient.invalidateQueries({ queryKey: ['feed'] });
+            // ⬅️ Bỏ: setShowReportModal(false) — ReportIssueModal tự đóng qua onClose
+            // ⬅️ Bỏ: Toast.show(...) — trùng với ReportSuccessModal
+            // ⬅️ Bỏ: onRemoved(currentPet.id) — không gỡ pet ngay, để xem xong popup mới gỡ (xem bước 2)
+        },
+        onError: (err) => {
+            console.error(err);
+            Toast.show({
+                type: 'error',
+                text1: isVi ? 'Lỗi hệ thống' : 'System Error',
+            });
+        }
+    });
+
+
 
     const pan = Gesture.Pan()
         .onUpdate((event) => {
@@ -1357,38 +1450,71 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
         ? `${fullPet.weight} kg`
         : (currentPet?.weight ? `${currentPet.weight} kg` : t('Unknown'));
 
+    // --- DYNAMIC HEALTH CARE BẮT ĐẦU ---
+    // 1. Phân loại thú cưng
+    const speciesStr = JSON.stringify(fullPet?.species || currentPet?.species || {}).toLowerCase();
+    const isDog = speciesStr.includes('dog') || speciesStr.includes('chó') || fullPet?.species === 'Dog' || currentPet?.species === 'Dog';
+
+    // 2. Lấy danh sách vaccine từ fullPet (chứa chi tiết medicalRecords)
+    const vaccinations = Array.isArray(fullPet?.medicalRecords)
+        ? fullPet.medicalRecords.filter((r: any) => r.type === 'VACCINATION' || r.type === 'vaccination')
+        : [];
+
+    const rabiesCount = vaccinations.filter((r: any) => {
+        if (r.vaccineCategory === 'RABIES') return true;
+        const name = JSON.stringify(r.recordName || {}).toLowerCase();
+        return name.includes('dại') || name.includes('rabies');
+    }).length;
+
+    const coreCount = vaccinations.filter((r: any) => {
+        if (r.vaccineCategory === 'CORE') return true;
+        const name = JSON.stringify(r.recordName || {}).toLowerCase();
+        if (isDog) return name.includes('5 bệnh') || name.includes('7 bệnh') || name.includes('dhpp') || name.includes('in-1');
+        return name.includes('3 bệnh') || name.includes('fvrcp') || name.includes('in-1');
+    }).length;
+
+    // 3. Tính toán tổng số mũi còn thiếu
+    const missingRabies = Math.max(0, 1 - rabiesCount);
+    const missingCore = Math.max(0, 3 - coreCount);
+    const totalMissing = missingRabies + missingCore;
+
+    const isFullyVaccinated = fullPet?.isVaccinated ?? currentPet?.isVaccinated ?? (totalMissing === 0);
+
+    // 4. Giữ đúng format text gốc (Missing + số lượng)
+    const vaccineText = isFullyVaccinated
+        ? (isVi ? 'Đầy đủ' : 'Fully vaccinated')
+        : (isVi ? `Thiếu ${totalMissing}` : `Missing ${totalMissing}`);
+
+    const isSpayedNeutered = fullPet?.isSpayedNeutered ?? currentPet?.isSpayedNeutered ?? false;
+    const spayedText = isSpayedNeutered
+        ? (isVi ? 'Đã triệt sản' : 'Neutered')
+        : (isVi ? 'Chưa triệt sản' : 'Intact');
+
     const healthCareItems = [
         {
             id: 'vaccination',
             label: isVi ? 'Tiêm chủng' : 'Vaccination',
-            value: isVi ? 'Đầy đủ' : 'Fully vaccinated',
-            icon: require('../../assets/icon/fully-icon.png'),
+            value: vaccineText,
+            icon: isFullyVaccinated ? require('../../assets/icon/fully-icon.png') : require('../../assets/icon/missing-icon.png'),
+            textColor: isFullyVaccinated ? 'text-black' : 'text-[#black]', // Đổi sang màu cam nếu thiếu mũi
         },
         {
             id: 'neutered',
             label: isVi ? 'Trạng thái' : 'Status',
-            value: isVi ? 'Đã triệt sản' : 'Neutered',
-            icon: require('../../assets/icon/neutered-icon.png'),
+            value: spayedText,
+            icon: isSpayedNeutered ? require('../../assets/icon/neutered-icon.png') : require('../../assets/icon/intact-icon.png'),
+            textColor: 'text-black'
         },
     ];
+    // --- DYNAMIC HEALTH CARE KẾT THÚC ---
 
-    const adoptionRequirementItems = [
-        {
-            id: 'house_with_yard',
-            label: isVi ? 'Có sân vườn' : 'House with yard',
-            icon: require('../../assets/icon/home-icon.png'),
-        },
-        {
-            id: 'daily_walk',
-            label: isVi ? 'Đi dạo thường xuyên' : 'Daily Walk',
-            icon: require('../../assets/icon/dog-walk.png'),
-        },
-        {
-            id: 'advance_experience',
-            label: isVi ? 'Chủ có kinh nghiệm' : 'Advance Experience',
-            icon: require('../../assets/icon/experience-icon.png'),
-        },
-    ];
+    const adoptionRequirementItems = (fullPet?.adoptionRequirements || currentPet?.adoptionRequirements || [])
+        .map((item: any) => ({
+            id: item.id, // chính là requirement.key, ví dụ 'house_with_yard'
+            label: getLocalizedField(item.label, language) || item.label?.en || item.id,
+            icon: ADOPTION_REQUIREMENT_ICONS[item.iconKey] || DEFAULT_REQUIREMENT_ICON,
+        }));
+
 
     return (
         <Animated.View
@@ -1414,12 +1540,42 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
 
                     <ScrollView className="flex-1 px-6 pt-2 bg-white" showsVerticalScrollIndicator={false} bounces={true}>
                         <View className='mb-6'>
-                            <View className="pr-10">
-                                <View className="flex-row items-baseline gap-1">
-                                    <Text className="text-[24px] font-semibold text-black tracking-wider">{currentPet.name}</Text>
-                                    {isLoading && <ActivityIndicator size="small" color="#F97316" />}
-                                    <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({displayBreed})</Text>
+                            <View className="flex-row items-center justify-between w-full">
+                                {/* VÙNG TEXT: Có flex-1 và overflow-hidden để giới hạn không gian, không cho đè sang nút More */}
+                                <View className="flex-row items-baseline flex-1 mr-3 overflow-hidden">
+                                    <Text
+                                        className="text-[24px] font-semibold text-black tracking-wider flex-shrink"
+                                        numberOfLines={1}
+                                    >
+                                        {currentPet.name}
+                                    </Text>
+
+                                    {isLoading && <ActivityIndicator size="small" color="#F97316" style={{ marginLeft: 4 }} />}
+
+                                    <Text
+                                        className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px] flex-shrink"
+                                        numberOfLines={1}
+                                    >
+                                        ({displayBreed})
+                                    </Text>
                                 </View>
+
+                                {/* NÚT MORE: Thêm flex-shrink-0 để đảm bảo nút này KHÔNG BAO GIỜ bị co lại hay bị đè */}
+                                <TouchableOpacity
+                                    onPress={(e) => {
+                                        const { pageY } = e.nativeEvent;
+                                        setMenuPosition({ top: pageY + 14, right: 25 });
+                                        setShowOptionsMenu(true);
+                                    }}
+                                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                    className="p-1 z-50 flex-shrink-0"
+                                >
+                                    <Image
+                                        source={require('../../assets/icon/more-vertical.png')}
+                                        style={{ width: 16, height: 16 }}
+                                        contentFit="cover"
+                                    />
+                                </TouchableOpacity>
                             </View>
 
                             <View className="flex-row items-center mt-1.5">
@@ -1489,15 +1645,36 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                             ? trait
                                             : getLocalizedField(trait?.name, language);
 
-
                                         if (!traitName) return null;
 
-                                        const colorStyles = [
-                                            { bg: 'bg-[#FFF4E8]', text: 'text-[#F3B27B]', border: 'border-[#E8A53C]/25' }, // Cam
-                                            { bg: 'bg-[#EBF4FE]', text: 'text-[#88B2F3]', border: 'border-[#5A90DA]/25' }, // Xanh dương
-                                            { bg: 'bg-[#EAF8EF]', text: 'text-[#8FD49D]', border: 'border-[#83DA5A]/25' }, // Xanh lá
+                                        // Mảng cấu hình màu (Mỗi item là 1 nhóm chứa 2 option màu)
+                                        const colorGroups = [
+                                            [ // Nhóm 1: Cam (Cũ) / Hồng (Mới)
+                                                { bg: 'bg-[#FFF4E8]', text: 'text-[#F3B27B]', border: 'border-[#E8A53C]/25' },
+                                                { bg: 'bg-[#FFEFF6]', text: 'text-[#F40C6D]', border: 'border-[#F40C6D]/25' }
+                                            ],
+                                            [ // Nhóm 2: Xanh dương (Cũ) / Tím (Mới)
+                                                { bg: 'bg-[#EBF4FE]', text: 'text-[#88B2F3]', border: 'border-[#5A90DA]/25' },
+                                                { bg: 'bg-[#FDF1FF]', text: 'text-[#C75ADA]', border: 'border-[#C75ADA]/25' }
+                                            ],
+                                            [ // Nhóm 3: Xanh lá (Cũ) / Xanh ngọc (Mới)
+                                                { bg: 'bg-[#EAF8EF]', text: 'text-[#8FD49D]', border: 'border-[#83DA5A]/25' },
+                                                { bg: 'bg-[#E7FFF9]', text: 'text-[#1DB08E]', border: 'border-[#38DFB8]/25' }
+                                            ],
                                         ];
-                                        const style = colorStyles[index % colorStyles.length];
+
+                                        // Hàm Hash để tạo random cố định dựa trên tên trait (Tránh lỗi nháy màu khi re-render)
+                                        const getStableRandomVariant = (str: string) => {
+                                            let hash = 0;
+                                            for (let i = 0; i < str.length; i++) {
+                                                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                                            }
+                                            return Math.abs(hash) % 2; // Trả về 0 hoặc 1
+                                        };
+
+                                        const groupIndex = index % colorGroups.length;
+                                        const variantIndex = getStableRandomVariant(traitName);
+                                        const style = colorGroups[groupIndex][variantIndex];
 
                                         return (
                                             <View
@@ -1593,7 +1770,7 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                             </Text>
 
                                             <Text
-                                                className="font-medium text-[14px] text-black"
+                                                className={`font-medium text-[14px] ${item.textColor || 'text-black'}`}
                                                 numberOfLines={1}
                                             >
                                                 {item.value}
@@ -1610,41 +1787,226 @@ const PetDetailOverlay = ({ pet, isVisible, onClose, onAdopt }: { pet: any, isVi
                                 {isVi ? 'Yêu cầu nhận nuôi' : 'Adoption Requirements'}
                             </Text>
 
-                            <View className="flex-row flex-wrap">
-                                {adoptionRequirementItems.map((item) => (
-                                    <View
-                                        key={item.id}
-                                        className="flex-row items-center px-3 h-[25px] rounded-full bg-white border border-[#E5E5E5]"
-                                        style={{
-                                            marginRight: 8,
-                                            marginBottom: 8,
-                                            shadowColor: '#000',
-                                            shadowOffset: { width: 0, height: 2 },
-                                            shadowOpacity: 0.08,
-                                            shadowRadius: 4,
-                                            elevation: 2,
-                                        }}
-                                    >
-                                        <Image
-                                            source={item.icon}
-                                            style={{ width: 12, height: 12 }}
-                                            contentFit="contain"
-                                        />
-
-                                        <Text
-                                            className="text-[11px] text-[#8E8E93] font-regular ml-1.5"
-                                            numberOfLines={1}
+                            {adoptionRequirementItems.length > 0 ? (
+                                <View className="flex-row flex-wrap">
+                                    {adoptionRequirementItems.map((item: any) => (
+                                        <View
+                                            key={item.id}
+                                            className="flex-row items-center px-3 h-[25px] rounded-full bg-white border border-[#E5E5E5]"
+                                            style={{
+                                                marginRight: 8,
+                                                marginBottom: 8,
+                                                shadowColor: '#000',
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: 0.08,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                            }}
                                         >
-                                            {item.label}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
+                                            <Image
+                                                source={item.icon}
+                                                style={{ width: 14, height: 14 }}
+                                                contentFit="contain"
+                                            />
+                                            <Text
+                                                className="text-[12px] text-[#8E8E93] font-regular ml-1.5"
+                                                numberOfLines={1}
+                                            >
+                                                {item.label}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            ) : (
+                                <Text className="text-[13px] text-[#8E8E93] italic">
+                                    {isVi ? 'Chưa có yêu cầu nhận nuôi cụ thể.' : 'No specific adoption requirements yet.'}
+                                </Text>
+                            )}
                         </View>
 
                         <View style={{ height: 20 }} />
                     </ScrollView>
 
+                    {/* ============================================================ */}
+                    {/* GIỮ NGUYÊN UI: menu "..." + modal Report + modal Block        */}
+                    {/* Đã loại bỏ toàn bộ logic block/hide/report thực tế.          */}
+                    {/* Mọi onPress dưới đây chỉ đóng modal, sẵn sàng để bạn          */}
+                    {/* tái triển khai logic ở bước refactor sau.                     */}
+                    {/* ============================================================ */}
+                    <Modal
+                        visible={showOptionsMenu}
+                        animationType="fade"
+                        transparent={true}
+                        onRequestClose={() => setShowOptionsMenu(false)}
+                    >
+                        <TouchableOpacity
+                            style={{ flex: 1 }}
+                            activeOpacity={1}
+                            onPress={() => setShowOptionsMenu(false)}
+                        >
+                            <View
+                                className="absolute bg-white rounded-xl border border-gray-100 w-52"
+                                style={{ top: menuPosition.top, right: menuPosition.right, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10 }}
+                            >
+                                {/* 1. NÚT ẨN (HIDE) — THÊM MỚI */}
+                                <TouchableOpacity
+                                    className="flex-row items-center px-4 py-3"
+                                    activeOpacity={0.6}
+                                    onPress={() => {
+                                        setShowOptionsMenu(false);
+                                        setShowHideModal(true);
+                                    }}
+                                >
+                                    <Feather name="eye-off" size={14} color="#374151" />
+                                    <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                                        {isVi ? `Ẩn ${currentPet?.name}` : `Hide ${currentPet?.name}`}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* 2. NÚT CHẶN (BLOCK) — giữ nguyên, chỉ thêm border-t cho đồng bộ vì giờ có 3 nút */}
+                                <TouchableOpacity
+                                    className="flex-row items-center px-4 py-3 border-t border-gray-50"
+                                    activeOpacity={0.6}
+                                    onPress={() => {
+                                        setShowOptionsMenu(false);
+                                        setShowBlockModal(true);
+                                    }}
+                                >
+                                    <Feather name="slash" size={14} color="#374151" />
+                                    <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                                        {isVi ? 'Chặn' : 'Block'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* 3. NÚT BÁO CÁO (REPORT) — giữ nguyên */}
+                                <TouchableOpacity
+                                    className="flex-row items-center px-4 py-3 border-t border-gray-50"
+                                    activeOpacity={0.6}
+                                    onPress={() => {
+                                        setShowOptionsMenu(false);
+                                        setShowReportModal(true);
+                                    }}
+                                >
+                                    <Feather name="flag" size={14} color="#EF4444" />
+                                    <Text className="text-[14px] text-red-600 ml-3 font-medium">
+                                        {isVi ? 'Báo cáo' : 'Report'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
+                    </Modal>
+
+                    <ReportIssueModal
+                        isVisible={showReportModal}
+                        onClose={() => setShowReportModal(false)}
+                        context="matching"
+                        targetName={currentPet?.name}
+                        onSubmit={async (data) => {
+                            await reportPetMutation.mutateAsync({
+                                reason: data.reason,
+                                detail: data.details,
+                                isBlockRequested: data.isBlockRequested,
+                            });
+                        }}
+                    />
+                    <Modal
+                        visible={showHideModal}
+                        animationType="fade"
+                        transparent={true}
+                        onRequestClose={() => !hidePetMutation.isPending && setShowHideModal(false)}
+                    >
+                        <View className="flex-1 justify-center items-center bg-black/60 px-5">
+                            <View className="bg-white w-full rounded-[28px] p-7 items-center shadow-2xl">
+                                <View className="w-16 h-16 rounded-full bg-gray-50 items-center justify-center mb-5 border border-gray-100">
+                                    <Feather name="eye-off" size={26} color="#6B7280" />
+                                </View>
+                                <Text className="text-[20px] font-bold text-gray-900 text-center mb-3 tracking-tight">
+                                    {isVi ? `Ẩn ${currentPet?.name}?` : `Hide ${currentPet?.name}?`}
+                                </Text>
+                                <Text className="text-[15px] text-gray-500 text-center mb-8 leading-6 px-1">
+                                    {isVi
+                                        ? `Hồ sơ của ${currentPet?.name} sẽ bị ẩn đi và không còn xuất hiện trong danh sách thú cưng của bạn nữa.`
+                                        : `Profile of ${currentPet?.name} will be hidden and will no longer appear in your feed.`}
+                                </Text>
+                                <View className="w-full flex-col gap-3.5">
+                                    <TouchableOpacity
+                                        className="w-full bg-[#374151] py-4 rounded-[14px] items-center"
+                                        activeOpacity={0.8}
+                                        disabled={hidePetMutation.isPending}
+                                        onPress={() => hidePetMutation.mutate()}
+                                    >
+                                        {hidePetMutation.isPending ? (
+                                            <ActivityIndicator color="white" />
+                                        ) : (
+                                            <Text className="text-white font-bold text-[15px]">{isVi ? 'Xác nhận ẩn' : 'Confirm Hide'}</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        className="w-full bg-gray-50 py-4 rounded-[14px] items-center border border-gray-100"
+                                        activeOpacity={0.7}
+                                        disabled={hidePetMutation.isPending}
+                                        onPress={() => setShowHideModal(false)}
+                                    >
+                                        <Text className="text-gray-600 font-bold text-[15px]">{isVi ? 'Hủy bỏ' : 'Cancel'}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
+                    <Modal
+                        visible={showBlockModal}
+                        animationType="fade"
+                        transparent={true}
+                        onRequestClose={() => !blockShelterMutation.isPending && setShowBlockModal(false)}
+                    >
+                        <View className="flex-1 justify-center items-center bg-black/60 px-5">
+                            <View className="bg-white w-full rounded-[28px] p-7 items-center shadow-2xl">
+                                {/* Icon cảnh báo */}
+                                <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-5 border border-red-100">
+                                    <Feather name="slash" size={26} color="#EF4444" />
+                                </View>
+
+                                <Text className="text-[20px] font-bold text-gray-900 text-center mb-3 tracking-tight">
+                                    {isVi ? `Chặn ${currentPet?.name}?` : `Block ${currentPet?.name}?`}
+                                </Text>
+
+                                <Text className="text-[15px] text-gray-500 text-center mb-8 leading-6 px-1">
+                                    {isVi
+                                        ? `Nếu bạn chặn, hồ sơ của ${currentPet?.name} sẽ bị ẩn đi và không còn xuất hiện trong danh sách thú cưng nữa.`
+                                        : `If you block, ${currentPet?.name}'s profile will be hidden and will no longer appear in your list.`}
+                                </Text>
+
+                                <View className="w-full flex-col gap-3.5">
+                                    {/* Nút Xác nhận chặn */}
+                                    <TouchableOpacity
+                                        className="w-full bg-[#EF4444] py-4 rounded-[14px] items-center shadow-sm shadow-red-200"
+                                        activeOpacity={0.8}
+                                        disabled={blockShelterMutation.isPending}
+                                        onPress={() => blockShelterMutation.mutate()}
+                                    >
+                                        {blockShelterMutation.isPending ? (
+                                            <ActivityIndicator color="white" />
+                                        ) : (
+                                            <Text className="text-white font-bold text-[15px] tracking-wide">
+                                                {isVi ? 'Xác nhận chặn' : 'Confirm Block'}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+
+                                    {/* Nút Hủy */}
+                                    <TouchableOpacity
+                                        className="w-full bg-gray-50 py-4 rounded-[14px] items-center border border-gray-100"
+                                        activeOpacity={0.7}
+                                        onPress={() => setShowBlockModal(false)}
+                                    >
+                                        <Text className="text-gray-600 font-bold text-[15px]">
+                                            {isVi ? 'Hủy bỏ' : 'Cancel'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
                     <View className="w-full px-6 pt-4 pb-6 bg-white items-center ">
                         <TouchableOpacity
                             className="px-10 bg-[#E89B5A] py-4 rounded-full items-center mb-4 shadow-sm"

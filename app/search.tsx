@@ -5,20 +5,21 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // BỔ SUNG useQuery
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { memo, useContext, useEffect, useState } from 'react';
+import React, { memo, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, Dimensions, FlatList, Image, LayoutAnimation, StatusBar, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { eventService } from '../services/eventService';
 import { petService } from '../services/petService';
 import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
+
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
 
-// --- CẬP NHẬT HÀM GETAGE HỖ TRỢ SONG NGỮ BẰNG isVi ---
+// --- HÀM GETAGE HỖ TRỢ SONG NGỮ ---
 const getAge = (dobString?: string, isVi?: boolean) => {
     if (!dobString) return isVi ? 'Không rõ' : 'Unknown';
     const dob = new Date(dobString);
@@ -61,13 +62,10 @@ const formatBreed = (breed?: any) => {
     return `${breedStr.substring(0, 15)}...`;
 };
 
-
-// --- CẬP NHẬT PETCARD NHẬN THÊM PROPS isVi ---
 const PetCard = memo(({ item, onPress, isVi }: { item: any; onPress: (item: any) => void; isVi: boolean }) => {
-    const { l } = useLocalizedData(); // 👈 thêm
+    const { l } = useLocalizedData();
 
     return (
-
         <TouchableOpacity
             className="bg-transparent mb-[21px]"
             style={{ width: COLUMN_WIDTH }}
@@ -96,11 +94,7 @@ const PetCard = memo(({ item, onPress, isVi }: { item: any; onPress: (item: any)
                         style={{ width: 10, height: 10 }}
                         resizeMode="cover"
                     />
-
-                    <Text
-                        className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5"
-                        numberOfLines={1}
-                    >
+                    <Text className="text-[12px] text-[#8E8E93] text-center mt-0.5 ml-1.5" numberOfLines={1}>
                         {item.age || getAge(item.dob, isVi)} · {formatBreed(l(item.breed)) || (isVi ? 'Không rõ' : 'Unknown')}
                     </Text>
                 </View>
@@ -282,35 +276,56 @@ const EventCard = memo(({ item, onPress }: { item: any; onPress: (item: any) => 
 
 
 // =========================================================================
-// 2. SECTIONS CHÍNH
+// 2. SECTIONS CHÍNH (Đã đồng bộ sang React Query)
 // =========================================================================
 
-// --- TRUYỀN isVi VÀO PETS SECTION VÀ PETCARD ---
 const PetsSection = ({ searchQuery, onDetailPress, isVi }: { searchQuery: string, onDetailPress: (item: any) => void, isVi: boolean }) => {
-    const [pets, setPets] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+    const { user } = useContext(AuthContext);
     const [activeType, setActiveType] = useState<'All' | 'Dog' | 'Cat'>('All');
 
-    useEffect(() => {
-        const fetchPets = async () => {
-            setLoading(true);
-            try {
-                const params: any = { search: searchQuery };
-
-                if (activeType !== 'All') {
-                    params.type = activeType.toUpperCase();
-                }
-
-                const response = await petService.searchPets(params);
-                setPets(response?.data || response || []);
-            } catch (error) {
-                console.error("Error fetching pets:", error);
-            } finally {
-                setLoading(false);
+    // 1. Chỉ gọi API 1 lần để lấy danh sách Pet ( KHÔNG truyền searchQuery vào API nữa )
+    const { data: pets = [], isLoading: loading } = useQuery({
+        // Xóa searchQuery khỏi queryKey để React Query không re-fetch mỗi khi gõ phím
+        queryKey: ['pets-list', activeType, user?.id],
+        queryFn: async () => {
+            const params: any = {
+                userId: user?.id,
+                limit: 200 // Có thể tăng limit ở Backend lên 100-500 để user search được nhiều hơn
+            };
+            if (activeType !== 'All') {
+                params.type = activeType.toUpperCase();
             }
-        };
-        fetchPets();
-    }, [searchQuery, activeType]);
+            const response = await petService.searchPets(params);
+            return response?.data || response || [];
+        },
+        staleTime: 5 * 60 * 1000, // Cache dữ liệu 5 phút để chuyển tab không bị giật/call lại API
+    });
+
+    // 2. Xử lý Search (Filter) ngay trên Frontend bằng useMemo
+    const filteredPets = useMemo(() => {
+        if (!searchQuery || searchQuery.trim() === '') {
+            return pets; // Nếu không nhập gì, trả về toàn bộ danh sách
+        }
+
+        const lowerQuery = searchQuery.toLowerCase().trim();
+
+        return pets.filter((pet: any) => {
+            // Lọc theo Tên (Name)
+            const nameMatch = pet.name?.toLowerCase().includes(lowerQuery);
+
+            // Lọc theo Giống (Breed) - Xử lý cả chuỗi string hoặc object đa ngôn ngữ { vi, en }
+            let breedMatch = false;
+            if (typeof pet.breed === 'string') {
+                breedMatch = pet.breed.toLowerCase().includes(lowerQuery);
+            } else if (pet.breed && typeof pet.breed === 'object') {
+                const breedVi = pet.breed.vi?.toLowerCase() || '';
+                const breedEn = pet.breed.en?.toLowerCase() || '';
+                breedMatch = breedVi.includes(lowerQuery) || breedEn.includes(lowerQuery);
+            }
+
+            return nameMatch || breedMatch;
+        });
+    }, [pets, searchQuery]);
 
     return (
         <View className="flex-1 px-6 pt-4">
@@ -320,7 +335,7 @@ const PetsSection = ({ searchQuery, onDetailPress, isVi }: { searchQuery: string
                 </View>
             ) : (
                 <FlatList
-                    data={pets}
+                    data={filteredPets} // 3. Hiển thị danh sách ĐÃ FILTER
                     keyExtractor={(item, index) => item.id?.toString() || index.toString()}
                     numColumns={2}
                     columnWrapperStyle={{ justifyContent: 'space-between' }}
@@ -328,7 +343,9 @@ const PetsSection = ({ searchQuery, onDetailPress, isVi }: { searchQuery: string
                     contentContainerStyle={{ paddingBottom: 20 }}
                     ListEmptyComponent={() => (
                         <View className="items-center justify-center mt-10">
-                            <Text className="text-gray-400">{isVi ? 'Không tìm thấy thú cưng nào' : 'No pets found'}</Text>
+                            <Text className="text-gray-400">
+                                {isVi ? `Không tìm thấy bé nào tên/giống "${searchQuery}"` : `No pets found for "${searchQuery}"`}
+                            </Text>
                         </View>
                     )}
                     renderItem={({ item }) => <PetCard item={item} onPress={onDetailPress} isVi={isVi} />}
@@ -339,29 +356,19 @@ const PetsSection = ({ searchQuery, onDetailPress, isVi }: { searchQuery: string
 };
 
 const SheltersSection = ({ searchQuery, onProfilePress }: { searchQuery: string, onProfilePress: (item: any) => void }) => {
-    const [shelters, setShelters] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
     const { user } = useContext(AuthContext);
 
-    useEffect(() => {
-        const fetchShelters = async () => {
-            setLoading(true);
-            try {
-                const response = await shelterService.getShelters({
-                    search: searchQuery,
-                    userId: user?.id
-                });
-                const responseData = response?.data?.data || response?.data || response;
-                setShelters(Array.isArray(responseData) ? responseData : []);
-            } catch (error) {
-                console.error("Error fetching shelters:", error);
-                setShelters([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchShelters();
-    }, [searchQuery, user?.id]);
+    const { data: shelters = [], isLoading: loading } = useQuery({
+        queryKey: ['search-shelters', searchQuery, user?.id],
+        queryFn: async () => {
+            const response = await shelterService.getShelters({
+                search: searchQuery,
+                userId: user?.id
+            });
+            const responseData = response?.data?.data || response?.data || response;
+            return Array.isArray(responseData) ? responseData : [];
+        }
+    });
 
     if (loading) return <ActivityIndicator size="large" color="#ffa053" style={{ marginTop: 40 }} />;
 
@@ -376,54 +383,16 @@ const SheltersSection = ({ searchQuery, onProfilePress }: { searchQuery: string,
 };
 
 const EventsSection = ({ searchQuery, onEventPress }: { searchQuery: string, onEventPress: (item: any) => void }) => {
-    const [events, setEvents] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-    const { user } = useContext(AuthContext);
-    const handleToggleInterest = async (item: any) => {
-        const eventId = item.id;
-        const previousStatus = item.isInterested;
-        setEvents(prev => prev.map(ev =>
-            ev.id === eventId
-                ? {
-                    ...ev,
-                    isInterested: !previousStatus,
-                    interestedCount: !previousStatus ? (ev.interestedCount + 1) : (ev.interestedCount - 1)
-                }
-                : ev
-        ));
 
-        try {
-            const res = await eventService.toggleInterest(eventId, user?.id || 'guest');
-            if (!res.success) {
-                throw new Error("API failed");
-            }
-        } catch (error) {
-            console.error("Lỗi khi toggle interest:", error);
-            setEvents(prev => prev.map(ev =>
-                ev.id === eventId
-                    ? {
-                        ...ev,
-                        isInterested: previousStatus,
-                        interestedCount: previousStatus ? (ev.interestedCount + 1) : (ev.interestedCount - 1)
-                    }
-                    : ev
-            ));
+    // Sử dụng React Query để lấy data và tự động quản lý cache. Key có chứa 'search-events' 
+    // để dễ dàng bị invalidate từ Event Detail.
+    const { data: events = [], isLoading: loading } = useQuery({
+        queryKey: ['search-events', searchQuery],
+        queryFn: async () => {
+            const response = await eventService.searchEvents({ search: searchQuery });
+            return response?.data || response || [];
         }
-    };
-    useEffect(() => {
-        const fetchEvents = async () => {
-            setLoading(true);
-            try {
-                const response = await eventService.searchEvents({ search: searchQuery });
-                setEvents(response?.data || response || []);
-            } catch (error) {
-                console.error("Error fetching events:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchEvents();
-    }, [searchQuery]);
+    });
 
     if (loading) return <ActivityIndicator size="large" color="#ffa053" style={{ marginTop: 40 }} />;
 
@@ -452,10 +421,10 @@ export default function SearchScreen() {
     const { type } = useLocalSearchParams();
     const initialTab = (type as 'Pet' | 'Shelter' | 'Event') || 'Pet';
     const [activeTab, setActiveTab] = useState<'Pet' | 'Shelter' | 'Event'>(initialTab);
+    const [keyword, setKeyword] = useState('');
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearchQuery = useDebounce(searchInput, 500);
 
-    // Lấy language để dùng song ngữ nội tuyến
     const { language } = useLanguage();
     const { l } = useLocalizedData();
     const isVi = language === 'vi';
@@ -502,7 +471,6 @@ export default function SearchScreen() {
         });
     };
 
-
     const handleEventPress = (item: any) => {
         router.push({
             pathname: '/event-detail',
@@ -515,8 +483,6 @@ export default function SearchScreen() {
             }
         });
     };
-
-
 
     const TabButton = ({ title }: { title: 'Pet' | 'Shelter' | 'Event' }) => {
         const isActive = activeTab === title;
@@ -538,17 +504,12 @@ export default function SearchScreen() {
                 onPress={() => setActiveTab(title)}
                 className="flex-1 items-center justify-center pb-3 relative"
             >
-                <Text
-                    className={`text-[16px]  ${isActive ? 'text-[#E89B5A] font-semibold' : 'text-[#8E8E93] font-regular'
-                        }`}
-                >
+                <Text className={`text-[16px]  ${isActive ? 'text-[#E89B5A] font-semibold' : 'text-[#8E8E93] font-regular'}`}>
                     {getDisplayTitle()}
                 </Text>
 
                 {isActive && (
-                    <View
-                        className="absolute bottom-[-1px] w-full h-[3px] bg-[#E89B5A] rounded-full"
-                    />
+                    <View className="absolute bottom-[-1px] w-full h-[3px] bg-[#E89B5A] rounded-full" />
                 )}
             </TouchableOpacity>
         );
@@ -587,7 +548,6 @@ export default function SearchScreen() {
                                 colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']}
                                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                                 locations={[0, 0.3, 1]}
-
                                 style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
                             />
                             <Feather name="chevron-left" size={20} color="#1F2937" />
@@ -622,6 +582,8 @@ export default function SearchScreen() {
                 </View>
             </View>
 
+            {/* Các thẻ <Component> ở đây tự động unmount khi tab không active,
+                khi mở lại React Query sẽ load từ bộ nhớ tạm (cache) mượt mà mà không giật màn hình */}
             <View className="flex-1 bg-white">
                 {activeTab === 'Pet' && <PetsSection searchQuery={debouncedSearchQuery} onDetailPress={handlePetPress} isVi={isVi} />}
                 {activeTab === 'Shelter' && <SheltersSection searchQuery={debouncedSearchQuery} onProfilePress={handleShelterPress} />}

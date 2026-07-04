@@ -6,16 +6,18 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, Dimensions, FlatList, Image, PixelRatio, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, DeviceEventEmitter, Dimensions, FlatList, Image, PixelRatio, Pressable, ScrollView, TouchableOpacity, View } from 'react-native';
 import Animated, {
     Easing,
     Extrapolation,
     interpolate,
+    useAnimatedProps,
     useAnimatedScrollHandler,
     useAnimatedStyle,
     useSharedValue,
@@ -25,6 +27,7 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 import axiosClient from '../../api/axiosClient';
 import { useLocation } from '../../hooks/useLocation';
 import { eventService } from '../../services/eventService';
@@ -61,20 +64,62 @@ const SectionLoader = () => (
     </View>
 );
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const CIRCLE_RADIUS = 42; // Bán kính vòng loading (lớn hơn nút 80x80 một chút để bọc ngoài)
+const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
 export default function HomeScreen() {
     const { t, language } = useLanguage();
-    const { l } = useLocalizedData(); 
+    const { l } = useLocalizedData();
     const router = useRouter();
     const isVi = language === 'vi';
     const [data, setData] = useState(null);
     const insets = useSafeAreaInsets();
     const { user } = useContext(AuthContext);
     const { location, errorMsg, isLocationLoaded } = useLocation();
+    const [isNutritionPressed, setIsNutritionPressed] = useState(false);
+
     const rotation = useSharedValue(0);
     const translateY = useSharedValue(0);
+    const [pressedCatId, setPressedCatId] = useState<number | null>(null);
+    const nutritionProgress = useSharedValue(0);
+
+    const animatedCircleProps = useAnimatedProps(() => {
+        return {
+            // strokeDashoffset dịch chuyển từ 100% (trống) về 0% (lấp đầy)
+            strokeDashoffset: CIRCUMFERENCE - nutritionProgress.value * CIRCUMFERENCE,
+        };
+    });
+    const nutritionLoadingStyle = useAnimatedStyle(() => {
+        return {
+            transform: [
+                // To dần ra ngoài ôm lấy nút
+                { scale: interpolate(nutritionProgress.value, [0, 1], [0.9, 1.18], Extrapolation.CLAMP) },
+                // Xoay 1 vòng 360 độ tạo cảm giác "đang load"
+                { rotate: `${interpolate(nutritionProgress.value, [0, 1], [0, 360], Extrapolation.CLAMP)}deg` }
+            ],
+            // Mờ -> Rõ ràng -> Tự động mờ đi khi load xong
+            opacity: interpolate(nutritionProgress.value, [0, 0.1, 0.9, 1], [0, 1, 1, 0], Extrapolation.CLAMP),
+            // Viền dày lên
+            borderWidth: interpolate(nutritionProgress.value, [0, 1], [2, 4], Extrapolation.CLAMP),
+        };
+    });
     const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
     const [greetingSubtitle, setGreetingSubtitle] = useState('');
+    useEffect(() => {
+        // Lắng nghe sự kiện 'pet_blocked'
+        const subscription = DeviceEventEmitter.addListener('pet_blocked', (blockedPetId) => {
+            // Cập nhật state pets: Lọc bỏ tất cả những item có id trùng với blockedPetId
+            setPets((prevPets) => {
+                if (!prevPets) return prevPets;
+                return prevPets.filter(pet => pet.id !== blockedPetId);
+            });
+        });
 
+        // Cleanup listener khi unmount
+        return () => {
+            subscription.remove();
+        };
+    }, []);
     const generateGreeting = useCallback((petName = '') => {
         const isVi = language === 'vi';
         const defaultPetNameVi = petName || 'các bé';
@@ -210,8 +255,15 @@ export default function HomeScreen() {
 
     const [pets, setPets] = useState<any[]>([]);
     const [shelters, setShelters] = useState<any[]>([]);
-    const [events, setEvents] = useState<any[]>([]);
-
+    const { data: upcomingEvents = [], isLoading: isEventsLoading } = useQuery({
+        // 1. THÊM user?.id VÀO QUERY KEY ĐỂ ĐỒNG BỘ CACHE VỚI MÀN DETAIL
+        queryKey: ['upcoming-events', user?.id],
+        queryFn: async () => {
+            // 2. TRUYỀN THÊM user?.id XUỐNG HÀM GET API
+            const res = await eventService.getUpcomingEvents(5, user?.id);
+            return res?.data || res || [];
+        }
+    });
     // Đổi logic loading: Tách riêng initialLoading để phục vụ hiển thị UI mượt
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [hasUnread, setHasUnread] = useState(false);
@@ -313,39 +365,26 @@ export default function HomeScreen() {
 
     const loadHomeData = async (currentLat?: number, currentLng?: number, isSilentRefresh = false) => {
         try {
-            // Không set trạng thái loading nếu đây là Silent Refresh
             if (!isSilentRefresh && pets.length === 0) setIsInitialLoading(true);
 
-            // ĐÃ XÓA: Lệnh setTimeout 2000ms gây chậm app vô lý. API bao nhiêu ms thì trả về bấy nhiêu ms.
-
-            // Gợi ý: Nếu trong service bạn cấu hình truyền được headers, hãy thêm X-Silent-Request: 'true' 
-            // vào tham số nếu isSilentRefresh = true để không chớp Global Loader.
-            const [eventsRes, petsRes, sheltersRes] = await Promise.all([
-                eventService.getUpcomingEvents(5),
+            const [petsRes, sheltersRes] = await Promise.all([
                 petService.getFeed(10, currentLat, currentLng),
                 (currentLat && currentLng)
                     ? shelterService.getSheltersNearBy(currentLat, currentLng, 5)
                     : shelterService.getShelters({ limit: 5 })
             ]);
 
-            setEvents(eventsRes?.data || eventsRes || []);
-            console.log("Event: ", eventsRes?.data);
+            // Lấy data pet từ API
             let fetchedPets = petsRes?.data || petsRes || [];
-            if (fetchedPets.length > 0) {
-                let infinitePetsData: any[] = [];
-                for (let i = 0; i < 50; i++) {
-                    infinitePetsData = infinitePetsData.concat(
-                        fetchedPets.map((p: any) => ({ ...p, fakeId: `${p.id}_clone_${i}` }))
-                    );
-                }
-                fetchedPets = infinitePetsData;
-            }
+
+            // Cập nhật thẳng vào state, KHÔNG nhân bản 50 lần nữa
             setPets(fetchedPets);
+
             const fetchedShelters = sheltersRes?.data?.data || sheltersRes?.data || sheltersRes || [];
             setShelters(Array.isArray(fetchedShelters) ? fetchedShelters : []);
         } catch (error: any) {
             if (error?.response?.status === 401) {
-                setPets([]); setEvents([]); setShelters([]);
+                // setPets([]); setEvents([]); setShelters([]);
             }
         } finally {
             setIsInitialLoading(false);
@@ -491,14 +530,82 @@ export default function HomeScreen() {
                             <View className="mt-[38px]">
                                 <Text className="text-[16px] font-semibold text-gray-900 mb-4">{t('Pawcare')}</Text>
                                 <View className="flex-row justify-between">
-                                    {CATEGORIES.map((cat) => (
-                                        <TouchableOpacity key={cat.id} className="items-center w-[22%] -ml-1" activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.push({ pathname: '/pawcare/[category]', params: { category: cat.label } })}>
-                                            <View className="w-20 h-20 bg-white rounded-full items-center justify-center mb-3" style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 }}>
-                                                <Image source={cat.icon} className="w-11 h-11" />
-                                            </View>
-                                            <Text className="text-gray-500 text-xs font-medium">{t(cat.label)}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                    {CATEGORIES.map((cat) => {
+                                        const isNutrition = cat.label === 'Nutrition';
+
+                                        return (
+                                            <Pressable
+                                                key={cat.id}
+                                                className="items-center w-[22%] -ml-1"
+                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+
+                                                onPress={() => router.push({ pathname: '/pawcare/[category]', params: { category: cat.label } })}
+
+                                                onPressIn={() => {
+                                                    if (isNutrition) {
+                                                        setPressedCatId(cat.id);
+                                                        // Đợi 300ms rồi mới bắt đầu chạy animation lấp đầy trong 800ms
+                                                        nutritionProgress.value = withDelay(
+                                                            300,
+                                                            withTiming(1, { duration: 800, easing: Easing.linear })
+                                                        );
+                                                    }
+                                                }}
+
+                                                onPressOut={() => {
+                                                    if (isNutrition) {
+                                                        setPressedCatId(null);
+                                                        // Người dùng nhả tay: 
+                                                        // Nếu nhả trước 300ms -> withDelay bị hủy, vòng tròn chưa kịp hiện.
+                                                        // Nếu nhả sau 300ms -> vòng tròn tụt nhanh về 0 trong 150ms.
+                                                        nutritionProgress.value = withTiming(0, { duration: 150 });
+                                                    }
+                                                }}
+
+                                                onLongPress={() => {
+                                                    if (isNutrition) {
+                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                        setPressedCatId(null);
+                                                        nutritionProgress.value = 0; // Reset lại vòng
+                                                        router.push('/ingredient-check');
+                                                    }
+                                                }}
+
+                                                // TỔNG THỜI GIAN NHẤN GIỮ = 300ms (chờ) + 800ms (loading) = 1100ms
+                                                delayLongPress={isNutrition ? 1100 : undefined}
+                                            >
+                                                <View className="relative items-center justify-center mb-3 w-20 h-20">
+
+                                                    {/* HIỆU ỨNG ĐỔ ĐẦY VÒNG TRÒN TỪ 12 GIỜ */}
+                                                    {isNutrition && (
+                                                        <View style={{ position: 'absolute', width: 90, height: 90, alignItems: 'center', justifyContent: 'center', zIndex: 0 }}>
+                                                            {/* Xoay SVG -90 độ để điểm bắt đầu nằm ở hướng 12h thay vì 3h */}
+                                                            <Svg width="90" height="90" style={{ transform: [{ rotate: '-90deg' }] }}>
+                                                                <AnimatedCircle
+                                                                    cx="45"
+                                                                    cy="45"
+                                                                    r={CIRCLE_RADIUS}
+                                                                    stroke="#E89B5A"
+                                                                    strokeWidth="4"
+                                                                    fill="transparent"
+                                                                    strokeDasharray={CIRCUMFERENCE}
+                                                                    animatedProps={animatedCircleProps}
+                                                                    strokeLinecap="round" // Làm tròn đầu vòng loading (tùy chọn)
+                                                                />
+                                                            </Svg>
+                                                        </View>
+                                                    )}
+
+                                                    {/* UI HIỆN TẠI (GIỮ NGUYÊN HOÀN TOÀN) */}
+                                                    <View className="w-full h-full bg-white rounded-full items-center justify-center z-10" style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 }}>
+                                                        <Image source={cat.icon} className="w-11 h-11" />
+                                                    </View>
+                                                </View>
+
+                                                <Text className="text-gray-500 text-xs font-medium">{t(cat.label)}</Text>
+                                            </Pressable>
+                                        );
+                                    })}
                                 </View>
                             </View>
                         </View>
@@ -519,7 +626,7 @@ export default function HomeScreen() {
                                     contentContainerStyle={{ paddingRight: 24, marginBottom: 5 }}
                                     ListHeaderComponent={<View style={{ width: 24 }} />}
                                     data={pets}
-                                    keyExtractor={(item, index) => item.fakeId ? item.fakeId : item.id.toString() + index}
+                                    keyExtractor={(item) => item.id.toString()}
                                     getItemLayout={getItemLayout}
                                     renderItem={renderPetItem}
                                     initialNumToRender={7}
@@ -567,13 +674,15 @@ export default function HomeScreen() {
                         {/* --- UPCOMING EVENTS TỪ API --- */}
                         <View className="mt-[38px] mb-6">
                             <SectionHeader title="Upcoming Events" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })} t={t} />
-                            {isInitialLoading && events.length === 0 ? (
+
+                            {/* Sửa biến check loading thành isEventsLoading và upcomingEvents */}
+                            {isEventsLoading && upcomingEvents.length === 0 ? (
                                 <SectionLoader />
-                            ) : events.length === 0 ? (
+                            ) : upcomingEvents.length === 0 ? (
                                 <Text className="text-center text-gray-400 mt-2 mb-4">No upcoming events</Text>
                             ) : (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }} nestedScrollEnabled={true}>
-                                    {events.map((event) => {
+                                    {upcomingEvents.map((event: any) => { // Sửa .map
                                         const d = new Date(event.startDate);
                                         return (
                                             <TouchableOpacity

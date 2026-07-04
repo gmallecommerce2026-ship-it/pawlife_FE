@@ -1,14 +1,14 @@
 // app/shelter-profile.tsx
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/localization';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { getLocalizedField } from '@/utils/localization';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Dimensions, Image, Keyboard, Linking, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Dimensions, Image, Keyboard, Linking, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -20,6 +20,8 @@ import Animated, {
   withTiming
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
+import ReportIssueModal from '../components/ReportIssueModal';
 import { shelterService } from '../services/shelterService';
 import { useEngagementStore } from '../store/useEngagementStore';
 
@@ -138,7 +140,7 @@ export default function ShelterProfileScreen() {
 
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
-
+  const [pendingBlockBack, setPendingBlockBack] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -151,14 +153,19 @@ export default function ShelterProfileScreen() {
   const HEADER_HEIGHT = insets.top + 60;
   const SCROLL_THRESHOLD = 100;
   const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
-
+  const AnimatedAppText = Animated.createAnimatedComponent(Text);
   const [selectedGender, setSelectedGender] = useState<string | null>(null);
   const [selectedAge, setSelectedAge] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedSterilized, setSelectedSterilized] = useState<boolean | null>(null);
   const [isfilterVisible, setIsFilterVisible] = useState(false);
-
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 20 });
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
   });
@@ -333,6 +340,72 @@ export default function ShelterProfileScreen() {
       }
     }
   });
+  const blockShelterMutation = useMutation({
+    mutationFn: () => {
+      console.log('[BLOCK] shelterId:', shelterId);
+      return shelterService.blockShelter(shelterId);
+    },
+    onMutate: () => setIsBlocking(true),
+    onSuccess: (res) => {
+      console.log('[BLOCK] Success response:', res);
+      setIsBlocked(true);
+      setShowBlockModal(false);
+
+
+      // Invalidate các query liên quan để làm mới data, loại bỏ shelter bị block
+      queryClient.invalidateQueries({ queryKey: ['followed-shelters'] });
+      queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
+      queryClient.invalidateQueries({ queryKey: ['shelters'] }); // Nếu có list shelter ở ngoài
+
+      Toast.show({
+        type: 'success',
+        text1: isVi ? 'Đã chặn thành công' : 'Blocked Successfully',
+        text2: isVi ? `Bạn sẽ không thấy nội dung từ ${shelterInfo?.name} nữa` : `You won't see content from ${shelterInfo?.name} again`,
+        position: 'top',
+        topOffset: insets.top + 10,
+      });
+
+      // Đá user ra khỏi trang sau khi chặn
+      router.back();
+    },
+    onError: (err) => {
+      console.log('[BLOCK] Error:', JSON.stringify(err));
+    },
+    onSettled: () => setIsBlocking(false),
+  });
+
+
+  // 2. Mutation xử lý Report Shelter
+  const reportShelterMutation = useMutation({
+    mutationFn: (reportData: any) => shelterService.reportShelter(shelterId, reportData),
+    onSuccess: () => {
+      setShowReportModal(false);
+      // Không cần Toast/Alert ở đây nữa — ReportIssueModal tự hiện ReportSuccessModal
+      queryClient.invalidateQueries({ queryKey: ['shelter-profile', shelterId] });
+    },
+    onError: (err) => {
+      console.error('[REPORT] Error:', err); // chỉ log, không Alert
+    }
+  });
+
+
+
+  const handleBlockShelter = () => {
+    Alert.alert(
+      isVi ? 'Ẩn trạm cứu hộ này?' : 'Block this shelter?',
+      isVi
+        ? `Bạn sẽ không còn thấy thú cưng từ "${shelterInfo?.name}" nữa. Bạn có thể bỏ ẩn trong phần Cài đặt.`
+        : `You will no longer see pets from "${shelterInfo?.name}". You can unblock later in Settings.`,
+      [
+        { text: isVi ? 'Hủy' : 'Cancel', style: 'cancel' },
+        {
+          text: isVi ? 'Ẩn' : 'Block',
+          style: 'destructive',
+          onPress: () => blockShelterMutation.mutate()
+        }
+      ]
+    );
+  };
 
   const handleToggleFollow = () => {
     toggleFollowMutation.mutate();
@@ -408,9 +481,13 @@ export default function ShelterProfileScreen() {
         style={[headerBarStyle, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 20, paddingHorizontal: 20 }]}
       >
         <View className="flex-1 items-center">
-          <Animated.Text style={headerTitleStyle} className="text-[20px] font-semibold text-black tracking-[0.5px]">
+          {/* SỬ DỤNG AnimatedAppText VÀ GIỮ NGUYÊN CLASS TỪ TAILWIND */}
+          <AnimatedAppText
+            style={headerTitleStyle}
+            className="text-[20px] font-semibold text-black tracking-[0.5px]"
+          >
             {shelterInfo?.name}
-          </Animated.Text>
+          </AnimatedAppText>
         </View>
       </Animated.View>
 
@@ -530,9 +607,28 @@ export default function ShelterProfileScreen() {
               />
             </View>
             <View className="ml-4 flex-1 justify-center mt-4">
-              <Text className="text-[20px] font-semibold text-black mb-2 tracking-[0.5px]" numberOfLines={1}>
-                {shelterInfo?.name}
-              </Text>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-[20px] font-semibold text-black mb-2 tracking-[0.5px] flex-1 mr-2" numberOfLines={1}>
+                  {shelterInfo?.name}
+                </Text>
+
+                {/* ⬇️ NÚT MORE: mở dropdown Report / Block */}
+                <TouchableOpacity
+                  onPress={(e) => {
+                    const { pageY } = e.nativeEvent;
+                    setMenuPosition({ top: pageY + 14, right: 20 });
+                    setShowOptionsMenu(true);
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  className="p-1 mb-2"
+                >
+                  <Image
+                    source={require('../assets/icon/more-vertical.png')}
+                    style={{ width: 16, height: 16 }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              </View>
               <View className="flex-row items-center">
                 <StatItem value={shelterInfo._count?.pets || pets.length} label={t("pets")} />
                 <Text className='text-[12px] px-2 font-extrabold'>•</Text>
@@ -813,6 +909,131 @@ export default function ShelterProfileScreen() {
           </TouchableWithoutFeedback>
         </TouchableOpacity>
       </Modal>
+      <Modal
+        visible={showOptionsMenu}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowOptionsMenu(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={() => setShowOptionsMenu(false)}
+        >
+          <View
+            className="absolute bg-white rounded-xl border border-gray-100 w-56"
+            style={{
+              top: menuPosition.top,
+              right: menuPosition.right,
+              elevation: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 10,
+            }}
+          >
+            {/* NÚT CHẶN (BLOCK) Ở TRÊN */}
+            <TouchableOpacity
+              className="flex-row items-center px-4 py-3"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowOptionsMenu(false); // Đóng menu
+                setShowBlockModal(true);   // Mở Modal xác nhận
+              }}
+            >
+              <Feather name="slash" size={14} color="#374151" />
+              <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                {isVi ? 'Chặn' : 'Block'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* NÚT BÁO CÁO (REPORT) Ở DƯỚI, MÀU ĐỎ */}
+            <TouchableOpacity
+              className="flex-row items-center px-4 py-3 border-t border-gray-50"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowReportModal(true);
+              }}
+            >
+              <Feather name="flag" size={14} color="#EF4444" />
+              <Text className="text-[14px] text-red-600 ml-3 font-medium">
+                {isVi ? 'Báo cáo' : 'Report'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      <Modal
+        visible={showBlockModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowBlockModal(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/60 px-5">
+          <View className="bg-white w-full rounded-[28px] p-7 items-center shadow-2xl">
+            {/* Icon cảnh báo */}
+            <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-5 border border-red-100">
+              <Feather name="slash" size={26} color="#EF4444" />
+            </View>
+
+            <Text className="text-[20px] font-bold text-gray-900 text-center mb-3 tracking-tight">
+              {isVi ? `Chặn ${shelterInfo?.name}?` : `Block ${shelterInfo?.name}?`}
+            </Text>
+
+            <Text className="text-[15px] text-gray-500 text-center mb-8 leading-6 px-1">
+              {isVi
+                ? `Nếu bạn chặn, bạn sẽ không còn thấy bất kỳ bài đăng hay thú cưng nào từ ${shelterInfo?.name} nữa.`
+                : `If you block, you will no longer see any posts or pets from ${shelterInfo?.name}.`}
+            </Text>
+
+            <View className="w-full flex-col gap-3.5">
+              {/* Nút Xác nhận chặn */}
+              <TouchableOpacity
+                className={`w-full py-4 rounded-[14px] items-center shadow-sm shadow-red-200 ${blockShelterMutation.isPending ? 'bg-red-300' : 'bg-[#EF4444]'}`}
+                activeOpacity={0.8}
+                disabled={blockShelterMutation.isPending}
+                onPress={() => {
+                  // Gọi thực tế API thay vì hardcode
+                  blockShelterMutation.mutate();
+                }}
+              >
+                {blockShelterMutation.isPending ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text className="text-white font-bold text-[15px] tracking-wide">
+                    {isVi ? 'Xác nhận chặn' : 'Confirm Block'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Nút Hủy */}
+              <TouchableOpacity
+                className="w-full bg-gray-50 py-4 rounded-[14px] items-center border border-gray-100"
+                activeOpacity={0.7}
+                onPress={() => setShowBlockModal(false)}
+              >
+                <Text className="text-gray-600 font-bold text-[15px]">
+                  {isVi ? 'Hủy bỏ' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* --- REPORT SHELTER MODAL --- */}
+      <ReportIssueModal
+        isVisible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        context="shelter"
+        targetName={shelterInfo?.name}
+        onSubmit={async (data: any) => {
+          const { location, date, isBlockRequested, details, ...rest } = data;
+          const payload = { ...rest, detail: details, isBlockRequested };
+          await reportShelterMutation.mutateAsync(payload);
+          if (isBlockRequested) setIsBlocked(true); // chỉ set state, KHÔNG router.back() ở đây
+        }}
+      />
     </View>
   );
 }

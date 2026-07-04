@@ -2,17 +2,19 @@ import axiosClient from '@/api/axiosClient';
 import AddMedicalRecordModal from '@/components/AddMedicalRecordModal';
 import { Text } from '@/components/AppText';
 import { TextInput } from '@/components/AppTextInput';
+import ReportIssueModal, { ReportSubmitData } from '@/components/ReportIssueModal';
+import { buildBreedBilingual, getBreedOptions, resolveBreedValue, resolveSpeciesValue, SPECIES_BILINGUAL } from '@/constants/breedData';
+import { getMedicalRecordIcon } from '@/constants/medicalRecordIcons';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useModalStore } from '@/store/useModalStore';
+import { buildBilingualOnSubmit } from '@/utils/autoTranslate';
+import { displayBilingual, parseBilingual } from '@/utils/bilingualField';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BlurView } from 'expo-blur';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { buildBreedBilingual, getBreedOptions, resolveBreedValue, resolveSpeciesValue, SPECIES_BILINGUAL } from '@/constants/breedData';
-import { buildBilingualOnSubmit } from '@/utils/autoTranslate';
-import { displayBilingual, parseBilingual } from '@/utils/bilingualField';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,6 +34,7 @@ import {
 import { Dropdown } from 'react-native-element-dropdown';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useImageUpload } from '../hooks/useImageUpload';
+import { useTotalImageSize } from '../hooks/useTotalImageSize';
 import { petService } from '../services/petService';
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
@@ -80,6 +83,61 @@ function resolveErrorMessage(error: any, t: (key: string, params?: Record<string
 
   return null;
 }
+
+// =====================================================================
+// 🚀 ĐỒNG BỘ UI: Helper lấy text bilingual an toàn cho recordName/nextDueName
+// (Giống hệt getSafeBilingualText trong pet-profile-detail)
+// =====================================================================
+const getSafeBilingualText = (val: any, isVi: boolean) => {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    if (val.trim().startsWith('{')) {
+      try {
+        const p = JSON.parse(val);
+        return isVi ? (p.vi || p.en) : (p.en || p.vi);
+      } catch { return val; }
+    }
+    return val;
+  }
+  if (typeof val === 'object') {
+    return isVi ? (val.vi || val.en) : (val.en || val.vi);
+  }
+  return String(val);
+};
+
+// =====================================================================
+// 🚀 ĐỒNG BỘ UI: Badge config GIỐNG HỆT getMedicalRecordBadgeConfig
+// trong pet-profile-detail (cùng màu sắc, icon, label cho từng trạng thái)
+// =====================================================================
+const getMedicalRecordBadgeConfig = (status: string | undefined, isVi: boolean) => {
+  if (status === 'DISPUTED') {
+    return {
+      bgColor: '#FFEAF2',
+      borderColor: '#F7BFD8',
+      color: '#D6447A',
+      icon: 'alert-triangle' as const,
+      label: isVi ? 'Cần xem xét' : 'Disputed',
+    };
+  }
+  if (status === 'VERIFIED') {
+    return {
+      bgColor: '#EBFFE2',
+      borderColor: '#D1F5BF',
+      color: '#77C852',
+      icon: 'check-circle' as const,
+      label: isVi ? 'Đã xác minh' : 'Verified',
+    };
+  }
+  // PENDING hoặc chưa có status
+  return {
+    bgColor: '#FBF7EB',
+    borderColor: '#F3E1AE',
+    color: '#E8A53C',
+    icon: 'info' as const,
+    label: isVi ? 'Đang xác minh' : 'Reviewing',
+  };
+};
+
 const Label = ({ text, required = false }: { text: string; required?: boolean }) => (
   <Text className="text-[#8E8E93] text-[14px] font-medium mb-2 mt-4">
     {text} {required && <Text className="text-red-500">*</Text>}
@@ -109,7 +167,11 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
         activeOpacity={0.7}
         className={`w-full bg-white border border-[#E5E5E5] rounded-[16px] h-14 px-4 flex-row items-center justify-between ${isOpen ? 'border-[#E89B5A]' : ''}`}
       >
-        <Text className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`} numberOfLines={1}>
+        <Text
+          className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`}
+          numberOfLines={1}
+          style={{ fontFamily: 'Urbanist-Medium' }} // THÊM DÒNG NÀY (Vì đang dùng font-medium)
+        >
           {value || placeholder}
         </Text>
         <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#9CA3AF" />
@@ -137,7 +199,11 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
                       setIsOpen(false);
                     }}
                   >
-                    <Text className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}>
+                    <Text
+                      className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}
+                      // THÊM DÒNG NÀY: Nếu được chọn thì dùng Bold, bình thường dùng Regular
+                      style={{ fontFamily: isSelected ? 'Urbanist-Bold' : 'Urbanist-Regular' }}
+                    >
                       {item}
                     </Text>
                     {isSelected && <Ionicons name="checkmark" size={18} color="#E89B5A" />}
@@ -156,85 +222,88 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
 // 🚀 FIX 2: Tách riêng Component MedicalRecordItem và bọc React.memo
 // Component này chỉ render lại khi props của chính nó thay đổi,
 // giúp tránh việc tính toán Date nặng nề khi người dùng đang gõ tên.
+//
+// 🚀 ĐỒNG BỘ UI: Layout + badge giống hệt khối render medicalRecords.map
+// trong pet-profile-detail (không còn chú thích DISPUTED hiển thị inline
+// dưới card — chú thích này giờ chỉ hiện trong menu, giống pet-profile-detail).
 // =====================================================================
 interface MedicalRecordItemProps {
   record: any;
   index: number;
   isVi: boolean;
-  onOpenMenu: (index: number, images: string[], pageY: number) => void;
+  onOpenMenu: (index: number, images: string[], pageY: number, status: string) => void;
 }
 
 const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalRecordItemProps) => {
-  console.log(record);
-
   const formattedRecordDate = record.recordDate ? new Date(record.recordDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
   const formattedNextDueDate = record.nextDueDate ? new Date(record.nextDueDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
-  const displayRecordName = displayBilingual(parseBilingual(record.recordName), isVi);
-  const isPending = record.verificationStatus === 'PENDING' || !record.verificationStatus;
+  const displayRecordName = getSafeBilingualText(record.recordName, isVi) || displayBilingual(parseBilingual(record.recordName), isVi);
+
+
+  const status = record.verificationStatus || 'PENDING';
   const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
+  const shouldShowNextDueDate = record.hasNextDueDate && !!record.nextDueDate;
+
+  // Badge GIỐNG HỆT pet-profile-detail
+  const badge = getMedicalRecordBadgeConfig(status, isVi);
+  const sizeKB = useTotalImageSize(imageList);
+  const recordIcon = getMedicalRecordIcon(record.type);
 
   return (
-
-    <View className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
-      <View className={`w-[30px] h-[30px] rounded-[100px] items-center justify-center`}>
-        <Image
-          source={require('../assets/icon/vacc-icon-report.png')}
-          style={{ width: 30, height: 30 }}
-          resizeMode="contain"
-        />
-      </View>
-      <View className="flex-1 mx-3">
-        <View className="flex-1 flex-row flex-wrap items-center pr-2">
-          <Text className="text-[14px] text-[#000000] font-medium leading-[16px] mr-2" numberOfLines={1}>
-            {displayRecordName || (isVi ? "Hồ sơ không tên" : "Unnamed Record")}
-          </Text>
-
-          <View
-            className="flex-row items-center px-2 py-[3px] rounded-full"
-            style={{ backgroundColor: isPending ? '#FBF7EB' : '#EBFFE2', borderColor: isPending ? "#E8A53C/25" : "#D1F5BF" }}
-          >
-            <Feather
-              name={isPending ? 'info' : 'check-circle'}
-              size={10}
-              color={isPending ? '#E8A53C' : '#77C852'}
-            />
-            <Text
-              className="text-[10px] font-medium ml-1"
-              style={{ color: isPending ? '#E8A53C' : '#77C852' }}
-            >
-              {isPending
-                ? (isVi ? 'Đang xác minh' : 'Reviewing')
-                : (isVi ? 'Đã xác minh' : 'Verified')}
-            </Text>
-          </View>
-        </View>
-        <Text className="text-[#6B7280] text-[12px]">
-          {isVi ? 'Loại' : 'Type'}: {record.type} | {isVi ? 'Ngày' : 'Date'}: {formattedRecordDate}
-        </Text>
-        {record.hasNextDueDate && (
-          <Text className="text-[#E89B5A] text-[12px] mt-1 font-regular">
-            {isVi ? 'Lịch tiếp theo' : 'Next due date'}: {formattedNextDueDate}
-          </Text>
-        )}
-      </View>
-
-      <View className="flex-row items-center gap-2">
-        <TouchableOpacity
-          onPress={(e) => {
-            e.stopPropagation();
-            const { pageY } = e.nativeEvent;
-            onOpenMenu(index, imageList, pageY);
-          }}
-          className="p-2"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    <View className="mb-4">
+      <View className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
+        <View
+          className="w-[30px] h-[30px] rounded-[100px] items-center justify-center"
+          style={{ backgroundColor: '#EDEDED' }}
         >
-          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
-        </TouchableOpacity>
+          <Image
+            source={getMedicalRecordIcon(record.type)}
+            style={{ width: 18, height: 18, tintColor: '#999999' }}
+            resizeMode="contain"
+          />
+        </View>
+        <View className="flex-1 mx-3">
+          <View className="flex-row justify-between items-center">
+            <View className="flex-1 flex-row flex-wrap items-center pr-2">
+              <Text className="text-[14px] text-[#000000] font-medium leading-[16px] mr-2" numberOfLines={1}>
+                {displayRecordName || (isVi ? "Hồ sơ vô danh" : "Unnamed Record")}
+              </Text>
+              <View
+                className="flex-row items-center px-2 py-[3px] rounded-full border"
+                style={{ backgroundColor: badge.bgColor, borderColor: badge.borderColor }}
+              >
+                <Feather
+                  name={badge.icon}
+                  size={10}
+                  color={badge.color}
+                />
+                <Text
+                  className="text-[10px] font-medium ml-1"
+                  style={{ color: badge.color }}
+                >
+                  {badge.label}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                onOpenMenu(index, imageList, e.nativeEvent.pageY, status);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
+            </TouchableOpacity>
+          </View>
+          <Text className="text-[10px] font-regular text-[#8E8E93] tracking-[0.5px]">
+            {sizeKB !== null ? `${sizeKB}KB • ` : ''}
+            {isVi ? 'Gửi lúc' : 'Submitted on'} {formattedRecordDate}
+          </Text>
+        </View>
       </View>
     </View>
   );
 }, (prevProps, nextProps) => {
-  // Chỉ re-render nếu record thay đổi, isVi thay đổi
   return (
     prevProps.record === nextProps.record &&
     prevProps.isVi === nextProps.isVi &&
@@ -280,7 +349,25 @@ export default function EditPetScreen() {
   const [currentMedicalRecordImages, setCurrentMedicalRecordImages] = useState<string[]>([]);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [selectedRecordStatus, setSelectedRecordStatus] = useState<string>('PENDING');
 
+  // 🚀 ĐỒNG BỘ UI: State View / Edit / Report cho 1 medical record — giống hệt pet-profile-detail
+  const [showViewMedicalModal, setShowViewMedicalModal] = useState(false);
+  const [viewingMedicalRecord, setViewingMedicalRecord] = useState<any | null>(null);
+  const [showEditMedicalRecordModal, setShowEditMedicalRecordModal] = useState(false);
+  const [editingMedicalRecord, setEditingMedicalRecord] = useState<any | null>(null);
+  const [showReportMedicalRecordModal, setShowReportMedicalRecordModal] = useState(false);
+  const [reportingMedicalRecord, setReportingMedicalRecord] = useState<any | null>(null);
+  const [isSavingMedicalRecord, setIsSavingMedicalRecord] = useState(false);
+
+  const handleOpenMedicalRecordMenu = useCallback((index: number, images: string[], pageY: number, status: string) => {
+    setMedicalRecordMenuPosition({ top: pageY + 10, right: 32 });
+    setSelectedMedicalRecordIndex(index);
+    setCurrentMedicalRecordImages(images);
+    setSelectedRecordStatus(status); // Lưu trạng thái hiện tại
+    setCurrentImageIndex(0);
+    setShowMedicalRecordMenu(true);
+  }, []);
   useEffect(() => {
     if (isLoading) return;
     if (!shouldAutoOpenMedicalModal) return;
@@ -298,13 +385,52 @@ export default function EditPetScreen() {
     setMedicalRecords(prev => prev.filter((_, i) => i !== indexToDelete));
   }, []);
 
-  const handleOpenMedicalRecordMenu = useCallback((index: number, images: string[], pageY: number) => {
-    setMedicalRecordMenuPosition({ top: pageY + 10, right: 32 });
-    setSelectedMedicalRecordIndex(index);
-    setCurrentMedicalRecordImages(images);
-    setCurrentImageIndex(0);
-    setShowMedicalRecordMenu(true);
+  // 🚀 ĐỒNG BỘ UI: Sửa hồ sơ y tế (record đang PENDING) — cập nhật state local,
+  // sẽ được gửi lên Backend khi người dùng bấm "Lưu thay đổi" của toàn màn hình.
+  const handleUpdateMedicalRecordLocal = useCallback((recordId: string | undefined, recordIndex: number, payload: any) => {
+    setMedicalRecords(prev => prev.map((r, i) => {
+      const matches = recordId ? r.id === recordId : i === recordIndex;
+      if (!matches) return r;
+      return {
+        ...r,
+        type: payload.type,
+        recordName: payload.recordName,
+        recordDate: payload.recordDate,
+        images: payload.images,
+        hasNextDueDate: payload.hasNextDueDate,
+        nextDueDate: payload.hasNextDueDate ? payload.nextDueDate : null,
+        nextDueName: payload.hasNextDueDate ? payload.nextDueName : null,
+      };
+    }));
+    setShowEditMedicalRecordModal(false);
+    setEditingMedicalRecord(null);
   }, []);
+
+  // 🚀 ĐỒNG BỘ UI: Cập nhật riêng "Lịch tiếp theo" từ modal View — giống pet-profile-detail
+  const handleUpdateNextDueOnlyLocal = useCallback((recordId: string | undefined, recordIndex: number, payload: { nextDueName: any; nextDueDate: string }) => {
+    setMedicalRecords(prev => prev.map((r, i) => {
+      const matches = recordId ? r.id === recordId : i === recordIndex;
+      if (!matches) return r;
+      return { ...r, nextDueName: payload.nextDueName, nextDueDate: payload.nextDueDate, hasNextDueDate: true };
+    }));
+    setShowViewMedicalModal(false);
+    setViewingMedicalRecord(null);
+  }, []);
+
+  // 🚀 ĐỒNG BỘ UI: Báo cáo hồ sơ y tế đã VERIFIED — gọi API ngay (giống pet-profile-detail)
+  // vì hồ sơ đã tồn tại trên Backend (có id thật), không cần đợi "Lưu thay đổi".
+  const handleReportMedicalRecord = useCallback(async (data: ReportSubmitData) => {
+    if (!reportingMedicalRecord?.id) return;
+
+    await petService.reportMedicalRecord(id as string, reportingMedicalRecord.id, {
+      reason: data.reason,
+      details: data.details,
+    });
+
+    setMedicalRecords(prev => prev.map((r) =>
+      r.id === reportingMedicalRecord.id ? { ...r, verificationStatus: 'DISPUTED' } : r
+    ));
+  }, [reportingMedicalRecord, id]);
 
   const handleDownloadMedicalRecordImage = async (url: string, fileName: string) => {
     try {
@@ -779,6 +905,8 @@ export default function EditPetScreen() {
   const selectedMedicalRecordIsPending = !!selectedMedicalRecord && (
     selectedMedicalRecord.verificationStatus === 'PENDING' || !selectedMedicalRecord.verificationStatus
   );
+  const selectedMedicalRecordIsVerified = selectedRecordStatus === 'VERIFIED';
+  const selectedMedicalRecordIsDisputed = selectedRecordStatus === 'DISPUTED';
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -1102,9 +1230,13 @@ export default function EditPetScreen() {
 
                 {/* 🚀 FIX 4: Thay thế khối code cũ bằng Component MedicalRecordItem đã được memoize */}
                 {medicalRecords.length === 0 ? (
-                  <Text className="text-gray-400 text-[14px] italic">
-                    {isVi ? 'Chưa có hồ sơ y tế nào.' : 'No medical records yet.'}
-                  </Text>
+                  <View className="bg-white border border-dashed border-[#E5E5E5] rounded-[12px] py-5 items-center justify-center">
+                    <View className="rounded-full items-center justify-center mb-2">
+                      <Image source={require('../assets/icon/file.png')} style={{ width: 17, height: 17 }} resizeMode="cover" />
+                    </View>
+                    <Text className="text-[16px] text-black font-medium mb-2">{isVi ? "Chưa có hồ sơ y tế" : "No medical records yet"}</Text>
+                    <Text className="text-[14px] text-[#A9ACB4] font-regular">{isVi ? "Các hồ sơ được thêm vào sẽ hiển thị ở đây." : "Records added to PawLife will be shown here."}</Text>
+                  </View>
                 ) : (
                   medicalRecords.map((record, index) => (
                     <MedicalRecordItem
@@ -1268,7 +1400,13 @@ export default function EditPetScreen() {
         </View>
       </Modal>
 
-      {/* --- MEDICAL RECORD MENU MODAL --- */}
+      {/* --- MEDICAL RECORD MENU MODAL ---
+          🚀 ĐỒNG BỘ UI: Cấu trúc menu GIỐNG HỆT pet-profile-detail:
+          1. Xem hồ sơ (luôn hiện)
+          2. Báo cáo (chỉ khi VERIFIED)
+          3. Sửa hồ sơ + Xóa (chỉ khi PENDING)
+          4. Chú thích tranh chấp (chỉ khi DISPUTED) — thay cho text inline dưới card cũ
+      */}
       <Modal
         visible={showMedicalRecordMenu}
         animationType="fade"
@@ -1298,29 +1436,36 @@ export default function EditPetScreen() {
               shadowRadius: 10
             }}
           >
-            {currentMedicalRecordImages.length > 0 && (
-              <>
-                <TouchableOpacity
-                  className="flex-row items-center px-4 py-3"
-                  activeOpacity={0.6}
-                  onPress={() => {
-                    setShowMedicalRecordMenu(false);
-                    setIsImageViewerVisible(true);
-                  }}
-                >
-                  <Text className="text-[14px] text-gray-700 ml-3 font-medium">
-                    {isVi ? 'Xem hồ sơ' : 'View record'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
+            {/* 1. Xem hồ sơ — luôn hiện, dùng chung cho record pending và verified */}
+            <TouchableOpacity
+              className="flex-row items-center px-4 py-3"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowMedicalRecordMenu(false);
+                const record = selectedMedicalRecordIndex !== null ? medicalRecords[selectedMedicalRecordIndex] : null;
+                if (record) {
+                  setViewingMedicalRecord(record);
+                  setShowViewMedicalModal(true);
+                }
+              }}
+            >
+              <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                {isVi ? 'Xem hồ sơ' : 'View record'}
+              </Text>
+            </TouchableOpacity>
 
-            {!selectedMedicalRecordIsPending && (
+            {/* 2. Record đã VERIFIED -> chỉ cho Báo cáo */}
+            {selectedMedicalRecordIsVerified && (
               <TouchableOpacity
                 className="flex-row items-center px-4 py-3 border-t border-gray-50"
                 activeOpacity={0.6}
                 onPress={() => {
-                  // TODO: handle report record
+                  setShowMedicalRecordMenu(false);
+                  const record = selectedMedicalRecordIndex !== null ? medicalRecords[selectedMedicalRecordIndex] : null;
+                  if (record) {
+                    setReportingMedicalRecord(record);
+                    setShowReportMedicalRecordModal(true);
+                  }
                 }}
               >
                 <Text className="text-[14px] text-red-600 ml-3 font-medium">
@@ -1329,35 +1474,51 @@ export default function EditPetScreen() {
               </TouchableOpacity>
             )}
 
+            {/* 3. Record đang PENDING -> cho Sửa + Xóa */}
             {selectedMedicalRecordIsPending && (
-              <TouchableOpacity
-                className={`flex-row items-center px-4 py-3 ${currentMedicalRecordImages.length > 0 ? 'border-t border-gray-50' : ''}`}
-                activeOpacity={0.6}
-                onPress={() => {
-                  // TODO: handle edit medical record
-                }}
-              >
-                <Text className="text-[14px] text-gray-700 ml-3 font-medium">
-                  {isVi ? 'Sửa hồ sơ' : 'Edit Record'}
-                </Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  className="flex-row items-center px-4 py-3 border-t border-gray-50"
+                  activeOpacity={0.6}
+                  onPress={() => {
+                    setShowMedicalRecordMenu(false);
+                    const record = selectedMedicalRecordIndex !== null ? medicalRecords[selectedMedicalRecordIndex] : null;
+                    if (record) {
+                      setEditingMedicalRecord(record);
+                      setShowEditMedicalRecordModal(true);
+                    }
+                  }}
+                >
+                  <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                    {isVi ? 'Sửa hồ sơ' : 'Edit Record'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="flex-row items-center px-4 py-3 border-t border-gray-50"
+                  activeOpacity={0.6}
+                  onPress={() => {
+                    const indexToDelete = selectedMedicalRecordIndex;
+                    setShowMedicalRecordMenu(false);
+                    setSelectedMedicalRecordIndex(null);
+                    if (indexToDelete !== null) handleDeleteMedicalRecord(indexToDelete);
+                  }}
+                >
+                  <Text className="text-[14px] text-red-600 ml-3 font-medium">
+                    {isVi ? 'Xóa' : 'Delete'}
+                  </Text>
+                </TouchableOpacity>
+              </>
             )}
 
-            {selectedMedicalRecordIndex !== null && (
-              <TouchableOpacity
-                className="flex-row items-center px-4 py-3 border-t border-gray-50"
-                activeOpacity={0.6}
-                onPress={() => {
-                  const indexToDelete = selectedMedicalRecordIndex;
-                  setShowMedicalRecordMenu(false);
-                  setSelectedMedicalRecordIndex(null);
-                  handleDeleteMedicalRecord(indexToDelete);
-                }}
-              >
-                <Text className="text-[14px] text-red-500 ml-3 font-medium">
-                  {isVi ? 'Xóa' : 'Delete'}
+            {/* 4. Record đang DISPUTED -> chú thích, giống hệt pet-profile-detail */}
+            {selectedMedicalRecordIsDisputed && (
+              <View className="px-4 py-3 border-t border-gray-50">
+                <Text className="text-[12px] text-[#8E8E93] italic leading-[16px]">
+                  {isVi
+                    ? 'Hồ sơ này đang bị báo cáo và chờ quản trị viên xem xét. Bạn không thể chỉnh sửa lúc này.'
+                    : 'This record is reported and under review by admins. You cannot edit it at this time.'}
                 </Text>
-              </TouchableOpacity>
+              </View>
             )}
           </View>
         </TouchableOpacity>
@@ -1445,7 +1606,7 @@ export default function EditPetScreen() {
         </View>
       </Modal>
 
-      {/* Gọi component Modal Medical Record */}
+      {/* Gọi component Modal Medical Record — THÊM hồ sơ mới */}
       <AddMedicalRecordModal
         visible={showMedicalModal}
         onClose={() => setShowMedicalModal(false)}
@@ -1454,6 +1615,53 @@ export default function EditPetScreen() {
           setMedicalRecords(prev => [...prev, record]);
           setShowMedicalModal(false);
         }}
+      />
+
+      {/* 🚀 ĐỒNG BỘ UI: Modal XEM hồ sơ y tế — giống hệt pet-profile-detail */}
+      <AddMedicalRecordModal
+        visible={showViewMedicalModal}
+        mode="view"
+        initialRecord={viewingMedicalRecord}
+        species={(formData.species as 'Dog' | 'Cat') || 'Dog'}
+        onClose={() => {
+          setShowViewMedicalModal(false);
+          setViewingMedicalRecord(null);
+        }}
+        onSubmit={() => { }}
+        onSubmitNextDueOnly={(recordId, payload) => {
+          const idx = medicalRecords.findIndex(r => (recordId ? r.id === recordId : r === viewingMedicalRecord));
+          handleUpdateNextDueOnlyLocal(recordId, idx, payload);
+        }}
+      />
+
+      {/* 🚀 ĐỒNG BỘ UI: Modal SỬA hồ sơ y tế (record đang PENDING) — giống hệt pet-profile-detail */}
+      <AddMedicalRecordModal
+        visible={showEditMedicalRecordModal}
+        mode="edit"
+        initialRecord={editingMedicalRecord}
+        species={(formData.species as 'Dog' | 'Cat') || 'Dog'}
+        onClose={() => {
+          setShowEditMedicalRecordModal(false);
+          setEditingMedicalRecord(null);
+        }}
+        onSubmit={() => { }}
+        onSubmitEdit={(recordId, payload) => {
+          const idx = medicalRecords.findIndex(r => (recordId ? r.id === recordId : r === editingMedicalRecord));
+          handleUpdateMedicalRecordLocal(recordId, idx, payload);
+        }}
+      />
+
+      {/* 🚀 ĐỒNG BỘ UI: Modal BÁO CÁO hồ sơ y tế đã VERIFIED — giống hệt pet-profile-detail */}
+      <ReportIssueModal
+        isVisible={showReportMedicalRecordModal}
+        context="medicalRecord"
+        targetName={reportingMedicalRecord ? getSafeBilingualText(reportingMedicalRecord.recordName, isVi) : undefined}
+        onClose={() => {
+          setShowReportMedicalRecordModal(false);
+          setReportingMedicalRecord(null);
+        }}
+        onSubmit={handleReportMedicalRecord}
+        onSuccessModalClose={() => setReportingMedicalRecord(null)}
       />
     </SafeAreaView>
   );

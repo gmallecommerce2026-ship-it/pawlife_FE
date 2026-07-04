@@ -35,6 +35,7 @@ import { petService } from '../services/petService';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAP_WIDTH = Math.round(SCREEN_WIDTH);
 const BACKGROUND_MAP_HEIGHT = SCREEN_HEIGHT;
+const SCAN_PIN_GRADIENT = ['#BB93FF', '#8D5AEE'] as const;
 const MINIMAL_MAP_STYLE = [
   {
     "featureType": "poi", // Ẩn các điểm đánh dấu (Points of Interest)
@@ -83,13 +84,15 @@ interface ActivityProp {
 // TimelineItem
 // ─────────────────────────────────────────────
 const TimelineItem = ({
-  item, isLast, onLocationPress, onContactPress, onReportPress,
+  item, isLast, isHighlighted, onLocationPress, onContactPress, onReportPress, onTitlePress,
 }: {
   item: ActivityProp;
   isLast: boolean;
+  isHighlighted?: boolean;
   onLocationPress?: (item: ActivityProp) => void;
   onContactPress?: (item: ActivityProp) => void;
   onReportPress?: (item: ActivityProp) => void;
+  onTitlePress?: (item: ActivityProp) => void;   // ← THÊM DÒNG NÀY
 }) => {
   const handleCallPress = () => {
     if (onContactPress && item.contactPhone) {
@@ -137,7 +140,20 @@ const TimelineItem = ({
   };
 
   return (
-    <View className="flex-row">
+    <View
+      className="flex-row"
+      style={
+        isHighlighted
+          ? {
+            backgroundColor: '#FFF4E8',
+            borderRadius: 12,
+            marginHorizontal: -8,
+            paddingHorizontal: 8,
+            paddingTop: 4,
+          }
+          : undefined
+      }
+    >
       <View className="items-center mr-4 relative">
         <View className="w-6 h-6 rounded-full bg-white items-center justify-center z-10">
           {renderIcon()}
@@ -148,9 +164,19 @@ const TimelineItem = ({
       </View>
       <View className="flex-1 pb-6">
         <View className="flex-row justify-between items-center mb-1 h-6">
-          <Text className="text-black text-[14px] font-medium flex-1 pr-2 leading-5" numberOfLines={1}>
-            {item.title}
-          </Text>
+          <TouchableOpacity
+            className="flex-1 pr-2"
+            activeOpacity={onTitlePress ? 0.6 : 1}
+            onPress={() => onTitlePress && onTitlePress(item)}
+            disabled={!onTitlePress}
+          >
+            <Text
+              className={`text-black text-[14px] ${isHighlighted ? 'font-bold' : 'font-medium'} leading-5`}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Text>
+          </TouchableOpacity>
           <View className="flex-row items-center">
             <Text className="text-[#8E8E93] font-regular text-[12px] tracking-[0.06px] mr-1">
               {item.time}
@@ -314,12 +340,14 @@ interface MapPinProps {
 // ─────────────────────────────────────────────
 const PinIcon = React.memo(({
   id, coordinate, iconName, pinColor, hasRadius = false,
+  gradientColors, // ← THÊM
   onPress, onZoomRequest, isZoomedIn,
 }: {
   id: string;
   coordinate: { latitude: number; longitude: number };
   iconName: string;
   pinColor: string;
+  gradientColors?: readonly [string, string]; // ← THÊM
   hasRadius?: boolean;
   isZoomedIn: boolean;
   onPress?: () => void;
@@ -341,35 +369,38 @@ const PinIcon = React.memo(({
     }
   };
 
-  // Tinh chỉnh Anchor: 
-  // - 0.5 là tâm toán học. 
-  // - Nâng nhẹ lên 0.53 (hoặc 0.55) sẽ kéo Pin nhích lên trên một chút để bù trừ ảo giác quang học
   const anchorY = hasRadius ? 0.53 : 0.5;
 
   return (
     <Marker
       coordinate={coordinate}
       tracksViewChanges={tracks}
-      anchor={{ x: 0.5, y: anchorY }} // 0.5 hoặc 0.53 để nhấc nhẹ lên như mình đề cập ở trên
+      anchor={{ x: 0.5, y: anchorY }}
       onPress={handlePress}
       zIndex={1000}
     >
-
       <View
         collapsable={false}
-        style={{
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 60,
-          height: 60
-        }}
+        style={{ alignItems: 'center', justifyContent: 'center', width: 60, height: 60 }}
       >
-        <View
-          style={{ borderColor: pinColor, borderWidth: 2.5 }}
-          className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm"
-        >
-          <Ionicons name={iconName as any} size={20} color={pinColor} />
-        </View>
+        {gradientColors ? (
+          <LinearGradient
+            colors={gradientColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            className="w-11 h-11 rounded-full items-center justify-center shadow-sm"
+            style={{ borderWidth: 2.5, borderColor: '#FFFFFF' }}
+          >
+            <Ionicons name={iconName as any} size={20} color="#FFFFFF" />
+          </LinearGradient>
+        ) : (
+          <View
+            style={{ borderColor: pinColor, borderWidth: 2.5 }}
+            className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm"
+          >
+            <Ionicons name={iconName as any} size={20} color={pinColor} />
+          </View>
+        )}
       </View>
     </Marker>
   );
@@ -379,9 +410,13 @@ const PinIcon = React.memo(({
   prev.pinColor === next.pinColor &&
   prev.iconName === next.iconName &&
   prev.isZoomedIn === next.isZoomedIn &&
+  prev.gradientColors?.[0] === next.gradientColors?.[0] &&
+  prev.gradientColors?.[1] === next.gradientColors?.[1] &&
   prev.coordinate.latitude === next.coordinate.latitude &&
   prev.coordinate.longitude === next.coordinate.longitude
 );
+
+
 
 // ─────────────────────────────────────────────
 //  PinBadge — card thông tin, chỉ MOUNT khi isZoomedIn && isFocused
@@ -409,28 +444,41 @@ const PinBadge = React.memo(({
     <Marker
       coordinate={coordinate}
       tracksViewChanges={tracks}
-      anchor={{ x: 0.5, y: 1 }} // Canh gốc vào đáy thẻ view
+      anchor={{ x: 0.5, y: 1 }}
       zIndex={9999}
       onPress={onPress}
     >
       <View collapsable={false} style={{ alignItems: 'center', width: 260, paddingBottom: 28, paddingTop: 16, paddingHorizontal: 16 }}>
         <View
-          style={{ maxWidth: 220 }} // Đã có vùng đệm 16px hai bên nên giảm max-width một chút để cân đối
-          className="bg-white px-3 py-1.5 rounded-lg shadow-md items-center relative"
+          style={{ maxWidth: 220 }}
+          className="bg-white pl-3 pr-1 py-1.5 rounded-lg shadow-md items-start"
         >
-          <View
-            style={{
-              position: 'absolute',
-              top: -6, right: -6,
-              width: 11, height: 11, borderRadius: 5.5,
-              backgroundColor: '#E89B5A', borderWidth: 1.5, borderColor: 'white',
-              zIndex: 10, opacity: isRead ? 0 : 1,
-            }}
-          />
-          <Text className="text-black text-[13px] font-medium tracking-[0.06px] text-center" allowFontScaling={false}>
-            {titleText}
-          </Text>
-          <Text className="text-[#8E8E93] text-[11px] font-regular tracking-[0.06px] text-center" allowFontScaling={false}>
+          {/* Dòng tiêu đề + chấm tròn nằm cùng hàng, cách nhau đúng 5px */}
+          <View className="flex-row items-start">
+            <Text
+              className="text-black text-[14px] font-regular tracking-[0.06px] text-left"
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={{ flexShrink: 1 }}
+            >
+              {titleText}
+            </Text>
+            <View
+              style={{
+                width: 13,
+                height: 13,
+                borderRadius: 100,
+                backgroundColor: '#BB93FF',
+                marginLeft: 5,         // ← khoảng cách 5px cố định với chữ cuối
+                marginTop: -10,
+                borderWidth: 2,
+                borderColor: "white",
+                opacity: isRead ? 0 : 1,
+              }}
+            />
+          </View>
+
+          <Text className="text-[#8E8E93] text-[12px] font-regular tracking-[0.06px] text-left" allowFontScaling={false}>
             {timeAgo}
           </Text>
         </View>
@@ -496,9 +544,21 @@ export default function TagReportDetailScreen() {
   );
 
   const [focusedPinId, setFocusedPinId] = useState<string | null>(null);
+  const focusedPinIdRef = useRef<string | null>(null);
   const [mapHeading, setMapHeading] = useState(0);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [reportTarget, setReportTarget] = useState<ActivityProp | null>(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const scrollViewRef = useRef<any>(null);
+  const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAutoScrollKeyRef = useRef<string | null>(null);
+
+  // Lưu layout (vị trí) của container timeline và từng item, để tính scroll offset
+  const timelineLayoutRef = useRef<{
+    containerY: number;
+    items: Record<string, { y: number; height: number }>;
+  }>({ containerY: 0, items: {} });
 
   const handleReportSubmit = async (
     reason: string,
@@ -507,19 +567,59 @@ export default function TagReportDetailScreen() {
     isBlockRequested: boolean
   ) => {
     if (!reportTarget) return;
-    await axiosClient.post('/interactions/report-tag-report', {
-      tagReportId: reportTarget.id,
-      reason,
-      details,
-      isHideRequested,
-      isBlockRequested,
-    });
-    if (isHideRequested) {
-      setHiddenIds((prev) => [...prev, reportTarget.id]);
+    try {
+      await axiosClient.post('/tags/report-feedback', {
+        tagReportId: reportTarget.id,
+        reason,
+        details,
+        isHideRequested,
+        isBlockRequested,
+      });
+
+      if (isBlockRequested) {
+        // Block → BE đã ẩn toàn bộ scan của user đó
+        // Cần refetch để lấy scanHistory đã được lọc mới nhất
+        await refetchReportData();
+      } else if (isHideRequested) {
+        // Chỉ hide 1 item → local state là đủ, không cần network round-trip
+        setHiddenIds((prev) => [...prev, reportTarget.id]);
+      }
+    } catch (err) {
+      console.error('Report submit error:', err);
+      Alert.alert(
+        'Error',
+        isVi
+          ? 'Không thể gửi báo cáo. Vui lòng thử lại.'
+          : 'Could not submit report. Please try again.'
+      );
+    } finally {
+      setReportTarget(null);
     }
   };
+  const fetchReportDetail = useCallback(async () => {
+    try {
+      if (!reportId) return;
+      const res = await axiosClient.get(`/tags/reports/${reportId}`);
+      setReportData(res.data);
+    } catch (error) {
+      console.error('Error loading report details:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [reportId]);
 
-
+  // Hàm refetch không show loading spinner (dùng sau block/hide)
+  const refetchReportData = useCallback(async () => {
+    try {
+      if (!reportId) return;
+      const res = await axiosClient.get(`/tags/reports/${reportId}`);
+      setReportData(res.data);
+      // Reset hiddenIds vì data từ server đã clean
+      setHiddenIds([]);
+    } catch (error) {
+      console.error('Error refetching report details:', error);
+    }
+  }, [reportId]);
 
   const handleReportPress = (item: ActivityProp) => {
     setReportTarget(item);
@@ -548,7 +648,13 @@ export default function TagReportDetailScreen() {
   useEffect(() => {
     return () => {
       if (headingPollRef.current) clearInterval(headingPollRef.current);
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
     };
+  }, []);
+
+  const setFocusedPin = useCallback((pinId: string | null) => {
+    focusedPinIdRef.current = pinId;   // cập nhật NGAY LẬP TỨC, không delay
+    setFocusedPinId(pinId);            // vẫn cập nhật state để re-render UI (badge, style pin...)
   }, []);
 
 
@@ -601,6 +707,40 @@ export default function TagReportDetailScreen() {
   const REQUIRED_TOP_INSET = insets.top + 44 + 21;
   const animatedPosition = useSharedValue(SCREEN_HEIGHT);
   const scrollY = useSharedValue(0);
+  const scrollAndHighlightTimelineItem = useCallback(
+    (activityId: string, delay = 400) => {
+      setHighlightedActivityId(activityId);
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedActivityId(null);
+      }, 2500);
+
+      setTimeout(() => {
+        const { containerY, items } = timelineLayoutRef.current;
+        const itemLayout = items[activityId];
+        if (!scrollViewRef.current || !itemLayout) return;
+
+        const viewportHeight = SCREEN_HEIGHT - REQUIRED_TOP_INSET - insets.bottom;
+        const itemAbsoluteY = containerY + itemLayout.y;
+        const targetY = Math.max(
+          0,
+          itemAbsoluteY - viewportHeight / 2 + itemLayout.height / 2
+        );
+
+        scrollViewRef.current.scrollTo({ y: targetY, animated: true });
+      }, delay);
+    },
+    [insets.bottom, REQUIRED_TOP_INSET]
+  );
+
+  // Dùng khi BẤM PIN: mở sheet to + scroll + highlight
+  const scrollToTimelineItem = useCallback(
+    (activityId: string) => {
+      bottomSheetRef.current?.snapToIndex(2);
+      scrollAndHighlightTimelineItem(activityId, 400);
+    },
+    [scrollAndHighlightTimelineItem]
+  );
 
   const headerAnimatedStyle = useAnimatedStyle(() => {
     const isScrolled = scrollY.value > 10;
@@ -645,20 +785,12 @@ export default function TagReportDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const fetchReportDetail = async () => {
-        try {
-          if (!reportId) return;
-          const res = await axiosClient.get(`/tags/reports/${reportId}`);
-          setReportData(res.data);
-        } catch (error) {
-          console.error('Error loading report details:', error);
-        } finally {
-          setLoading(false);
-        }
-      };
       fetchReportDetail();
-    }, [reportId])
+    }, [fetchReportDetail])
   );
+
+
+
 
   const handleMarkAsFound = () => {
     const petId = reportData?.tag?.pet?.id;
@@ -741,7 +873,7 @@ export default function TagReportDetailScreen() {
   });
 
   const activeScansForMap: any[] = [];
-  if (!isPointZeroReport && reportData) {
+  if (!isPointZeroReport && reportData && !reportData.isHidden) {
     activeScansForMap.push({
       id: reportData.id,
       type: 'SCAN',
@@ -784,34 +916,80 @@ export default function TagReportDetailScreen() {
   }, [lostLat, lostLng]);
 
   const processedScans = useMemo(() => {
+    const activeScans: any[] = [];
+
+    // 1. Lọc Pin chính (Bỏ qua nếu nằm trong hiddenIds)
+    if (!isPointZeroReport && reportData && !reportData.isHidden && !hiddenIds.includes(reportData.id)) {
+      activeScans.push({
+        id: reportData.id,
+        type: 'SCAN',
+        latitude: lat,
+        longitude: lng,
+        radius: getRadius(reportData),
+        scannedBy: reportData.scannedBy || 'Anonymous',
+        message: reportData.message || 'Found your pet in this area!',
+        phoneNumber: reportData.phoneNumber || '',
+        scannedAt: reportData.scannedAt || reportData.createdAt,
+        images: reportData.images,
+      });
+    }
+
+    // 2. Lọc Pin lịch sử quét (Bỏ qua nếu nằm trong hiddenIds)
+    filteredScanHistory.forEach((hist: any) => {
+      const histLat = parseFloat(hist.latitude || hist.lat || '0');
+      const histLng = parseFloat(hist.longitude || hist.lng || '0');
+
+      if (!checkIsPointZero(hist, histLat, histLng) && !hiddenIds.includes(hist.id)) {
+        activeScans.push({
+          id: hist.id,
+          type: 'SCAN',
+          latitude: histLat,
+          longitude: histLng,
+          scannedBy: hist.scannedBy || 'Anonymous',
+          message: hist.message || 'Found your pet in this area!',
+          phoneNumber: hist.phoneNumber || '',
+          scannedAt: hist.scannedAt || hist.createdAt,
+          radius: normalizeRadius(hist.radius),
+          images: hist.images,
+          isEstimated: hist.isEstimated,
+        });
+      }
+    });
+
+    // 3. Xử lý chống đè tọa độ (Logic tản Marker cũ của bạn)
     const result: any[] = [];
-    [...activeScansForMap]
+    activeScans
       .sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime())
       .forEach((scan) => {
         let displayLat = parseFloat(scan.latitude) || 0;
         let displayLng = parseFloat(scan.longitude) || 0;
         const r = parseFloat(scan.radius) || 0;
         let overlapIndex = 0;
+
         if (fakeLostPos &&
           Math.abs(displayLat - fakeLostPos.lat) < 0.00015 &&
           Math.abs(displayLng - fakeLostPos.lng) < 0.00015) {
           overlapIndex++;
         }
+
         result.forEach((p) => {
           if (Math.abs(displayLat - p.displayLat) < 0.00015 &&
             Math.abs(displayLng - p.displayLng) < 0.00015) {
             overlapIndex++;
           }
         });
+
         if (overlapIndex > 0) {
           const angle = overlapIndex * (Math.PI / 4);
           const cr = 0.0003 + (Math.floor(overlapIndex / 8) * 0.00015);
           displayLat += Math.cos(angle) * cr;
           displayLng += Math.sin(angle) * cr;
         }
+
         const isEstimated = scan.id === reportData?.id
           ? !reportData?.isExactLocation
           : (scan.isEstimated ?? true);
+
         result.push({
           ...scan,
           originalLat: parseFloat(scan.latitude) || 0,
@@ -822,8 +1000,17 @@ export default function TagReportDetailScreen() {
           isEstimated,
         });
       });
+
     return result;
-  }, [activeScansForMap, fakeLostPos, reportData]);
+  }, [
+    reportData,
+    filteredScanHistory,
+    fakeLostPos,
+    isPointZeroReport,
+    lat,
+    lng,
+    hiddenIds // <-- ĐIỂM MẤU CHỐT: Lắng nghe sự thay đổi của hiddenIds
+  ]);
 
   const [addressMap, setAddressMap] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -868,13 +1055,10 @@ export default function TagReportDetailScreen() {
     const newLngDelta = isZoomIn
       ? currentRegion.longitudeDelta / ZOOM_FACTOR
       : currentRegion.longitudeDelta * ZOOM_FACTOR;
-    const currentScan = processedScans.find((s) => s.id === reportId);
-    let baseLat = currentScan ? currentScan.displayLat : lat;
-    let baseLng = currentScan ? currentScan.displayLng : lng;
-    if (openFrom === 'profile' && fakeLostPos) {
-      baseLat = fakeLostPos.lat;
-      baseLng = fakeLostPos.lng;
-    }
+
+    // Dùng đúng pin đang focus (ref-based, luôn mới nhất) làm tâm zoom
+    const { latitude: baseLat, longitude: baseLng } = getFocusedCoordinate();
+
     const latOffset = newLatDelta * 0.25;
     const newRegion = {
       latitude: baseLat - latOffset,
@@ -885,7 +1069,46 @@ export default function TagReportDetailScreen() {
     mapRef.current?.animateToRegion(newRegion, 300);
     setCurrentRegion(newRegion);
   };
+  const getInitialPinId = useCallback(() => {
+    // Trường hợp mở từ trang profile -> focus vào pin "lost"
+    if (openFrom === 'profile' && fakeLostPos) return 'lost-pin';
 
+    // Trường hợp thông thường (mở từ notification/deep link) -> focus đúng pin của reportId
+    const currentScan = processedScans.find((s) => s.id === reportId);
+    if (currentScan) return currentScan.id;
+
+    // Fallback cuối: nếu không tìm thấy scan nào khớp reportId, focus pin lost nếu có
+    if (fakeLostPos) return 'lost-pin';
+
+    return null;
+  }, [openFrom, fakeLostPos, processedScans, reportId]);
+  const getFocusedCoordinate = useCallback(() => {
+    const currentFocusedId = focusedPinIdRef.current;   // ← đổi từ focusedPinId sang ref
+
+    if (currentFocusedId === 'lost-pin' && fakeLostPos) {
+      return { latitude: fakeLostPos.lat, longitude: fakeLostPos.lng };
+    }
+    if (currentFocusedId) {
+      const focusedScan = processedScans.find((s) => s.id === currentFocusedId);
+      if (focusedScan) {
+        return { latitude: focusedScan.displayLat, longitude: focusedScan.displayLng };
+      }
+    }
+    const currentScan = processedScans.find((s) => s.id === reportId);
+    if (openFrom === 'profile' && fakeLostPos) {
+      return { latitude: fakeLostPos.lat, longitude: fakeLostPos.lng };
+    }
+    if (currentScan) {
+      return { latitude: currentScan.displayLat, longitude: currentScan.displayLng };
+    }
+    return { latitude: lat, longitude: lng };
+  }, [fakeLostPos, processedScans, reportId, openFrom, lat, lng]);
+  const getActivityIdFromFocusedPin = useCallback(() => {
+    const currentFocusedId = focusedPinIdRef.current;   // ← đổi từ focusedPinId sang ref
+    if (!currentFocusedId) return null;
+    if (currentFocusedId === 'lost-pin') return 'report-lost-origin';
+    return currentFocusedId;
+  }, []);
   const handleSheetChanges = useCallback(
     (index: number) => {
       if (!mapRef.current) return;
@@ -893,58 +1116,77 @@ export default function TagReportDetailScreen() {
       if (index === 1) bottomPadding = SCREEN_HEIGHT / 2;
       if (index === 2) bottomPadding = SCREEN_HEIGHT - REQUIRED_TOP_INSET;
 
-      const currentScan = processedScans.find((s) => s.id === reportId);
-      const targetLat = openFrom === 'profile' && fakeLostPos
-        ? fakeLostPos.lat
-        : currentScan ? currentScan.displayLat : lat;
-      const targetLng = openFrom === 'profile' && fakeLostPos
-        ? fakeLostPos.lng
-        : currentScan ? currentScan.displayLng : lng;
+      const { latitude: targetLat, longitude: targetLng } = getFocusedCoordinate();
+      const latDelta = currentRegion.latitudeDelta || 0.025;
+      const lngDelta = currentRegion.longitudeDelta || 0.025;
 
       if (index === 1) {
-        const latDelta = 0.025;
         const latOffset = latDelta * (bottomPadding / SCREEN_HEIGHT) * 0.6;
         mapRef.current.animateToRegion(
-          { latitude: targetLat - latOffset, longitude: targetLng, latitudeDelta: latDelta, longitudeDelta: latDelta },
+          { latitude: targetLat - latOffset, longitude: targetLng, latitudeDelta: latDelta, longitudeDelta: lngDelta },
+          400
+        );
+      } else if (index === 2) {
+        const latOffset = latDelta * (bottomPadding / SCREEN_HEIGHT) * 0.45;
+        mapRef.current.animateToRegion(
+          { latitude: targetLat - latOffset, longitude: targetLng, latitudeDelta: latDelta, longitudeDelta: lngDelta },
           400
         );
       } else if (index === 0) {
-        if (processedScans.length > 0 && lostLat && lostLng) {
-          const coords = [{ latitude: fakeLostPos?.lat || lostLat, longitude: fakeLostPos?.lng || lostLng }];
-          processedScans.forEach((s) => coords.push({ latitude: s.displayLat, longitude: s.displayLng }));
-          mapRef.current.fitToCoordinates(coords, {
-            edgePadding: { top: 120, right: 60, bottom: bottomPadding + 40, left: 60 },
-            animated: true,
-          });
-        } else if (lostLat && lostLng) {
-          mapRef.current.animateToRegion(
-            { latitude: fakeLostPos?.lat || lostLat, longitude: fakeLostPos?.lng || lostLng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-            400
-          );
-        }
-      } else if (index === 2) {
-        const latDelta = 0.025;
-        const latOffset = latDelta * (bottomPadding / SCREEN_HEIGHT) * 0.45;
+        const latOffset = latDelta * (bottomPadding / SCREEN_HEIGHT) * 0.3;
         mapRef.current.animateToRegion(
-          { latitude: targetLat - latOffset, longitude: targetLng, latitudeDelta: latDelta, longitudeDelta: latDelta },
+          { latitude: targetLat - latOffset, longitude: targetLng, latitudeDelta: latDelta, longitudeDelta: lngDelta },
           400
         );
       }
+
+      // ─── MỚI: nếu sheet đang ở trạng thái mở rộng (index 1 hoặc 2)
+      // và có pin đang focus → tự scroll + highlight item tương ứng
+      if (index === 1 || index === 2) {
+        const activityId = getActivityIdFromFocusedPin();
+        if (activityId) {
+          const key = `${activityId}-${index}`;
+          if (lastAutoScrollKeyRef.current !== key) {
+            lastAutoScrollKeyRef.current = key;
+            scrollAndHighlightTimelineItem(activityId, 350);
+          }
+        }
+      } else {
+        // Sheet thu nhỏ lại -> reset để lần mở tiếp theo vẫn trigger được
+        lastAutoScrollKeyRef.current = null;
+      }
     },
-    [processedScans, reportId, lat, lng, openFrom, fakeLostPos, headerHeight, insets.bottom, lostLat, lostLng, REQUIRED_TOP_INSET]
+    [
+      getFocusedCoordinate,
+      getActivityIdFromFocusedPin,
+      scrollAndHighlightTimelineItem,
+      headerHeight,
+      insets.bottom,
+      currentRegion.latitudeDelta,
+      currentRegion.longitudeDelta,
+      REQUIRED_TOP_INSET,
+    ]
   );
+
+
 
   const hasInitializedMap = useRef(false);
   useEffect(() => {
     if (!reportData || hasInitializedMap.current) return;
     if (mapRef.current) {
       const timer = setTimeout(() => {
-        handleSheetChanges(1);
+        const initialPinId = getInitialPinId();
+        if (initialPinId) {
+          setFocusedPin(initialPinId);     // set NGAY (ref + state) trước khi mở sheet
+          markPinAsRead(initialPinId);
+        }
+        handleSheetChanges(1);             // giờ sẽ đọc đúng initialPinId vừa set
         hasInitializedMap.current = true;
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [reportData]);
+  }, [reportData, getInitialPinId, setFocusedPin, markPinAsRead, handleSheetChanges]);
+
 
   // Tính toán derived booleans tại parent — KHÔNG truyền currentRegion xuống Marker
   const isZoomedIn = currentRegion.longitudeDelta < ZOOM_THRESHOLD;
@@ -988,6 +1230,26 @@ export default function TagReportDetailScreen() {
     transform: [{ translateY: animatedPosition.value - 38 }],
     opacity: withTiming(isFocusingEstimatedPin ? 1 : 0, { duration: 300 }),
   }));
+  const handleTimelineTitlePress = useCallback(
+    (item: ActivityProp) => {
+      const pinId = item.id === 'report-lost-origin' ? 'lost-pin' : item.id;
+
+      let coordinate: { latitude: number; longitude: number } | null = null;
+      if (pinId === 'lost-pin' && fakeLostPos) {
+        coordinate = { latitude: fakeLostPos.lat, longitude: fakeLostPos.lng };
+      } else if (item.routeData) {
+        coordinate = { latitude: item.routeData.displayLat, longitude: item.routeData.displayLng };
+      }
+      if (!coordinate) return;
+
+      markPinAsRead(pinId);
+      setFocusedPin(pinId);   // ← đổi: ref được cập nhật NGAY, handleSheetChanges sẽ đọc đúng dù chạy trước re-render
+      bottomSheetRef.current?.snapToIndex(0);
+      handleZoomToPin(coordinate);
+    },
+    [fakeLostPos, markPinAsRead, handleZoomToPin, setFocusedPin]
+  );
+
 
   // Early returns — sau tất cả hooks
   if (loading) {
@@ -1004,6 +1266,7 @@ export default function TagReportDetailScreen() {
       </View>
     );
   }
+
 
 
   const handleShareLocation = () => {
@@ -1260,13 +1523,14 @@ export default function TagReportDetailScreen() {
                   iconName="alert-outline"
                   pinColor="#DA5A5A"
                   onZoomRequest={(coord) => {
-                    setFocusedPinId('lost-pin');
+                    setFocusedPin('lost-pin');
                     handleZoomToPin(coord);
                   }}
                   onPress={() => {
                     markPinAsRead('lost-pin');
-                    setFocusedPinId('lost-pin');
-                    handleLostPinPress();
+                    setFocusedPin('lost-pin');
+                    lastAutoScrollKeyRef.current = 'report-lost-origin-2';
+                    scrollToTimelineItem('report-lost-origin');
                   }}
                 />
                 {isZoomedIn && lostIsFocused && (
@@ -1301,35 +1565,37 @@ export default function TagReportDetailScreen() {
             return (
               <React.Fragment key={`pin-${scanPoint.id}`}>
                 <PinIcon
-                  id={scanPoint.id}
-                  coordinate={pinCoordinate}
-                  hasRadius={hasRadius}
-                  isZoomedIn={isZoomedIn}
-                  iconName="scan-outline"
-                  pinColor="#FFC28F"
-                  onZoomRequest={(coord) => {
-                    setFocusedPinId(scanPoint.id);
+                    id={scanPoint.id}
+                    coordinate={pinCoordinate}
+                    hasRadius={hasRadius}
+                    isZoomedIn={isZoomedIn}
+                    iconName="scan-outline"
+                    pinColor="#8D5AEE"
+                    onZoomRequest={(coord) => {
+                    setFocusedPin(scanPoint.id);
                     handleZoomToPin(coord);
                   }}
                   onPress={() => {
                     markPinAsRead(scanPoint.id);
-                    setFocusedPinId(scanPoint.id);
-                    router.push({
-                      pathname: '/tag-route-details',
-                      params: {
-                        targetLat: scanPoint.displayLat.toString(),
-                        targetLng: scanPoint.displayLng.toString(),
-                        centerLat: scanPoint.originalLat.toString(),
-                        centerLng: scanPoint.originalLng.toString(),
-                        radius: scanPoint.radius.toString(),
-                        scannerName: scanPoint.scannedBy !== 'Anonymous' ? scanPoint.scannedBy : 'Anonymous',
-                        scannerMessage: scanPoint.message || 'Scanned your pet tag',
-                        scannerPhone: scanPoint.phoneNumber || '',
-                        timeAgo: getTimeAgo(scanPoint.scannedAt, isVi),
-                        pageTitle: 'Scanned Tag',
-                        isEstimated: (scanPoint.isEstimated ?? false).toString(),
-                      },
-                    });
+                    setFocusedPin(scanPoint.id);
+                    lastAutoScrollKeyRef.current = `${scanPoint.id}-2`;
+                    scrollToTimelineItem(scanPoint.id);
+                    // router.push({
+                    //   pathname: '/tag-route-details',
+                    //   params: {
+                    //     targetLat: scanPoint.displayLat.toString(),
+                    //     targetLng: scanPoint.displayLng.toString(),
+                    //     centerLat: scanPoint.originalLat.toString(),
+                    //     centerLng: scanPoint.originalLng.toString(),
+                    //     radius: scanPoint.radius.toString(),
+                    //     scannerName: scanPoint.scannedBy !== 'Anonymous' ? scanPoint.scannedBy : 'Anonymous',
+                    //     scannerMessage: scanPoint.message || 'Scanned your pet tag',
+                    //     scannerPhone: scanPoint.phoneNumber || '',
+                    //     timeAgo: getTimeAgo(scanPoint.scannedAt, isVi),
+                    //     pageTitle: 'Scanned Tag',
+                    //     isEstimated: (scanPoint.isEstimated ?? false).toString(),
+                    //   },
+                    // });
                   }}
                 />
                 {isZoomedIn && isFocused && (
@@ -1398,6 +1664,7 @@ export default function TagReportDetailScreen() {
 
       {/* Bottom Sheet */}
       <BottomSheet
+        ref={bottomSheetRef}
         index={1}
         snapPoints={snapPoints}
         onChange={handleSheetChanges}
@@ -1477,6 +1744,7 @@ export default function TagReportDetailScreen() {
         </BottomSheetView>
 
         <BottomSheetScrollView
+          ref={scrollViewRef}
           onScroll={handleScroll}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 20, paddingHorizontal: 24, paddingTop: 110 }}
@@ -1520,16 +1788,32 @@ export default function TagReportDetailScreen() {
           </View>
 
           <Text className="text-[14px] font-semibold text-black mb-4 mt-2">Scan Activity</Text>
-          <View className="ml-1 mb-6">
+          <View
+            className="ml-1 mb-6"
+            onLayout={(e) => {
+              timelineLayoutRef.current.containerY = e.nativeEvent.layout.y;
+            }}
+          >
             {visibleActivities.map((activity, index, array) => (
-              <TimelineItem
+              <View
                 key={activity.id}
-                item={activity}
-                isLast={index === array.length - 1}
-                onLocationPress={handleTimelineLocationPress}
-                onContactPress={handleTimelineContactPress}
-                onReportPress={handleReportPress}
-              />
+                onLayout={(e) => {
+                  timelineLayoutRef.current.items[activity.id] = {
+                    y: e.nativeEvent.layout.y,
+                    height: e.nativeEvent.layout.height,
+                  };
+                }}
+              >
+                <TimelineItem
+                  item={activity}
+                  isLast={index === array.length - 1}
+                  isHighlighted={highlightedActivityId === activity.id}
+                  onLocationPress={handleTimelineLocationPress}
+                  onContactPress={handleTimelineContactPress}
+                  onReportPress={handleReportPress}
+                  onTitlePress={handleTimelineTitlePress}
+                />
+              </View>
             ))}
           </View>
         </BottomSheetScrollView>

@@ -79,17 +79,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    if (socket && socket.connected) {
-      socket.disconnect();
+    // 1. Dọn dẹp Socket triệt để
+    if (socket) {
+      // Xóa toàn bộ các sự kiện đang lắng nghe trước khi ngắt kết nối để tránh rò rỉ bộ nhớ
+      socket.removeAllListeners();
+      if (socket.connected) {
+        socket.disconnect();
+      }
     }
 
-    // ĐÃ FIX: Đồng nhất key xóa và xóa cả userData
+    // 2. Xóa đồng bộ ở TẤT CẢ các storage
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('userData');
+    // Thêm dòng này vì trong updateUser bạn có dùng AsyncStorage
+    await AsyncStorage.removeItem('user_data');
 
+    // 3. Xóa thông tin auth trên axios
     delete axiosClient.defaults.headers.common['Authorization'];
 
-    // ĐÃ FIX: Xóa user state trực tiếp thay vì gọi setAuth("", null)
+    // 4. Reset User State
     setUser(null);
   };
 

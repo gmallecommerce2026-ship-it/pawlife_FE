@@ -20,7 +20,7 @@ export const shelterService = {
       throw error.response?.data || { message: error.message };
     }
   },
-  
+
   // 2. Thêm userId vào hàm Detail
   getShelterDetail: async (shelterId: string, userId?: string, petSearch?: string) => {
     try {
@@ -32,7 +32,24 @@ export const shelterService = {
       throw error.response?.data || { message: error.message };
     }
   },
-
+  blockShelter: async (shelterId: string) => {
+    try {
+      const response = await axiosClient.post(`/shelters/${shelterId}/block`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Lỗi khi chặn trạm cứu hộ:', error);
+      throw error.response?.data || { message: error.message };
+    }
+  },
+  reportShelter: async (shelterId: string, reportData: { reason: string, detail: string }) => {
+    try {
+      const response = await axiosClient.post(`/shelters/${shelterId}/report`, reportData);
+      return response.data;
+    } catch (error: any) {
+      console.error('Lỗi khi gửi báo cáo:', error);
+      throw error.response?.data || { message: error.message };
+    }
+  },
   getFollowedShelters: async () => {
     try {
       // Đảm bảo route này khớp với Backend API sắp tạo

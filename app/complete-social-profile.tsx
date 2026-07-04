@@ -270,8 +270,8 @@ export default function CompleteSocialProfileScreen() {
 
               {/* Inputs */}
               <InputField
-                label="Your Name"
-                placeholder="Enter your name"
+                label={isVi ? "Tên" :"Your Name"}
+                placeholder={isVi ? "Nhập tên của bạn" : "Enter your name"}
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
@@ -282,7 +282,7 @@ export default function CompleteSocialProfileScreen() {
                 <View className="flex-1 mr-2">
                   <InputField
                     label="Gender"
-                    placeholder="Select Gender"
+                    placeholder={isVi ? "Chọn giới tính" :"Select Gender"}
                     value={getGenderLabel()}
                     onPress={() => setShowGenderModal(true)}
                     containerStyle=""
@@ -291,8 +291,8 @@ export default function CompleteSocialProfileScreen() {
 
                 <View className="flex-1 ml-2" ref={dobRef} collapsable={false}>
                   <InputField
-                    label="Date of Birth"
-                    placeholder="Select DOB"
+                    label={isVi ? "Ngày sinh" : "Date of Birth"}
+                    placeholder={isVi ? "Chọn ngày" : "Select DOB"}
                     value={hasSelectedDate ? dob.toLocaleDateString('en-GB') : ''}
                     onPress={() => Platform.OS === 'ios' ? openDropdownPicker('dob') : setShowPicker(true)}
                     containerStyle=""
@@ -314,7 +314,7 @@ export default function CompleteSocialProfileScreen() {
                   <View className="flex-1">
                     <View className="flex-row items-center bg-[#FAFAFA] px-5 py-4 rounded-2xl border border-gray-100 h-[56px]">
                       <TextInput
-                        placeholder="Phone Number"
+                        placeholder={isVi ? "Số điện thoại" : "Phone Number"}
                         keyboardType="phone-pad"
                         style={{ fontFamily: "Urbanist" }}
                         value={phone}

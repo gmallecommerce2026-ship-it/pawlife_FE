@@ -359,7 +359,7 @@ export default function FillProfileScreen() {
 
       <InputField
         label="Your Name"
-        placeholder="Your Name"
+        placeholder={isVi ? "Nhập tên của bạn" : "Your Name"}
         value={name}
         onChangeText={(text: string) => { setName(text); setErrors({ ...errors, name: '' }) }}
         autoCapitalize="words"
@@ -371,7 +371,7 @@ export default function FillProfileScreen() {
         <View className="flex-1 mr-2">
           <InputField
             label="Gender"
-            placeholder="Select Gender"
+            placeholder={isVi ? "Chọn giới tính" : "Select Gender"}
             value={gender}
             onPress={() => setShowGenderModal(true)}
             error={errors.gender}
@@ -383,7 +383,7 @@ export default function FillProfileScreen() {
         <View className="flex-1 ml-2" ref={dobRef} collapsable={false}>
           <InputField
             label="Date of Birth"
-            placeholder="Select DOB"
+            placeholder={isVi ? "Chọn ngày" : "Select DOB"}
             value={hasSelectedDate ? dob.toLocaleDateString('en-GB') : ''}
             onPress={() => Platform.OS === 'ios' ? openDropdownPicker('dob') : setShowPicker(true)}
             error={errors.dob}
@@ -406,7 +406,7 @@ export default function FillProfileScreen() {
           <View className="flex-1">
             <View className={`flex-row items-center bg-white px-5 py-4 rounded-2xl border ${errors.phone ? 'border-red-500' : 'border-gray-100'} h-[56px]`}>
               <TextInput
-                placeholder="Phone Number"
+                placeholder={isVi ? "Số điện thoại" : "Phone Number"}
                 keyboardType="phone-pad"
                 style={{ fontFamily: "Urbanist" }}
                 value={phone}

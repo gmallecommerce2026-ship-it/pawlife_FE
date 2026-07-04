@@ -429,6 +429,7 @@ function RootLayoutNav() {
       <Stack.Screen name="application-success" options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
       <Stack.Screen name="search" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="event-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <Stack.Screen name="ingredient-check" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="organizer-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="filter-modal" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />

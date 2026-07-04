@@ -2,15 +2,14 @@
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalizedData } from '@/hooks/useLocalizedData';
-import { resolvePawHistoryItem } from '@/utils/pawHistory';
-import { Feather, FontAwesome5 } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, LayoutAnimation, Platform, TouchableOpacity, UIManager, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Image, ImageSourcePropType, LayoutAnimation, Modal, Platform, TouchableOpacity, UIManager, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -18,8 +17,135 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
+import ReportIssueModal from '../components/ReportIssueModal'; // ⬅️ THÊM MỚI
+import { ADOPTION_REQUIREMENT_ICONS, DEFAULT_REQUIREMENT_ICON } from '../constants/adoptionRequirementIcons';
 import { petService } from '../services/petService';
-import { ImageSourcePropType } from 'react-native';
+import { shelterService } from '../services/shelterService';
+
+type PawHistoryType =
+  | 'CREATED' | 'BIRTH' | 'QR_LINKED' | 'TRANSFER'
+  | 'VACCINE' | 'DENTAL_CARE' | 'ANNUAL_CHECKUP'
+  | 'UNDER_SHELTER_CARE' | 'WAS_UNDER_SHELTER_CARE'
+  | 'CURRENT_OWNER' | 'PREVIOUS_OWNER';
+
+type HistoryUIConfig = {
+  icon: ImageSourcePropType;
+  iconBgColor: string;
+  lineColor: string;
+};
+
+const PAW_HISTORY_UI_CONFIG: Record<PawHistoryType, HistoryUIConfig> = {
+  DENTAL_CARE: {
+    icon: require('../assets/icon/teeth-icon.png'),
+    iconBgColor: '#E8FFD8',
+    lineColor: '#D5F5C6',
+  },
+  ANNUAL_CHECKUP: {
+    icon: require('../assets/icon/anual-icon.png'),
+    iconBgColor: '#E8FFD8',
+    lineColor: '#D5F5C6',
+  },
+  UNDER_SHELTER_CARE: {
+    icon: require('../assets/icon/home-heart.png'),
+    iconBgColor: '#FFE4F0',
+    lineColor: '#F8BBD0',
+  },
+  WAS_UNDER_SHELTER_CARE: {
+    icon: require('../assets/icon/home-heart-2.png'),
+    iconBgColor: '#FFE4F0',
+    lineColor: '#F8BBD0',
+  },
+  CURRENT_OWNER: {
+    icon: require('../assets/icon/owner.png'),
+    iconBgColor: '#FFE9B8',
+    lineColor: '#FFD88A',
+  },
+  PREVIOUS_OWNER: {
+    icon: require('../assets/icon/owner-2.png'),
+    iconBgColor: '#FFE9B8',
+    lineColor: '#FFD88A',
+  },
+  VACCINE: {
+    icon: require('../assets/icon/vaccine.png'),
+    iconBgColor: '#E3F0FF',
+    lineColor: '#BFD9FF',
+  },
+  QR_LINKED: {
+    icon: require('../assets/icon/qr-icon.png'),
+    iconBgColor: '#EAE7FF',
+    lineColor: '#D3CCFF',
+  },
+  BIRTH: {
+    icon: require('../assets/icon/birth-date.png'),
+    iconBgColor: '#DFFFF7',
+    lineColor: '#BDF5EA',
+  },
+  CREATED: {
+    icon: require('../assets/icon/qr-icon.png'), // dùng tạm, đổi sang icon phù hợp
+    iconBgColor: '#EAE7FF',
+    lineColor: '#D3CCFF',
+  },
+  TRANSFER: {
+    icon: require('../assets/icon/home-heart.png'),
+    iconBgColor: '#E8FFD8',
+    lineColor: '#D5F5C6',
+  },
+};
+
+const DEFAULT_HISTORY_UI: HistoryUIConfig = {
+  icon: require('../assets/icon/birth-date.png'),
+  iconBgColor: '#F5F5F5',
+  lineColor: '#E0E0E0',
+};
+
+const resolvePawHistoryText = (
+  item: any,
+  isVi: boolean,
+): { title: string; description: string } => {
+  const { type, i18n, title: fallbackTitle, description: fallbackDesc } = item;
+
+  // Map i18n key → bilingual text
+  const I18N_MAP: Record<string, { vi: string; en: string }> = {
+    'pawHistory.current_owner_title': { vi: 'Chủ sở hữu hiện tại', en: 'Current Owner' },
+    'pawHistory.current_owner_body': { vi: 'Quyền sở hữu đã được chuyển giao cho {name}', en: 'Ownership transferred to {name}' },
+    'pawHistory.previous_owner_title': { vi: 'Chủ trước', en: 'Previous Owner' },
+    'pawHistory.previous_owner_body': { vi: 'Từng được chăm sóc bởi {name}', en: 'Previously cared for by {name}' },
+    'pawHistory.under_shelter_title': { vi: 'Đang ở trạm cứu hộ', en: "Under Shelter's Care" },
+    'pawHistory.under_shelter_body': { vi: 'Hiện đang được chăm sóc tại {shelterName}', en: 'Currently under the care of {shelterName}' },
+    'pawHistory.was_under_shelter_title': { vi: 'Từng ở trạm cứu hộ', en: "Was Under Shelter's Care" },
+    'pawHistory.was_under_shelter_body': { vi: 'Trước đây được chăm sóc tại {shelterName}', en: 'Previously cared by {shelterName}' },
+    'pawHistory.transfer_title': { vi: 'Chuyển giao quyền sở hữu', en: 'Ownership Transferred' },
+    'pawHistory.transfer_body': { vi: 'Đã chuyển giao cho {receiverName}', en: 'Transferred to {receiverName}' },
+    'pawHistory.vaccine_title': { vi: '{recordNameVi}', en: '{recordNameEn}' },
+    'pawHistory.vaccine_body': { vi: 'Đã hoàn thành mũi tiêm', en: 'Vaccination completed' },
+    'pawHistory.dental_title': { vi: 'Khám răng miệng', en: 'Dental Care' },
+    'pawHistory.dental_body': { vi: 'Đã hoàn thành khám tại {clinicName}', en: 'Teeth cleaning completed at {clinicName}' },
+    'pawHistory.checkup_title': { vi: 'Khám tổng quát định kỳ', en: 'Annual Checkup' },
+    'pawHistory.checkup_body': { vi: 'Đã hoàn thành khám tại {clinicName}', en: 'Checkup completed at {clinicName}' },
+    'pawHistory.qr_registered_title': { vi: 'Kích hoạt thẻ QR PawLife', en: 'QR Tag Registered' },
+    'pawHistory.qr_registered_body': { vi: 'Thẻ đã được kích hoạt và sẵn sàng sử dụng', en: 'PawLife QR tag is now active and ready to use' },
+    'pawHistory.qr_replaced_title': { vi: 'Thay thẻ QR PawLife', en: 'QR Tag Replaced' },
+    'pawHistory.qr_replaced_body': { vi: 'Thẻ QR cũ đã được thay thế', en: 'Old QR tag has been replaced' },
+    'pawHistory.birth_title': { vi: 'Ngày sinh', en: 'Date of Birth' },
+    'pawHistory.birth_body': { vi: 'Mừng ngày {petName} chào đời', en: 'Celebrate {petName} was born' },
+    'pawHistory.joined_title': { vi: 'Gia nhập PawLife', en: 'Joined PawLife' },
+    'pawHistory.joined_body': { vi: 'Hồ sơ của {petName} được tạo trên hệ thống', en: 'Profile for {petName} was created' },
+  };
+
+  const interpolate = (template: string, params: Record<string, any> = {}) =>
+    template.replace(/\{(\w+)\}/g, (_, key) => params[key] ?? `{${key}}`);
+
+  if (i18n?.titleKey) {
+    const titleTpl = I18N_MAP[i18n.titleKey];
+    const bodyTpl = I18N_MAP[i18n.bodyKey];
+    return {
+      title: titleTpl ? interpolate(isVi ? titleTpl.vi : titleTpl.en, i18n.params) : fallbackTitle,
+      description: bodyTpl ? interpolate(isVi ? bodyTpl.vi : bodyTpl.en, i18n.params) : fallbackDesc,
+    };
+  }
+
+  return { title: fallbackTitle, description: fallbackDesc };
+};
 
 const getAge = (pet?: any, isVi?: boolean) => {
   if (pet?.dob) {
@@ -84,7 +210,11 @@ export default function PetDetailModal() {
   const [headerHeight, setHeaderHeight] = useState(100);
   const BOTTOM_BAR_HEIGHT = 100;
   const [isFavourite, setIsFavourite] = useState(false);
-
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 25 });
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showHideModal, setShowHideModal] = useState(false);
+  const [showBlockShelterModal, setShowBlockShelterModal] = useState(false);
   const scrollY = useSharedValue(0);
 
   const headerAnimatedStyle = useAnimatedStyle(() => {
@@ -130,81 +260,6 @@ export default function PetDetailModal() {
     }
   };
 
-  const ADOPTION_REQUIREMENTS = [
-    {
-      id: 'house_with_yard',
-      label_en: 'House with yard',
-      label_vi: 'Có sân vườn',
-      icon: require('../assets/icon/home-icon.png'),
-    },
-    {
-      id: 'daily_walk',
-      label_en: 'Daily Walk',
-      label_vi: 'Đi dạo thường xuyên',
-      icon: require('../assets/icon/dog-walk.png'),
-    },
-    {
-      id: 'advance_experience',
-      label_en: 'Advance Experience',
-      label_vi: 'Chủ có kinh nghiệm',
-      icon: require('../assets/icon/experience-icon.png'),
-    },
-    {
-      id: 'no_cat',
-      label_en: 'No cat',
-      label_vi: 'Không chó khác',
-      icon: require('../assets/icon/no-cat-icon.png'),
-    },
-    {
-      id: 'no_dog',
-      label_en: 'No dog',
-      label_vi: 'Không mèo khác',
-      icon: require('../assets/icon/no-dog-icon.png'),
-    },
-    {
-      id: 'no_other_pet',
-      label_en: 'No other pet',
-      label_vi: 'Không pet khác',
-      icon: require('../assets/icon/no-dog-icon.png'),
-    },
-    {
-      id: 'no_small_animal',
-      label_en: 'No small animal',
-      label_vi: 'Không động vật nhỏ',
-      icon: require('../assets/icon/no-small-pet-icon.png'),
-    },
-    {
-      id: 'indoor_raise',
-      label_en: 'Indoor raise',
-      label_vi: 'Nuôi trong nhà',
-      icon: require('../assets/icon/home-icon.png'),
-    },
-    {
-      id: 'spacious_living',
-      label_en: 'Spacious Living',
-      label_vi: 'Không gian rộng',
-      icon: require('../assets/icon/home-icon.png'),
-    },
-    {
-      id: 'quiet_home',
-      label_en: 'Quiet Home',
-      label_vi: 'Nhà yên tĩnh',
-      icon: require('../assets/icon/home-icon.png'),
-    },
-    {
-      id: 'often_at_home',
-      label_en: 'Often at Home',
-      label_vi: 'Có thời gian ở nhà',
-      icon: require('../assets/icon/home-icon.png'),
-    },
-    {
-      id: 'stable_routine',
-      label_en: 'Stable Routine',
-      label_vi: 'Lịch sinh hoạt ổn định',
-      icon: require('../assets/icon/calendar-icon.png'),
-    },
-  ];
-
   type BilingualText = {
     vi: string;
     en: string;
@@ -219,158 +274,7 @@ export default function PetDetailModal() {
     lineColor: string;
   };
 
-  const DEFAULT_TIMELINE_ITEMS: TimelineItem[] = [
-    {
-      id: 'dental-care',
-      title: {
-        vi: 'Khám răng miệng',
-        en: 'Dental Care',
-      },
-      description: {
-        vi: 'Đã hoàn thành khám tại {clinicName}',
-        en: 'Teeth cleaning was completed',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/teeth-icon.png'),
-      iconBgColor: '#E8FFD8',
-      lineColor: '#D5F5C6',
-    },
-    {
-      id: 'annual-checkup',
-      title: {
-        vi: 'Khám tổng quát định kỳ',
-        en: 'Annual Checkup',
-      },
-      description: {
-        vi: 'Đã hoàn thành khám tại {clinicName}',
-        en: 'Checkup was completed at {clinicName}',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/anual-icon.png'),
-      iconBgColor: '#E8FFD8',
-      lineColor: '#D5F5C6',
-    },
-    {
-      id: 'under-shelter-care',
-      title: {
-        vi: 'Đang ở trạm cứu hộ',
-        en: "Under Shelter's Care",
-      },
-      description: {
-        vi: 'Hiện đang được chăm sóc tại {shelterName}',
-        en: 'Currently under the care of {shelterName}',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/home-heart.png'),
-      iconBgColor: '#FFE4F0',
-      lineColor: '#F8BBD0',
-    },
-    {
-      id: 'was-under-shelter-care',
-      title: {
-        vi: 'Từng ở trạm cứu hộ',
-        en: "Was Under Shelter's Care",
-      },
-      description: {
-        vi: 'Trước đây được chăm sóc tại {shelterName}',
-        en: 'Previously cared by {shelterName}',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/home-heart-2.png'),
-      iconBgColor: '#FFE4F0',
-      lineColor: '#F8BBD0',
-    },
-    {
-      id: 'current-owner',
-      title: {
-        vi: 'Chủ sở hữu hiện tại',
-        en: 'Current Owner',
-      },
-      description: {
-        vi: 'Quyền sở hữu đã được chuyển giao cho {name}',
-        en: 'Ownership transferred to Jane Doe',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/owner.png'),
-      iconBgColor: '#FFE9B8',
-      lineColor: '#FFD88A',
-    },
-    {
-      id: 'previous-owner',
-      title: {
-        vi: 'Chủ trước',
-        en: 'Previous Owner',
-      },
-      description: {
-        vi: 'Từng được chăm sóc bởi {name}',
-        en: 'Previously cared for by Jane Doe',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/owner-2.png'),
-      iconBgColor: '#FFE9B8',
-      lineColor: '#FFD88A',
-    },
-    {
-      id: 'rabies-vaccination',
-      title: {
-        vi: 'Tiêm phòng dại',
-        en: 'Rabies Vaccination',
-      },
-      description: {
-        vi: 'Đã hoàn thành mũi phòng dại',
-        en: 'Annual rabies vaccination completed',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/vaccine.png'),
-      iconBgColor: '#E3F0FF',
-      lineColor: '#BFD9FF',
-    },
-    {
-      id: 'dhpp-vaccination',
-      title: {
-        vi: 'Tiêm phòng DHP',
-        en: 'DHP Vaccination',
-      },
-      description: {
-        vi: 'Đã hoàn thành mũi DHP 5/7in1',
-        en: '1st dose of DHPP 5/7in1 completed',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/vaccine.png'),
-      iconBgColor: '#E3F0FF',
-      lineColor: '#BFD9FF',
-    },
-    {
-      id: 'qr-registered',
-      title: {
-        vi: 'Kích hoạt thẻ QR PawLife',
-        en: 'QR Tag Registered',
-      },
-      description: {
-        vi: 'Thẻ đã được kích hoạt và sẵn sàng sử dụng',
-        en: 'PawLife QR tag is now active and ready to use',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/qr-icon.png'),
-      iconBgColor: '#EAE7FF',
-      lineColor: '#D3CCFF',
-    },
-    {
-      id: 'date-of-birth',
-      title: {
-        vi: 'Ngày sinh',
-        en: 'Date of Birth',
-      },
-      description: {
-        vi: 'Mừng ngày {petName} chào đời',
-        en: 'Celebrate {petName} was born',
-      },
-      date: '01/01/2026',
-      icon: require('../assets/icon/birth-date.png'),
-      iconBgColor: '#DFFFF7',
-      lineColor: '#BDF5EA',
-    },
-  ];
+
 
 
   const { data: pet, isLoading } = useQuery({
@@ -438,7 +342,54 @@ export default function PetDetailModal() {
       });
     }
   });
+  // 1. Mutation Ẩn thú cưng
+  const hidePetMutation = useMutation({
+    mutationFn: () => {
+      if (!pet?.id) throw new Error("Pet ID missing");
+      return petService.hidePet(pet.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      setShowHideModal(false);
+      Toast.show({
+        type: 'success',
+        text1: isVi ? 'Đã ẩn thú cưng' : 'Pet Hidden',
+      });
+      router.back();
+    },
+    onError: (error) => {
+      console.error("Hide Pet Error:", error); // 👈 BẮT BUỘC LOG LỖI RA CONSOLE ĐỂ DEBUG
+      setShowHideModal(false);
+      Toast.show({
+        type: 'error',
+        text1: isVi ? 'Có lỗi xảy ra' : 'An error occurred',
+        text2: isVi ? 'Không thể ẩn lúc này.' : 'Cannot hide right now.',
+      });
+    }
+  });
 
+  // 2. Mutation Chặn Shelter
+  const blockShelterMutation = useMutation({
+    mutationFn: () => shelterService.blockShelter(pet.shelter.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      setShowBlockShelterModal(false);
+      Toast.show({
+        type: 'success',
+        text1: isVi ? 'Đã chặn trạm cứu hộ' : 'Shelter Blocked',
+        text2: isVi ? `Đã chặn ${pet.shelter.name}` : `Blocked ${pet.shelter.name}`,
+      });
+      router.back();
+    },
+    onError: () => {
+      setShowBlockShelterModal(false);
+      Toast.show({
+        type: 'error',
+        text1: isVi ? 'Có lỗi xảy ra' : 'An error occurred',
+        text2: isVi ? 'Không thể chặn trạm lúc này.' : 'Cannot block shelter right now.',
+      });
+    }
+  });
   const handleFavourite = () => {
     const previousState = isFavourite;
     setIsFavourite(!previousState);
@@ -524,9 +475,28 @@ export default function PetDetailModal() {
         }}>
           <Animated.View style={headerAnimatedStyle}>
             <View className="flex-1 justify-between items-start px-[25px] pb-[16px]">
-              <View className="flex-row items-baseline">
-                <Text className="text-[24px] font-semibold text-black">{pet.name}</Text>
-                <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]">({l(pet.breed)})</Text>
+              <View className="flex-row items-center justify-between w-full">
+                <View className="flex-row items-baseline flex-1 mr-2">
+                  <Text className="text-[24px] font-semibold text-black" numberOfLines={1}>{pet.name}</Text>
+                  <Text className="text-[14px] text-[#8E8E93] ml-2 font-regular mb-[2px]" numberOfLines={1}>({l(pet.breed)})</Text>
+                </View>
+
+                {/* ⬇️ NÚT MORE: mở dropdown View Shelter / Report */}
+                <TouchableOpacity
+                  onPress={(e) => {
+                    const { pageY } = e.nativeEvent;
+                    setMenuPosition({ top: pageY + 14, right: 25 });
+                    setShowOptionsMenu(true);
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  className="p-1"
+                >
+                  <Image
+                    source={require('../assets/icon/more-vertical.png')}
+                    style={{ width: 16, height: 16 }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
               </View>
               <View className="flex-row items-center mt-1.5">
                 <Image source={require('../assets/icon/location_solid.png')} style={{ width: 16, height: 16 }} resizeMode="cover" />
@@ -593,12 +563,35 @@ export default function PetDetailModal() {
 
                     if (!traitName) return null;
 
-                    const colorStyles = [
-                      { bg: 'bg-[#FFF4E8]', text: 'text-[#F3B27B]', border: 'border-[#E8A53C]/25' },
-                      { bg: 'bg-[#EBF4FE]', text: 'text-[#88B2F3]', border: 'border-[#5A90DA]/25' },
-                      { bg: 'bg-[#EAF8EF]', text: 'text-[#8FD49D]', border: 'border-[#83DA5A]/25' },
+                    // Mảng cấu hình màu (Mỗi item là 1 nhóm chứa 2 option màu)
+                    const colorGroups = [
+                      [ // Nhóm 1: Cam (Cũ) / Hồng (Mới)
+                        { bg: 'bg-[#FFF4E8]', text: 'text-[#F3B27B]', border: 'border-[#E8A53C]/25' },
+                        { bg: 'bg-[#FFEFF6]', text: 'text-[#F40C6D]', border: 'border-[#F40C6D]/25' }
+                      ],
+                      [ // Nhóm 2: Xanh dương (Cũ) / Tím (Mới)
+                        { bg: 'bg-[#EBF4FE]', text: 'text-[#88B2F3]', border: 'border-[#5A90DA]/25' },
+                        { bg: 'bg-[#FDF1FF]', text: 'text-[#C75ADA]', border: 'border-[#C75ADA]/25' }
+                      ],
+                      [ // Nhóm 3: Xanh lá (Cũ) / Xanh ngọc (Mới)
+                        { bg: 'bg-[#EAF8EF]', text: 'text-[#8FD49D]', border: 'border-[#83DA5A]/25' },
+                        { bg: 'bg-[#E7FFF9]', text: 'text-[#1DB08E]', border: 'border-[#38DFB8]/25' }
+                      ],
                     ];
-                    const style = colorStyles[index % colorStyles.length];
+
+                    // Hàm Hash để tạo random cố định dựa trên tên trait
+                    const getStableRandomVariant = (str: string) => {
+                      if (!str || typeof str !== 'string') return 0;
+                      let hash = 0;
+                      for (let i = 0; i < str.length; i++) {
+                        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                      }
+                      return Math.abs(hash) % 2; // Trả về 0 hoặc 1
+                    };
+
+                    const groupIndex = index % colorGroups.length;
+                    const variantIndex = getStableRandomVariant(traitName);
+                    const style = colorGroups[groupIndex][variantIndex];
 
                     return (
                       <View key={index} className={`${style.bg} ${style.border} border px-3.5 py-1 rounded-full`}>
@@ -633,7 +626,7 @@ export default function PetDetailModal() {
                   )}
 
                   {pet?.badWith && (
-                    <View className="flex-row items-start mt-2">
+                    <View className="flex-row items-start">
                       <View className="flex-row items-center mr-1 mt-[2px]">
                         <Image source={require('../assets/icon/X.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
                         <Text className="ml-1.5 text-[14px] text-[#FE7D66] font-medium">{isVi ? 'Nên cân nhắc:' : 'Not suitable:'}</Text>
@@ -658,117 +651,127 @@ export default function PetDetailModal() {
                 {isVi ? 'Chăm sóc sức khỏe' : 'Health Care'}
               </Text>
 
-              <View className="flex-row gap-2 w-full">
-                <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
-                  <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
-                    <Image
-                      source={require('../assets/icon/fully-icon.png')}
-                      style={{ width: 20, height: 20 }}
-                      resizeMode="cover"
-                    />
-                  </View>
+              {/* DYNAMIC HEALTH CARE SECTION BẮT ĐẦU */}
+              {(() => {
+                // 1. Phân loại thú cưng
+                const speciesStr = JSON.stringify(pet?.species || {}).toLowerCase();
+                const isDog = speciesStr.includes('dog') || speciesStr.includes('chó') || pet?.species === 'Dog';
 
-                  <View className="ml-[5px] flex-1">
-                    <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
-                      {isVi ? 'Tiêm chủng' : 'Vaccination'}
-                    </Text>
-                    <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
-                      {isVi ? 'Đầy đủ' : 'Fully vaccinated'}
-                    </Text>
-                  </View>
-                </View>
+                // 2. Lấy danh sách vaccine hiện có
+                const vaccinations = Array.isArray(pet?.medicalRecords)
+                  ? pet.medicalRecords.filter((r: any) => r.type === 'VACCINATION' || r.type === 'vaccination')
+                  : [];
 
-                <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
-                  <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
-                    <Image
-                      source={require('../assets/icon/neutered-icon.png')}
-                      style={{ width: 20, height: 20 }}
-                      resizeMode="cover"
-                    />
-                  </View>
+                // Đếm mũi Dại
+                const rabiesCount = vaccinations.filter((r: any) => {
+                  if (r.vaccineCategory === 'RABIES') return true;
+                  const name = JSON.stringify(r.recordName || {}).toLowerCase();
+                  return name.includes('dại') || name.includes('rabies');
+                }).length;
 
-                  <View className="ml-[5px] flex-1">
-                    <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
-                      {isVi ? 'Trạng thái' : 'Status'}
-                    </Text>
-                    <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
-                      {isVi ? 'Đã triệt sản' : 'Neutered'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
+                // Đếm mũi Lõi
+                const coreCount = vaccinations.filter((r: any) => {
+                  if (r.vaccineCategory === 'CORE') return true;
+                  const name = JSON.stringify(r.recordName || {}).toLowerCase();
+                  if (isDog) return name.includes('5 bệnh') || name.includes('7 bệnh') || name.includes('dhpp') || name.includes('in-1');
+                  return name.includes('3 bệnh') || name.includes('fvrcp') || name.includes('in-1');
+                }).length;
 
-              <View className="flex-row gap-2 w-full mt-2 mb-6">
-                <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
-                  <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
-                    <Image
-                      source={require('../assets/icon/missing-icon.png')}
-                      style={{ width: 20, height: 20 }}
-                      resizeMode="cover"
-                    />
-                  </View>
+                // 3. Tính toán tổng số mũi còn thiếu
+                const missingRabies = Math.max(0, 1 - rabiesCount);
+                const missingCore = Math.max(0, 3 - coreCount);
+                const totalMissing = missingRabies + missingCore;
 
-                  <View className="ml-[5px] flex-1">
-                    <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
-                      {isVi ? 'Tiêm chủng' : 'Vaccination'}
-                    </Text>
-                    <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
-                      Missing 1
-                    </Text>
-                  </View>
-                </View>
+                const isFullyVaccinated = pet?.isVaccinated || totalMissing === 0;
 
-                <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
-                  <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
-                    <Image
-                      source={require('../assets/icon/intact-icon.png')}
-                      style={{ width: 20, height: 20 }}
-                      resizeMode="cover"
-                    />
-                  </View>
+                // 4. Giữ nguyên format text gốc của bạn (Missing + số lượng)
+                const vaccineText = isFullyVaccinated
+                  ? (isVi ? 'Đầy đủ' : 'Fully vaccinated')
+                  : (isVi ? `Thiếu ${totalMissing}` : `Missing ${totalMissing}`);
 
-                  <View className="ml-[5px] flex-1">
-                    <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
-                      {isVi ? 'Trạng thái' : 'Status'}
-                    </Text>
-                    <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
-                      {isVi ? 'Chưa triệt sản' : 'Intact'}
-                    </Text>
+                const spayedText = pet?.isSpayedNeutered
+                  ? (isVi ? 'Đã triệt sản' : 'Neutered')
+                  : (isVi ? 'Chưa triệt sản' : 'Intact');
+
+                return (
+                  <View className="flex-row gap-2 w-full mb-6">
+                    {/* VACCINATION CARD */}
+                    <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
+                      <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
+                        <Image
+                          source={isFullyVaccinated ? require('../assets/icon/fully-icon.png') : require('../assets/icon/missing-icon.png')}
+                          style={{ width: 20, height: 20 }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <View className="ml-[5px] flex-1">
+                        <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
+                          {isVi ? 'Tiêm chủng' : 'Vaccination'}
+                        </Text>
+                        <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
+                          {vaccineText}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* SPAYED/NEUTERED CARD */}
+                    <View className="flex-1 flex-row rounded-[44px] bg-[#F7F7F7] h-[50px] items-center px-[5px]">
+                      <View className="bg-white w-[40px] h-[40px] items-center justify-center rounded-full">
+                        <Image
+                          source={pet?.isSpayedNeutered ? require('../assets/icon/neutered-icon.png') : require('../assets/icon/intact-icon.png')}
+                          style={{ width: 20, height: 20 }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <View className="ml-[5px] flex-1">
+                        <Text className="font-regular text-[12px] text-[#8E8E93]" numberOfLines={1}>
+                          {isVi ? 'Trạng thái' : 'Status'}
+                        </Text>
+                        <Text className="font-medium text-[14px] text-black" numberOfLines={1}>
+                          {spayedText}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </View>
+                );
+              })()}
+              {/* DYNAMIC HEALTH CARE SECTION KẾT THÚC */}
             </View>
 
             <View className="mt-3 mb-6">
               <Text className="text-[17px] font-medium text-black mb-3">
-               {isVi? 'Yêu cầu nhận nuôi' : 'Adoption Requirements'}
+                {isVi ? 'Yêu cầu nhận nuôi' : 'Adoption Requirements'}
               </Text>
-
-              <View className="flex-row flex-wrap gap-2">
-                {ADOPTION_REQUIREMENTS.map((item) => (
-                  <View
-                    key={item.id}
-                    className="flex-row items-center px-3 h-[25px] rounded-full bg-white border border-[#E5E5E5]"
-                    style={{
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 2,
-                      elevation: 1,
-                    }}
-                  >
-                    <Image
-                      source={item.icon}
-                      style={{ width: 12, height: 12 }}
-                      resizeMode="contain"
-                    />
-
-                    <Text className="text-[11px] text-[#8E8E93] font-regular ml-1.5">
-                      {isVi ? item.label_vi : item.label_en}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+              {pet?.adoptionRequirements?.length > 0 ? (
+                <View className="flex-row flex-wrap gap-2">
+                  {pet.adoptionRequirements.map((item: any) => (
+                    <View
+                      key={item.id}
+                      className="flex-row items-center px-3 h-[25px] rounded-full bg-white border border-[#E5E5E5]"
+                      style={{
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 2,
+                        elevation: 1,
+                      }}
+                    >
+                      <Image
+                        source={ADOPTION_REQUIREMENT_ICONS[item.iconKey] || DEFAULT_REQUIREMENT_ICON}
+                        style={{ width: 14, height: 14 }}
+                        resizeMode="contain"
+                      />
+                      <Text className="text-[12x] text-[#8E8E93] font-regular ml-1.5">
+                        {l(item.label)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text className="text-[13px] text-[#8E8E93] italic">
+                  {isVi ? 'Chưa có yêu cầu nhận nuôi cụ thể.' : 'No specific adoption requirements yet.'}
+                </Text>
+              )}
             </View>
 
             <View className="mb-10">
@@ -782,14 +785,21 @@ export default function PetDetailModal() {
                 </TouchableOpacity>
               </View>
 
-              {showHistory && pet?.pawHistory && (
-
+              {showHistory && Array.isArray(pet?.pawHistory) && pet.pawHistory.length > 0 && (
                 <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
-                  {DEFAULT_TIMELINE_ITEMS.map((item, index) => {
-                    const isLast = index === DEFAULT_TIMELINE_ITEMS.length - 1;
+                  {pet.pawHistory.map((item: any, index: number) => {
+                    const isLast = index === pet.pawHistory.length - 1;
+                    const uiConfig =
+                      PAW_HISTORY_UI_CONFIG[item.type as PawHistoryType] ?? DEFAULT_HISTORY_UI;
+                    const { title, description } = resolvePawHistoryText(item, isVi);
+                    const formattedDate = new Date(item.date).toLocaleDateString(
+                      isVi ? 'vi-VN' : 'en-GB',
+                      { day: '2-digit', month: '2-digit', year: 'numeric' },
+                    );
 
                     return (
                       <View key={item.id} className="flex-row min-h-[54px]">
+                        {/* Timeline line + icon */}
                         <View className="w-[40px] relative">
                           {!isLast && (
                             <View
@@ -798,52 +808,66 @@ export default function PetDetailModal() {
                                 top: 24,
                                 bottom: -2,
                                 left: 10.25,
-                                backgroundColor: item.lineColor,
+                                backgroundColor: uiConfig.lineColor,
                               }}
                             />
                           )}
-
                           <View
                             className="w-[22px] h-[22px] rounded-full items-center justify-center z-10"
-                            style={{ backgroundColor: item.iconBgColor }}
+                            style={{ backgroundColor: uiConfig.iconBgColor }}
                           >
                             <Image
-                              source={item.icon}
+                              source={uiConfig.icon}
                               style={{ width: 12, height: 12 }}
                               resizeMode="contain"
                             />
                           </View>
                         </View>
 
+                        {/* Content */}
                         <View className="flex-1 pb-4 pr-3">
                           <Text
                             className="text-[15px] font-medium text-black leading-[18px]"
                             numberOfLines={1}
                           >
-                            {isVi ? item.title.vi : item.title.en}
+                            {title}
                           </Text>
-
                           <Text
                             className="text-[12px] font-regular text-[#9B9B9B] mt-[2px] leading-[15px]"
-                            numberOfLines={1}
                           >
-                            {isVi ? item.description.vi : item.description.en}
+                            {item.displayDescription}
                           </Text>
                         </View>
 
+                        {/* Date */}
                         <Text className="text-[11px] font-regular text-[#8E8E93] pt-[2px]">
-                          {item.date}
+                          {formattedDate}
                         </Text>
                       </View>
                     );
                   })}
-                  <View className='flex-row py-[8px] items-center justify-center gap-2 bg-[#F5F5F5] rounded-[8px]'>
-                    <Image source={require('../assets/icon/lock.png')} style={{ width: 12, height: 12 }} resizeMode="cover" />
-                    <Text className='font-regular text-[12px] text-[#8E8E93]'>
-                      {isVi ? 'Dòng thời gian này được tạo tự động và không thể chỉnh sửa.' : 'This timeline is auto-generated and append-only.'}
+
+                  {/* Footer badge */}
+                  <View className="flex-row py-[8px] items-center justify-center gap-2 bg-[#F5F5F5] rounded-[8px]">
+                    <Image
+                      source={require('../assets/icon/lock.png')}
+                      style={{ width: 12, height: 12 }}
+                      resizeMode="cover"
+                    />
+                    <Text className="font-regular text-[12px] text-[#8E8E93]">
+                      {isVi
+                        ? 'Dòng thời gian này được tạo tự động và không thể chỉnh sửa.'
+                        : 'This timeline is auto-generated and append-only.'}
                     </Text>
                   </View>
                 </View>
+              )}
+
+              {/* Empty state khi pawHistory rỗng */}
+              {showHistory && (!pet?.pawHistory || pet.pawHistory.length === 0) && (
+                <Text className="text-[13px] text-[#8E8E93] italic text-center py-4">
+                  {isVi ? 'Chưa có lịch sử hoạt động.' : 'No history available yet.'}
+                </Text>
               )}
               {/* <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
                 {pet.pawHistory.map((item: any, index: number) => {
@@ -900,7 +924,180 @@ export default function PetDetailModal() {
           </View>
         </BottomSheetScrollView>
       </BottomSheet>
+      <Modal
+        visible={showOptionsMenu}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowOptionsMenu(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={() => setShowOptionsMenu(false)}
+        >
+          <View
+            className="absolute bg-white rounded-xl border border-gray-100 w-56"
+            style={{
+              top: menuPosition.top,
+              right: menuPosition.right,
+              elevation: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 10,
+            }}
+          >
+            {/* 1. NÚT ẨN THÚ CƯNG (HIDE PET) */}
+            <TouchableOpacity
+              className="flex-row items-center px-4 py-3"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowHideModal(true);
+              }}
+            >
+              <Feather name="eye-off" size={15} color="#374151" />
+              <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                {isVi ? `Ẩn ${pet.name}` : `Hide ${pet.name}`}
+              </Text>
+            </TouchableOpacity>
 
+            {/* 2. NÚT CHẶN TRẠM CỨU HỘ (BLOCK SHELTER) */}
+            {pet?.shelter?.id && (
+              <TouchableOpacity
+                className="flex-row items-center px-4 py-3 border-t border-gray-50"
+                activeOpacity={0.6}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  setShowBlockShelterModal(true);
+                }}
+              >
+                <Feather name="shield" size={15} color="#374151" />
+                <Text className="text-[14px] text-gray-700 ml-3 font-medium">
+                  {isVi ? 'Chặn trạm cứu hộ' : 'Block Shelter'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* 3. NÚT BÁO CÁO (REPORT) */}
+            <TouchableOpacity
+              className="flex-row items-center px-4 py-3 border-t border-gray-50"
+              activeOpacity={0.6}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowReportModal(true);
+              }}
+            >
+              <Feather name="flag" size={15} color="#EF4444" />
+              <Text className="text-[14px] text-red-600 ml-3 font-medium">
+                {isVi ? 'Báo cáo thú cưng' : 'Report Pet'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      {/* MODAL XÁC NHẬN CHẶN THÚ CƯNG */}
+      <Modal visible={showHideModal} animationType="fade" transparent={true} onRequestClose={() => !hidePetMutation.isPending && setShowHideModal(false)}>
+        <View className="flex-1 justify-center items-center bg-black/60 px-5">
+          <View className="bg-white w-full rounded-[28px] p-7 items-center shadow-2xl">
+            <View className="w-16 h-16 rounded-full bg-gray-50 items-center justify-center mb-5 border border-gray-100">
+              <Feather name="eye-off" size={26} color="#6B7280" />
+            </View>
+            <Text className="text-[20px] font-bold text-gray-900 text-center mb-3 tracking-tight">
+              {isVi ? `Ẩn ${pet?.name}?` : `Hide ${pet?.name}?`}
+            </Text>
+            <Text className="text-[15px] text-gray-500 text-center mb-8 leading-6 px-1">
+              {isVi
+                ? `Hồ sơ của ${pet?.name} sẽ bị ẩn đi và không còn xuất hiện trong danh sách thú cưng của bạn nữa.`
+                : `Profile of ${pet?.name} will be hidden and will no longer appear in your feed.`}
+            </Text>
+            <View className="w-full flex-col gap-3.5">
+              <TouchableOpacity
+                className="w-full bg-[#374151] py-4 rounded-[14px] items-center"
+                activeOpacity={0.8}
+                disabled={hidePetMutation.isPending}
+                onPress={() => hidePetMutation.mutate()}
+              >
+                {hidePetMutation.isPending ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text className="text-white font-bold text-[15px]">{isVi ? 'Xác nhận ẩn' : 'Confirm Hide'}</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="w-full bg-gray-50 py-4 rounded-[14px] items-center border border-gray-100"
+                activeOpacity={0.7}
+                disabled={hidePetMutation.isPending}
+                onPress={() => setShowHideModal(false)}
+              >
+                <Text className="text-gray-600 font-bold text-[15px]">{isVi ? 'Hủy bỏ' : 'Cancel'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 2. MODAL XÁC NHẬN CHẶN SHELTER */}
+      <Modal visible={showBlockShelterModal} animationType="fade" transparent={true} onRequestClose={() => !blockShelterMutation.isPending && setShowBlockShelterModal(false)}>
+        <View className="flex-1 justify-center items-center bg-black/60 px-5">
+          <View className="bg-white w-full rounded-[28px] p-7 items-center shadow-2xl">
+            <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-5 border border-red-100">
+              <Feather name="shield-off" size={26} color="#EF4444" />
+            </View>
+            <Text className="text-[20px] font-bold text-gray-900 text-center mb-3 tracking-tight">
+              {isVi ? `Chặn ${pet?.shelter?.name}?` : `Block ${pet?.shelter?.name}?`}
+            </Text>
+            <Text className="text-[15px] text-gray-500 text-center mb-8 leading-6 px-1">
+              {isVi
+                ? `Bạn sẽ không thấy bất kỳ bài đăng hoặc thú cưng nào từ trạm cứu hộ này nữa.`
+                : `You won't see any posts or pets from this shelter anymore.`}
+            </Text>
+            <View className="w-full flex-col gap-3.5">
+              <TouchableOpacity
+                className="w-full bg-[#EF4444] py-4 rounded-[14px] items-center shadow-sm shadow-red-200"
+                activeOpacity={0.8}
+                disabled={blockShelterMutation.isPending}
+                onPress={() => blockShelterMutation.mutate()}
+              >
+                {blockShelterMutation.isPending ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text className="text-white font-bold text-[15px]">{isVi ? 'Xác nhận chặn' : 'Confirm Block'}</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="w-full bg-gray-50 py-4 rounded-[14px] items-center border border-gray-100"
+                activeOpacity={0.7}
+                disabled={blockShelterMutation.isPending}
+                onPress={() => setShowBlockShelterModal(false)}
+              >
+                <Text className="text-gray-600 font-bold text-[15px]">{isVi ? 'Hủy bỏ' : 'Cancel'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* --- REPORT SHELTER MODAL --- */}
+      <ReportIssueModal
+        isVisible={showReportModal}
+        context="matching"
+        targetName={pet?.name}
+        onClose={() => setShowReportModal(false)}
+        onSubmit={async (data) => {
+          await petService.reportPet(pet.id, {
+            reason: data.reason,
+            detail: data.details,
+            isBlockRequested: data.isBlockRequested
+          });
+
+          if (data.isBlockRequested) {
+            queryClient.setQueryData(['feed'], (oldData: any) => {
+              return oldData?.filter((p: any) => p.id !== pet.id) || [];
+            });
+          }
+          queryClient.invalidateQueries({ queryKey: ['feed'] });
+        }}
+      />
       <View style={{ paddingBottom: 21 }} className="absolute bottom-0 w-full px-[25px] pt-4 bg-white flex-row items-center gap-4">
         <TouchableOpacity
           className={`w-[55px] h-[55px] rounded-full border-2 items-center justify-center bg-white ${isFavourite ? "border-[#E89B5A]/50" : "border-[#E5E5EA]"}`}
@@ -914,6 +1111,7 @@ export default function PetDetailModal() {
           <Text className="text-white text-[16px] font-bold">{isVi ? 'Đăng ký nhận nuôi' : 'Apply to Adopt'}</Text>
         </TouchableOpacity>
       </View>
+
     </View>
   );
 }

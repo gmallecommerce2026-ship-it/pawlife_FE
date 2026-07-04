@@ -22,14 +22,19 @@ export const eventService = {
     const response = await axiosClient.post(`/events/${eventId}/interest`, { userId });
     return response.data;
   },
-
+  reportEvent: async (eventId: string, userId: string, data: any) => {
+    return axiosClient.post(`/events/${eventId}/report`, { userId, ...data });
+  },
+  hideEvent: async (eventId: string, userId: string) => {
+    return axiosClient.post(`/events/${eventId}/hide`, { userId });
+  },
   getInterestedEvents: async (userId: string) => {
     const response = await axiosClient.get(`/events/interested/user`, {
       params: { userId }
     });
     return response.data;
   },
-  
+
   searchEvents: async (params?: { search?: string; limit?: number }) => {
     try {
       const response = await axiosClient.get('/events', { params });

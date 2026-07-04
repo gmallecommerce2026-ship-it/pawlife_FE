@@ -5,7 +5,6 @@ import { TextInput } from '@/components/AppTextInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { petService } from '@/services/petService';
 import { useModalStore } from '@/store/useModalStore';
-import { getLocalizedField } from '@/utils/localization';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BlurView } from 'expo-blur';
@@ -97,7 +96,11 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
         activeOpacity={0.7}
         className={`w-full bg-white border border-[#E5E5E5] rounded-[16px] h-14 px-4 flex-row items-center justify-between ${isOpen ? 'border-[#E89B5A]' : ''}`}
       >
-        <Text className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`} numberOfLines={1}>
+        <Text
+          className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`}
+          numberOfLines={1}
+          style={{ fontFamily: 'Urbanist-Medium' }} // THÊM DÒNG NÀY (Vì đang dùng font-medium)
+        >
           {value || placeholder}
         </Text>
         <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={20} color="#9CA3AF" />
@@ -127,7 +130,11 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
                       setIsOpen(false);
                     }}
                   >
-                    <Text className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}>
+                    <Text
+                      className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}
+                      // THÊM DÒNG NÀY: Nếu được chọn thì dùng Bold, bình thường dùng Regular
+                      style={{ fontFamily: isSelected ? 'Urbanist-Bold' : 'Urbanist-Regular' }}
+                    >
                       {item}
                     </Text>
                     {isSelected && <Ionicons name="checkmark" size={18} color="#E89B5A" />}
@@ -149,36 +156,82 @@ interface MedicalRecordItemProps {
   record: any;
   index: number;
   isVi: boolean;
-  onDelete: (index: number) => void;
+  onOpenMenu: (index: number, images: string[], pageY: number, status: string) => void;
 }
 
-const MedicalRecordItem = memo(({ record, index, isVi, onDelete }: MedicalRecordItemProps) => {
+const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalRecordItemProps) => {
   const formattedRecordDate = record.recordDate ? new Date(record.recordDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
   const formattedNextDueDate = record.nextDueDate ? new Date(record.nextDueDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
-  const recordNameText = getLocalizedField(record.recordName, isVi ? 'vi' : 'en');
-  const nextDueNameText = getLocalizedField(record.nextDueName, isVi ? 'vi' : 'en');
+  const displayRecordName = displayBilingual(parseBilingual(record.recordName), isVi);
+
+  const status = record.verificationStatus || 'PENDING';
+  const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
+
+  // Map cấu hình UI theo từng trạng thái
+  const getStatusConfig = (statusCode: string) => {
+    switch (statusCode) {
+      case 'VERIFIED':
+        return { bg: '#EBFFE2', border: '#D1F5BF', text: '#77C852', icon: 'check-circle', labelVi: 'Đã xác minh', labelEn: 'Verified' };
+      case 'DISPUTED':
+        return { bg: '#FEE2E2', border: '#FECACA', text: '#EF4444', icon: 'alert-triangle', labelVi: 'Cần xem xét', labelEn: 'Disputed' };
+      case 'PENDING':
+      default:
+        return { bg: '#FBF7EB', border: '#E8A53C25', text: '#E8A53C', icon: 'clock', labelVi: 'Đang xử lý', labelEn: 'Processing' };
+    }
+  };
+
+  const statusConfig = getStatusConfig(status);
 
   return (
-    <View className="p-4 bg-[#FAFAFA] rounded-[12px] mb-3 border border-[#E5E5EA] flex-row items-center justify-between">
-      <View>
-        <Text className="font-semibold text-[#111827] text-[15px] mb-1">
-          {recordNameText || (isVi ? "Hồ sơ không tên" : "Unnamed Record")}
-        </Text>
-        <Text className="text-[#6B7280] text-[13px]">
+    <View className="border border-[#E5E5E5] rounded-[4px] p-3 flex-row items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
+      <View className="w-[30px] h-[30px] rounded-[4px] items-center justify-center">
+        <Image
+          source={require('../assets/icon/vacc-icon-report.png')}
+          style={{ width: 30, height: 30 }}
+          resizeMode="contain"
+        />
+      </View>
+      <View className="flex-1 mx-3">
+        <View className="flex-1 flex-row flex-wrap items-center pr-2 mb-1">
+          <Text className="text-[14px] text-[#000000] font-medium leading-[16px] mr-2" numberOfLines={1}>
+            {displayRecordName || (isVi ? "Hồ sơ vô danh" : "Unnamed Record")}
+          </Text>
+
+          {/* Badge trạng thái */}
+          <View
+            className="flex-row items-center px-2 py-[3px] rounded-[4px] border"
+            style={{ backgroundColor: statusConfig.bg, borderColor: statusConfig.border }}
+          >
+            <Feather name={statusConfig.icon as any} size={10} color={statusConfig.text} />
+            <Text className="text-[10px] font-medium ml-1" style={{ color: statusConfig.text }}>
+              {isVi ? statusConfig.labelVi : statusConfig.labelEn}
+            </Text>
+          </View>
+        </View>
+
+        <Text className="text-[#6B7280] text-[12px]">
           {isVi ? 'Loại' : 'Type'}: {record.type} | {isVi ? 'Ngày' : 'Date'}: {formattedRecordDate}
         </Text>
         {record.hasNextDueDate && (
-          <Text className="text-[#E89B5A] text-[12px] mt-1 font-medium">
-            {isVi ? 'Lịch tiếp theo' : 'Next due'}: {formattedNextDueDate} ({nextDueNameText})
+          <Text className="text-[#E89B5A] text-[12px] mt-1 font-regular">
+            {isVi ? 'Lịch tiếp theo' : 'Next due date'}: {formattedNextDueDate}
           </Text>
         )}
       </View>
-      <TouchableOpacity
-        onPress={() => onDelete(index)}
-        className="p-2"
-      >
-        <Ionicons name="trash-outline" size={12} color="#7e7e7e" />
-      </TouchableOpacity>
+
+      {/* Nút More Options */}
+      <View className="flex-row items-center gap-2">
+        <TouchableOpacity
+          onPress={(e) => {
+            e.stopPropagation();
+            onOpenMenu(index, imageList, e.nativeEvent.pageY, status);
+          }}
+          className="p-2"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }, (prevProps, nextProps) => {

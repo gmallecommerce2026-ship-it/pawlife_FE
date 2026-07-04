@@ -98,6 +98,49 @@ export const petService = {
     }
   },
 
+  hidePet: async (petId: string) => {
+    const response = await axiosClient.post(`/pets/${petId}/hide`);
+    return response.data;
+  },
+  // ============================================================
+  // THÊM VÀO services/petService.ts (cùng object/class petService)
+  // ============================================================
+
+  updateMedicalRecord: async (
+    petId: string,
+    recordId: string,
+    payload: {
+      type?: string;
+      recordName?: any;
+      recordDate?: string;
+      images?: string[];
+      hasNextDueDate?: boolean;
+      nextDueDate?: string | null;
+      nextDueName?: any;
+    }
+  ) => {
+    const res = await axiosClient.patch(`/pets/${petId}/medical-records/${recordId}`, payload);
+    return res.data;
+  },
+
+  deleteMedicalRecord: async (petId: string, recordId: string) => {
+    const res = await axiosClient.delete(`/pets/${petId}/medical-records/${recordId}`);
+    return res.data;
+  },
+  reportMedicalRecord: async (
+    petId: string,
+    recordId: string,
+    data: { reason: string; details?: string }
+  ) => {
+    const res = await axiosClient.post(`/pets/${petId}/medical-records/${recordId}/report`, data);
+    return res.data;
+  },
+
+  reportPet: async (petId: string, data: { reason: string; detail?: string; isBlockRequested?: boolean }) => {
+    const response = await axiosClient.post(`/pets/${petId}/report`, data);
+    return response.data;
+  },
+
   updatePet: async (id: string, data: any) => {
     try {
       const response = await axiosClient.patch(`/pets/${id}`, data);
@@ -118,7 +161,7 @@ export const petService = {
 
   getPassToken: async (petId: string) => {
     const response = await axiosClient.post(`/wallet/pets/${petId}/pass-token`);
-    return response.data; 
+    return response.data;
   },
 
   toggleLostMode: async (petId: string, data: {

@@ -38,14 +38,20 @@ export interface ReportSubmitData {
     isBlockRequested: boolean;
 }
 
+// --- CONTEXT TYPE: phân biệt report Pet (đi lạc/found) hay report Shelter ---
+export type ReportContext = 'pet' | 'shelter' | 'event' | 'matching' | 'medicalRecord';
 interface Props {
     isVisible: boolean;
     onClose: () => void;
     onSubmit?: (data: ReportSubmitData) => Promise<void>;
+    context?: ReportContext;
+    targetName?: string;
+    onSuccessModalClose?: () => void;   // ⬅️ THÊM MỚI
 }
 
-// Cấu trúc lại REPORT_OPTIONS để hỗ trợ song ngữ
-const REPORT_OPTIONS = [
+
+// Cấu trúc lại REPORT_OPTIONS để hỗ trợ song ngữ — dùng cho context 'pet' (giữ behavior cũ)
+const PET_REPORT_OPTIONS = [
     { key: "Inappropriate content or photos", en: "Inappropriate content or photos", vi: "Hình ảnh hoặc nội dung phản cảm" },
     { key: "Abusive language or hate speech", en: "Abusive language or hate speech", vi: "Ngôn từ quấy rối hoặc thù ghét" },
     { key: "Spam, scam or fake profile", en: "Spam, scam or fake profile", vi: "Spam, lừa đảo hoặc giả mạo" },
@@ -55,6 +61,42 @@ const REPORT_OPTIONS = [
     { key: "Other", en: "Other", vi: "Khác" },
 ];
 
+// REPORT_OPTIONS riêng cho context 'shelter' — lý do phù hợp khi report một trạm cứu hộ/chủ nuôi
+const SHELTER_REPORT_OPTIONS = [
+    { key: "Misleading or false information", en: "Misleading or false information", vi: "Thông tin sai lệch hoặc gây hiểu nhầm" },
+    { key: "Suspected scam or fraud", en: "Suspected scam or fraud", vi: "Nghi ngờ lừa đảo" },
+    { key: "Signs of animal neglect or abuse", en: "Signs of animal neglect or abuse", vi: "Dấu hiệu bỏ bê hoặc bạo hành động vật" },
+    { key: "Unresponsive or unprofessional behavior", en: "Unresponsive or unprofessional behavior", vi: "Không phản hồi hoặc thiếu chuyên nghiệp" },
+    { key: "Inappropriate content or photos", en: "Inappropriate content or photos", vi: "Hình ảnh hoặc nội dung phản cảm" },
+    { key: "Other", en: "Other", vi: "Khác" },
+];
+
+const EVENT_REPORT_OPTIONS = [
+    { key: "Misleading or false information", en: "Misleading or false information", vi: "Thông tin sai lệch hoặc gây hiểu nhầm" },
+    { key: "Event was cancelled or postponed", en: "Event was cancelled or postponed", vi: "Sự kiện đã bị hủy hoặc dời lịch" },
+    { key: "Suspected scam or fraud", en: "Suspected scam or fraud", vi: "Nghi ngờ lừa đảo" },
+    { key: "Duplicate event", en: "Duplicate event", vi: "Sự kiện bị đăng trùng lặp" },
+    { key: "Inappropriate content or photos", en: "Inappropriate content or photos", vi: "Hình ảnh hoặc nội dung phản cảm" },
+    { key: "Other", en: "Other", vi: "Khác" },
+];
+const MATCHING_REPORT_OPTIONS = [
+    { key: "Inappropriate content or photos", en: "Inappropriate content or photos", vi: "Hình ảnh hoặc nội dung phản cảm" },
+    { key: "Spam, scam or fake profile", en: "Spam, scam or fake profile", vi: "Spam, lừa đảo hoặc giả mạo" },
+    { key: "Misleading or false information", en: "Misleading or false information", vi: "Thông tin sai lệch hoặc gây hiểu nhầm" },
+    { key: "Signs of neglect or abuse", en: "Signs of animal neglect or abuse", vi: "Dấu hiệu bị bỏ bê hoặc bạo hành" },
+    { key: "Other", en: "Other", vi: "Khác" },
+];
+
+const MEDICAL_RECORD_REPORT_OPTIONS = [
+    { key: "Inaccurate vaccine information", en: "Inaccurate vaccine information", vi: "Thông tin vaccine không chính xác" },
+    { key: "Wrong vaccine type", en: "Wrong vaccine type", vi: "Sai loại vaccine" },
+    { key: "Wrong vaccination/expiry date", en: "Wrong vaccination/expiry date", vi: "Sai ngày tiêm / ngày hết hạn" },
+    { key: "Wrong clinic or doctor", en: "Wrong clinic or doctor", vi: "Sai phòng khám / bác sĩ" },
+    { key: "Record belongs to a different pet", en: "Record belongs to a different pet", vi: "Hồ sơ thuộc thú cưng khác" },
+    { key: "Photo edited or forged", en: "Photo edited or forged", vi: "Ảnh bị chỉnh sửa / giả mạo" },
+    { key: "Record was verified with incorrect information", en: "Record was verified with incorrect information", vi: "Record bị verify sai thông tin" },
+    { key: "Other", en: "Other", vi: "Khác" },
+];
 // --- CÁC COMPONENT PHỤ TRỢ CHO POPUP ĐỊA CHỈ ---
 const Label = ({ text, required = false }: { text: string; required?: boolean }) => (
     <Text className="text-[#8E8E93] text-[14px] font-medium mb-2 mt-4">
@@ -135,10 +177,27 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
 };
 
 
-export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props) {
-    // --- LẤY NGÔN NGỮ HIỆN TẠI ---
+export default function ReportIssueModal({ isVisible, onClose, onSubmit, context = 'pet', targetName, onSuccessModalClose }: Props) {
     const { t, language } = useLanguage();
     const isVi = language === 'vi';
+    const isShelterContext = context === 'shelter';
+    const isEventContext = context === 'event';
+    const isMatchingContext = context === 'matching';
+    const isMedicalRecordContext = context === 'medicalRecord';
+
+    // true cho shelter, event, matching, medicalRecord — đều ẩn block địa điểm/ngày giờ kiểu "pet"
+    const hideLocationDateBlock = isShelterContext || isEventContext || isMatchingContext || isMedicalRecordContext;
+
+    const REPORT_OPTIONS = isShelterContext
+        ? SHELTER_REPORT_OPTIONS
+        : isEventContext
+            ? EVENT_REPORT_OPTIONS
+            : isMatchingContext
+                ? MATCHING_REPORT_OPTIONS
+                : isMedicalRecordContext
+                    ? MEDICAL_RECORD_REPORT_OPTIONS
+                    : PET_REPORT_OPTIONS;
+
 
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const [otherReason, setOtherReason] = useState('');
@@ -159,30 +218,22 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
                 await onSubmit({
                     reason: finalReason,
                     details: otherReason,
-                    location,
-                    date,
-                    isBlockRequested
+                    location: location, // Các field này chỉ tồn tại nếu !hideLocationDateBlock
+                    date: date,
+                    isBlockRequested: isBlockRequested // Đã truyền đúng flag này
                 });
             }
 
-            // 1. Đóng report modal trước
+            // Logic hiển thị thành công (Giữ nguyên)
             onClose();
+            setTimeout(() => {
+                setSubmittedAt(new Date());
+                setIsSuccessVisible(true);
+            }, 350);
+            handleResetState();
 
-            // 2. Nếu CHỌN BLOCK -> Không cần hiện popup Success, màn hình cha tự ẩn.
-            // Ngược lại, hiện popup Success.
-            if (!isBlockRequested) {
-                setTimeout(() => {
-                    setSubmittedAt(new Date());
-                    setIsSuccessVisible(true);
-                }, 350);
-            } else {
-                handleResetState(); // Reset ngầm
-            }
         } catch (e) {
-            Alert.alert(
-                isVi ? 'Lỗi' : 'Error',
-                isVi ? 'Không thể gửi báo cáo. Vui lòng thử lại.' : 'Failed to submit report. Please try again.'
-            );
+            Alert.alert(isVi ? 'Lỗi' : 'Error', isVi ? 'Không thể gửi báo cáo.' : 'Failed to submit.');
         } finally {
             setIsSubmitting(false);
         }
@@ -199,7 +250,9 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
     const handleSuccessClose = () => {
         setIsSuccessVisible(false);
         handleResetState();
+        onSuccessModalClose?.();   // ⬅️ THÊM MỚI — báo ra ngoài rằng success modal đã đóng
     };
+
 
     const [location, setLocation] = useState('');
 
@@ -226,6 +279,10 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
     const [tempDetail, setTempDetail] = useState('');
 
     useEffect(() => {
+        // Phần địa điểm/ngày giờ chỉ phục vụ context 'pet' (nơi phát hiện thú cưng đi lạc),
+        // không cần fetch tỉnh/thành khi đang report shelter hoặc event để tránh gọi API thừa.
+        if (hideLocationDateBlock) return;
+
         fetch('https://provinces.open-api.vn/api/v2/p/')
             .then(res => res.json())
             .then(data => {
@@ -241,11 +298,13 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
                 }
             })
             .catch(e => console.error(isVi ? "Lỗi fetch tỉnh/thành phố:" : "Error fetching provinces:", e));
-    }, [isVi]);
+    }, [isVi, hideLocationDateBlock]);
 
     const cityOptions = provinces.map((c: any) => c.name);
 
     useEffect(() => {
+        if (hideLocationDateBlock) return;
+
         if (!tempCity) {
             setWardOptions([]);
             return;
@@ -267,7 +326,7 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
                 })
                 .catch(e => console.error(isVi ? "Lỗi fetch phường/xã:" : "Error fetching wards:", e));
         }
-    }, [tempCity, provinces, isVi]);
+    }, [tempCity, provinces, isVi, hideLocationDateBlock]);
 
     const handleConfirmAddress = () => {
         if (!tempCity || !tempWard) {
@@ -317,6 +376,56 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
         hour: '2-digit', minute: '2-digit', hour12: !isVi
     }).replace(',', isVi ? ' lúc' : ' at');
 
+    // --- TEXT THEO CONTEXT ---
+    const modalTitle = isShelterContext
+        ? (isVi ? 'Báo cáo trạm cứu hộ' : 'Report Shelter')
+        : isEventContext
+            ? (isVi ? 'Báo cáo sự kiện' : 'Report Event')
+            : isMatchingContext
+                ? (isVi ? 'Báo cáo hồ sơ' : 'Report Profile')
+                : isMedicalRecordContext
+                    ? (isVi ? 'Báo cáo hồ sơ y tế' : 'Report Medical Record')
+                    : (isVi ? 'Báo cáo vấn đề' : 'Report Concern');
+
+    const questionLabel = isShelterContext
+        ? (isVi ? 'Bạn đang gặp vấn đề gì?' : 'What is the issue?')
+        : isEventContext
+            ? (isVi ? 'Bạn muốn báo cáo điều gì?' : 'What would you like to report?')
+            : isMatchingContext
+                ? (isVi ? 'Tại sao bạn báo cáo hồ sơ này?' : 'Why are you reporting this profile?')
+                : isMedicalRecordContext
+                    ? (isVi ? 'Bạn muốn báo cáo điều gì về hồ sơ này?' : 'What would you like to report about this record?')
+                    : (isVi ? 'Tại sao bạn lo lắng?' : 'Why are you concerned?');
+
+
+
+    // 👇 ĐIỀU CHỈNH TEXT CHO NÚT SWITCH CHẶN
+    const blockTitle = isShelterContext
+        ? (isVi ? `Ẩn nội dung từ ${targetName || (isVi ? 'trạm này' : 'this shelter')}` : `Block content from ${targetName || 'this shelter'}`)
+        : isMatchingContext
+            ? (isVi ? `Chặn hồ sơ của ${targetName || 'bé này'}` : `Block profile of ${targetName || 'this pet'}`)
+            : isEventContext // 👈 THÊM DÒNG NÀY CHO EVENT
+                ? (isVi ? `Ẩn sự kiện này` : `Hide this event`)
+                : (isVi ? "Ẩn nội dung từ người này" : "Block content from this user");
+
+    const blockDesc = isShelterContext
+        ? (isVi ? "Bạn sẽ không còn thấy thú cưng từ trạm cứu hộ này nữa." : "You will no longer see pets from this shelter.")
+        : isMatchingContext
+            ? (isVi ? "Bạn sẽ không còn thấy thú cưng này trong danh sách nữa." : "You will no longer see this pet in your list.")
+            : isEventContext // 👈 THÊM DÒNG NÀY CHO EVENT
+                ? (isVi ? "Sự kiện này sẽ bị ẩn khỏi danh sách của bạn." : "This event will be hidden from your list.")
+                : (isVi ? "Bạn sẽ không còn thấy thú cưng của người dùng này nữa." : "You will no longer see pets from this owner.");
+
+    const disclaimerText = isShelterContext
+        ? (isVi ? 'Báo cáo sẽ được xem xét bởi đội ngũ PawLife và không tự động ảnh hưởng đến trạm cứu hộ.' : 'The report will be reviewed by the PawLife team and does not automatically affect the shelter.')
+        : isEventContext
+            ? (isVi ? 'Báo cáo sẽ được xem xét bởi đội ngũ PawLife và không tự động gỡ bỏ sự kiện.' : 'The report will be reviewed by the PawLife team and does not automatically remove the event.')
+            : isMatchingContext
+                ? (isVi ? 'Báo cáo sẽ được xem xét bởi PawLife. Chúng tôi sẽ bảo mật danh tính của bạn.' : 'The report will be reviewed by PawLife. Your identity will remain anonymous.')
+                : isMedicalRecordContext
+                    ? (isVi ? 'Báo cáo của bạn giúp hệ thống kiểm tra nếu có sai lệch.' : 'Your report helps our system review the record for any discrepancies.')
+                    : (isVi ? 'Báo cáo sẽ được xem xét và không tự động đánh dấu thú cưng là đi lạc.' : 'The report will be reviewed and does not automatically mark pet as lost.');
+
     return (
         <>
             <Modal visible={isVisible} transparent animationType="fade">
@@ -332,7 +441,7 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
 
                                     <View className="relative items-center justify-center mb-[30px] pt-2">
                                         <Text className="text-[20px] font-semibold text-[#1C1C1E]">
-                                            {isVi ? 'Báo cáo vấn đề' : 'Report Concern'}
+                                            {modalTitle}
                                         </Text>
                                         <TouchableOpacity onPress={onClose} className="absolute right-0" style={{ padding: 4 }}>
                                             <Ionicons name="close" size={24} color="#8E8E93" />
@@ -340,7 +449,7 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
                                     </View>
 
                                     <Text className="font-semibold mb-[15px] text-[16px]">
-                                        {isVi ? 'Tại sao bạn lo lắng?' : 'Why are you concerned?'}
+                                        {questionLabel}
                                     </Text>
 
                                     <View className="mx-4 gap-y-3 mb-[30px]">
@@ -377,76 +486,95 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
                                         })}
                                     </View>
 
-                                    <Text className="font-semibold mb-[15px] text-[16px] tracking-[0.06px]">
-                                        {isVi ? 'Bạn đã thấy thú cưng ở đâu?' : 'Where did you see the pet?'}
-                                    </Text>
-
-                                    <View className='mb-[20px] rounded-[16px] border border-[#E5E5E5]'>
-                                        <View className='flex-row border-b border-[#E5E5E5] py-3 mx-4 items-center'>
-                                            <Image source={require('../assets/icon/location-gray-icon.png')} style={{ width: 9, height: 11 }} resizeMode="cover" />
-                                            <Text className="text-[13px] font-medium text-[#8E8E93] px-2">
-                                                {isVi ? 'Địa điểm' : 'Location'}
+                                    {/* --- KHỐI ĐỊA ĐIỂM / NGÀY GIỜ: chỉ hiển thị khi report PET, ẩn hoàn toàn khi report SHELTER hoặc EVENT --- */}
+                                    {!hideLocationDateBlock && (
+                                        <>
+                                            <Text className="font-semibold mb-[15px] text-[16px] tracking-[0.06px]">
+                                                {isVi ? 'Bạn đã thấy thú cưng ở đâu?' : 'Where did you see the pet?'}
                                             </Text>
-                                            <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
-                                                <Text className={`font-regular text-[13px] text-right tracking-[0.06px] ${location ? 'text-[#1C1C1E]' : 'text-[#9CA3AF]'}`} numberOfLines={1}>
-                                                    {location || (isVi ? "Nhấn để chọn địa chỉ..." : "Tap to select address...")}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        </View>
 
-                                        <View ref={datetimeRef} collapsable={false}>
-                                            <TouchableOpacity
-                                                onPress={() => {
-                                                    if (Platform.OS === 'ios') {
-                                                        openDropdownPicker('datetime');
-                                                    } else {
-                                                        setTempDate(date);
-                                                        setPickerMode('date');
-                                                        setDatePickerVisible(true);
-                                                    }
-                                                }}
-                                                className='flex-row border-b border-[#E5E5E5] py-3 mx-4 items-center'
-                                            >
-                                                <Image source={require('../assets/icon/date-time-gray-icon.png')} style={{ width: 9, height: 9 }} resizeMode="cover" />
-                                                <Text className="text-[13px] font-medium text-[#8E8E93] px-2">
-                                                    {isVi ? 'Ngày & Giờ' : 'Date & Time'}
-                                                </Text>
-                                                <Text className="flex-1 text-[13px] text-[#1C1C1E] text-right">{formattedDate}</Text>
-                                            </TouchableOpacity>
-                                        </View>
+                                            <View className='mb-[20px] rounded-[16px] border border-[#E5E5E5]'>
+                                                <View className='flex-row border-b border-[#E5E5E5] py-3 mx-4 items-center'>
+                                                    <Image source={require('../assets/icon/location-gray-icon.png')} style={{ width: 9, height: 11 }} resizeMode="cover" />
+                                                    <Text className="text-[13px] font-medium text-[#8E8E93] px-2">
+                                                        {isVi ? 'Địa điểm' : 'Location'}
+                                                    </Text>
+                                                    <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
+                                                        <Text className={`font-regular text-[13px] text-right tracking-[0.06px] ${location ? 'text-[#1C1C1E]' : 'text-[#9CA3AF]'}`} numberOfLines={1}>
+                                                            {location || (isVi ? "Nhấn để chọn địa chỉ..." : "Tap to select address...")}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </View>
 
-                                        <View className='flex-row py-3 mx-4 items-center'>
-                                            <Image source={require('../assets/icon/note-gray.png')} style={{ width: 9, height: 9 }} resizeMode="cover" />
-                                            <Text className="text-[13px] font-medium text-[#8E8E93] px-2">
+                                                <View ref={datetimeRef} collapsable={false}>
+                                                    <TouchableOpacity
+                                                        onPress={() => {
+                                                            if (Platform.OS === 'ios') {
+                                                                openDropdownPicker('datetime');
+                                                            } else {
+                                                                setTempDate(date);
+                                                                setPickerMode('date');
+                                                                setDatePickerVisible(true);
+                                                            }
+                                                        }}
+                                                        className='flex-row border-b border-[#E5E5E5] py-3 mx-4 items-center'
+                                                    >
+                                                        <Image source={require('../assets/icon/date-time-gray-icon.png')} style={{ width: 9, height: 9 }} resizeMode="cover" />
+                                                        <Text className="text-[13px] font-medium text-[#8E8E93] px-2">
+                                                            {isVi ? 'Ngày & Giờ' : 'Date & Time'}
+                                                        </Text>
+                                                        <Text className="flex-1 text-[13px] text-[#1C1C1E] text-right">{formattedDate}</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                <View className='flex-row py-3 mx-4 items-center'>
+                                                    <Image source={require('../assets/icon/note-gray.png')} style={{ width: 9, height: 9 }} resizeMode="cover" />
+                                                    <Text className="text-[13px] font-medium text-[#8E8E93] px-2">
+                                                        {isVi ? 'Ghi chú (tùy chọn)' : 'Note (optional)'}
+                                                    </Text>
+                                                    <TextInput
+                                                        placeholder={isVi ? 'Kể cho chúng tôi chuyện gì đã xảy ra' : 'Tell us what happened'}
+                                                        placeholderTextColor="#9CA3AF"
+                                                        style={{ fontFamily: "Urbanist" }}
+                                                        className="font-regular flex-1 text-[12px] text-[#1C1C1E] p-0 text-right tracking-[0.06px]"
+                                                    />
+                                                </View>
+                                            </View>
+                                        </>
+                                    )}
+
+                                    {/* --- KHỐI NOTE RIÊNG CHO SHELTER/EVENT: vì ẩn cả block địa điểm/ngày giờ phía trên, --- */}
+                                    {/* --- vẫn cần 1 nơi cho user mô tả thêm chi tiết --- */}
+                                    {hideLocationDateBlock && (
+                                        <View className='mb-[20px] rounded-[16px] border border-[#E5E5E5] px-4 py-3'>
+                                            <Text className="text-[13px] font-medium text-[#8E8E93] mb-2">
                                                 {isVi ? 'Ghi chú (tùy chọn)' : 'Note (optional)'}
                                             </Text>
                                             <TextInput
                                                 placeholder={isVi ? 'Kể cho chúng tôi chuyện gì đã xảy ra' : 'Tell us what happened'}
                                                 placeholderTextColor="#9CA3AF"
                                                 style={{ fontFamily: "Urbanist" }}
-                                                className="font-regular flex-1 text-[12px] text-[#1C1C1E] p-0 text-right tracking-[0.06px]"
+                                                className="font-regular text-[13px] text-[#1C1C1E] p-0 tracking-[0.06px]"
+                                                multiline
                                             />
                                         </View>
-                                    </View>
+                                    )}
 
-                                    {/* BỔ SUNG SWITCH ẨN NỘI DUNG VÀO ĐÚNG UI CỦA BẠN */}
-                                    <View className="flex-row items-center justify-between mb-[20px] px-2">
-                                        <View className="flex-1 mr-4">
-                                            <Text className="font-semibold text-[14px] text-[#1C1C1E]">
-                                                {isVi ? "Ẩn nội dung từ người này" : "Block content from this user"}
-                                            </Text>
-                                            <Text className="text-[12px] text-[#8E8E93] mt-0.5">
-                                                {isVi ? "Bạn sẽ không còn thấy thú cưng của người dùng này nữa." : "You will no longer see pets from this owner."}
-                                            </Text>
+                                    {/* BỔ SUNG SWITCH ẨN NỘI DUNG — không áp dụng cho context 'event' vì organizer không phải đối tượng đang follow ở đây */}
+                                    {!isMatchingContext && !isShelterContext && !isMedicalRecordContext && (
+                                        <View className="flex-row items-center justify-between mb-[20px] px-2">
+                                            <View className="flex-1 mr-4">
+                                                <Text className="font-semibold text-[14px] text-[#1C1C1E]">{blockTitle}</Text>
+                                                <Text className="text-[12px] text-[#8E8E93] mt-0.5">{blockDesc}</Text>
+                                            </View>
+                                            <Switch
+                                                value={isBlockRequested}
+                                                onValueChange={setIsBlockRequested}
+                                                trackColor={{ false: '#E5E5E5', true: '#F2A465' }}
+                                                thumbColor={'#FFFFFF'}
+                                            />
                                         </View>
-                                        <Switch
-                                            value={isBlockRequested}
-                                            onValueChange={setIsBlockRequested}
-                                            trackColor={{ false: '#E5E5E5', true: '#F2A465' }}
-                                            thumbColor={'#FFFFFF'}
-                                            style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
-                                        />
-                                    </View>
+                                    )}
 
                                     <View className='w-full justify-center items-center mb-[12px]'>
                                         <TouchableOpacity
@@ -468,9 +596,7 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
 
                                     <View className='items-center justify-center'>
                                         <Text className='text-center text-[#8E8E93] text-[12px] leading-5 px-8 italic'>
-                                            {isVi
-                                                ? 'Báo cáo sẽ được xem xét và không tự động đánh dấu thú cưng là đi lạc'
-                                                : 'The report will be reviewed and does not automatically mark pet as lost'}
+                                            {disclaimerText}
                                         </Text>
                                     </View>
                                 </View>
@@ -478,8 +604,8 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
                         </KeyboardAvoidingView>
                     </View>
 
-                    {/* --- ADDRESS POPUP MODAL (ABSOLUTE OVERLAY) --- */}
-                    {showAddressPopup && (
+                    {/* --- ADDRESS POPUP MODAL (ABSOLUTE OVERLAY) — chỉ tồn tại trong context 'pet' --- */}
+                    {!hideLocationDateBlock && showAddressPopup && (
                         <View
                             className="absolute inset-0 bg-black/50 justify-center px-4"
                             style={{ zIndex: 9999, elevation: 9999 }}
@@ -539,8 +665,8 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
                         </View>
                     )}
 
-                    {/* --- KÍNH MỜ DROPDOWN CĂN GIỮA VÀ MÀU CAM (IOS) --- */}
-                    {Platform.OS === 'ios' && activePicker === 'datetime' && (
+                    {/* --- KÍNH MỜ DROPDOWN CĂN GIỮA VÀ MÀU CAM (IOS) — chỉ tồn tại trong context 'pet' --- */}
+                    {!hideLocationDateBlock && Platform.OS === 'ios' && activePicker === 'datetime' && (
                         <View className="absolute inset-0 z-[100]">
                             <TouchableOpacity activeOpacity={1} className="absolute inset-0" onPress={closeDropdownPicker} />
 
@@ -595,8 +721,8 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit }: Props
                         </View>
                     )}
 
-                    {/* --- ANDROID NATIVE DATE & TIME PICKER FLOW --- */}
-                    {Platform.OS === 'android' && isDatePickerVisible && (
+                    {/* --- ANDROID NATIVE DATE & TIME PICKER FLOW — chỉ tồn tại trong context 'pet' --- */}
+                    {!hideLocationDateBlock && Platform.OS === 'android' && isDatePickerVisible && (
                         <DateTimePicker
                             value={tempDate}
                             mode={pickerMode}

@@ -19,14 +19,34 @@ import {
 } from 'react-native';
 import { Text } from './AppText';
 import { TextInput } from './AppTextInput';
-import axiosClient from '@/api/axiosClient';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 function buildBilingual(sourceText: string): { vi: string; en: string } {
   const trimmed = sourceText?.trim() || '';
   return { vi: trimmed, en: trimmed };
 }
 
+// Lấy text hiển thị theo ngôn ngữ hiện tại từ field recordName/nextDueName
+// (field này có thể là string thường, JSON string "{...}", hoặc object {vi, en})
+function extractBilingualText(val: any, isVi: boolean): string {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return (isVi ? parsed.vi : parsed.en) || parsed.en || parsed.vi || '';
+      } catch {
+        return val;
+      }
+    }
+    return val;
+  }
+  if (typeof val === 'object') {
+    return (isVi ? val.vi : val.en) || val.en || val.vi || '';
+  }
+  return String(val);
+}
 
 const formatShortDate = (date: Date, isVi: boolean) => {
   const day = date.getDate();
@@ -77,7 +97,7 @@ const RECORD_OPTIONS = [
   },
 ];
 
-const VACCINE_OPTIONS = {
+const VACCINE_OPTIONS: Record<'Dog' | 'Cat', { id: string; label: string }[]> = {
   Dog: [
     { id: 'DOG_DHP', label: 'DHP (3in1)' },
     { id: 'DOG_DHPP', label: 'DHPP (5/7in1)' },
@@ -93,31 +113,100 @@ const VACCINE_OPTIONS = {
   ]
 };
 
+// Chuẩn hoá bất kỳ giá trị species nào (string 'Dog'/'DOG'/'dog', hoặc object
+// bilingual {vi:'Chó', en:'Dog'} từ Prisma Json field, hoặc JSON string) về
+// đúng key 'Dog' | 'Cat' dùng làm index cho VACCINE_OPTIONS.
+// Luôn fallback về 'Dog' để KHÔNG BAO GIỜ trả về undefined — đây chính là
+// nguồn gây lỗi "Cannot read property 'find' of undefined".
+function resolveSpeciesKey(species: any): 'Dog' | 'Cat' {
+  if (!species) return 'Dog';
+
+  let raw = species;
+  if (typeof raw === 'object') {
+    raw = raw.en || raw.vi || '';
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        raw = parsed.en || parsed.vi || '';
+      } catch {
+        // giữ raw nguyên bản nếu parse lỗi
+      }
+    }
+  }
+
+  const normalized = String(raw).toLowerCase();
+  if (normalized.includes('cat') || normalized.includes('mèo') || normalized.includes('meo')) {
+    return 'Cat';
+  }
+  return 'Dog';
+}
+
 const OPTION_ROW_H = 62;
 const BASE_HEIGHT = 52 + 21 + 29 + (OPTION_ROW_H * 4) + 21;
+
+// Map từ id RECORD_OPTIONS <-> record.type lưu ở backend (vaccination/examination/dental/other
+// đang được dùng làm cả "selectedType" UI lẫn giá trị gửi lên BE qua field `type`,
+// nên khi edit ta chỉ cần map ngược lại đúng id nếu type khớp, fallback 'other').
+function resolveSelectedTypeFromRecord(record: any): string {
+  const t = (record?.type || '').toLowerCase();
+  const known = RECORD_OPTIONS.map(o => o.id);
+  if (known.includes(t)) return t;
+  return 'other';
+}
 
 interface AddMedicalRecordModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Gọi khi tạo record mới (mode === 'create') */
   onSubmit: (data: any) => void;
+  /** Gọi khi sửa record có sẵn (mode === 'edit'). Nhận (recordId, data) */
+  onSubmitEdit?: (recordId: string, data: any) => void;
+  /**
+   * Gọi khi đang ở mode === 'view' và người dùng chỉ đổi Next Due Date/Name.
+   * Nhận (recordId, { nextDueName, nextDueDate }) — KHÔNG gửi các field khác,
+   * để tránh ghi đè nhầm dữ liệu đã verify ở các field còn lại.
+   */
+  onSubmitNextDueOnly?: (recordId: string, data: { nextDueName: string; nextDueDate: string }) => void;
   species?: 'Dog' | 'Cat';
+  /** 'create' (mặc định), 'edit' (sửa toàn bộ), hoặc 'view' (chỉ xem, chỉ sửa được Next Due Date) */
+  mode?: 'create' | 'edit' | 'view';
+  /** Record gốc cần sửa/xem, bắt buộc khi mode === 'edit' | 'view' */
+  initialRecord?: any | null;
 }
 
 export default function AddMedicalRecordModal({
   visible,
   onClose,
   onSubmit,
-  species = 'Dog'
+  onSubmitEdit,
+  onSubmitNextDueOnly,
+  species = 'Dog',
+  mode = 'create',
+  initialRecord = null,
 }: AddMedicalRecordModalProps) {
   const { language } = useLanguage();
   const isVi = language === 'vi';
+  const isEditMode = mode === 'edit' && !!initialRecord;
+  const isViewMode = mode === 'view' && !!initialRecord;
+  const isReadOnly = isViewMode; // alias cho dễ đọc ở JSX phía dưới
+  // species có thể được truyền vào sai kiểu (object bilingual {vi,en}, chuỗi khác hoa/thường, ...)
+  // resolveSpeciesKey luôn trả về đúng 'Dog' | 'Cat', không bao giờ undefined.
+  const safeSpecies = resolveSpeciesKey(species);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Lưu giá trị GỐC của nextDueName/nextDueDate lúc mở modal (chỉ dùng ở view mode)
+  // để so sánh và biết người dùng có thực sự thay đổi gì không → quyết định hiện/ẩn nút Update.
+  const originalNextDueRef = useRef<{ name: string; date: Date | null }>({ name: '', date: null });
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
 
   const [recordName, setRecordName] = useState('');
   const [recordDate, setRecordDate] = useState(new Date());
   const [showRecordDatePicker, setShowRecordDatePicker] = useState(false);
+  // images: có thể là local file:// uri (ảnh mới chọn) hoặc http(s) url (ảnh cũ đã upload)
   const [images, setImages] = useState<string[]>([]);
 
   const [vaccineType, setVaccineType] = useState<string>('');
@@ -128,6 +217,20 @@ export default function AddMedicalRecordModal({
   const [nextDueName, setNextDueName] = useState('');
   const [nextDueDate, setNextDueDate] = useState(new Date());
   const [showNextDatePicker, setShowNextDatePicker] = useState(false);
+
+  // Trong view mode: true khi người dùng thực sự đổi nextDueName hoặc nextDueDate
+  // so với giá trị gốc lúc mở modal. Dùng để quyết định hiện/ẩn nút "Cập nhật Next Due".
+  const hasNextDueChanged = isViewMode && hasNextDueDate && (() => {
+    const original = originalNextDueRef.current;
+    if (!original.date) return false; // ban đầu không có next due thì view mode không cho bật mới
+    const nameChanged = nextDueName.trim() !== (original.name || '').trim();
+    const dateChanged = nextDueDate.getTime() !== original.date.getTime();
+    return nameChanged || dateChanged;
+  })();
+
+  // Cờ này để tắt các useEffect "tự tính toán nextDueDate/nextDueName" khi vừa prefill
+  // dữ liệu edit vào, tránh việc auto-overwrite giá trị gốc người dùng đã lưu trước đó.
+  const skipAutoCalcRef = useRef(false);
 
   const modalHeight = useRef(new Animated.Value(BASE_HEIGHT)).current;
   const detailsFade = useRef(new Animated.Value(0)).current;
@@ -148,8 +251,6 @@ export default function AddMedicalRecordModal({
     const ref = type === 'record' ? recordDateRef : nextDateRef;
     ref.current?.measureInWindow((x, y, width, height) => {
       const dropdownWidth = 340;
-
-      // SỬA Ở ĐÂY: Thay thế khối if-else bằng công thức căn giữa tuyệt đối
       const finalX = (SCREEN_WIDTH - dropdownWidth) / 2;
 
       setPickerLayout({ x: finalX, y: y + height + 8, width: dropdownWidth });
@@ -177,7 +278,13 @@ export default function AddMedicalRecordModal({
     }, {})
   ).current;
 
+  // Auto-tính nextDueDate/nextDueName cho vaccine — CHỈ áp dụng khi đang tạo mới
+  // hoặc khi user tự đổi vaccine/dose trong lúc edit (không chạy ngay sau khi prefill)
   useEffect(() => {
+    if (skipAutoCalcRef.current) {
+      skipAutoCalcRef.current = false;
+      return;
+    }
     if (selectedType === 'vaccination' && vaccineType) {
       setHasNextDueDate(true);
       const nextDate = new Date(recordDate);
@@ -196,12 +303,13 @@ export default function AddMedicalRecordModal({
 
       setNextDueDate(nextDate);
 
-      const vName = VACCINE_OPTIONS[species].find(v => v.id === vaccineType)?.label || '';
+      const vName = VACCINE_OPTIONS[safeSpecies].find(v => v.id === vaccineType)?.label || '';
       setNextDueName(isVi ? `Nhắc lại ${vName}` : `${vName} Booster`);
     }
-  }, [selectedType, vaccineType, recordDate, doseNumber, species, isVi]);
+  }, [selectedType, vaccineType, recordDate, doseNumber, safeSpecies, isVi]);
 
   useEffect(() => {
+    if (skipAutoCalcRef.current) return;
     if (selectedType && selectedType !== 'vaccination') {
       if (recordName.trim()) {
         setNextDueName(isVi ? `Nhắc lại ${recordName}` : `${recordName} Reminder`);
@@ -247,16 +355,19 @@ export default function AddMedicalRecordModal({
       detailsH += 48;
 
       if (selectedType === 'vaccination') {
-        if (showVaccineDropdown) {
-          const itemsCount = VACCINE_OPTIONS[species].length;
+        if (showVaccineDropdown && !isReadOnly) {
+          const itemsCount = VACCINE_OPTIONS[safeSpecies].length;
           detailsH += Math.min(160, itemsCount * 41 + 2) + 12;
         }
-        if (vaccineType && vaccineType !== 'DOG_RABIES' && vaccineType !== 'CAT_RABIES' && vaccineType !== 'DOG_BORDETELLA') {
+        if (!isReadOnly && vaccineType && vaccineType !== 'DOG_RABIES' && vaccineType !== 'CAT_RABIES' && vaccineType !== 'DOG_BORDETELLA') {
           detailsH += 46;
         }
       }
 
-      detailsH += 56;
+      // Khối "Upload Photos" (đường viền nét đứt) chỉ tồn tại khi KHÔNG readonly
+      if (!isReadOnly) {
+        detailsH += 56;
+      }
       if (images.length > 0) {
         detailsH += Math.ceil(images.length / 3) * 94;
       }
@@ -271,36 +382,82 @@ export default function AddMedicalRecordModal({
     }
 
     animateHeight(target).start();
-  }, [selectedType, images.length, hasNextDueDate, vaccineType, doseNumber, showVaccineDropdown, species]);
+  }, [selectedType, images.length, hasNextDueDate, vaccineType, doseNumber, showVaccineDropdown, safeSpecies, isReadOnly]);
 
   useEffect(() => { animateTo(detailsFade, selectedType ? 1 : 0).start(); }, [selectedType]);
   useEffect(() => { animateTo(imagesFade, images.length > 0 ? 1 : 0, 200).start(); }, [images.length]);
   useEffect(() => { animateTo(nextDueFade, hasNextDueDate ? 1 : 0).start(); }, [hasNextDueDate]);
 
+  // Reset (create) hoặc Prefill (edit) mỗi khi modal mở
   useEffect(() => {
     if (visible) {
       RECORD_OPTIONS.forEach(opt => {
         optionHeights[opt.id].setValue(OPTION_ROW_H);
       });
 
-      setSelectedType(null);
-      setRecordName('');
-      setRecordDate(new Date());
-      setVaccineType('');
-      setShowVaccineDropdown(false);
-      setDoseNumber(1);
-      setImages([]);
-      setHasNextDueDate(false);
-      setNextDueName('');
-      setNextDueDate(new Date());
-      setIsSubmitting(false);
+      if ((isEditMode || isViewMode) && initialRecord) {
+        // Ngăn các useEffect auto-calc ghi đè giá trị gốc ngay sau khi set state dưới đây
+        skipAutoCalcRef.current = true;
 
+        const typeId = resolveSelectedTypeFromRecord(initialRecord);
+        setSelectedType(typeId);
+
+        if (typeId === 'vaccination') {
+          // record.vaccineType có thể không được lưu trực tiếp; cố gắng suy ra từ recordName
+          const nameText = extractBilingualText(initialRecord.recordName, isVi);
+          const matched = VACCINE_OPTIONS[safeSpecies].find(
+            v => v.label.toLowerCase() === nameText.toLowerCase()
+          );
+          setVaccineType(initialRecord.vaccineType || matched?.id || '');
+          setDoseNumber(initialRecord.doseNumber || 1);
+          setRecordName('');
+        } else {
+          setRecordName(extractBilingualText(initialRecord.recordName, isVi));
+          setVaccineType('');
+          setDoseNumber(1);
+        }
+
+        setRecordDate(initialRecord.recordDate ? new Date(initialRecord.recordDate) : new Date());
+        setShowVaccineDropdown(false);
+
+        const existingImages = Array.isArray(initialRecord.images)
+          ? initialRecord.images.filter(Boolean)
+          : [];
+        setImages(existingImages);
+
+        const initialHasNextDue = !!initialRecord.hasNextDueDate;
+        const initialNextDueName = extractBilingualText(initialRecord.nextDueName, isVi);
+        const initialNextDueDate = initialRecord.nextDueDate ? new Date(initialRecord.nextDueDate) : new Date();
+
+        setHasNextDueDate(initialHasNextDue);
+        setNextDueName(initialNextDueName);
+        setNextDueDate(initialNextDueDate);
+
+        // Lưu mốc gốc để view mode so sánh, biết người dùng có thực sự sửa gì không
+        originalNextDueRef.current = {
+          name: initialNextDueName,
+          date: initialHasNextDue ? initialNextDueDate : null,
+        };
+      } else {
+        setSelectedType(null);
+        setRecordName('');
+        setRecordDate(new Date());
+        setVaccineType('');
+        setShowVaccineDropdown(false);
+        setDoseNumber(1);
+        setImages([]);
+        setHasNextDueDate(false);
+        setNextDueName('');
+        setNextDueDate(new Date());
+      }
+
+      setIsSubmitting(false);
       animateTo(backdropOpacity, 1, 220).start();
     } else {
       backdropOpacity.setValue(0);
       setActivePicker(null);
     }
-  }, [visible]);
+  }, [visible, isEditMode, isViewMode, initialRecord]);
 
   const handleClose = () => {
     onClose();
@@ -330,15 +487,14 @@ export default function AddMedicalRecordModal({
       return;
     }
     const recordNameBilingual = selectedType === 'vaccination'
-      ? buildBilingual(VACCINE_OPTIONS[species].find(v => v.id === vaccineType)?.label || '')
+      ? buildBilingual(VACCINE_OPTIONS[safeSpecies].find(v => v.id === vaccineType)?.label || '')
       : buildBilingual(recordName);
-
 
     const nextDueNameBilingual = hasNextDueDate
       ? buildBilingual(nextDueName)
       : null;
 
-    onSubmit({
+    const payload = {
       type: selectedType,
       recordName: recordNameBilingual,
       vaccineType: selectedType === 'vaccination' ? vaccineType : undefined,
@@ -348,6 +504,29 @@ export default function AddMedicalRecordModal({
       hasNextDueDate,
       nextDueName: nextDueNameBilingual ?? undefined,
       nextDueDate: hasNextDueDate ? nextDueDate.toISOString() : undefined,
+    };
+
+    if (isEditMode) {
+      onSubmitEdit?.(initialRecord.id, payload);
+    } else {
+      onSubmit(payload);
+    }
+    handleClose();
+  };
+
+  // Dành riêng cho view mode: chỉ gửi nextDueName/nextDueDate, không đụng các field khác
+  // của record (giữ nguyên type, recordName, recordDate, images, verificationStatus...).
+  const handleSubmitNextDueOnly = () => {
+    if (!isViewMode || !initialRecord) return;
+    if (!nextDueName.trim()) {
+      Alert.alert('Lỗi', isVi ? 'Vui lòng nhập tên/ghi chú nhắc lịch' : 'Please enter a reminder name');
+      return;
+    }
+    const nextDueNameBilingual = buildBilingual(nextDueName);
+
+    onSubmitNextDueOnly?.(initialRecord.id, {
+      nextDueName: nextDueNameBilingual as any,
+      nextDueDate: nextDueDate.toISOString(),
     });
     handleClose();
   };
@@ -364,14 +543,18 @@ export default function AddMedicalRecordModal({
           <TouchableOpacity
             onPress={handleClose}
             className="absolute z-50 p-1"
-            style={{ top: 36, right: 23 }}
+            style={{ top: 28, right: 23 }}
           >
             <Ionicons name="close" size={16} color="#000000" />
           </TouchableOpacity>
 
           <View className="flex-row items-center justify-center pt-[26px]">
-            <Text className="text-[22px] font-semibold text-[#000000]">
-              {isVi ? 'Thêm hồ sơ y tế' : 'Add Medical Record'}
+            <Text className="text-[18px] font-semibold text-[#000000]">
+              {isViewMode
+                ? (isVi ? 'Xem hồ sơ y tế' : 'View Medical Record')
+                : isEditMode
+                  ? (isVi ? 'Sửa hồ sơ y tế' : 'Edit Medical Record')
+                  : (isVi ? 'Thêm hồ sơ y tế' : 'Add Medical Record')}
             </Text>
           </View>
 
@@ -385,8 +568,11 @@ export default function AddMedicalRecordModal({
               return (
                 <Animated.View key={item.id} style={{ height: optionHeights[item.id], overflow: 'hidden' }}>
                   <TouchableOpacity
-                    activeOpacity={0.7}
+                    activeOpacity={isReadOnly ? 1 : 0.7}
+                    disabled={isReadOnly}
                     onPress={() => {
+                      if (isReadOnly) return;
+                      // Trong edit mode, vẫn cho phép đổi loại nếu muốn — nhưng sẽ reset chi tiết
                       setSelectedType(isActive ? null : item.id);
                       setRecordName('');
                       setVaccineType('');
@@ -428,19 +614,21 @@ export default function AddMedicalRecordModal({
                     <View style={{ flex: 2 }}>
                       {selectedType === 'vaccination' ? (
                         <TouchableOpacity
-                          onPress={() => setShowVaccineDropdown(!showVaccineDropdown)}
-                          activeOpacity={0.8}
-                          className="h-[36px] border border-[#E5E5EA] rounded-[12px] px-[14px] flex-row items-center justify-between bg-white relative z-10"
+                          onPress={() => !isReadOnly && setShowVaccineDropdown(!showVaccineDropdown)}
+                          activeOpacity={isReadOnly ? 1 : 0.8}
+                          disabled={isReadOnly}
+                          className={`h-[36px] border border-[#E5E5EA] rounded-[12px] px-[14px] flex-row items-center justify-between relative z-10 ${isReadOnly ? 'bg-[#F9FAFB]' : 'bg-white'}`}
                         >
-                          <Text className={`${vaccineType ? 'text-black' : 'text-[#8E8E93]'} text-[14px] font-regular flex-1`} numberOfLines={1}>
-                            {VACCINE_OPTIONS[species].find(v => v.id === vaccineType)?.label || (isVi ? 'Chọn vắc-xin...' : 'Select vaccination...')}
+                          <Text className={`${vaccineType ? (isReadOnly ? 'text-[#6B7280]' : 'text-black') : 'text-[#8E8E93]'} text-[14px] font-regular flex-1`} numberOfLines={1}>
+                            {VACCINE_OPTIONS[safeSpecies].find(v => v.id === vaccineType)?.label || (isVi ? 'Chọn vắc-xin...' : 'Select vaccination...')}
                           </Text>
-                          <Feather name={showVaccineDropdown ? "chevron-up" : "chevron-down"} size={16} color="#8E8E93" />
+                          {!isReadOnly && <Feather name={showVaccineDropdown ? "chevron-up" : "chevron-down"} size={16} color="#8E8E93" />}
                         </TouchableOpacity>
                       ) : (
                         <TextInput
                           style={{ fontFamily: 'Urbanist-Regular' }}
-                          className="h-[36px] border border-[#E5E5EA] rounded-[12px] px-[14px] text-[14px] font-regular text-black bg-white"
+                          editable={!isReadOnly}
+                          className={`h-[36px] border border-[#E5E5EA] rounded-[12px] px-[14px] text-[14px] font-regular ${isReadOnly ? 'bg-[#F9FAFB] text-[#6B7280]' : 'bg-white text-black'}`}
                           placeholder={isVi ? 'Nhập tên...' : 'Enter name...'}
                           placeholderTextColor="#A1A1AA"
                           value={recordName}
@@ -449,27 +637,31 @@ export default function AddMedicalRecordModal({
                       )}
                     </View>
 
-                    {/* REF ĐO TỌA ĐỘ VÀ GỌI KÍNH MỜ CHO NGÀY HỒ SƠ */}
                     <View style={{ flex: 1 }} ref={recordDateRef} collapsable={false}>
                       <TouchableOpacity
-                        onPress={() => Platform.OS === 'ios' ? openDropdownPicker('record') : setShowRecordDatePicker(true)}
-                        className="h-[36px] border border-[#E5E5E5] rounded-[12px] px-1 justify-center items-center bg-white"
+                        onPress={() => {
+                          if (isReadOnly) return;
+                          Platform.OS === 'ios' ? openDropdownPicker('record') : setShowRecordDatePicker(true);
+                        }}
+                        activeOpacity={isReadOnly ? 1 : 0.7}
+                        disabled={isReadOnly}
+                        className={`h-[36px] border border-[#E5E5E5] rounded-[12px] px-1 justify-center items-center ${isReadOnly ? 'bg-[#F9FAFB]' : 'bg-white'}`}
                       >
-                        <Text className="text-[14px] font-regular text-black text-center" numberOfLines={1} adjustsFontSizeToFit>
+                        <Text className={`text-[14px] font-regular text-center ${isReadOnly ? 'text-[#6B7280]' : 'text-black'}`} numberOfLines={1} adjustsFontSizeToFit>
                           {formatShortDate(recordDate, isVi)}
                         </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
 
-                  {selectedType === 'vaccination' && showVaccineDropdown && (
+                  {selectedType === 'vaccination' && showVaccineDropdown && !isReadOnly && (
                     <View className="bg-gray-50 border border-[#E5E5EA] rounded-[12px] mb-3 max-h-[160px] overflow-hidden">
                       <ScrollView
                         showsVerticalScrollIndicator={true}
                         nestedScrollEnabled={true}
                         keyboardShouldPersistTaps="handled"
                       >
-                        {VACCINE_OPTIONS[species].map((item) => {
+                        {VACCINE_OPTIONS[safeSpecies].map((item) => {
                           const isSelected = vaccineType === item.id;
                           return (
                             <TouchableOpacity
@@ -491,7 +683,7 @@ export default function AddMedicalRecordModal({
                     </View>
                   )}
 
-                  {selectedType === 'vaccination' && vaccineType && vaccineType !== 'DOG_RABIES' && vaccineType !== 'CAT_RABIES' && vaccineType !== 'DOG_BORDETELLA' && (
+                  {!isReadOnly && selectedType === 'vaccination' && vaccineType && vaccineType !== 'DOG_RABIES' && vaccineType !== 'CAT_RABIES' && vaccineType !== 'DOG_BORDETELLA' && (
                     <View className="flex-row items-center justify-between mb-3 bg-[#FAFAFA] px-[12px] py-[10px] rounded-[12px] border border-[#E5E5EA]">
                       {[1, 2, 3].map((dose) => {
                         const isSelected = doseNumber === dose;
@@ -516,7 +708,7 @@ export default function AddMedicalRecordModal({
                     </View>
                   )}
 
-                  {images.length < 3 && (
+                  {!isReadOnly && images.length < 3 && (
                     <TouchableOpacity
                       onPress={handleUploadPhotos}
                       activeOpacity={0.7}
@@ -535,12 +727,14 @@ export default function AddMedicalRecordModal({
                         {images.map((url, index) => (
                           <View key={index} style={{ width: '31%', aspectRatio: 1 }} className="relative">
                             <Image source={{ uri: url }} className="w-full h-full rounded-[12px]" />
-                            <TouchableOpacity
-                              onPress={() => setImages(prev => prev.filter((_, i) => i !== index))}
-                              className="absolute -top-1.5 -right-1.5 bg-white rounded-full"
-                            >
-                              <Ionicons name="close-circle" size={18} color="#FF3B30" />
-                            </TouchableOpacity>
+                            {!isReadOnly && (
+                              <TouchableOpacity
+                                onPress={() => setImages(prev => prev.filter((_, i) => i !== index))}
+                                className="absolute -top-1.5 -right-1.5 bg-white rounded-full"
+                              >
+                                <Ionicons name="close-circle" size={18} color="#FF3B30" />
+                              </TouchableOpacity>
+                            )}
                           </View>
                         ))}
                       </View>
@@ -555,6 +749,7 @@ export default function AddMedicalRecordModal({
                       style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                       value={hasNextDueDate}
                       onValueChange={setHasNextDueDate}
+                      disabled={isReadOnly}
                       trackColor={{ false: '#E5E5EA', true: '#E89B5A' }}
                       thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
                     />
@@ -574,7 +769,6 @@ export default function AddMedicalRecordModal({
                           />
                         </View>
 
-                        {/* REF ĐO TỌA ĐỘ VÀ GỌI KÍNH MỜ CHO NGÀY NHẮC LẠI */}
                         <View style={{ flex: 1 }} ref={nextDateRef} collapsable={false}>
                           <TouchableOpacity
                             onPress={() => Platform.OS === 'ios' ? openDropdownPicker('next') : setShowNextDatePicker(true)}
@@ -593,7 +787,12 @@ export default function AddMedicalRecordModal({
             </Animated.View>
           </View>
 
-          {selectedType && (
+          {/* Nút submit dưới đáy modal:
+              - create/edit mode: luôn hiện khi đã chọn loại record (selectedType)
+              - view mode: CHỈ hiện khi người dùng thực sự sửa Next Due Name/Date
+                so với giá trị gốc — đúng yêu cầu "ẩn nút update, chỉ hiện khi có
+                chỉnh sửa Next Due" */}
+          {!isViewMode && selectedType && (
             <View className="bg-white items-center" style={{ paddingTop: 17 }}>
               <TouchableOpacity
                 onPress={handleSubmit}
@@ -601,7 +800,27 @@ export default function AddMedicalRecordModal({
                 className={`h-[37px] w-2/3 rounded-[1000px] items-center justify-center bg-[#E89B5A] ${isSubmitting ? 'opacity-60' : ''}`}
               >
                 <Text className="font-semibold text-[14px] text-white">
-                  {isSubmitting ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Lưu hồ sơ' : 'Submit Record')}
+                  {isSubmitting
+                    ? (isVi ? 'Đang lưu...' : 'Saving...')
+                    : isEditMode
+                      ? (isVi ? 'Cập nhật' : 'Update Record')
+                      : (isVi ? 'Lưu hồ sơ' : 'Submit Record')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isViewMode && hasNextDueChanged && (
+            <View className="bg-white items-center" style={{ paddingTop: 17 }}>
+              <TouchableOpacity
+                onPress={handleSubmitNextDueOnly}
+                disabled={isSubmitting}
+                className={`h-[37px] w-2/3 rounded-[1000px] items-center justify-center bg-[#E89B5A] ${isSubmitting ? 'opacity-60' : ''}`}
+              >
+                <Text className="font-semibold text-[14px] text-white">
+                  {isSubmitting
+                    ? (isVi ? 'Đang lưu...' : 'Saving...')
+                    : (isVi ? 'Cập nhật lịch tiếp theo' : 'Update Next Due')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -643,7 +862,6 @@ export default function AddMedicalRecordModal({
               </TouchableOpacity>
             </View>
 
-            {/* Đã giới hạn strict height và giảm padding để xoá bỏ khoảng trắng to đùng ở dưới đáy */}
             <View style={{ paddingTop: 4, paddingBottom: 4, paddingHorizontal: 10, alignItems: 'center' }} className="relative z-10">
               <DateTimePicker
                 value={activePicker === 'record' ? recordDate : nextDueDate}
@@ -652,9 +870,7 @@ export default function AddMedicalRecordModal({
                 themeVariant="dark"
                 locale={isVi ? "vi-VN" : "en-US"}
                 minimumDate={activePicker === 'next' ? new Date() : undefined}
-                // Giới hạn cứng chiều cao để iOS không sinh thêm padding thừa
                 style={{ width: 320, height: 315, alignSelf: 'center' }}
-                // Đổi toàn bộ các nút xanh mặc định của DatePicker sang màu cam chuẩn
                 accentColor="#E89B5A"
                 onChange={(event, selectedDate) => {
                   if (selectedDate) {

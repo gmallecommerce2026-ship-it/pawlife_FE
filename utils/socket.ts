@@ -14,7 +14,7 @@ export const connectSocket = async (token?: string) => {
     // Nếu gọi lúc login, bạn có thể truyền thẳng token vào. 
     // Nếu gọi lúc app khởi động, tự động lấy từ storage.
     const accessToken = token || await SecureStore.getItemAsync('access_token'); // Đổi lại đúng key lưu token của bạn
-    
+
     if (accessToken) {
       socket.auth = { token: accessToken }; // Backend lấy token từ đây
       socket.connect();
@@ -28,7 +28,13 @@ export const connectSocket = async (token?: string) => {
 
 // Hàm này dùng để gọi khi User Logout
 export const disconnectSocket = () => {
-  if (socket.connected) {
-    socket.disconnect();
+  if (socket) {
+    // 1. Tắt tất cả các sự kiện hiện có trước khi ngắt kết nối
+    socket.removeAllListeners();
+
+    // 2. Ngắt kết nối
+    if (socket.connected) {
+      socket.disconnect();
+    }
   }
 };

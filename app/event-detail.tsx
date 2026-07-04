@@ -18,6 +18,7 @@ import { useEngagementStore } from '../store/useEngagementStore';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import ReportIssueModal from '../components/ReportIssueModal';
 
 const { width } = Dimensions.get('window');
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -45,13 +46,13 @@ export default function EventDetailScreen() {
     const { l } = useLocalizedData();
     const isVi = language === 'vi';
     const queryClient = useQueryClient();
-
+    const [shouldBackOnClose, setShouldBackOnClose] = useState(false);
     const bottomSheetRef = useRef<BottomSheet>(null);
     const snapPoints = useMemo(() => ['60%', '95%'], []);
 
     const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-
+    const [showReportModal, setShowReportModal] = useState(false);
     // --- 1. FETCH EVENT DETAIL VỚI USEQUERY ---
     const { data: eventData, isLoading: detailLoading, isError: isNotFound } = useQuery({
         queryKey: ['event-detail', eventId],
@@ -80,9 +81,11 @@ export default function EventDetailScreen() {
 
     // --- 2. FETCH SIMILAR EVENTS VỚI USEQUERY ---
     const { data: similarEvents = [] } = useQuery({
-        queryKey: ['upcoming-events'],
+        // THÊM user?.id VÀO QUERY KEY ĐỂ CACHE THEO TỪNG USER
+        queryKey: ['upcoming-events', user?.id],
         queryFn: async () => {
-            const res = await eventService.getUpcomingEvents(5);
+            // TRUYỀN THÊM user?.id VÀO HÀM (Cần đảm bảo eventService.getUpcomingEvents có hỗ trợ nhận param thứ 2)
+            const res = await eventService.getUpcomingEvents(5, user?.id);
             return res.data ? res.data.filter((ev: any) => ev.id !== eventId) : [];
         },
         enabled: !!eventId
@@ -191,7 +194,38 @@ export default function EventDetailScreen() {
             });
         }
     });
+    const hideEventMutation = useMutation({
+        mutationFn: (data: any) => {
+            const userId = user?.id || 'guest';
+            return Promise.all([
+                eventService.reportEvent(eventId, userId, data),
+                eventService.hideEvent(eventId, userId)
+            ]);
+        },
+        onSuccess: () => {
+            // 1. Optimistic Update (Giữ nguyên)
+            queryClient.setQueryData(['upcoming-events', user?.id], (oldData: any) => {
+                if (!Array.isArray(oldData)) return oldData;
+                return oldData.filter((ev: any) => ev.id !== eventId);
+            });
 
+            // 2. FIX: Invalidate chuẩn của React Query 
+            // Cơ chế của nó sẽ tự động fuzzy-match và invalidate tất cả query có CHỨA key này ở đầu mảng.
+            queryClient.invalidateQueries({ queryKey: ['upcoming-events'] });
+            queryClient.invalidateQueries({ queryKey: ['interested-events'] });
+            queryClient.invalidateQueries({ queryKey: ['search-events'] });
+
+            // Cập nhật state để force pop về home
+            setShouldBackOnClose(true);
+        },
+        onError: () => {
+            Toast.show({
+                type: 'error',
+                text1: isVi ? 'Lỗi' : 'Error',
+                text2: isVi ? 'Có lỗi xảy ra, vui lòng thử lại.' : 'Something went wrong. Please try again.',
+            });
+        }
+    });
     const handleInterest = () => {
         toggleInterestMutation.mutate();
     };
@@ -348,6 +382,7 @@ export default function EventDetailScreen() {
                         </TouchableOpacity>
 
                         {/* BÊN PHẢI: Nút Share & Mark */}
+                        {/* BÊN PHẢI: Nút Bookmark, Report & Share */}
                         <View className="flex-row items-center">
                             <TouchableOpacity
                                 onPress={handleInterest}
@@ -386,6 +421,43 @@ export default function EventDetailScreen() {
                                         style={{ width: 10, height: 13 }}
                                         resizeMode="cover"
                                     />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* ⬇️ NÚT REPORT MỚI: chèn giữa bookmark và share, dùng icon flag từ Feather */}
+                            <TouchableOpacity
+                                onPress={() => setShowReportModal(true)}
+                                activeOpacity={0.7}
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.1,
+                                    shadowRadius: 5,
+                                    elevation: 3,
+                                }}
+                                className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                            >
+                                <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 28,
+                                        borderWidth: 0.5,
+                                        borderTopColor: 'white',
+                                        borderLeftColor: 'white',
+                                        borderBottomColor: 'transparent',
+                                        borderRightColor: 'transparent',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    }}>
+                                    <LinearGradient
+                                        colors={['rgba(221, 221, 221, 0.1)', 'rgba(247, 247, 247, 0.5)', '#FFFFFF']}
+                                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                        locations={[0, 0.3, 1]}
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }}
+                                    />
+                                    <Feather name="flag" size={16} color="#000000" />
                                 </View>
                             </TouchableOpacity>
 
@@ -710,7 +782,33 @@ export default function EventDetailScreen() {
 
                 </BottomSheetScrollView>
             </BottomSheet>
+            <ReportIssueModal
+                isVisible={showReportModal}
+                context="event"
+                targetName={l(eventData.title)}
+                onClose={() => setShowReportModal(false)}   // ⬅️ chỉ đóng modal report, KHÔNG back ở đây nữa
+                onSuccessModalClose={() => {                 // ⬅️ back CHỈ khi success modal đã đóng
+                    if (shouldBackOnClose) {
+                        setShouldBackOnClose(false);
+                        router.replace('/(tabs)');
+                    }
+                }}
+                onSubmit={async (data) => {
+                    const { location, date, isBlockRequested, ...rest } = data;
+                    const userId = user?.id || 'guest';
 
+                    if (isBlockRequested) {
+                        await hideEventMutation.mutateAsync(rest);
+                    } else {
+                        try {
+                            await eventService.reportEvent(eventId, userId, rest);
+                        } catch (error) {
+                            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to report.' });
+                            throw error;
+                        }
+                    }
+                }}
+            />
         </View>
     );
 }
