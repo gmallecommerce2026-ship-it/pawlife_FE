@@ -248,7 +248,7 @@ export default function ScannedPetScreen() {
       );
     }
   };
-
+  const [sliderWidth, setSliderWidth] = useState(width - 40);
   const onImageScroll = (event: any) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
     const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
@@ -303,8 +303,7 @@ export default function ScannedPetScreen() {
     ? (typeof rawNote === 'object' ? displayBilingual(parseBilingual(rawNote), isVi) : rawNote)
     : (isVi ? 'Vui lòng liên hệ tôi sớm nhất' : 'Please contact me ASAP');
 
-  const lostImageWidth = width - 40;
-  const safeImageWidth = width - 48;
+
   const handleReportSubmit = async (reason: string, details: string, isBlockRequested: boolean) => {
     try {
       // Nếu chưa đăng nhập thì hiện thông báo yêu cầu đăng nhập ở đây
@@ -398,11 +397,14 @@ export default function ScannedPetScreen() {
                 elevation: 3,
               }}>
 
-              <View className="relative rounded-[24px] overflow-hidden bg-gray-200 " style={{
-                height: 210, shadowColor: '#000', shadowOffset: { width: 10, height: 10 },
-                shadowOpacity: 0.6, shadowRadius: 15, elevation: 4,
-              }}>
-
+              <View 
+                onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
+                className="relative rounded-[24px] overflow-hidden bg-gray-200" 
+                style={{
+                  height: 210, shadowColor: '#000', shadowOffset: { width: 10, height: 10 },
+                  shadowOpacity: 0.6, shadowRadius: 15, elevation: 4,
+                }}
+              >
                 {/* --- SLIDER ẢNH --- */}
                 <ScrollView
                   horizontal
@@ -412,7 +414,8 @@ export default function ScannedPetScreen() {
                   style={{ width: '100%', height: 210 }}
                 >
                   {displayImages.map((uri, index) => (
-                    <ImageWithLoading key={`lost-${index}`} uri={uri} imgWidth={lostImageWidth} />
+                    // THAY imgWidth THÀNH sliderWidth
+                    <ImageWithLoading key={`lost-${index}`} uri={uri} imgWidth={sliderWidth} />
                   ))}
                 </ScrollView>
 
@@ -467,7 +470,11 @@ export default function ScannedPetScreen() {
               shadowRadius: 5,
               elevation: 3,
             }}>
-              <View className="w-full rounded-[24px] overflow-hidden shadow-lg shadow-black/10 bg-gray-200" style={{ height: 210 }}>
+              <View 
+                onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
+                className="w-full rounded-[24px] overflow-hidden shadow-lg shadow-black/10 bg-gray-200" 
+                style={{ height: 210 }}
+              >
                 {/* --- SLIDER ẢNH --- */}
                 <ScrollView
                   horizontal
@@ -477,7 +484,8 @@ export default function ScannedPetScreen() {
                   style={{ width: '100%', height: 210 }}
                 >
                   {displayImages.map((uri, index) => (
-                    <ImageWithLoading key={`safe-${index}`} uri={uri} imgWidth={safeImageWidth} />
+                    // THAY imgWidth THÀNH sliderWidth
+                    <ImageWithLoading key={`safe-${index}`} uri={uri} imgWidth={sliderWidth} />
                   ))}
                 </ScrollView>
 

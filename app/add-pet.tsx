@@ -86,8 +86,13 @@ const CustomInput = ({ value, onChangeText, placeholder }: { value?: string; onC
   </View>
 );
 
-const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeholder: string; value?: string; options?: string[]; onSelect?: (val: string) => void }) => {
+const CustomDropdown = ({ placeholder, value, options = [], onSelect, isVi }: { placeholder: string; value?: string; options?: string[]; onSelect?: (val: string) => void; isVi: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Các biến font động
+  const fontMedium = isVi ? 'BeVietnamPro-Medium' : 'Urbanist-Medium';
+  const fontRegular = isVi ? 'BeVietnamPro-Regular' : 'Urbanist-Regular';
+  const fontBold = isVi ? 'BeVietnamPro-Bold' : 'Urbanist-Bold';
 
   return (
     <View>
@@ -99,7 +104,7 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
         <Text
           className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`}
           numberOfLines={1}
-          style={{ fontFamily: 'Urbanist-Medium' }} // THÊM DÒNG NÀY (Vì đang dùng font-medium)
+          style={{ fontFamily: fontMedium }} // DÙNG BIẾN ĐỘNG
         >
           {value || placeholder}
         </Text>
@@ -132,8 +137,7 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
                   >
                     <Text
                       className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}
-                      // THÊM DÒNG NÀY: Nếu được chọn thì dùng Bold, bình thường dùng Regular
-                      style={{ fontFamily: isSelected ? 'Urbanist-Bold' : 'Urbanist-Regular' }}
+                      style={{ fontFamily: isSelected ? fontBold : fontRegular }} // DÙNG BIẾN ĐỘNG
                     >
                       {item}
                     </Text>
@@ -250,6 +254,7 @@ export default function AddPetScreen() {
   const rawQrData = params.rawQrData as string;
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const defaultFont = isVi ? 'BeVietnamPro-Regular' : 'Urbanist-Regular';
   const showModal = useModalStore((state) => state.showModal);
 
   const [showMedicalModal, setShowMedicalModal] = useState(false);
@@ -399,7 +404,15 @@ export default function AddPetScreen() {
     handleChange('contactAddress', fullAddress);
     setShowAddressPopup(false);
   };
-
+  const handleBack = useCallback(() => {
+    // Nếu có lịch sử trang trước đó thì lùi lại
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Nếu không có lịch sử (do quét QR vào thẳng), đưa user về trang danh sách thú cưng hoặc trang chủ
+      router.replace('/(tabs)/my-pets');
+    }
+  }, [router]);
   const [formData, setFormData] = useState<AddPetFormData>({
     name: '',
     species: 'Dog',
@@ -633,7 +646,7 @@ export default function AddPetScreen() {
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 py-4 bg-white z-10">
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={handleBack}
               activeOpacity={0.7}
               style={{
                 shadowColor: '#000',
@@ -673,6 +686,7 @@ export default function AddPetScreen() {
           <ScrollView
             ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 20 }}
             className="flex-1"
           >
@@ -728,9 +742,9 @@ export default function AddPetScreen() {
                           backgroundColor: '#FFFFFF',
                         }}
                         containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
-                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                        selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: defaultFont }}
+                        selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
                         data={speciesData}
                         maxHeight={200}
                         labelField="label"
@@ -759,9 +773,9 @@ export default function AddPetScreen() {
                           backgroundColor: '#FFFFFF',
                         }}
                         containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 4, borderColor: '#E5E7EB', borderWidth: 1 }}
-                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                        selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: defaultFont }}
+                        selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
                         data={genderData}
                         maxHeight={200}
                         labelField="label"
@@ -804,9 +818,9 @@ export default function AddPetScreen() {
                           backgroundColor: formData.species ? '#FFFFFF' : '#F9FAFB',
                         }}
                         containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 4, borderColor: '#E5E7EB', borderWidth: 1 }}
-                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                        selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
-                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: defaultFont }}
+                        selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
                         data={formData.species ? getBreedOptions(formData.species, isVi) : []}
                         disable={!formData.species}
                         maxHeight={250}
@@ -993,7 +1007,7 @@ export default function AddPetScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => router.back()}
+                  onPress={handleBack}
                   disabled={isSubmitting || isUploadingVaccine}
                   className="bg-white border border-[#E5E5E5] h-[52px] rounded-[16px] items-center justify-center mt-4"
                 >

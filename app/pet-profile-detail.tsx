@@ -265,7 +265,7 @@ export default function PetProfileDetailScreen() {
 
   const handleUpdateNextDueOnly = async (
     recordId: string,
-    payload: { nextDueName: any; nextDueDate: string }
+    payload: any // 🚀 Đổi thành any để nhận thêm hasNextDueDate
   ) => {
     try {
       setIsSavingMedicalRecord(true);
@@ -273,14 +273,19 @@ export default function PetProfileDetailScreen() {
       await petService.updateMedicalRecord(petId, recordId, {
         nextDueName: payload.nextDueName,
         nextDueDate: payload.nextDueDate,
-        hasNextDueDate: true, // luôn true ở nhánh này vì chỉ submit khi switch đang ON
+        hasNextDueDate: payload.hasNextDueDate, // 🚀 Sử dụng cờ bật/tắt từ Modal truyền ra
       });
 
       setPetData((prev: any) => {
         if (!prev) return prev;
         const updatedRecords = (prev.medicalRecords || []).map((r: any) =>
           r.id === recordId
-            ? { ...r, nextDueName: payload.nextDueName, nextDueDate: payload.nextDueDate }
+            ? {
+              ...r,
+              hasNextDueDate: payload.hasNextDueDate, // 🚀 Cập nhật trạng thái switch vào UI
+              nextDueName: payload.nextDueName,
+              nextDueDate: payload.nextDueDate
+            }
             : r
         );
         return { ...prev, medicalRecords: updatedRecords };
@@ -590,11 +595,11 @@ export default function PetProfileDetailScreen() {
   const InfoRow = ({ label1, value1, label2, value2 }: any) => (
     <View className="flex-row justify-between mb-5">
       <View className="flex-1">
-        <Text className="text-black text-[16px] font-medium mb-1">{label1}</Text>
+        <Text className="text-black text-[14px] font-medium mb-1">{label1}</Text>
         <Text className="text-[#8E8E93] text-[14px] font-regular">{value1}</Text>
       </View>
       <View className="flex-1">
-        <Text className="text-black text-[16px] font-medium mb-1">{label2}</Text>
+        <Text className="text-black text-[14px] font-medium mb-1">{label2}</Text>
         <Text className="text-[#8E8E93] text-[14px] font-regular">{value2}</Text>
       </View>
     </View>

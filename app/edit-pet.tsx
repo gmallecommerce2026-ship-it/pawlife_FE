@@ -157,8 +157,13 @@ const CustomInput = ({ value, onChangeText, placeholder }: { value?: string; onC
   </View>
 );
 
-const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeholder: string; value?: string; options?: string[]; onSelect?: (val: string) => void }) => {
+const CustomDropdown = ({ placeholder, value, options = [], onSelect, isVi }: { placeholder: string; value?: string; options?: string[]; onSelect?: (val: string) => void; isVi: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Các biến font động
+  const fontMedium = isVi ? 'BeVietnamPro-Medium' : 'Urbanist-Medium';
+  const fontRegular = isVi ? 'BeVietnamPro-Regular' : 'Urbanist-Regular';
+  const fontBold = isVi ? 'BeVietnamPro-Bold' : 'Urbanist-Bold';
 
   return (
     <View>
@@ -170,7 +175,7 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
         <Text
           className={`${value ? 'text-black' : 'text-[#9CA3AF]'} text-[14px] font-medium`}
           numberOfLines={1}
-          style={{ fontFamily: 'Urbanist-Medium' }} // THÊM DÒNG NÀY (Vì đang dùng font-medium)
+          style={{ fontFamily: fontMedium }} // DÙNG BIẾN ĐỘNG
         >
           {value || placeholder}
         </Text>
@@ -201,8 +206,7 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
                   >
                     <Text
                       className={`text-[14px] ${isSelected ? 'text-[#E89B5A] font-bold' : 'text-gray-700'}`}
-                      // THÊM DÒNG NÀY: Nếu được chọn thì dùng Bold, bình thường dùng Regular
-                      style={{ fontFamily: isSelected ? 'Urbanist-Bold' : 'Urbanist-Regular' }}
+                      style={{ fontFamily: isSelected ? fontBold : fontRegular }} // DÙNG BIẾN ĐỘNG
                     >
                       {item}
                     </Text>
@@ -239,67 +243,107 @@ const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalReco
   const formattedNextDueDate = record.nextDueDate ? new Date(record.nextDueDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
   const displayRecordName = getSafeBilingualText(record.recordName, isVi) || displayBilingual(parseBilingual(record.recordName), isVi);
 
-
   const status = record.verificationStatus || 'PENDING';
   const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
   const shouldShowNextDueDate = record.hasNextDueDate && !!record.nextDueDate;
 
-  // Badge GIỐNG HỆT pet-profile-detail
   const badge = getMedicalRecordBadgeConfig(status, isVi);
   const sizeKB = useTotalImageSize(imageList);
   const recordIcon = getMedicalRecordIcon(record.type);
 
   return (
     <View className="mb-4">
-      <View className="border border-[#E5E5E5] rounded-[16px] p-3 flex-row items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
-        <View
-          className="w-[30px] h-[30px] rounded-[100px] items-center justify-center"
-          style={{ backgroundColor: '#EDEDED' }}
-        >
-          <Image
-            source={getMedicalRecordIcon(record.type)}
-            style={{ width: 18, height: 18, tintColor: '#999999' }}
-            resizeMode="contain"
-          />
-        </View>
-        <View className="flex-1 mx-3">
-          <View className="flex-row justify-between items-center">
-            <View className="flex-1 flex-row flex-wrap items-center pr-2">
-              <Text className="text-[14px] text-[#000000] font-medium leading-[16px] mr-2" numberOfLines={1}>
-                {displayRecordName || (isVi ? "Hồ sơ vô danh" : "Unnamed Record")}
-              </Text>
-              <View
-                className="flex-row items-center px-2 py-[3px] rounded-full border"
-                style={{ backgroundColor: badge.bgColor, borderColor: badge.borderColor }}
-              >
-                <Feather
-                  name={badge.icon}
-                  size={10}
-                  color={badge.color}
-                />
-                <Text
-                  className="text-[10px] font-medium ml-1"
-                  style={{ color: badge.color }}
-                >
-                  {badge.label}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                onOpenMenu(index, imageList, e.nativeEvent.pageY, status);
-              }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
-            </TouchableOpacity>
+      {/* Chuyển flex-row thành flex-col để chứa nhiều block dọc */}
+      <View className="border border-[#E5E5E5] rounded-[16px] p-3 flex-col items-start bg-[#FFFF] shadow-sm shadow-orange-100/50">
+
+        {/* --- KHỐI THÔNG TIN CHÍNH CỦA RECORD --- */}
+        <View className="flex-row items-start w-full">
+          <View
+            className="w-[30px] h-[30px] rounded-[100px] items-center justify-center"
+            style={{ backgroundColor: '#EDEDED' }}
+          >
+            <Image
+              source={getMedicalRecordIcon(record.type)}
+              style={{ width: 18, height: 18, tintColor: '#999999' }}
+              resizeMode="contain"
+            />
           </View>
-          <Text className="text-[10px] font-regular text-[#8E8E93] tracking-[0.5px]">
-            {sizeKB !== null ? `${sizeKB}KB • ` : ''}
-            {isVi ? 'Gửi lúc' : 'Submitted on'} {formattedRecordDate}
-          </Text>
+          <View className="flex-1 mx-3">
+            <View className="flex-row justify-between items-center">
+              <View className="flex-1 flex-row flex-wrap items-center pr-2">
+                <Text className="text-[14px] text-[#000000] font-medium leading-[16px] mr-2" numberOfLines={1}>
+                  {displayRecordName || (isVi ? "Hồ sơ vô danh" : "Unnamed Record")}
+                </Text>
+                <View
+                  className="flex-row items-center px-2 py-[3px] rounded-full border"
+                  style={{ backgroundColor: badge.bgColor, borderColor: badge.borderColor }}
+                >
+                  <Feather
+                    name={badge.icon}
+                    size={10}
+                    color={badge.color}
+                  />
+                  <Text
+                    className="text-[10px] font-medium ml-1"
+                    style={{ color: badge.color }}
+                  >
+                    {badge.label}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onOpenMenu(index, imageList, e.nativeEvent.pageY, status);
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
+              </TouchableOpacity>
+            </View>
+            <Text className="text-[10px] font-regular text-[#8E8E93] tracking-[0.5px]">
+              {sizeKB !== null ? `${sizeKB}KB • ` : ''}
+              {isVi ? 'Gửi lúc' : 'Submitted on'} {formattedRecordDate}
+            </Text>
+          </View>
         </View>
+
+        {/* --- KHỐI CHI TIẾT TIÊM PHÒNG (READ-ONLY) --- */}
+        {record.vaccineDoses && record.vaccineDoses.length > 0 && (
+          <View className="w-full mt-3 bg-[#F9FAFB] border border-[#E5E5E5] rounded-[4px] p-2.5">
+            <Text className="text-[12px] font-semibold text-[#6B7280] mb-2">
+              {isVi ? 'Chi tiết mũi tiêm (Chỉ xem)' : 'Vaccination Details (Read-only)'}
+            </Text>
+
+            {record.vaccineDoses.slice(0, 3).map((dose: any, idx: number) => (
+              <View
+                key={idx}
+                className={`flex-row justify-between items-center py-1.5 ${idx !== Math.min(record.vaccineDoses.length - 1, 2) ? 'border-b border-[#F3F4F6]' : ''
+                  }`}
+              >
+                <View className="flex-row items-center">
+                  <Feather
+                    name="check-circle"
+                    size={12}
+                    color={dose.status === 'COMPLETED' ? '#E89B5A' : '#D1D5DB'}
+                  />
+                  <Text className="text-[13px] text-[#4B5563] ml-2 font-medium">
+                    {isVi ? `Mũi ${idx + 1}` : `Dose ${idx + 1}`}
+                  </Text>
+                </View>
+                <View className="items-end">
+                  <Text className="text-[13px] font-semibold text-[#111827]">
+                    {dose.name || '-'}
+                  </Text>
+                  <Text className="text-[11px] text-[#9CA3AF] mt-0.5">
+                    {dose.date || '-'}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
       </View>
     </View>
   );
@@ -327,6 +371,7 @@ export default function EditPetScreen() {
   const showModal = useModalStore((state) => state.showModal);
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const defaultFont = isVi ? 'BeVietnamPro-Regular' : 'Urbanist-Regular';
   const insets = useSafeAreaInsets();
 
   const { pickAndUploadImage: pickAvatar, isUploading: isUploadingAvatar } = useImageUpload();
@@ -407,11 +452,18 @@ export default function EditPetScreen() {
   }, []);
 
   // 🚀 ĐỒNG BỘ UI: Cập nhật riêng "Lịch tiếp theo" từ modal View — giống pet-profile-detail
-  const handleUpdateNextDueOnlyLocal = useCallback((recordId: string | undefined, recordIndex: number, payload: { nextDueName: any; nextDueDate: string }) => {
+  const handleUpdateNextDueOnlyLocal = useCallback((recordId: string | undefined, recordIndex: number, payload: any) => {
     setMedicalRecords(prev => prev.map((r, i) => {
       const matches = recordId ? r.id === recordId : i === recordIndex;
       if (!matches) return r;
-      return { ...r, nextDueName: payload.nextDueName, nextDueDate: payload.nextDueDate, hasNextDueDate: true };
+
+      // 🚀 Lấy cờ hasNextDueDate từ payload thay vì gán cứng true
+      return {
+        ...r,
+        hasNextDueDate: payload.hasNextDueDate,
+        nextDueName: payload.nextDueName,
+        nextDueDate: payload.nextDueDate
+      };
     }));
     setShowViewMedicalModal(false);
     setViewingMedicalRecord(null);
@@ -996,9 +1048,9 @@ export default function EditPetScreen() {
                         disable={lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN'}
                         style={{ height: 34, borderColor: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? 'transparent' : '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? '#F9FAFB' : '#FFFFFF' }}
                         containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
-                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? '#9CA3AF' : '#000000', fontFamily: 'Urbanist' }}
-                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: defaultFont }}
+                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? '#9CA3AF' : '#000000', fontFamily: defaultFont }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
                         data={speciesData}
                         maxHeight={200}
                         labelField="label"
@@ -1025,9 +1077,9 @@ export default function EditPetScreen() {
                         disable={lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN'}
                         style={{ height: 34, borderColor: (lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN') ? 'transparent' : '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: (lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN') ? '#F9FAFB' : '#FFFFFF' }}
                         containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 4, borderColor: '#E5E7EB', borderWidth: 1 }}
-                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN') ? '#9CA3AF' : '#000000', fontFamily: 'Urbanist' }}
-                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: defaultFont }}
+                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.gender && formData.gender !== 'UNKNOWN') ? '#9CA3AF' : '#000000', fontFamily: defaultFont }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
                         data={genderData}
                         maxHeight={200}
                         labelField="label"
@@ -1068,9 +1120,9 @@ export default function EditPetScreen() {
                         disable={lockStatus.isCoreLocked && !!formData.breed}
                         style={{ height: 34, borderColor: (lockStatus.isCoreLocked && !!formData.breed) ? 'transparent' : '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: (lockStatus.isCoreLocked && !!formData.breed) ? '#F9FAFB' : '#FFFFFF' }}
                         containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
-                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: 'Urbanist' }}
-                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.breed) ? '#9CA3AF' : '#000000', fontFamily: 'Urbanist' }}
-                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: 'Urbanist' }}
+                        placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: defaultFont }}
+                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.breed) ? '#9CA3AF' : '#000000', fontFamily: defaultFont }}
+                        itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
                         data={currentBreedOptions}
                         maxHeight={250}
                         labelField="label"

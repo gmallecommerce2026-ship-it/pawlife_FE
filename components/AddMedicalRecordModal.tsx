@@ -220,12 +220,21 @@ export default function AddMedicalRecordModal({
 
   // Trong view mode: true khi người dùng thực sự đổi nextDueName hoặc nextDueDate
   // so với giá trị gốc lúc mở modal. Dùng để quyết định hiện/ẩn nút "Cập nhật Next Due".
-  const hasNextDueChanged = isViewMode && hasNextDueDate && (() => {
+  const hasNextDueChanged = isViewMode && (() => {
     const original = originalNextDueRef.current;
-    if (!original.date) return false; // ban đầu không có next due thì view mode không cho bật mới
-    const nameChanged = nextDueName.trim() !== (original.name || '').trim();
-    const dateChanged = nextDueDate.getTime() !== original.date.getTime();
-    return nameChanged || dateChanged;
+    const originalHasNextDue = !!original.date;
+
+    // Trạng thái bật/tắt bị thay đổi -> Chắc chắn là có sửa
+    if (hasNextDueDate !== originalHasNextDue) return true;
+
+    // Nếu đang bật, thì kiểm tra xem text hoặc ngày có bị sửa không
+    if (hasNextDueDate) {
+      const nameChanged = nextDueName.trim() !== (original.name || '').trim();
+      const dateChanged = original.date ? nextDueDate.getTime() !== original.date.getTime() : true;
+      return nameChanged || dateChanged;
+    }
+
+    return false;
   })();
 
   // Cờ này để tắt các useEffect "tự tính toán nextDueDate/nextDueName" khi vừa prefill
@@ -362,6 +371,10 @@ export default function AddMedicalRecordModal({
         if (!isReadOnly && vaccineType && vaccineType !== 'DOG_RABIES' && vaccineType !== 'CAT_RABIES' && vaccineType !== 'DOG_BORDETELLA') {
           detailsH += 46;
         }
+        if (isReadOnly && initialRecord?.vaccineDoses && initialRecord.vaccineDoses.length > 0) {
+          // Tính toán nhẩm: padding (24) + title (20) + mỗi item khoảng 40px + margin bottom (12)
+          detailsH += 36 + (initialRecord.vaccineDoses.length * 40) + 12;
+        }
       }
 
       // Khối "Upload Photos" (đường viền nét đứt) chỉ tồn tại khi KHÔNG readonly
@@ -378,11 +391,27 @@ export default function AddMedicalRecordModal({
       if (hasNextDueDate) detailsH += 36;
 
       target += detailsH;
-      target += 70;
+
+      // 🚀 FIX: Thêm khoảng bù trừ 16px (buffer) cho các margin/padding bị thiếu trong công thức tính detailsH
+      const BOTTOM_BUFFER = 38;
+
+      if (!isReadOnly) {
+        // Chế độ Create/Edit: Luôn có nút Submit (17 top + 37 height + 17 bot = 71)
+        target += BOTTOM_BUFFER + 71;
+      } else {
+        // Chế độ View:
+        if (hasNextDueChanged) {
+          // Hiện nút Cập nhật (17 top + 37 height + 17 bot = 71)
+          target += BOTTOM_BUFFER + 71;
+        } else {
+          // Ẩn nút -> Giữ lại buffer 16px + 24px padding đáy để không bị cụt input
+          target += BOTTOM_BUFFER + 24;
+        }
+      }
     }
 
     animateHeight(target).start();
-  }, [selectedType, images.length, hasNextDueDate, vaccineType, doseNumber, showVaccineDropdown, safeSpecies, isReadOnly]);
+  }, [selectedType, images.length, hasNextDueDate, vaccineType, doseNumber, showVaccineDropdown, safeSpecies, isReadOnly, hasNextDueChanged]);
 
   useEffect(() => { animateTo(detailsFade, selectedType ? 1 : 0).start(); }, [selectedType]);
   useEffect(() => { animateTo(imagesFade, images.length > 0 ? 1 : 0, 200).start(); }, [images.length]);
@@ -518,16 +547,21 @@ export default function AddMedicalRecordModal({
   // của record (giữ nguyên type, recordName, recordDate, images, verificationStatus...).
   const handleSubmitNextDueOnly = () => {
     if (!isViewMode || !initialRecord) return;
-    if (!nextDueName.trim()) {
+
+    // Nếu bật lịch nhắc nhưng không nhập tên thì báo lỗi
+    if (hasNextDueDate && !nextDueName.trim()) {
       Alert.alert('Lỗi', isVi ? 'Vui lòng nhập tên/ghi chú nhắc lịch' : 'Please enter a reminder name');
       return;
     }
-    const nextDueNameBilingual = buildBilingual(nextDueName);
+    const nextDueNameBilingual = hasNextDueDate ? buildBilingual(nextDueName) : null;
 
+    // 🚀 CẬP NHẬT: Gửi thêm hasNextDueDate và cho phép date null
     onSubmitNextDueOnly?.(initialRecord.id, {
+      hasNextDueDate: hasNextDueDate,
       nextDueName: nextDueNameBilingual as any,
-      nextDueDate: nextDueDate.toISOString(),
-    });
+      nextDueDate: hasNextDueDate ? nextDueDate.toISOString() : null,
+    } as any);
+
     handleClose();
   };
 
@@ -583,17 +617,25 @@ export default function AddMedicalRecordModal({
                       setNextDueName('');
                       setNextDueDate(new Date());
                     }}
-                    className={`flex-row items-center px-[12px] py-[11px] rounded-[12px] border ${isActive ? 'border-[#E89B5A]/50 bg-[#FFD0A8]/25' : 'border-[#E89B5A]/0 bg-white'}`}
+                    className={`flex-row items-center px-[12px] py-[11px] rounded-[12px] border ${isActive && !isReadOnly
+                        ? 'border-[#E89B5A]/50 bg-[#FFD0A8]/25'
+                        : (isActive && isReadOnly ? 'border-[#E5E5E5] bg-[#F9FAFB]' : 'border-transparent bg-white')
+                      }`}
                   >
-                    <View className={`w-[24px] h-[24px] rounded-[100px] items-center justify-center mr-3`}>
+                    <View className="w-[30px] h-[30px] rounded-[100px] items-center justify-center mr-3">
                       <Image
-                        source={isActive ? item.iconSelected : item.iconUnselected}
-                        style={{ width: 24, height: 24 }}
+                        // 🚀 2. Dùng Icon xám (Unselected) nếu đang ở chế độ Xem
+                        source={isActive && !isReadOnly ? item.iconSelected : item.iconUnselected}
+                        style={{ width: 30, height: 30 }}
                         resizeMode="contain"
                       />
                     </View>
                     <View className="flex-1">
-                      <Text className={`text-[14px] font-medium mb-0.5 text-black ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                      <Text
+                        // 🚀 3. Đổi màu chữ thành xám chữ đậm vừa phải để đồng bộ với các input readonly khác
+                        className={`text-[14px] mb-0.5 ${isActive && !isReadOnly ? 'text-black font-semibold' : 'text-[#4B5563] font-medium'
+                          }`}
+                      >
                         {isVi ? item.titleVi : item.titleEn}
                       </Text>
                       <Text className="text-[12px] font-regular text-[#8E8E93]">{isVi ? item.descVi : item.descEn}</Text>
@@ -683,23 +725,26 @@ export default function AddMedicalRecordModal({
                     </View>
                   )}
 
-                  {!isReadOnly && selectedType === 'vaccination' && vaccineType && vaccineType !== 'DOG_RABIES' && vaccineType !== 'CAT_RABIES' && vaccineType !== 'DOG_BORDETELLA' && (
+                  {selectedType === 'vaccination' && vaccineType && vaccineType !== 'DOG_RABIES' && vaccineType !== 'CAT_RABIES' && vaccineType !== 'DOG_BORDETELLA' && (
                     <View className="flex-row items-center justify-between mb-3 bg-[#FAFAFA] px-[12px] py-[10px] rounded-[12px] border border-[#E5E5EA]">
                       {[1, 2, 3].map((dose) => {
                         const isSelected = doseNumber === dose;
                         return (
                           <TouchableOpacity
                             key={dose}
-                            activeOpacity={0.7}
+                            activeOpacity={isReadOnly ? 1 : 0.7}
+                            disabled={isReadOnly}
                             onPress={() => setDoseNumber(dose as 1 | 2 | 3)}
-                            className="flex-row items-center"
+                            // 🚀 Thêm logic làm mờ opacity-50 nếu đang ở chế độ xem (isReadOnly)
+                            className={`flex-row items-center ${isReadOnly ? 'opacity-50' : ''}`}
                           >
                             <Ionicons
                               name={isSelected ? "radio-button-on" : "radio-button-off"}
                               size={20}
-                              color={isSelected ? "#E89B5A" : "#9CA3AF"}
+                              // 🚀 Có thể làm nhạt màu viền xám một chút cho đồng bộ nếu muốn
+                              color={isSelected ? "#E89B5A" : (isReadOnly ? "#D1D5DB" : "#9CA3AF")}
                             />
-                            <Text className={`text-[13px] ml-1.5 ${isSelected ? 'text-[#E89B5A] font-medium' : 'text-[#4B5563] font-regular'}`}>
+                            <Text className={`text-[13px] ml-1.5 ${isSelected ? 'text-[#E89B5A] font-medium' : (isReadOnly ? 'text-[#9CA3AF]' : 'text-[#4B5563]')}`}>
                               {isVi ? `Mũi ${dose}` : `${dose}${dose === 1 ? 'st' : dose === 2 ? 'nd' : 'rd'} Dose`}
                             </Text>
                           </TouchableOpacity>
@@ -707,7 +752,43 @@ export default function AddMedicalRecordModal({
                       })}
                     </View>
                   )}
+                  {isViewMode && selectedType === 'vaccination' && initialRecord?.vaccineDoses && initialRecord.vaccineDoses.length > 0 && (
+                    <View className="w-full mb-3 bg-[#F9FAFB] border border-[#E5E5E5] rounded-[12px] p-3">
+                      <Text className="text-[14px] font-semibold text-[#4B5563] mb-3">
+                        {isVi ? 'Chi tiết mũi tiêm' : 'Vaccination Details'}
+                      </Text>
 
+                      {initialRecord.vaccineDoses.map((dose: any, idx: number) => {
+                        const isLast = idx === initialRecord.vaccineDoses.length - 1;
+                        return (
+                          <View
+                            key={idx}
+                            className={`flex-row justify-between items-center py-2 ${!isLast ? 'border-b border-[#F3F4F6]' : ''
+                              }`}
+                          >
+                            <View className="flex-row items-center">
+                              <Feather
+                                name="check-circle"
+                                size={16}
+                                color={dose.status === 'COMPLETED' ? '#E89B5A' : '#D1D5DB'}
+                              />
+                              <Text className="text-[14px] text-[#4B5563] ml-2 font-medium">
+                                {isVi ? `Mũi ${idx + 1}` : `Dose ${idx + 1}`}
+                              </Text>
+                            </View>
+                            <View className="items-end">
+                              <Text className="text-[14px] font-semibold text-[#111827]">
+                                {dose.name || '-'}
+                              </Text>
+                              <Text className="text-[12px] text-[#9CA3AF] mt-0.5">
+                                {dose.date || '-'}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
                   {!isReadOnly && images.length < 3 && (
                     <TouchableOpacity
                       onPress={handleUploadPhotos}
@@ -749,7 +830,6 @@ export default function AddMedicalRecordModal({
                       style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                       value={hasNextDueDate}
                       onValueChange={setHasNextDueDate}
-                      disabled={isReadOnly}
                       trackColor={{ false: '#E5E5EA', true: '#E89B5A' }}
                       thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
                     />
@@ -793,7 +873,8 @@ export default function AddMedicalRecordModal({
                 so với giá trị gốc — đúng yêu cầu "ẩn nút update, chỉ hiện khi có
                 chỉnh sửa Next Due" */}
           {!isViewMode && selectedType && (
-            <View className="bg-white items-center" style={{ paddingTop: 17 }}>
+            // 🚀 Đổi style thành paddingTop và paddingBottom bằng nhau
+            <View className="bg-white items-center" style={{ paddingTop: 17, paddingBottom: 17 }}>
               <TouchableOpacity
                 onPress={handleSubmit}
                 disabled={isSubmitting}
@@ -811,7 +892,8 @@ export default function AddMedicalRecordModal({
           )}
 
           {isViewMode && hasNextDueChanged && (
-            <View className="bg-white items-center" style={{ paddingTop: 17 }}>
+            // 🚀 Đổi style thành paddingTop và paddingBottom bằng nhau
+            <View className="bg-white items-center" style={{ paddingTop: 17, paddingBottom: 17 }}>
               <TouchableOpacity
                 onPress={handleSubmitNextDueOnly}
                 disabled={isSubmitting}

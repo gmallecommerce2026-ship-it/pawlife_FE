@@ -198,6 +198,8 @@ export const enDict: Record<string, string> = {
   'error.not_in_favorites': 'This pet is not in your favorites list!',
   'error.get_my_pets_failed': "Error fetching user's pet list",
   'error.create_pet_failed': 'System error when creating pet',
+  "ingredientCheck.title": "Ingredient Check",
+  "ingredientCheck.searchPlaceholder": "Search ingredients...",
   'error.update_pet_failed': 'Error updating pet information',
   'error.name_change_limit': 'You can only change the name once every 14 days. Please wait {daysLeft} more days.',
   'error.dob_locked': 'Date of birth cannot be changed after 7 days of profile creation.',

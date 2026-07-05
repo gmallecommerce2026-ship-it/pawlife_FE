@@ -84,7 +84,7 @@ interface ActivityProp {
 // TimelineItem
 // ─────────────────────────────────────────────
 const TimelineItem = ({
-  item, isLast, isHighlighted, onLocationPress, onContactPress, onReportPress, onTitlePress,
+  item, isLast, isHighlighted, onLocationPress, onContactPress, onReportPress, onTitlePress, onImagePress // <--- THÊM onImagePress
 }: {
   item: ActivityProp;
   isLast: boolean;
@@ -92,7 +92,8 @@ const TimelineItem = ({
   onLocationPress?: (item: ActivityProp) => void;
   onContactPress?: (item: ActivityProp) => void;
   onReportPress?: (item: ActivityProp) => void;
-  onTitlePress?: (item: ActivityProp) => void;   // ← THÊM DÒNG NÀY
+  onTitlePress?: (item: ActivityProp) => void;
+  onImagePress?: (images: string[], index: number) => void; // <--- THÊM DÒNG NÀY
 }) => {
   const handleCallPress = () => {
     if (onContactPress && item.contactPhone) {
@@ -199,13 +200,13 @@ const TimelineItem = ({
         {/* Đã thêm !! để chặn lỗi chuỗi rỗng */}
         {!!item.location && (
           <TouchableOpacity
-            className="flex-row items-center mt-1.5"
+            className="flex-row items-start mt-1.5"
             activeOpacity={item.routeData ? 0.6 : 1}
             onPress={() => item.routeData && onLocationPress && onLocationPress(item)}
           >
             <Image
               source={require('../assets/icon/location-gray-icon.png')}
-              style={{ width: 8, height: 10 }}
+              style={{ width: 8, height: 10, marginTop: 2.5 }}
               resizeMode="cover"
             />
             <Text className="text-[#8E8E93] text-[12px] ml-1.5 font-regular flex-1">
@@ -261,13 +262,18 @@ const TimelineItem = ({
             className="mt-3 flex-row"
           >
             {item.images.map((imgUrl, index) => (
-              <Image
+              <TouchableOpacity
                 key={`${item.id}-img-${index}`}
-                source={{ uri: imgUrl }}
-                className="w-[100px] h-[74px] rounded-[12px] bg-gray-100"
-                style={{ marginRight: 8 }}
-                resizeMode="cover"
-              />
+                activeOpacity={0.8}
+                onPress={() => onImagePress && onImagePress(item.images as string[], index)}
+              >
+                <Image
+                  source={{ uri: imgUrl }}
+                  className="w-[100px] h-[74px] rounded-[12px] bg-gray-100"
+                  style={{ marginRight: 8 }}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
             ))}
           </ScrollView>
         )}
@@ -553,7 +559,15 @@ export default function TagReportDetailScreen() {
   const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAutoScrollKeyRef = useRef<string | null>(null);
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [currentImageList, setCurrentImageList] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  const handleImagePress = useCallback((images: string[], index: number) => {
+    setCurrentImageList(images);
+    setCurrentImageIndex(index);
+    setIsImageViewerVisible(true);
+  }, []);
   // Lưu layout (vị trí) của container timeline và từng item, để tính scroll offset
   const timelineLayoutRef = useRef<{
     containerY: number;
@@ -1565,13 +1579,13 @@ export default function TagReportDetailScreen() {
             return (
               <React.Fragment key={`pin-${scanPoint.id}`}>
                 <PinIcon
-                    id={scanPoint.id}
-                    coordinate={pinCoordinate}
-                    hasRadius={hasRadius}
-                    isZoomedIn={isZoomedIn}
-                    iconName="scan-outline"
-                    pinColor="#8D5AEE"
-                    onZoomRequest={(coord) => {
+                  id={scanPoint.id}
+                  coordinate={pinCoordinate}
+                  hasRadius={hasRadius}
+                  isZoomedIn={isZoomedIn}
+                  iconName="scan-outline"
+                  pinColor="#8D5AEE"
+                  onZoomRequest={(coord) => {
                     setFocusedPin(scanPoint.id);
                     handleZoomToPin(coord);
                   }}
@@ -1812,6 +1826,7 @@ export default function TagReportDetailScreen() {
                   onContactPress={handleTimelineContactPress}
                   onReportPress={handleReportPress}
                   onTitlePress={handleTimelineTitlePress}
+                  onImagePress={handleImagePress} // <--- TRUYỀN HÀM VÀO ĐÂY
                 />
               </View>
             ))}
@@ -1876,6 +1891,87 @@ export default function TagReportDetailScreen() {
           />
         )
       }
+      <Modal
+        visible={isImageViewerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsImageViewerVisible(false)}
+      >
+        <View className="flex-1 bg-black/95 justify-center items-center">
+          <View
+            className="absolute top-0 w-full z-50 flex-row justify-between items-center px-4 pb-4"
+            style={{
+              paddingTop: Math.max(insets.top, 20),
+              backgroundColor: 'rgba(0,0,0,0.3)'
+            }}
+          >
+            <Text className="text-white font-medium text-lg drop-shadow-md">
+            </Text>
+            <View className="flex-row items-center gap-3">
+              <TouchableOpacity
+                className="p-2.5 bg-white/20 rounded-full"
+                onPress={() => setIsImageViewerVisible(false)}
+              >
+                <Feather name="x" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {currentImageList.length > 0 && (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              contentOffset={{ x: currentImageIndex * Dimensions.get('window').width, y: 0 }}
+              onMomentumScrollEnd={(e) => {
+                const newIndex = Math.round(
+                  e.nativeEvent.contentOffset.x / Dimensions.get('window').width
+                );
+                setCurrentImageIndex(newIndex);
+              }}
+              // 🚀 1. Thêm flex: 1 để ScrollView phủ kín modal
+              style={{ flex: 1, width: '100%' }} 
+            >
+              {currentImageList.map((uri, idx) => (
+                <View
+                  key={idx}
+                  style={{ 
+                    width: Dimensions.get('window').width, 
+                    // 🚀 2. Đặt flex: 1 để View bao trọn chiều cao ScrollView
+                    flex: 1, 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    // 🚀 3. Thêm padding để đẩy khung ảnh lọt thỏm vào giữa, 
+                    // cách xa thanh Header bên trên và cụm dấu chấm bên dưới
+                    paddingTop: Math.max(insets.top, 20) + 60, 
+                    paddingBottom: 80,
+                    paddingHorizontal: 10
+                  }}
+                >
+                  <Image
+                    source={{ uri }}
+                    // 🚀 4. Ảnh sẽ scale vừa vặn (contain) 100% TRONG vùng đã được padding an toàn
+                    style={{ width: '100%', height: '100%' }} 
+                    resizeMode="contain"
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Chấm tròn báo trang hiện tại */}
+          {currentImageList.length > 1 && (
+            <View className="absolute bottom-10 flex-row gap-2">
+              {currentImageList.map((_, idx) => (
+                <View
+                  key={idx}
+                  className={`w-2 h-2 rounded-full ${idx === currentImageIndex ? 'bg-white' : 'bg-white/30'}`}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </Modal>
     </View >
   );
 }
