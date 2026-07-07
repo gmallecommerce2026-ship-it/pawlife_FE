@@ -301,10 +301,16 @@ const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalReco
                 <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
               </TouchableOpacity>
             </View>
-            <Text className="text-[10px] font-regular text-[#8E8E93] tracking-[0.5px]">
-              {sizeKB !== null ? `${sizeKB}KB • ` : ''}
-              {isVi ? 'Gửi lúc' : 'Submitted on'} {formattedRecordDate}
-            </Text>
+            <View className="mt-[2px]">
+              <Text className="text-[12px] font-regular text-[#8E8E93]">
+                {isVi ? 'Loại' : 'Type'}: {record.type ? (record.type.charAt(0).toUpperCase() + record.type.slice(1).toLowerCase()) : ''} | {isVi ? 'Ngày' : 'Date'}: {formattedRecordDate}
+              </Text>
+              {shouldShowNextDueDate && (
+                <Text className="text-[12px] font-medium text-[#E89B5A] mt-[2px]">
+                  {isVi ? 'Lịch tiếp theo' : 'Next due date'}: {formattedNextDueDate}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
 

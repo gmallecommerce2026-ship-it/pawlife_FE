@@ -7,6 +7,7 @@ const MEDICAL_RECORD_ICON_MAP: Record<string, any> = {
   DENTAL:         require('../assets/icon/teeth-icon.png'),
   CHECKUP:        require('../assets/icon/anual-icon.png'),
   ANNUAL_CHECKUP: require('../assets/icon/anual-icon.png'),
+  OTHER:          require('../assets/icon/shield.png'),
 };
 
 const DEFAULT_MEDICAL_ICON = require('../assets/icon/vacc-icon-report.png');

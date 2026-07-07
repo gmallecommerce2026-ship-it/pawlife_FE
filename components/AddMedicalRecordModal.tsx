@@ -48,15 +48,13 @@ function extractBilingualText(val: any, isVi: boolean): string {
   return String(val);
 }
 
-const formatShortDate = (date: Date, isVi: boolean) => {
-  const day = date.getDate();
+const formatShortDate = (date: Date, isVi?: boolean) => {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
-  if (isVi) {
-    return `${day} Thg ${date.getMonth() + 1}, ${year}`;
-  }
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[date.getMonth()]} ${day}, ${year}`;
+  return `${day}/${month}/${year}`;
 };
+
 
 const RECORD_OPTIONS = [
   {
@@ -144,7 +142,7 @@ function resolveSpeciesKey(species: any): 'Dog' | 'Cat' {
   return 'Dog';
 }
 
-const OPTION_ROW_H = 62;
+const OPTION_ROW_H = 64;
 const BASE_HEIGHT = 52 + 21 + 29 + (OPTION_ROW_H * 4) + 21;
 
 // Map từ id RECORD_OPTIONS <-> record.type lưu ở backend (vaccination/examination/dental/other
@@ -257,6 +255,13 @@ export default function AddMedicalRecordModal({
   const pickerTranslateY = useRef(new Animated.Value(-8)).current;
 
   const openDropdownPicker = (type: 'record' | 'next') => {
+    // Nếu đang có picker khác mở, đóng nó trước rồi mới mở picker mới,
+    // tránh đổi value/onChange giữa lúc native view đang animate.
+    if (activePicker && activePicker !== type) {
+      closeDropdownPicker(() => openDropdownPicker(type));
+      return;
+    }
+
     const ref = type === 'record' ? recordDateRef : nextDateRef;
     ref.current?.measureInWindow((x, y, width, height) => {
       const dropdownWidth = 340;
@@ -265,6 +270,9 @@ export default function AddMedicalRecordModal({
       setPickerLayout({ x: finalX, y: y + height + 8, width: dropdownWidth });
       setActivePicker(type);
 
+      pickerOpacity.setValue(0);
+      pickerTranslateY.setValue(-8);
+
       Animated.parallel([
         Animated.timing(pickerOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.ease), useNativeDriver: true }),
         Animated.timing(pickerTranslateY, { toValue: 0, duration: 250, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true })
@@ -272,12 +280,16 @@ export default function AddMedicalRecordModal({
     });
   };
 
-  const closeDropdownPicker = () => {
+  const closeDropdownPicker = (onDone?: () => void) => {
     Animated.parallel([
       Animated.timing(pickerOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
       Animated.timing(pickerTranslateY, { toValue: -8, duration: 150, useNativeDriver: true })
-    ]).start(() => setActivePicker(null));
+    ]).start(() => {
+      setActivePicker(null);
+      onDone?.();
+    });
   };
+
   // ------------------------------------------
 
   const optionHeights = useRef(
@@ -289,12 +301,15 @@ export default function AddMedicalRecordModal({
 
   // Auto-tính nextDueDate/nextDueName cho vaccine — CHỈ áp dụng khi đang tạo mới
   // hoặc khi user tự đổi vaccine/dose trong lúc edit (không chạy ngay sau khi prefill)
+  // Auto-tính nextDueDate/nextDueName cho vaccine — CHỈ áp dụng khi đang tạo mới
+  // hoặc khi user tự đổi vaccine/dose trong lúc edit (không chạy ngay sau khi prefill)
   useEffect(() => {
+    if (selectedType !== 'vaccination') return;
     if (skipAutoCalcRef.current) {
       skipAutoCalcRef.current = false;
       return;
     }
-    if (selectedType === 'vaccination' && vaccineType) {
+    if (vaccineType) {
       setHasNextDueDate(true);
       const nextDate = new Date(recordDate);
 
@@ -317,16 +332,37 @@ export default function AddMedicalRecordModal({
     }
   }, [selectedType, vaccineType, recordDate, doseNumber, safeSpecies, isVi]);
 
+  // Auto-tính Next Due cho Examination (1 năm) / Dental (6 tháng) — Other thì ẨN HẲN section
   useEffect(() => {
-    if (skipAutoCalcRef.current) return;
-    if (selectedType && selectedType !== 'vaccination') {
-      if (recordName.trim()) {
-        setNextDueName(isVi ? `Nhắc lại ${recordName}` : `${recordName} Reminder`);
-      } else {
-        setNextDueName('');
-      }
+    if (!selectedType || selectedType === 'vaccination') return;
+    if (skipAutoCalcRef.current) {
+      skipAutoCalcRef.current = false;
+      return;
     }
-  }, [selectedType, recordName, isVi]);
+
+    if (selectedType === 'other') {
+      setHasNextDueDate(false);
+      setNextDueName('');
+      return;
+    }
+
+    setHasNextDueDate(true);
+
+    const nextDate = new Date(recordDate);
+    if (selectedType === 'examination') {
+      nextDate.setFullYear(nextDate.getFullYear() + 1); // 1 năm/lần
+    } else if (selectedType === 'dental') {
+      nextDate.setMonth(nextDate.getMonth() + 6); // 6 tháng/lần
+    }
+    setNextDueDate(nextDate);
+
+    const baseName = recordName.trim()
+      || (selectedType === 'examination'
+        ? (isVi ? 'Khám bệnh' : 'Examination')
+        : (isVi ? 'Khám răng' : 'Dental Checkup'));
+
+    setNextDueName(isVi ? `Nhắc lại ${baseName}` : `${baseName} Reminder`);
+  }, [selectedType, recordName, recordDate, isVi]);
 
   const animateTo = (anim: Animated.Value, toValue: number, duration = 260) =>
     Animated.timing(anim, {
@@ -378,17 +414,22 @@ export default function AddMedicalRecordModal({
       }
 
       // Khối "Upload Photos" (đường viền nét đứt) chỉ tồn tại khi KHÔNG readonly
-      if (!isReadOnly) {
-        detailsH += 56;
+      if (!isReadOnly && images.length < 3) {
+        detailsH += 56; // Chỉ cộng khi khối Upload Photos thực sự còn hiển thị
       }
+
       if (images.length > 0) {
         detailsH += Math.ceil(images.length / 3) * 94;
       }
 
-      detailsH += 13;
-      detailsH += 30;
+      const showNextDue = selectedType !== 'other';
 
-      if (hasNextDueDate) detailsH += 36;
+      if (showNextDue) {
+        detailsH += 13;
+        detailsH += 30;
+        if (hasNextDueDate) detailsH += 36;
+      }
+
 
       target += detailsH;
 
@@ -396,18 +437,17 @@ export default function AddMedicalRecordModal({
       const BOTTOM_BUFFER = 38;
 
       if (!isReadOnly) {
-        // Chế độ Create/Edit: Luôn có nút Submit (17 top + 37 height + 17 bot = 71)
-        target += BOTTOM_BUFFER + 71;
+        // Chế độ Create/Edit: nút Submit (17 top + 37 height + 30 bottom = 84)
+        target += 75;
       } else {
-        // Chế độ View:
+        // Chế độ View: giữ nguyên logic cũ
         if (hasNextDueChanged) {
-          // Hiện nút Cập nhật (17 top + 37 height + 17 bot = 71)
           target += BOTTOM_BUFFER + 71;
         } else {
-          // Ẩn nút -> Giữ lại buffer 16px + 24px padding đáy để không bị cụt input
           target += BOTTOM_BUFFER + 24;
         }
       }
+
     }
 
     animateHeight(target).start();
@@ -572,7 +612,7 @@ export default function AddMedicalRecordModal({
       <View className="flex-1 justify-center items-center px-4">
         <Animated.View
           style={{ height: modalHeight }}
-          className="bg-white rounded-[22px] w-[320px] overflow-hidden shadow-xl relative"
+          className="bg-white rounded-[22px] w-[350px] overflow-hidden shadow-xl relative"
         >
           <TouchableOpacity
             onPress={handleClose}
@@ -618,8 +658,8 @@ export default function AddMedicalRecordModal({
                       setNextDueDate(new Date());
                     }}
                     className={`flex-row items-center px-[12px] py-[11px] rounded-[12px] border ${isActive && !isReadOnly
-                        ? 'border-[#E89B5A]/50 bg-[#FFD0A8]/25'
-                        : (isActive && isReadOnly ? 'border-[#E5E5E5] bg-[#F9FAFB]' : 'border-transparent bg-white')
+                      ? 'border-[#E89B5A]/50 bg-[#FFD0A8]/25'
+                      : (isActive && isReadOnly ? 'border-[#E5E5E5] bg-[#F9FAFB]' : 'border-transparent bg-white')
                       }`}
                   >
                     <View className="w-[30px] h-[30px] rounded-[100px] items-center justify-center mr-3">
@@ -632,13 +672,14 @@ export default function AddMedicalRecordModal({
                     </View>
                     <View className="flex-1">
                       <Text
-                        // 🚀 3. Đổi màu chữ thành xám chữ đậm vừa phải để đồng bộ với các input readonly khác
-                        className={`text-[14px] mb-0.5 ${isActive && !isReadOnly ? 'text-black font-semibold' : 'text-[#4B5563] font-medium'
-                          }`}
+                        className={`text-[14px] mb-0.5 ${isActive && !isReadOnly ? 'text-black font-semibold' : 'text-[#4B5563] font-medium'}`}
+                        numberOfLines={1}
                       >
                         {isVi ? item.titleVi : item.titleEn}
                       </Text>
-                      <Text className="text-[12px] font-regular text-[#8E8E93]">{isVi ? item.descVi : item.descEn}</Text>
+                      <Text className="text-[12px] font-regular text-[#8E8E93]" numberOfLines={1}>
+                        {isVi ? item.descVi : item.descEn}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 </Animated.View>
@@ -822,46 +863,50 @@ export default function AddMedicalRecordModal({
                     )}
                   </Animated.View>
 
-                  <View className="flex-row justify-between items-center mb-[6px]">
-                    <Text className="text-[14px] font-semibold text-[#111827]">
-                      {isVi ? 'Ngày hẹn tiếp theo' : 'Next Due Date'}
-                    </Text>
-                    <Switch
-                      style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                      value={hasNextDueDate}
-                      onValueChange={setHasNextDueDate}
-                      trackColor={{ false: '#E5E5EA', true: '#E89B5A' }}
-                      thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-                    />
-                  </View>
-
-                  <Animated.View style={{ opacity: nextDueFade }}>
-                    {hasNextDueDate && (
-                      <View className="flex-row gap-2.5">
-                        <View style={{ flex: 2 }}>
-                          <TextInput
-                            style={{ fontFamily: 'Urbanist-Regular' }}
-                            className="h-[36px] border border-[#E5E5EA] rounded-[12px] px-[14px] text-[14px] font-regular text-black bg-white"
-                            placeholder={isVi ? 'Ghi chú / Tên...' : 'Note / Name...'}
-                            placeholderTextColor="#A1A1AA"
-                            value={nextDueName}
-                            onChangeText={setNextDueName}
-                          />
-                        </View>
-
-                        <View style={{ flex: 1 }} ref={nextDateRef} collapsable={false}>
-                          <TouchableOpacity
-                            onPress={() => Platform.OS === 'ios' ? openDropdownPicker('next') : setShowNextDatePicker(true)}
-                            className="h-[36px] border border-[#E5E5E5] rounded-[12px] px-1 justify-center items-center bg-white"
-                          >
-                            <Text className="text-[14px] font-regular text-black text-center" numberOfLines={1} adjustsFontSizeToFit>
-                              {formatShortDate(nextDueDate, isVi)}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
+                  {selectedType !== 'other' && (
+                    <>
+                      <View className="flex-row justify-between items-center mb-[6px]">
+                        <Text className="text-[14px] font-semibold text-[#111827]">
+                          {isVi ? 'Ngày hẹn tiếp theo' : 'Next Due Date'}
+                        </Text>
+                        <Switch
+                          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                          value={hasNextDueDate}
+                          onValueChange={setHasNextDueDate}
+                          trackColor={{ false: '#E5E5EA', true: '#E89B5A' }}
+                          thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                        />
                       </View>
-                    )}
-                  </Animated.View>
+
+                      <Animated.View style={{ opacity: nextDueFade }}>
+                        {hasNextDueDate && (
+                          <View className="flex-row gap-2.5">
+                            <View style={{ flex: 2 }}>
+                              <TextInput
+                                style={{ fontFamily: 'Urbanist-Regular' }}
+                                className="h-[36px] border border-[#E5E5EA] rounded-[12px] px-[14px] text-[14px] font-regular text-black bg-white"
+                                placeholder={isVi ? 'Ghi chú / Tên...' : 'Note / Name...'}
+                                placeholderTextColor="#A1A1AA"
+                                value={nextDueName}
+                                onChangeText={setNextDueName}
+                              />
+                            </View>
+
+                            <View style={{ flex: 1 }} ref={nextDateRef} collapsable={false}>
+                              <TouchableOpacity
+                                onPress={() => Platform.OS === 'ios' ? openDropdownPicker('next') : setShowNextDatePicker(true)}
+                                className="h-[36px] border border-[#E5E5E5] rounded-[12px] px-1 justify-center items-center bg-white"
+                              >
+                                <Text className="text-[14px] font-regular text-black text-center" numberOfLines={1} adjustsFontSizeToFit>
+                                  {formatShortDate(nextDueDate, isVi)}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        )}
+                      </Animated.View>
+                    </>
+                  )}
                 </>
               )}
             </Animated.View>
@@ -874,7 +919,7 @@ export default function AddMedicalRecordModal({
                 chỉnh sửa Next Due" */}
           {!isViewMode && selectedType && (
             // 🚀 Đổi style thành paddingTop và paddingBottom bằng nhau
-            <View className="bg-white items-center" style={{ paddingTop: 17, paddingBottom: 17 }}>
+            <View className="bg-white items-center" style={{ paddingTop: 17, paddingBottom: 30 }}>
               <TouchableOpacity
                 onPress={handleSubmit}
                 disabled={isSubmitting}
@@ -946,6 +991,7 @@ export default function AddMedicalRecordModal({
 
             <View style={{ paddingTop: 4, paddingBottom: 4, paddingHorizontal: 10, alignItems: 'center' }} className="relative z-10">
               <DateTimePicker
+                key={activePicker}
                 value={activePicker === 'record' ? recordDate : nextDueDate}
                 mode="date"
                 display="inline"

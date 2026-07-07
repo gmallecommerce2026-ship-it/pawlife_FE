@@ -800,25 +800,25 @@ export default function PetDetailModal() {
                     return (
                       <View key={item.id} className="flex-row min-h-[54px]">
                         {/* Timeline line + icon */}
-                        <View className="w-[40px] relative">
+                        <View className="w-[40px] relative mr-2.5">
                           {!isLast && (
                             <View
                               className="absolute w-[1.5px]"
                               style={{
                                 top: 24,
                                 bottom: -2,
-                                left: 10.25,
+                                left: 14.25,
                                 backgroundColor: uiConfig.lineColor,
                               }}
                             />
                           )}
                           <View
-                            className="w-[22px] h-[22px] rounded-full items-center justify-center z-10"
+                            className="w-[30px] h-[30px] rounded-full items-center justify-center z-10"
                             style={{ backgroundColor: uiConfig.iconBgColor }}
                           >
                             <Image
                               source={uiConfig.icon}
-                              style={{ width: 12, height: 12 }}
+                              style={{ width: 16, height: 16 }}
                               resizeMode="contain"
                             />
                           </View>

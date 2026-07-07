@@ -145,16 +145,65 @@ const resolvePawHistoryText = (
   item: any,
   isVi: boolean,
 ): { title: string; description: string } => {
+  let title = item.title ?? '';
+  let description = item.description ?? '';
+
   if (item?.i18n?.titleKey) {
     const titleTpl = I18N_MAP[item.i18n.titleKey];
     const bodyTpl = I18N_MAP[item.i18n.bodyKey];
-    return {
-      title: titleTpl ? interpolate(isVi ? titleTpl.vi : titleTpl.en, item.i18n.params ?? {}) : (item.title ?? ''),
-      description: bodyTpl ? interpolate(isVi ? bodyTpl.vi : bodyTpl.en, item.i18n.params ?? {}) : (item.description ?? ''),
-    };
+
+    // Gán title và description theo template mặc định
+    title = titleTpl ? interpolate(isVi ? titleTpl.vi : titleTpl.en, item.i18n.params ?? {}) : title;
+    description = bodyTpl ? interpolate(isVi ? bodyTpl.vi : bodyTpl.en, item.i18n.params ?? {}) : description;
+
+    // --- BẮT ĐẦU: LOGIC XỬ LÝ RIÊNG CHO VACCINE (BÓC TÁCH MŨI TIÊM) ---
+    if (item.type === 'VACCINE' || item.i18n.titleKey === 'pawHistory.vaccine_title') {
+      const params = item?.i18n?.params || {};
+      const recNameVi = params.recordNameVi || title;
+      const recNameEn = params.recordNameEn || title;
+
+      let doseNumber = params.dose; // Dùng nếu Backend có truyền riêng tham số { dose: 1 }
+      let pureVaccineNameVi = recNameVi;
+      let pureVaccineNameEn = recNameEn;
+
+      // Nếu không có tham số dose rời, tiến hành bóc tách bằng Regex từ tên (VD: "Vaccine 7 bệnh (Mũi 1)" hoặc "Mũi 1 - 7 Bệnh")
+      if (!doseNumber) {
+        const regexVi = /(?:-\s*|\(\s*)?(mũi)\s*(\d+)(?:\s*\))?/i;
+        const matchVi = recNameVi.match(regexVi);
+        if (matchVi) {
+          doseNumber = matchVi[2];
+          // Cắt bỏ chữ Mũi 1, Mũi 2... và các dấu dư thừa ra khỏi tên vaccine
+          pureVaccineNameVi = recNameVi.replace(regexVi, '').trim().replace(/^[-()]+|[-()]+$/g, '').trim();
+        }
+
+        const regexEn = /(?:-\s*|\(\s*)?(dose)\s*(\d+)(?:\s*\))?/i;
+        const matchEn = recNameEn.match(regexEn);
+        if (matchEn) {
+          if (!doseNumber) doseNumber = matchEn[2];
+          pureVaccineNameEn = recNameEn.replace(regexEn, '').trim().replace(/^[-()]+|[-()]+$/g, '').trim();
+        }
+      } else {
+        // Nếu backend trả về vaccineName riêng
+        pureVaccineNameVi = params.vaccineName || recNameVi;
+        pureVaccineNameEn = params.vaccineName || recNameEn;
+      }
+
+      // Format lại Description thành "Đã hoàn thành mũi 1/2/3 (Tên vaccine)"
+      if (doseNumber) {
+        description = isVi
+          ? `Đã hoàn thành mũi ${doseNumber} (${pureVaccineNameVi})`
+          : `Completed dose ${doseNumber} (${pureVaccineNameEn})`;
+      } else {
+        // Fallback nếu người dùng chọn loại Vaccine không phân mũi (VD: Vaccine Dại 1 mũi duy nhất)
+        description = isVi
+          ? `Đã hoàn thành mũi tiêm (${pureVaccineNameVi})`
+          : `Completed vaccination (${pureVaccineNameEn})`;
+      }
+    }
+    // --- KẾT THÚC ---
   }
-  // Fallback: dùng resolvePawHistoryItem từ utils nếu không có i18n key
-  return { title: item.title ?? '', description: item.description ?? '' };
+
+  return { title, description };
 };
 
 
@@ -567,6 +616,9 @@ export default function PetProfileDetailScreen() {
     if (!petData?.pawHistory?.length) return [];
 
     return petData.pawHistory
+      // --- THÊM DÒNG NÀY ĐỂ LỌC BỎ SỰ KIỆN JOINED PAWLIFE ---
+      .filter((item: any) => item?.i18n?.titleKey !== 'pawHistory.joined_title' && item?.type !== 'CREATED')
+      // -----------------------------------------------------
       .map((item: any) => {
         const { title, description } = resolvePawHistoryText(item, isVi);
 
@@ -608,11 +660,11 @@ export default function PetProfileDetailScreen() {
   const InfoRow2 = ({ label1, value1, label2, value2 }: any) => (
     <View className="flex-row justify-between mb-8">
       <View className="flex-1">
-        <Text className="text-black text-[16px] font-medium mb-1">{label1}</Text>
+        <Text className="text-black text-[14px] font-medium mb-1">{label1}</Text>
         <Text className="text-[#8E8E93] text-[14px] font-regular">{value1}</Text>
       </View>
       <View className="flex-1">
-        <Text className="text-black text-[16px] font-medium mb-1">{label2}</Text>
+        <Text className="text-black text-[14px] font-medium mb-1">{label2}</Text>
         <Text className="text-[#8E8E93] text-[14px] font-regular">{value2}</Text>
       </View>
     </View>
@@ -620,7 +672,7 @@ export default function PetProfileDetailScreen() {
 
   const OwnerRow = ({ label, value, isLast = false }: any) => (
     <View className={`flex-row justify-between items-center py-4 ${!isLast ? 'border-b border-gray-200' : ''}`}>
-      <Text className="text-black text-[16px] font-medium">
+      <Text className="text-black text-[14px] font-medium">
         {label}
       </Text>
       <Text className="text-[#8E8E93] text-[14px] font-regular flex-1 text-right ml-4" numberOfLines={1}>
@@ -653,6 +705,7 @@ export default function PetProfileDetailScreen() {
 
   const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId.substring(0, 8).toUpperCase();
   const hasValidQRCode = !!petData.qrCodeUrl && petData.qrVerificationStatus === 'VERIFIED';
+  const qrCodeId = petData.qrCode || petData.tags?.[0]?.code || petData.code;
   const selectedMedicalRecord = selectedVaccineIndex !== null
     ? petData?.medicalRecords?.[selectedVaccineIndex]
     : null;
@@ -953,11 +1006,13 @@ export default function PetProfileDetailScreen() {
             <Text className="text-[18px] font-semibold text-gray-900 mt-[23px] mb-[12px]">{petData.name}</Text>
 
             {/* Pet ID Tag */}
-            {/* <View className="mt-[12px] flex-row items-center gap-2">
-              <Text className="text-[#B8B8B8] font-normal text-[14px] tracking-wider">
-                ID: {displayId}
-              </Text>
-            </View> */}
+            {hasValidQRCode && (
+              <View className="bg-[#F3F4F6] px-3 py-[3px] rounded-full mb-[6px] border border-[#E5E7EB]">
+                <Text className="text-[#6B7280] font-medium text-[12px] tracking-wider">
+                  ID: {displayId}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* --- LOST MODE / QR REQUIRED SECTION --- */}
@@ -1118,7 +1173,7 @@ export default function PetProfileDetailScreen() {
           {/* --- PET INFORMATION CARD --- */}
           <View className="mx-[20px] mb-8 ">
             <View className=''>
-              <Text className="font-semibold text-[16px] text-black mb-3">Pet Information</Text>
+              <Text className="font-semibold text-[16px] text-black mb-5">Pet Information</Text>
             </View>
             <View className='bg-white rounded-[24px] p-6 border border-gray-200'>
 
@@ -1155,7 +1210,7 @@ export default function PetProfileDetailScreen() {
                 label2="Weight" value2={petData.weight != null ? `${petData.weight} kg` : 'Not updated'}
               />
               <View className="h-[1px] bg-gray-200 w-full mb-5" />
-              <Text className="text-black text-[16px] font-medium mb-2">Notes</Text>
+              <Text className="text-black text-[14px] font-medium mb-2">Notes</Text>
               <Text className="text-[#8E8E93] text-[14px] leading-5">
                 {petData.description || 'Loves Belly rubs and playing fetch. Very friendly with children'}
               </Text>
@@ -1165,7 +1220,7 @@ export default function PetProfileDetailScreen() {
 
           {/* --- OWNER / SHELTER INFORMATION CARD --- */}
           <View className="mx-[20px] mb-8">
-            <Text className="font-semibold text-[16px] text-black mb-3">
+            <Text className="font-semibold text-[16px] text-black mb-5">
               {isShelter ? 'Shelter Information' : 'Owner Information'}
             </Text>
 
@@ -1190,7 +1245,7 @@ export default function PetProfileDetailScreen() {
             <View className="flex-row justify-between items-center mb-5">
               <View className="flex-row items-center">
                 <Text className="text-[16px] font-semibold text-black">
-                  {isVi ? 'Lịch sử hoạt động' : 'Paw History'}
+                  {isVi ? 'PawHistory' : 'PawHistory'}
                 </Text>
                 <Text className="text-[16px] font-semibold text-[#D1D1D6] mx-2">|</Text>
                 <Text className="text-[16px] font-regular text-[#8E8E93]">
@@ -1225,14 +1280,14 @@ export default function PetProfileDetailScreen() {
                       <View key={item.id ?? index} className="flex-row min-h-[54px]">
 
                         {/* Cột trái: icon + line */}
-                        <View className="w-[36px] relative">
+                        <View className="w-[36px] relative mr-[5px]">
 
                           {/* Vertical line — nét đứt nếu pending, nét liền bình thường */}
                           {!isLastItem && (
                             item.isPending ? (
                               <View
                                 className="absolute overflow-hidden items-center"
-                                style={{ top: 24, bottom: -2, left: 10.25, width: 1.5 }}
+                                style={{ top: 24, bottom: -2, left: 14.25, width: 1.5 }}
                               >
                                 {Array.from({ length: 20 }).map((_, i) => (
                                   <View
@@ -1252,7 +1307,7 @@ export default function PetProfileDetailScreen() {
                                 style={{
                                   top: 24,
                                   bottom: -2,
-                                  left: 10.25,
+                                  left: 14.25,
                                   backgroundColor: uiConfig.lineColor,
                                 }}
                               />
@@ -1261,12 +1316,12 @@ export default function PetProfileDetailScreen() {
 
                           {/* Icon tròn */}
                           <View
-                            className="w-[22px] h-[22px] rounded-full items-center justify-center z-10"
+                            className="w-[30px] h-[30px] rounded-full items-center justify-center z-10"
                             style={{ backgroundColor: uiConfig.iconBgColor }}
                           >
                             <Image
                               source={uiConfig.icon}
-                              style={{ width: 12, height: 12 }}
+                              style={{ width: 16, height: 16 }}
                               resizeMode="contain"
                             />
                           </View>
@@ -1280,7 +1335,7 @@ export default function PetProfileDetailScreen() {
                           <View className="flex-row justify-between items-start">
                             <View className="flex-1 flex-row flex-wrap items-center pr-2">
                               <Text
-                                className="text-[15px] font-medium text-black leading-[18px]"
+                                className="text-[14px] font-medium text-black leading-[18px]"
                                 numberOfLines={1}
                               >
                                 {item.displayTitle}
@@ -1350,7 +1405,7 @@ export default function PetProfileDetailScreen() {
 
           {/* --- VACCINATION & MEDICAL RECORD SECTION --- */}
           <View className="mx-[20px] mb-8">
-            <View className="flex-row justify-between items-center mb-[20px]">
+            <View className="flex-row justify-between items-center mb-5">
               <Text className="text-[16px] font-semibold text-[#111827] tracking-[0.06px]">
                 {isVi ? 'Hồ sơ y tế' : 'Medical Records'}
               </Text>
@@ -1436,11 +1491,16 @@ export default function PetProfileDetailScreen() {
                           </TouchableOpacity>
                         </View>
 
-                        <MedicalRecordSubtitle
-                          images={Array.isArray(record.images) ? record.images.filter(Boolean) : []}
-                          recordDate={record.recordDate}
-                          isVi={isVi}
-                        />
+                        <View className="mt-[2px]">
+                          <Text className="text-[12px] font-regular text-[#8E8E93]">
+                            {isVi ? 'Loại' : 'Type'}: {record.type ? (record.type.charAt(0).toUpperCase() + record.type.slice(1).toLowerCase()) : ''} | {isVi ? 'Ngày' : 'Date'}: {formattedRecordDate}
+                          </Text>
+                          {shouldShowNextDueDate && (
+                            <Text className="text-[12px] font-medium text-[#E89B5A] mt-[2px]">
+                              {isVi ? 'Lịch tiếp theo' : 'Next due date'}: {formattedNextDueDate}
+                            </Text>
+                          )}
+                        </View>
                       </View>
                     </View>
                   );
