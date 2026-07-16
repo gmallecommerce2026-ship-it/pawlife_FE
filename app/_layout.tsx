@@ -24,7 +24,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useContext, useEffect, useRef, useState } from 'react';
 // BỔ SUNG 1: Thêm Alert vào import từ react-native
-import { Alert, Animated, AppState, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Animated, AppState, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
@@ -38,6 +38,7 @@ import * as SecureStore from 'expo-secure-store';
 import Toast from 'react-native-toast-message';
 import { SuccessModal } from '../components/SuccessModal';
 // BỔ SUNG: Import React Query
+import IncomingTransferModal from '@/components/IncomingTransferModal';
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ResizeMode, Video } from 'expo-av';
@@ -100,35 +101,6 @@ function RootLayoutNavGuard() {
     initSocket();
   }, [isAuthenticated]);
 
-  // BỔ SUNG 3: Global Socket Listener cho luồng Transfer Ownership
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const handleIncomingTransfer = (data: { transferId: string, petId: string, senderId: string }) => {
-      Alert.alert(
-        t('Transfer Request'),
-        t('You just received a pet transfer request. Do you want to check and confirm it now?'),
-        [
-          { text: t('Later'), style: "cancel" },
-          {
-            text: t('View now'),
-            onPress: () => {
-              router.push({
-                pathname: '/transfer-ownership',
-                params: { petId: data.petId }
-              });
-            }
-          }
-        ]
-      );
-    };
-
-    socket.on('transfer_requested', handleIncomingTransfer);
-
-    return () => {
-      socket.off('transfer_requested', handleIncomingTransfer);
-    };
-  }, [isAuthenticated, router, t]);
 
   const verifyFaceId = async () => {
     try {
@@ -396,7 +368,7 @@ export default function RootLayout() {
                     </Animated.View>
                   )}
                 </> */}
-
+                <IncomingTransferModal />
               </LanguageProvider>
             </AuthProvider>
           </AppProvider>
@@ -453,6 +425,7 @@ function RootLayoutNav() {
       <Stack.Screen name="view-qr-code" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="transfer-ownership" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="pawcare/[category]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <Stack.Screen name="blocked-list" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="intro" options={{ headerShown: false, animation: 'fade' }} />
       <Stack.Screen name="report-lost-pet" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="complete-social-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />

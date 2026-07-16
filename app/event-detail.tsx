@@ -36,6 +36,46 @@ const formatMonthInline = (date: Date, isVi: boolean) => {
     return date.toLocaleString('en-US', { month: 'short' });
 };
 
+const formatTime = (date: Date, isVi: boolean) =>
+    date.toLocaleTimeString(isVi ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+
+// Build chuỗi hiển thị đầy đủ khoảng thời gian sự kiện, dùng CẢ startDate lẫn endDate
+// (trước đây code chỉ tính từ startDate, endDate bị bỏ quên hoàn toàn -> event nhiều
+// ngày chỉ hiện đúng 1 mốc, không phản ánh đúng thời lượng thật của sự kiện)
+const formatEventSchedule = (startISO: string, endISO: string | null | undefined, isVi: boolean) => {
+    const start = new Date(startISO);
+    const end = endISO ? new Date(endISO) : null;
+
+    const startDay = start.getDate();
+    const startMonth = formatMonthInline(start, isVi);
+    const startYear = start.getFullYear();
+    const startTime = formatTime(start, isVi);
+
+    if (!end || end.getTime() === start.getTime()) {
+        return `${startDay} ${startMonth}, ${startYear} ${isVi ? 'lúc' : 'at'} ${startTime}`;
+    }
+
+    const endDay = end.getDate();
+    const endMonth = formatMonthInline(end, isVi);
+    const endYear = end.getFullYear();
+    const endTime = formatTime(end, isVi);
+
+    const sameDay = start.toDateString() === end.toDateString();
+    if (sameDay) {
+        // "17 Thg4, 2026 · 09:30 - 17:30"
+        return `${startDay} ${startMonth}, ${startYear} · ${startTime} - ${endTime}`;
+    }
+
+    const sameMonthYear = start.getMonth() === end.getMonth() && startYear === endYear;
+    if (sameMonthYear) {
+        // "17 - 19 Thg4, 2026 · 09:30 - 18:30"
+        return `${startDay} - ${endDay} ${endMonth}, ${endYear} · ${startTime} - ${endTime}`;
+    }
+
+    // Khác tháng/năm: "17 Thg4 - 19 Thg5, 2026 · 09:30 - 18:30"
+    return `${startDay} ${startMonth} - ${endDay} ${endMonth}, ${endYear} · ${startTime} - ${endTime}`;
+};
+
 export default function EventDetailScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -53,6 +93,7 @@ export default function EventDetailScreen() {
     const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [showReportModal, setShowReportModal] = useState(false);
+
     // --- 1. FETCH EVENT DETAIL VỚI USEQUERY ---
     const { data: eventData, isLoading: detailLoading, isError: isNotFound } = useQuery({
         queryKey: ['event-detail', eventId],
@@ -81,11 +122,11 @@ export default function EventDetailScreen() {
 
     // --- 2. FETCH SIMILAR EVENTS VỚI USEQUERY ---
     const { data: similarEvents = [] } = useQuery({
-        // THÊM user?.id VÀO QUERY KEY ĐỂ CACHE THEO TỪNG USER
-        queryKey: ['upcoming-events', user?.id],
+        // ĐỔI QUERY KEY: Tách biệt key này khỏi 'upcoming-events' của Homescreen
+        queryKey: ['similar-events', eventId, user?.id],
         queryFn: async () => {
-            // TRUYỀN THÊM user?.id VÀO HÀM (Cần đảm bảo eventService.getUpcomingEvents có hỗ trợ nhận param thứ 2)
             const res = await eventService.getUpcomingEvents(5, user?.id);
+            // Việc filter lúc này chỉ ảnh hưởng đến cache của 'similar-events'
             return res.data ? res.data.filter((ev: any) => ev.id !== eventId) : [];
         },
         enabled: !!eventId
@@ -101,8 +142,9 @@ export default function EventDetailScreen() {
 
     const onShare = async () => {
         if (!eventData) return;
-
-        const startDate = new Date(eventData.startDate);
+        const date = formatEventSchedule(eventData.startDate, eventData.endDate, isVi);
+        const startDate = new Date(eventData.startDate); // vẫn giữ để dùng cho map, similar events...
+        const scheduleText = formatEventSchedule(eventData.startDate, eventData.endDate, isVi);
         const monthName = formatMonthInline(startDate, isVi);
         const day = startDate.getDate();
         const year = startDate.getFullYear();
@@ -113,7 +155,6 @@ export default function EventDetailScreen() {
         const organizer = eventData.organizer?.name || 'PawLife';
         const locationName = l(eventData.locationName);
         const location = [locationName, eventData.address].filter(Boolean).join(', ');
-        const date = `${day} ${monthName}, ${year} at ${timeString}`;
         const interested = eventData.interestedCount ?? 0;
 
         const rawDesc = l(eventData.description);
@@ -129,9 +170,9 @@ export default function EventDetailScreen() {
             `📅 ${date}`,
             `📍 ${location}`,
             `🏠 Organizer: ${organizer}`,
-            `👥 ${interested} people interested`,
             description ? `\n📝 ${description}` : null,
         ].filter(Boolean).join('\n');
+
 
         try {
             await Share.share(
@@ -269,6 +310,7 @@ export default function EventDetailScreen() {
     const timeString = startDate.toLocaleTimeString(isVi ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
     const date = `${day} ${monthName}, ${year} ${isVi ? 'lúc' : 'at'} ${timeString}`;
 
+    const scheduleText = formatEventSchedule(eventData.startDate, eventData.endDate, isVi);
 
     const bannerImage = eventData.bannerUrl || eventData.images?.[0]?.url;
 
@@ -554,9 +596,10 @@ export default function EventDetailScreen() {
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-[#E89B5A] font-regular text-[14px]">
-                                        {day} {monthName}, {year} {isVi ? 'lúc' : 'at'} {timeString}
+                                        {scheduleText}
                                     </Text>
                                 </View>
+
                             </View>
                         </View>
 
@@ -618,9 +661,6 @@ export default function EventDetailScreen() {
                             </View>
 
                             <View className="mb-[12px]">
-                                <Text className="text-[#8E8E93] text-[14px] font-regular flex-1 mb-[6px]" numberOfLines={2}>
-                                    {l(eventData.locationName)} Mall
-                                </Text>
                                 <Text className="text-[#8E8E93] text-[14px] font-regular flex-1" numberOfLines={2}>
                                     {eventData.address}
                                 </Text>

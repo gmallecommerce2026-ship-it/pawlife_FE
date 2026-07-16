@@ -125,6 +125,8 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
         }
     }, [item.id, item.isFollowed]);
 
+    const petCount = item._count?.pets ?? 0;
+
     const handleToggleFollow = async (e: any) => {
         if (e && e.stopPropagation) e.stopPropagation();
         if (isLoading) return;
@@ -159,7 +161,7 @@ const ShelterCard = memo(({ item, onPress }: { item: any; onPress: (item: any) =
                     {item.name}
                 </Text>
                 <Text className="text-[#8E8E93] text-[12px] font-regular" numberOfLines={1}>
-                    {item.address || 'Unknown location'} · {item.petCount || 0} pets
+                    {item.address || 'Unknown location'} · {petCount || 0} pets
                 </Text>
             </View>
 
@@ -285,21 +287,28 @@ const PetsSection = ({ searchQuery, onDetailPress, isVi }: { searchQuery: string
 
     // 1. Chỉ gọi API 1 lần để lấy danh sách Pet ( KHÔNG truyền searchQuery vào API nữa )
     const { data: pets = [], isLoading: loading } = useQuery({
-        // Xóa searchQuery khỏi queryKey để React Query không re-fetch mỗi khi gõ phím
         queryKey: ['pets-list', activeType, user?.id],
         queryFn: async () => {
             const params: any = {
                 userId: user?.id,
-                limit: 200 // Có thể tăng limit ở Backend lên 100-500 để user search được nhiều hơn
+                limit: 200
             };
             if (activeType !== 'All') {
                 params.type = activeType.toUpperCase();
             }
             const response = await petService.searchPets(params);
-            return response?.data || response || [];
+            const result = response?.data || response || [];
+
+            // ✅ THÊM DÒNG NÀY — log ngay khi có data, không cần chờ block
+            if (result.length > 0) {
+                console.log('🔥 Sample pet:', JSON.stringify(result[0], null, 2));
+            }
+
+            return result;
         },
-        staleTime: 5 * 60 * 1000, // Cache dữ liệu 5 phút để chuyển tab không bị giật/call lại API
+        staleTime: 5 * 60 * 1000,
     });
+
 
     // 2. Xử lý Search (Filter) ngay trên Frontend bằng useMemo
     const filteredPets = useMemo(() => {
@@ -429,7 +438,67 @@ export default function SearchScreen() {
     const { l } = useLocalizedData();
     const isVi = language === 'vi';
 
+    // 🌟 1. Khai báo queryClient ở đây
+    const queryClient = useQueryClient();
+
     const [isFocused, setIsFocused] = useState(false);
+
+    // 🌟 2. Thêm useEffect lắng nghe sự kiện Bỏ Chặn
+    useEffect(() => {
+        // Lắng nghe BỎ CHẶN
+        const unblockSub = DeviceEventEmitter.addListener('REFETCH_DATA_AFTER_UNBLOCK', () => {
+            console.log('🔥 [SEARCH] Nhận REFETCH_DATA_AFTER_UNBLOCK, đang refetch...');
+            queryClient.refetchQueries({ queryKey: ['pets-list'], type: 'all' });
+            queryClient.refetchQueries({ queryKey: ['search-shelters'], type: 'all' });
+        });
+
+        const petHiddenSub = DeviceEventEmitter.addListener('PET_HIDDEN', (event: { petId: string }) => {
+            if (!event?.petId) return;
+            // Ẩn ngay thú cưng khỏi danh sách search
+            queryClient.setQueriesData({ queryKey: ['pets-list'] }, (old: any) => {
+                if (!Array.isArray(old)) return old;
+                return old.filter((pet: any) => pet.id !== event.petId);
+            });
+        });
+
+        // ✅ Lắng nghe CHẶN — lọc cache ngay để UI phản hồi tức thì, không phải chờ refetch
+        const blockShelterSub = DeviceEventEmitter.addListener('SHELTER_BLOCKED', (event: { shelterId: string }) => {
+            console.log('🔥 SHELTER_BLOCKED event:', event);
+
+            // Log 1 pet mẫu trong cache để xem field thật là gì
+            const samplePets = queryClient.getQueriesData({ queryKey: ['pets-list'] });
+            console.log('🔥 Sample pet structure:', JSON.stringify(samplePets?.[0]?.[1]?.[0], null, 2));
+
+
+            if (!event?.shelterId) return;
+
+            // Ẩn ngay các pet thuộc shelter vừa bị chặn khỏi tab Pet
+            queryClient.setQueriesData({ queryKey: ['pets-list'] }, (old: any) => {
+                if (!Array.isArray(old)) return old;
+                return old.filter((pet: any) =>
+                    pet?.shelter?.id !== event.shelterId && pet?.shelterId !== event.shelterId
+                );
+            });
+
+            // Ẩn ngay shelter đó khỏi tab Shelter
+            queryClient.setQueriesData({ queryKey: ['search-shelters'] }, (old: any) => {
+                if (!Array.isArray(old)) return old;
+                return old.filter((shelter: any) => shelter?.id !== event.shelterId);
+            });
+
+            // Đồng bộ lại với server sau đó (phòng khi backend đã lọc sẵn)
+            queryClient.invalidateQueries({ queryKey: ['pets-list'] });
+            queryClient.invalidateQueries({ queryKey: ['search-shelters'] });
+        });
+
+        return () => {
+            unblockSub.remove();
+            petHiddenSub.remove();
+            blockShelterSub.remove();
+        };
+    }, [queryClient]);
+
+
     const handleFocus = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setIsFocused(true);

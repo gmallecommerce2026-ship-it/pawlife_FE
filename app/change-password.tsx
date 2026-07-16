@@ -69,9 +69,11 @@ export default function ChangePasswordScreen() {
           buttonText: isVi ? 'Trở lại' : 'Back',
           onConfirm: () => {
             // Guard khi trigger navigation từ modal toàn cục
-            if (isMounted.current) {
-              router.back();
-            }
+            setTimeout(() => {
+              if (isMounted.current) {
+                router.back();
+              }
+            }, 300);
           },
         });
       });

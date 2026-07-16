@@ -264,7 +264,7 @@ export default function ProfileSettingsScreen() {
                                 style={{ width: 30, height: 30 }}
                                 resizeMode="cover"
                             />}
-                            label={t('Security')}
+                            label={t('Account & Security')}
                             onPress={() => router.push('/account-security')}
                         />
                         <MenuItem

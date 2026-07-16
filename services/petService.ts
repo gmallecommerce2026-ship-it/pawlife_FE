@@ -158,7 +158,16 @@ export const petService = {
       throw error.response?.data || { message: error.message };
     }
   },
-
+  getPetByTagId: async (tagId: string) => {
+    try {
+      // Lưu ý: Kiểm tra lại đường dẫn API thực tế trên BE của bạn. 
+      // Thông thường nếu hàm nằm ở PetsController sẽ là `/pets/tag/${tagId}` hoặc `/pets/qr/${tagId}`
+      const response = await axiosClient.get(`/pets/tag/${tagId}`);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: error.message };
+    }
+  },
   getPassToken: async (petId: string) => {
     const response = await axiosClient.post(`/wallet/pets/${petId}/pass-token`);
     return response.data;

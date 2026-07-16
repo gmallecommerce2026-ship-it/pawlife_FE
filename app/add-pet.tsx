@@ -14,7 +14,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 // 🚀 FIX 1: Import thêm useCallback và memo từ React
 import { OTHER_BREED_VALUE, SPECIES_BILINGUAL, buildBreedBilingual, getBreedOptions } from '@/constants/breedData';
 import { buildBilingualOnSubmit } from '@/utils/autoTranslate';
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { getDefaultAvatar } from '@/utils/avatarHelper'; // Import file helper vừa tạo
+import { displayBilingual, parseBilingual } from '@/utils/bilingualField';
+import { Asset } from 'expo-asset';
+import React, { memo, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -32,8 +35,8 @@ import {
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AuthContext } from '../contexts/AuthContext';
 import { useImageUpload } from '../hooks/useImageUpload';
-
 type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
 type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
@@ -160,13 +163,13 @@ interface MedicalRecordItemProps {
   record: any;
   index: number;
   isVi: boolean;
-  onOpenMenu: (index: number, images: string[], pageY: number, status: string) => void;
+  onDelete: (index: number) => void; // THÊM DÒNG NÀY
 }
 
-const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalRecordItemProps) => {
+const MedicalRecordItem = memo(({ record, index, isVi, onDelete }: MedicalRecordItemProps) => { // <-- Thay onOpenMenu thành onDelete  
   const formattedRecordDate = record.recordDate ? new Date(record.recordDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
   const formattedNextDueDate = record.nextDueDate ? new Date(record.nextDueDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '';
-  const displayRecordName = displayBilingual(parseBilingual(record.recordName), isVi);
+  const displayRecordName = getSafeBilingualText(record.recordName, isVi) || displayBilingual(parseBilingual(record.recordName), isVi);
 
   const status = record.verificationStatus || 'PENDING';
   const imageList = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
@@ -228,12 +231,21 @@ const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalReco
         <TouchableOpacity
           onPress={(e) => {
             e.stopPropagation();
-            onOpenMenu(index, imageList, e.nativeEvent.pageY, status);
+            // Thêm Alert xác nhận xóa thay vì gọi Menu
+            Alert.alert(
+              isVi ? "Xóa hồ sơ" : "Delete Record",
+              isVi ? "Bạn có chắc chắn muốn xóa hồ sơ này?" : "Are you sure you want to delete this record?",
+              [
+                { text: isVi ? "Hủy" : "Cancel", style: "cancel" },
+                { text: isVi ? "Xóa" : "Delete", style: "destructive", onPress: () => onDelete(index) }
+              ]
+            );
           }}
           className="p-2"
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Image source={require('../assets/icon/more-vertical.png')} style={{ width: 11.1, height: 11.1 }} resizeMode="cover" />
+          {/* Đổi sang icon thùng rác cho dễ hiểu */}
+          <Feather name="trash-2" size={10} color="#a5a5a5" />
         </TouchableOpacity>
       </View>
     </View>
@@ -246,7 +258,22 @@ const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalReco
   );
 });
 // =====================================================================
-
+const getSafeBilingualText = (val: any, isVi: boolean) => {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    if (val.trim().startsWith('{')) {
+      try {
+        const p = JSON.parse(val);
+        return isVi ? (p.vi || p.en) : (p.en || p.vi);
+      } catch { return val; }
+    }
+    return val;
+  }
+  if (typeof val === 'object') {
+    return isVi ? (val.vi || val.en) : (val.en || val.vi);
+  }
+  return String(val);
+};
 export default function AddPetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -256,7 +283,11 @@ export default function AddPetScreen() {
   const isVi = language === 'vi';
   const defaultFont = isVi ? 'BeVietnamPro-Regular' : 'Urbanist-Regular';
   const showModal = useModalStore((state) => state.showModal);
+  const { user } = useContext(AuthContext);
 
+  // 2. Tạo cờ đánh dấu trạng thái "dữ liệu tự động điền"
+  const [isDefaultName, setIsDefaultName] = useState(false);
+  const [isDefaultPhone, setIsDefaultPhone] = useState(false);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [medicalRecords, setMedicalRecords] = useState<any[]>([]);
 
@@ -435,7 +466,22 @@ export default function AddPetScreen() {
     nextDueDate: '',
     vaccineName: ''
   });
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        // Chỉ điền nếu form hiện tại đang trống để tránh ghi đè
+        contactName: prev.contactName || user.name || '',
+        contactPhone: prev.contactPhone || user.phone || '',
+        // Giả sử user có thuộc tính address, nếu không thì truyền chuỗi rỗng
+        contactAddress: prev.contactAddress || (user as any).address || '',
+      }));
 
+      // Bật cờ nếu có dữ liệu
+      if (user.name) setIsDefaultName(true);
+      if (user.phone) setIsDefaultPhone(true);
+    }
+  }, [user]);
   const inputFontStyle = { fontFamily: 'Urbanist-Regular' };
 
   const handlePickAvatar = async () => {
@@ -528,7 +574,6 @@ export default function AddPetScreen() {
           : Promise.resolve(null),
       ]);
 
-
       // 1. XỬ LÝ UPLOAD ẢNH CHO MEDICAL RECORDS
       let processedMedicalRecords: any[] = [];
 
@@ -578,6 +623,48 @@ export default function AddPetScreen() {
           })
         );
       }
+      let finalAvatarUrl = formData.imageUrl;
+
+      if (!finalAvatarUrl) {
+        try {
+          const defaultAssetModule = getDefaultAvatar(species, formData.breed);
+
+          if (defaultAssetModule) {
+            // Lấy URI local của asset từ thư mục bundle
+            const [{ localUri, uri }] = await Asset.loadAsync(defaultAssetModule);
+            const assetUri = localUri || uri;
+
+            if (assetUri) {
+              // Upload ảnh default lên hệ thống lưu trữ cloud (sử dụng logic presigned URL có sẵn)
+              const filename = `default-${species.toLowerCase()}-${Date.now()}.png`;
+              const presignedRes = await axiosClient.post('/storage/presigned-url', {
+                fileName: filename,
+                fileType: 'image/png',
+                folder: 'pets'
+              });
+
+              const localFileFetch = await fetch(assetUri);
+              const fileBlob = await localFileFetch.blob();
+              const uploadRes = await fetch(presignedRes.data.uploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'image/png' },
+                body: fileBlob
+              });
+
+              if (uploadRes.ok) {
+                finalAvatarUrl = presignedRes.data.fileUrl;
+              } else {
+                console.warn("Upload default avatar failed");
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Lỗi khi thiết lập avatar mặc định:", error);
+          // Vẫn cho phép tiếp tục tạo pet ngay cả khi set ảnh default thất bại
+        }
+      }
+      // =========================================================
+
 
       // 2. KHAI BÁO PAYLOAD MỚI
       const payload = {
@@ -592,10 +679,11 @@ export default function AddPetScreen() {
         contactName: formData.contactName || undefined,
         contactPhone: formData.contactPhone || undefined,
         contactAddress: formData.contactAddress || undefined,
-        images: formData.imageUrl ? [formData.imageUrl] : [],
+
+        // SỬ DỤNG finalAvatarUrl THAY VÌ formData.imageUrl TRỰC TIẾP
+        images: finalAvatarUrl ? [finalAvatarUrl] : [],
 
         medicalRecords: processedMedicalRecords,
-
         ...(formData.dob && { dob: formData.dob }),
         isSpayedNeutered: formData.sterilized !== null ? formData.sterilized : undefined,
         ...(tagId && { tagId: (tagId as string).trim() }),
@@ -605,22 +693,9 @@ export default function AddPetScreen() {
       const newPet = await petService.addPet(payload);
       const realPetId = newPet?.id || newPet?.data?.id;
 
-      setIsSubmitting(false); // Tắt loading ngay lập tức
-      setIsUploadingVaccine(false);
-
-      showModal({
-        title: isVi ? 'Thành công' : 'Success',
-        message: tagId
-          ? (isVi ? 'Tạo hồ sơ thú cưng thành công! Vòng cổ đã được kích hoạt.' : 'Pet profile created successfully! Collar is activated.')
-          : (isVi ? 'Tạo hồ sơ thành công!\n(Profile hiện chưa có QR code, bạn có thể cập nhật và gán vòng cổ sau).' : 'Profile created successfully!\n(Currently no QR code, you can update and assign a collar later).'),
-        buttonText: 'OK',
-        onConfirm: () => {
-          // Thêm delay nhỏ (100-300ms) để modal kịp đóng hiệu ứng mượt mà trước khi chuyển trang
-          setTimeout(() => {
-            router.replace(`/pet-profile-detail?id=${realPetId}`);
-            // Lời khuyên: Dùng router.replace thay vì push để User bấm Back không bị quay lại màn form thêm mới
-          }, 150);
-        }
+      router.replace({
+        pathname: '/pet-profile-detail',
+        params: { id: realPetId, fromFlow: 'add-pet' }
       });
 
     } catch (error: any) {
@@ -635,7 +710,47 @@ export default function AddPetScreen() {
       setIsUploadingVaccine(false);
     }
   };
+  const handleContactNameChange = (text: string) => {
+    if (isDefaultName) {
+      setIsDefaultName(false);
+      // Nếu người dùng ấn nút Backspace (text mới ngắn hơn text cũ) -> Xóa trắng luôn
+      if (text.length < formData.contactName.length) {
+        handleChange('contactName', '');
+      } else {
+        // Lọc lấy ký tự mới vừa được nhập vào (loại bỏ phần text mặc định cũ)
+        let newChar = text.replace(formData.contactName, '');
+        if (!newChar) newChar = text.slice(-1); // Fallback lấy ký tự cuối
+        handleChange('contactName', newChar);
+      }
+    } else {
+      handleChange('contactName', text);
+    }
+  };
 
+  // Xử lý thông minh cho SĐT Chủ Nuôi
+  const handleContactPhoneChange = (text: string) => {
+    const cleanText = text.replace(/[^0-9]/g, '');
+    if (isDefaultPhone) {
+      setIsDefaultPhone(false);
+      if (cleanText.length < formData.contactPhone.length) {
+        handleChange('contactPhone', '');
+      } else {
+        let newChar = cleanText.replace(formData.contactPhone, '');
+        if (!newChar) newChar = cleanText.slice(-1);
+        handleChange('contactPhone', newChar);
+      }
+    } else {
+      handleChange('contactPhone', cleanText);
+    }
+  };
+
+  const isFormValid =
+    formData.name.trim() !== '' &&
+    formData.gender !== 'UNKNOWN' &&
+    formData.sterilized !== null &&
+    formData.breed.trim() !== '' &&
+    formData.contactName.trim() !== '' &&
+    formData.contactPhone.trim() !== '';
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView
@@ -819,15 +934,22 @@ export default function AddPetScreen() {
                         }}
                         containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 4, borderColor: '#E5E7EB', borderWidth: 1 }}
                         placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: defaultFont }}
-                        selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
+
+                        // 1. Thêm marginRight: 8 vào selectedTextStyle để cách xa icon mũi tên
+                        selectedTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont, marginRight: 8 }}
+
                         itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
                         data={formData.species ? getBreedOptions(formData.species, isVi) : []}
                         disable={!formData.species}
                         maxHeight={250}
                         labelField="label"
                         valueField="value"
-                        placeholder={formData.species ? (isVi ? "Chọn Giống" : "Select breed") : (isVi ? "Hãy chọn loài trước" : "Select type first")}
+                        placeholder={formData.species ? (isVi ? "Chọn Giống" : "Select breed") : (isVi ? "Hãy chọn loại trước" : "Select type first")}
                         value={isCustomBreed ? OTHER_BREED_VALUE : formData.breed}
+
+                        // 2. Thêm prop này để cắt chuỗi thành dấu "..." nếu quá dài
+                        selectedTextProps={{ numberOfLines: 1 }}
+
                         onChange={(item) => {
                           if (item.value === OTHER_BREED_VALUE) {
                             setIsCustomBreed(true);
@@ -918,33 +1040,35 @@ export default function AddPetScreen() {
                 <View className="bg-white rounded-[16px] border border-[#E5E5E5] px-[18px] py-[3px]">
                   {/* Name */}
                   <View className="flex-row items-center py-4 border-b border-gray-100">
-                    <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'Tên' : 'Name'}</Text>
+                    <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'Họ và tên' : 'Name'}</Text>
                     <TextInput
                       style={inputFontStyle}
                       className="flex-1 text-right text-[14px] text-black p-0"
                       value={formData.contactName}
-                      onChangeText={(text) => handleChange('contactName', text)}
+                      onChangeText={handleContactNameChange} // <-- DÙNG HÀM MỚI Ở ĐÂY
                       placeholder={isVi ? "Họ Và Tên" : "Full Name"}
                       placeholderTextColor="#A1A1AA"
+                      selectTextOnFocus={isDefaultName} // (Tùy chọn) Highlight text khi ấn vào
                     />
                   </View>
 
                   {/* Phone */}
                   <View className="flex-row items-center py-4 border-b border-gray-100">
-                    <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'SĐT' : 'Phone'}</Text>
+                    <Text className="text-[14px] font-medium text-black">{isVi ? 'Số điện thoại' : 'Phone'}</Text>
                     <TextInput
                       style={inputFontStyle}
                       className="flex-1 text-right text-[14px] text-black p-0"
                       value={formData.contactPhone}
-                      onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
+                      onChangeText={handleContactPhoneChange} // <-- DÙNG HÀM MỚI Ở ĐÂY
                       keyboardType="phone-pad"
                       placeholder={isVi ? "Số Điện Thoại" : "Phone Number"}
                       placeholderTextColor="#A1A1AA"
                       maxLength={15}
+                      selectTextOnFocus={isDefaultPhone} // (Tùy chọn) Highlight text khi ấn vào
                     />
                   </View>
 
-                  {/* Address */}
+                  {/* Address (Không cần thay thế khi gõ) */}
                   <View className="flex-row items-center py-4">
                     <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
                     <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
@@ -953,7 +1077,7 @@ export default function AddPetScreen() {
                         className={`text-right text-[14px] p-0 ${formData.contactAddress ? 'text-black' : 'text-[#A1A1AA]'}`}
                         numberOfLines={1}
                       >
-                        {formData.contactAddress || (isVi ? "Địa chỉ của bạn" : "Street Address, District, City")}
+                        {formData.contactAddress || (isVi ? "Địa chỉ" : "Street Address, District, City")}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -996,8 +1120,12 @@ export default function AddPetScreen() {
               <View className="space-y-3">
                 <TouchableOpacity
                   onPress={handleSubmit}
-                  disabled={isSubmitting || isUploadingAvatar || isUploadingVaccine}
-                  className={`bg-[#E89B5A] h-[52px] rounded-[16px] items-center justify-center flex-row ${(isSubmitting || isUploadingVaccine) ? 'opacity-70' : ''}`}
+                  // Khóa nút nếu form chưa hợp lệ hoặc đang xử lý upload/submit
+                  disabled={!isFormValid || isSubmitting || isUploadingAvatar || isUploadingVaccine}
+                  className={`h-[52px] rounded-[16px] items-center justify-center flex-row ${(!isFormValid || isSubmitting || isUploadingVaccine)
+                    ? 'bg-[#E89B5A]/50' // Giảm opacity/màu mờ đi khi bị khóa
+                    : 'bg-[#E89B5A]'
+                    }`}
                 >
                   {(isSubmitting || isUploadingVaccine) ? (
                     <ActivityIndicator size="small" color="white" />

@@ -4,13 +4,14 @@ import { displayBilingual, parseBilingual } from '@/utils/bilingualField';
 import { AntDesign, Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useContext, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   Image,
   Linking,
+  Modal,
   ScrollView,
   TouchableOpacity,
   View
@@ -19,11 +20,13 @@ import {
 import LostModeShareModal, { FormData } from '@/components/LostModeShareModal';
 import ReportIssueModal from '@/components/ReportIssueModal';
 import ShelterContactModal from '@/components/ShelterContactModal';
-import { LinearGradient } from 'expo-linear-gradient';
 
 // Bổ sung import LanguageContext
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FlatList } from 'react-native';
+const { width: SCREEN_W } = Dimensions.get('window');
 
 const { width } = Dimensions.get('window');
 
@@ -52,6 +55,97 @@ const ImageWithLoading = ({ uri, imgWidth }: { uri: string; imgWidth: number }) 
   );
 };
 
+const ImageViewerOverlay = ({
+  images,
+  isVisible,
+  initialIndex = 0,
+  onClose,
+}: {
+  images: string[];
+  isVisible: boolean;
+  initialIndex?: number;
+  onClose: () => void;
+}) => {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const listRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    if (isVisible) setCurrentIndex(initialIndex);
+  }, [isVisible, initialIndex]);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index);
+  }).current;
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+
+  if (!isVisible || !images || images.length === 0) return null;
+
+  return (
+    <Modal visible={isVisible} transparent animationType="fade">
+      <View className="flex-1 bg-black">
+        <View
+          className="flex-row items-center justify-end px-4 py-2 z-50 absolute left-0 right-0"
+          style={{ top: 50 }}
+        >
+          <TouchableOpacity
+            onPress={onClose}
+            className="p-2 bg-black/40 rounded-full"
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          >
+            <Feather name="x" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          ref={listRef}
+          data={images}
+          keyExtractor={(_, index) => index.toString()}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          initialScrollIndex={initialIndex}
+          getItemLayout={(_, index) => ({ length: SCREEN_W, offset: SCREEN_W * index, index })}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          renderItem={({ item }) => (
+            <View style={{ width: SCREEN_W, height: '100%' }}>
+              <Image
+                source={{ uri: item }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+        />
+
+        {images.length > 1 && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 40,
+              left: 0,
+              right: 0,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 6,
+              zIndex: 10,
+            }}
+          >
+            {images.map((_, index) => (
+              <View
+                key={index}
+                className={`h-2 rounded-full ${currentIndex === index ? 'w-6 bg-white' : 'w-2 bg-white/60'}`}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+};
+
 export default function ScannedPetScreen() {
   const router = useRouter();
   const { tagId } = useLocalSearchParams();
@@ -75,45 +169,71 @@ export default function ScannedPetScreen() {
   const [shelterData, setShelterData] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isContactModalVisible, setIsContactModalVisible] = useState(false);
+  const [isViewerVisible, setIsViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
+  const handleOpenViewer = (index: number) => {
+    setViewerIndex(index);
+    setIsViewerVisible(true);
+  };
 
   // Xác định xem người đang cầm máy quét có phải là chủ không
   const displayImages = React.useMemo(() => {
-    // 1. Kiểm tra nếu pet chưa load xong
     if (!pet) return ['https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop'];
 
     const isLost = pet.isLost || pet.status?.toUpperCase() === 'LOST';
-    let images: string[] = [];
 
-    // 2. Xử lý ảnh Lost (từ lostPhotos)
-    if (isLost && pet.lostPhotos) {
-      try {
-        const parsed = JSON.parse(pet.lostPhotos);
-        if (Array.isArray(parsed)) {
-          images = parsed.filter(url => typeof url === 'string' && url.trim() !== '');
+    // 2. Xử lý ảnh gốc (Avatar / Ảnh thông thường) trước
+    let originalImages: string[] = [];
+    const imagesArray = Array.isArray(pet.images) ? pet.images : [];
+    originalImages = imagesArray
+      .map((img: any) => (typeof img === 'string' ? img : img?.url))
+      .filter((url: any) => typeof url === 'string' && url.trim() !== '');
+
+    if (originalImages.length === 0 && typeof pet.image === 'string' && pet.image.trim() !== '') {
+      originalImages = [pet.image];
+    }
+
+    let combinedImages = [...originalImages];
+
+    // 3. Xử lý nối tiếp ảnh báo lạc (Lost Photos) nếu đang ở trạng thái Lost
+    // Thử lần lượt các key có thể có từ BE, và chịu được cả 2 dạng: mảng sẵn hoặc chuỗi JSON.
+    if (isLost) {
+      const rawLostPhotos =
+        pet.lostPhotos ?? pet.photos ?? pet.lostInfo?.photos ?? null;
+
+      let lostImages: string[] = [];
+
+      if (Array.isArray(rawLostPhotos)) {
+        // BE trả về mảng thuần (Prisma Json field đã tự parse sẵn)
+        lostImages = rawLostPhotos.filter(
+          (url: any) => typeof url === 'string' && url.trim() !== ''
+        );
+      } else if (typeof rawLostPhotos === 'string' && rawLostPhotos.trim() !== '') {
+        // BE trả về chuỗi JSON thô
+        try {
+          const parsed = JSON.parse(rawLostPhotos);
+          if (Array.isArray(parsed)) {
+            lostImages = parsed.filter(
+              (url: any) => typeof url === 'string' && url.trim() !== ''
+            );
+          }
+        } catch (e) {
+          console.warn(isVi ? "Lỗi parse lostPhotos:" : "Error parsing lostPhotos:", e, rawLostPhotos);
         }
-      } catch (e) {
-        console.warn(isVi ? "Lỗi parse lostPhotos:" : "Error parsing lostPhotos:", e);
       }
+
+      // Nối ảnh lost vào SAU ảnh avatar/ảnh gốc, loại trùng nếu ảnh lost trùng ảnh gốc
+      const dedupedLostImages = lostImages.filter((url) => !combinedImages.includes(url));
+      combinedImages = [...combinedImages, ...dedupedLostImages];
     }
 
-    // 3. Nếu không có ảnh Lost, xử lý ảnh mặc định (từ pet.images)
-    if (images.length === 0) {
-      const imagesArray = Array.isArray(pet.images) ? pet.images : [];
-      images = imagesArray
-        .map((img: any) => (typeof img === 'string' ? img : img?.url))
-        .filter((url: any) => typeof url === 'string' && url.trim() !== '');
-    }
-
-    // 4. Nếu pet.image là string đơn lẻ (fallback cho dữ liệu cũ)
-    if (images.length === 0 && typeof pet.image === 'string' && pet.image.trim() !== '') {
-      images = [pet.image];
-    }
-
-    // 5. Fallback cuối cùng
-    return images.length > 0
-      ? images
+    // 4. Trả về mảng đã kết hợp hoặc fallback
+    return combinedImages.length > 0
+      ? combinedImages
       : ['https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop'];
   }, [pet, isVi]);
+
 
 
 
@@ -386,7 +506,9 @@ export default function ScannedPetScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
 
         {/* --- 1. HERO IMAGE SECTION --- */}
-        {isLost ? (
+        Đúng rồi, nhìn vào file bạn gửi thì thấy bạn đã copy nhầm — cả 2 nhánh isLost và safe đều đang dùng chung bản "safe" (không có gradient overlay, badge "Lost", tên/tuổi/giống đè lên ảnh). Phần đó bị mất hoàn toàn ở nhánh isLost.
+        Sửa lại đúng nhánh isLost (thay toàn bộ block hiện tại của nó):
+        tsx{isLost ? (
           <View className="px-5 pt-4">
             <View className="bg-white rounded-[32px] z-10"
               style={{
@@ -397,15 +519,15 @@ export default function ScannedPetScreen() {
                 elevation: 3,
               }}>
 
-              <View 
+              <View
                 onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
-                className="relative rounded-[24px] overflow-hidden bg-gray-200" 
+                className="relative rounded-[24px] overflow-hidden bg-gray-200"
                 style={{
                   height: 210, shadowColor: '#000', shadowOffset: { width: 10, height: 10 },
                   shadowOpacity: 0.6, shadowRadius: 15, elevation: 4,
                 }}
               >
-                {/* --- SLIDER ẢNH --- */}
+                {/* --- SLIDER ẢNH (bấm để mở fullscreen) --- */}
                 <ScrollView
                   horizontal
                   pagingEnabled
@@ -414,22 +536,16 @@ export default function ScannedPetScreen() {
                   style={{ width: '100%', height: 210 }}
                 >
                   {displayImages.map((uri, index) => (
-                    // THAY imgWidth THÀNH sliderWidth
-                    <ImageWithLoading key={`lost-${index}`} uri={uri} imgWidth={sliderWidth} />
+                    <TouchableOpacity
+                      key={`lost-${index}`}
+                      activeOpacity={0.9}
+                      onPress={() => handleOpenViewer(index)}
+                      style={{ width: sliderWidth, height: 210 }}
+                    >
+                      <ImageWithLoading uri={uri} imgWidth={sliderWidth} />
+                    </TouchableOpacity>
                   ))}
                 </ScrollView>
-
-                {/* Dấu chấm (Pagination Dots) đè lên ảnh */}
-                {displayImages.length > 1 && (
-                  <View className="absolute bottom-[90px] w-full flex-row justify-center z-20" pointerEvents="none">
-                    {displayImages.map((_, index) => (
-                      <View
-                        key={index}
-                        className={`h-1.5 rounded-full mx-1 transition-all ${index === currentImageIndex ? 'w-4 bg-[#E89B5A]' : 'w-1.5 bg-white/70'}`}
-                      />
-                    ))}
-                  </View>
-                )}
 
                 {/* Overlays LinearGradient */}
                 <View pointerEvents="none" className="bottom-0 left-0 right-0 h-[105px] w-full absolute rounded-2xl overflow-hidden items-center justify-center z-10">
@@ -447,16 +563,27 @@ export default function ScannedPetScreen() {
                   </Text>
                 </View>
 
-                {/* Tên & Tuổi thú cưng */}
-                <View className="absolute bottom-0 left-0 right-0 mb-4 items-center z-20" pointerEvents="none">
+                {/* Tên & Tuổi thú cưng — đẩy lên chút để chừa chỗ cho dot bên dưới */}
+                <View className="absolute bottom-0 left-0 right-0 mb-[26px] items-center z-20" pointerEvents="none">
                   <Text className="text-white text-[24px] font-bold text-center capitalize mb-2">
                     {pet?.name?.toLowerCase() || (isVi ? 'thú cưng' : 'pet')}
                   </Text>
                   <Text className="text-white text-[14px] font-regular text-center tracking-[0.5px]">
-                    {/* SỬA Ở DÒNG DƯỚI: Bọc displayBilingual cho pet?.breed giống như đã làm ở Safe Mode */}
                     {displayAge !== (isVi ? 'Không rõ tuổi' : 'Unknown age') ? `${displayAge}` : (isVi ? 'Không rõ tuổi' : 'Age unknown')} • {displayBilingual(parseBilingual(pet?.breed), isVi) || (isVi ? 'Không rõ giống' : 'Unknown breed')}
                   </Text>
                 </View>
+
+                {/* Dấu chấm (Pagination Dots) — dời XUỐNG DƯỚI CÙNG, dưới cả tên/tuổi/giống, gọn lại */}
+                {displayImages.length > 1 && (
+                  <View className="absolute bottom-[8px] w-full flex-row justify-center items-center z-20" pointerEvents="none">
+                    {displayImages.map((_, index) => (
+                      <View
+                        key={index}
+                        className={`h-[5px] rounded-full mx-[2px] ${index === currentImageIndex ? 'w-[14px] bg-[#E89B5A]' : 'w-[5px] bg-white/70'}`}
+                      />
+                    ))}
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -470,9 +597,9 @@ export default function ScannedPetScreen() {
               shadowRadius: 5,
               elevation: 3,
             }}>
-              <View 
+              <View
                 onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
-                className="w-full rounded-[24px] overflow-hidden shadow-lg shadow-black/10 bg-gray-200" 
+                className="w-full rounded-[24px] overflow-hidden shadow-lg shadow-black/10 bg-gray-200"
                 style={{ height: 210 }}
               >
                 {/* --- SLIDER ẢNH --- */}
@@ -491,11 +618,11 @@ export default function ScannedPetScreen() {
 
                 {/* Dấu chấm (Pagination Dots) đè lên ảnh */}
                 {displayImages.length > 1 && (
-                  <View className="absolute bottom-3 w-full flex-row justify-center z-20" pointerEvents="none">
+                  <View className="absolute bottom-[8px] w-full flex-row justify-center items-center z-20" pointerEvents="none">
                     {displayImages.map((_, index) => (
                       <View
                         key={index}
-                        className={`h-1.5 rounded-full mx-1 transition-all ${index === currentImageIndex ? 'w-4 bg-[#E89B5A]' : 'w-1.5 bg-white/50'}`}
+                        className={`h-[5px] rounded-full mx-[2px] ${index === currentImageIndex ? 'w-[14px] bg-[#E89B5A]' : 'w-[5px] bg-white/70'}`}
                       />
                     ))}
                   </View>
@@ -707,7 +834,12 @@ export default function ScannedPetScreen() {
           )}
         </View>
       </ScrollView>
-
+      <ImageViewerOverlay
+        images={displayImages}
+        isVisible={isViewerVisible}
+        initialIndex={viewerIndex}
+        onClose={() => setIsViewerVisible(false)}
+      />
       {shelterData && (
         <ShelterContactModal
           isVisible={isContactModalVisible}

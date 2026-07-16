@@ -130,7 +130,19 @@ const FilterChip = ({ label, selected, onPress, iconSource }: any) => {
     </TouchableOpacity>
   );
 };
+// Hàm xử lý rút gọn địa chỉ
+const formatShortAddress = (fullAddress?: string) => {
+  if (!fullAddress) return 'Chưa cập nhật địa chỉ'; // Hoặc nội dung mặc định
 
+  // Tách địa chỉ bằng dấu phẩy và loại bỏ khoảng trắng thừa
+  const parts = fullAddress.split(',').map(part => part.trim());
+
+  // Nếu địa chỉ đã ngắn sẵn (<= 2 phần), trả về nguyên vẹn
+  if (parts.length <= 2) return fullAddress;
+
+  // Lấy 2 phần cuối cùng (Ví dụ: "Đà Nẵng, Việt Nam" hoặc "Quận 1, Hồ Chí Minh")
+  return parts.slice(-2).join(', ');
+};
 export default function ShelterProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -166,6 +178,14 @@ export default function ShelterProfileScreen() {
   const [isBlocked, setIsBlocked] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
+  useEffect(() => {
+    const unblockSub = DeviceEventEmitter.addListener('REFETCH_DATA_AFTER_UNBLOCK', () => {
+      setIsBlocked(false);
+      queryClient.refetchQueries({ queryKey: ['shelter-profile', shelterId], type: 'all' });
+    });
+    return () => unblockSub.remove();
+  }, [shelterId]);
+
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
   });
@@ -267,7 +287,9 @@ export default function ShelterProfileScreen() {
   const { data: shelterInfo, isLoading: loading, isError: isNotFound } = useQuery({
     queryKey: ['shelter-profile', shelterId],
     queryFn: async () => {
+
       const data = await shelterService.getShelterDetail(shelterId);
+      console.log('shelter detail response:', data);
       if (data.isFollowed !== undefined) {
         useEngagementStore.getState().setInitialShelterFollow(shelterId, data.isFollowed);
       }
@@ -293,12 +315,17 @@ export default function ShelterProfileScreen() {
   const toggleFollowMutation = useMutation({
     mutationFn: () => shelterService.toggleFollow(shelterId),
     onMutate: async () => {
+      // 1. Cancel query đang chạy để tránh đụng độ
+      await queryClient.cancelQueries({ queryKey: ['shelter-profile', shelterId] });
+
       const previousState = isFollowing;
       const newFollowingState = !isFollowing;
 
+      // Cập nhật state Global (Zustand)
       toggleShelterFollow(shelterId);
 
-      queryClient.setQueryData(['shelter-profile', shelterId, debouncedSearch], (oldData: any) => {
+      // 2. SỬA LẠI ĐÚNG QUERY KEY: Xóa bỏ debouncedSearch
+      queryClient.setQueryData(['shelter-profile', shelterId], (oldData: any) => {
         if (!oldData) return oldData;
         const currentFollowers = oldData?._count?.followers || 0;
         return {
@@ -323,9 +350,12 @@ export default function ShelterProfileScreen() {
     },
     onError: (err, variables, context) => {
       console.error('Lỗi khi thay đổi trạng thái theo dõi:', err);
+      // Rollback Zustand
       toggleShelterFollow(shelterId);
+
+      // SỬA LẠI ĐÚNG QUERY KEY CHO PHẦN ROLLBACK
       if (context) {
-        queryClient.setQueryData(['shelter-profile', shelterId, debouncedSearch], (oldData: any) => {
+        queryClient.setQueryData(['shelter-profile', shelterId], (oldData: any) => {
           if (!oldData) return oldData;
           const currentFollowers = oldData?._count?.followers || 0;
           return {
@@ -340,6 +370,7 @@ export default function ShelterProfileScreen() {
       }
     }
   });
+
   const blockShelterMutation = useMutation({
     mutationFn: () => {
       console.log('[BLOCK] shelterId:', shelterId);
@@ -351,11 +382,16 @@ export default function ShelterProfileScreen() {
       setIsBlocked(true);
       setShowBlockModal(false);
 
-
-      // Invalidate các query liên quan để làm mới data, loại bỏ shelter bị block
+      // ✅ THÊM 2 DÒNG NÀY — đây là phần còn thiếu
+      queryClient.invalidateQueries({ queryKey: ['pets-feed'] }); // Cho Home và Matching
+      queryClient.invalidateQueries({ queryKey: ['shelters-nearby'] }); // Cho Home
+      queryClient.invalidateQueries({ queryKey: ['pets-list'] }); // Cho màn Search Pet
+      queryClient.invalidateQueries({ queryKey: ['search-shelters'] }); // Cho màn Search Shelter
       queryClient.invalidateQueries({ queryKey: ['followed-shelters'] });
       queryClient.invalidateQueries({ queryKey: ['favorite-pets'] });
-      queryClient.invalidateQueries({ queryKey: ['shelters'] }); // Nếu có list shelter ở ngoài
+
+      // Bắn event để Home Screen tự cập nhật UI mượt mà không bị giật (nhờ code ở Bước 1)
+      DeviceEventEmitter.emit('SHELTER_BLOCKED', { shelterId });
 
       Toast.show({
         type: 'success',
@@ -365,9 +401,10 @@ export default function ShelterProfileScreen() {
         topOffset: insets.top + 10,
       });
 
-      // Đá user ra khỏi trang sau khi chặn
+
       router.back();
     },
+
     onError: (err) => {
       console.log('[BLOCK] Error:', JSON.stringify(err));
     },
@@ -575,7 +612,7 @@ export default function ShelterProfileScreen() {
                     placeholder={t("Search pets...")}
                     placeholderTextColor="#8E8E93"
                     className="flex-1 text-[14px] text-black"
-                    style={{ fontFamily: 'Urbanist' }}
+                    style={{ fontFamily: isVi ? 'BeVietnamPro-Regular' : 'Urbanist-Regular' }}
                   />
                 </Animated.View>
               </Animated.View>
@@ -644,7 +681,7 @@ export default function ShelterProfileScreen() {
                 {shelterInfo?.shelterType ? t(shelterInfo.shelterType) : t("Animal Shelter & Rescue")}
               </Text>
               <Text className="text-[14px] text-black font-regular leading-5 tracking-[0.06px]">
-                {shelterInfo?.description || t("Saving lives and finding forever home 🐾")}
+                {shelterInfo?.bio || t("Saving lives and finding forever home 🐾")}
               </Text>
               <View className="flex-row items-center mt-1">
                 <Image
@@ -661,7 +698,9 @@ export default function ShelterProfileScreen() {
                   style={{ width: 7, height: 9 }}
                   resizeMode="cover"
                 />
-                <Text className="ml-2 text-[12px] text-[#8E8E93] flex-1 leading-4 tracking-[0.06px]">{shelterInfo?.address || t('Not updated')}</Text>
+                <Text className="ml-2 text-[12px] text-[#8E8E93] flex-1 leading-4 tracking-[0.06px]">
+                  {shelterInfo?.address ? formatShortAddress(shelterInfo.address) : t('Not updated')}
+                </Text>
               </View>
 
 
@@ -728,7 +767,7 @@ export default function ShelterProfileScreen() {
               <View className="gap-y-3">
                 <View className="flex-row items-center gap-x-3">
                   <Image source={require('../assets/icon/earth.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />
-                  <Text className="text-[14px] text-[#8E8E93]">{t("Based in")} {shelterInfo?.address || t("Vietnam")}</Text>
+                  <Text className="text-[14px] text-[#8E8E93]">{t("Based in")} {t("Vietnam")}</Text>
                 </View>
                 <View className="flex-row items-center gap-x-3">
                   <Image source={require('../assets/icon/info.png')} style={{ width: 13, height: 13 }} resizeMode="cover" />

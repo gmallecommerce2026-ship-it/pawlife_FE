@@ -6,7 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,23 +17,20 @@ import Animated, {
     Easing,
     Extrapolation,
     interpolate,
-    useAnimatedProps,
     useAnimatedScrollHandler,
     useAnimatedStyle,
     useSharedValue,
     withDelay,
     withRepeat,
     withSequence,
-    withTiming,
+    withTiming
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle } from 'react-native-svg';
 import axiosClient from '../../api/axiosClient';
 import { useLocation } from '../../hooks/useLocation';
 import { eventService } from '../../services/eventService';
 import { petService } from '../../services/petService';
 import { shelterService } from '../../services/shelterService';
-
 const CATEGORIES = [
     { id: 1, label: 'Training', icon: require('../../assets/images/training-icon.png') },
     { id: 2, label: 'Nutrition', icon: require('../../assets/images/nutrition-icon.png') },
@@ -50,7 +47,49 @@ const SectionHeader = ({ title, onLinkPress, t }: { title: string, onLinkPress?:
     </View>
 );
 const VI_MONTHS_SHORT = ['Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'];
+// Đặt ngoài component, cùng chỗ với các hàm helper khác
+const VN_PROVINCES = [
+    'Hà Nội', 'TP Hồ Chí Minh', 'Hồ Chí Minh', 'Hải Phòng', 'Đà Nẵng', 'Cần Thơ',
+    'An Giang', 'Bà Rịa - Vũng Tàu', 'Bạc Liêu', 'Bắc Giang', 'Bắc Kạn', 'Bắc Ninh',
+    'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước', 'Bình Thuận', 'Cà Mau',
+    'Cao Bằng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên', 'Đồng Nai', 'Đồng Tháp',
+    'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Tĩnh', 'Hải Dương', 'Hậu Giang',
+    'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
+    'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định', 'Nghệ An',
+    'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên', 'Quảng Bình', 'Quảng Nam',
+    'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị', 'Sóc Trăng', 'Sơn La', 'Tây Ninh',
+    'Thái Bình', 'Thái Nguyên', 'Thanh Hóa', 'Thừa Thiên Huế', 'Huế', 'Tiền Giang',
+    'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái',
+];
 
+// Chuẩn hoá chuỗi để so sánh không phân biệt dấu/hoa-thường
+const normalize = (str: string) =>
+    str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+
+const NORMALIZED_PROVINCES = VN_PROVINCES.map(p => ({ raw: p, key: normalize(p) }));
+
+const getDisplayCity = (fullAddress?: string) => {
+    if (!fullAddress) return 'not updated';
+
+    const parts = fullAddress.split(',').map(p => p.trim()).filter(Boolean);
+
+    // Duyệt từ cuối lên đầu vì tỉnh/thành thường nằm gần cuối (trước "Việt Nam")
+    for (let i = parts.length - 1; i >= 0; i--) {
+        const partKey = normalize(parts[i]);
+        const match = NORMALIZED_PROVINCES.find(
+            p => partKey === p.key || partKey.includes(p.key)
+        );
+        if (match) return match.raw;
+    }
+
+    // Không match được tỉnh nào -> fallback về phần tử cuối cùng không phải "Việt Nam"
+    const fallback = parts.filter(p => normalize(p) !== 'viet nam' && normalize(p) !== 'vietnam');
+    return fallback.length > 0 ? fallback[fallback.length - 1] : 'not updated';
+};
 const formatMonthShort = (date: Date, isVi: boolean) => {
     if (isVi) {
         return VI_MONTHS_SHORT[date.getMonth()];
@@ -63,10 +102,22 @@ const SectionLoader = () => (
         <ActivityIndicator size="small" color="#E89B5A" />
     </View>
 );
+const formatShortAddress = (fullAddress?: string) => {
+    if (!fullAddress) return '';
+    const parts = fullAddress
+        .split(',')
+        .map(part => part.trim())
+        .filter(p => p.length > 0 && !COUNTRY_NAMES.includes(p.toLowerCase()));
+
+    if (parts.length <= 2) return parts.join(', ');
+    return parts.slice(-2).join(', ');
+};
+
+
+const COUNTRY_NAMES = ['việt nam', 'vietnam', 'vn'];
+
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const CIRCLE_RADIUS = 42; // Bán kính vòng loading (lớn hơn nút 80x80 một chút để bọc ngoài)
-const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
 export default function HomeScreen() {
     const { t, language } = useLanguage();
     const { l } = useLocalizedData();
@@ -76,50 +127,13 @@ export default function HomeScreen() {
     const insets = useSafeAreaInsets();
     const { user } = useContext(AuthContext);
     const { location, errorMsg, isLocationLoaded } = useLocation();
-    const [isNutritionPressed, setIsNutritionPressed] = useState(false);
 
     const rotation = useSharedValue(0);
     const translateY = useSharedValue(0);
-    const [pressedCatId, setPressedCatId] = useState<number | null>(null);
-    const nutritionProgress = useSharedValue(0);
 
-    const animatedCircleProps = useAnimatedProps(() => {
-        return {
-            // strokeDashoffset dịch chuyển từ 100% (trống) về 0% (lấp đầy)
-            strokeDashoffset: CIRCUMFERENCE - nutritionProgress.value * CIRCUMFERENCE,
-        };
-    });
-    const nutritionLoadingStyle = useAnimatedStyle(() => {
-        return {
-            transform: [
-                // To dần ra ngoài ôm lấy nút
-                { scale: interpolate(nutritionProgress.value, [0, 1], [0.9, 1.18], Extrapolation.CLAMP) },
-                // Xoay 1 vòng 360 độ tạo cảm giác "đang load"
-                { rotate: `${interpolate(nutritionProgress.value, [0, 1], [0, 360], Extrapolation.CLAMP)}deg` }
-            ],
-            // Mờ -> Rõ ràng -> Tự động mờ đi khi load xong
-            opacity: interpolate(nutritionProgress.value, [0, 0.1, 0.9, 1], [0, 1, 1, 0], Extrapolation.CLAMP),
-            // Viền dày lên
-            borderWidth: interpolate(nutritionProgress.value, [0, 1], [2, 4], Extrapolation.CLAMP),
-        };
-    });
     const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
     const [greetingSubtitle, setGreetingSubtitle] = useState('');
-    useEffect(() => {
-        // Lắng nghe sự kiện 'pet_blocked'
-        const subscription = DeviceEventEmitter.addListener('pet_blocked', (blockedPetId) => {
-            // Cập nhật state pets: Lọc bỏ tất cả những item có id trùng với blockedPetId
-            setPets((prevPets) => {
-                if (!prevPets) return prevPets;
-                return prevPets.filter(pet => pet.id !== blockedPetId);
-            });
-        });
 
-        // Cleanup listener khi unmount
-        return () => {
-            subscription.remove();
-        };
-    }, []);
     const generateGreeting = useCallback((petName = '') => {
         const isVi = language === 'vi';
         const defaultPetNameVi = petName || 'các bé';
@@ -253,22 +267,53 @@ export default function HomeScreen() {
         return () => subscription.remove();
     }, []);
 
-    const [pets, setPets] = useState<any[]>([]);
-    const [shelters, setShelters] = useState<any[]>([]);
+    // const [pets, setPets] = useState<any[]>([]);
+    // const [shelters, setShelters] = useState<any[]>([]);
     const { data: upcomingEvents = [], isLoading: isEventsLoading } = useQuery({
-        // 1. THÊM user?.id VÀO QUERY KEY ĐỂ ĐỒNG BỘ CACHE VỚI MÀN DETAIL
         queryKey: ['upcoming-events', user?.id],
         queryFn: async () => {
-            // 2. TRUYỀN THÊM user?.id XUỐNG HÀM GET API
-            const res = await eventService.getUpcomingEvents(5, user?.id);
-            return res?.data || res || [];
+            // Tăng limit từ 5 lên 10 hoặc 15 để hiển thị đầy đủ hơn
+            const res = await eventService.getUpcomingEvents(10, user?.id);
+
+            // Sửa lại logic bóc tách dữ liệu để phòng hờ NestJS trả về Pagination Object
+            const responseData = res?.data?.data || res?.data || res;
+            return Array.isArray(responseData) ? responseData : [];
         }
     });
     // Đổi logic loading: Tách riêng initialLoading để phục vụ hiển thị UI mượt
-    const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [hasUnread, setHasUnread] = useState(false);
     const bounceY = useSharedValue(0);
+    const queryClient = useQueryClient(); // Dùng để can thiệp vào cache (cần cho chức năng chặn Pet)
 
+    // 1. QUERY TẢI DANH SÁCH PETS
+    const { data: pets = [], isLoading: isPetsLoading } = useQuery({
+        queryKey: ['pets-feed', location?.lat, location?.lng],
+        queryFn: async () => {
+            const res = await petService.getFeed(10, location?.lat, location?.lng);
+            const fetchedPets = res?.data?.data || res?.data || res || [];
+            return Array.isArray(fetchedPets) ? fetchedPets : [];
+        },
+        enabled: isLocationLoaded, // Chỉ gọi API khi đã lấy được tọa độ (hoặc lấy tọa độ thất bại có fallback)
+        staleTime: 5 * 60 * 1000, // Caching data trong 5 phút. Khi chuyển tab qua lại sẽ không gọi lại API gây giật UI.
+    });
+
+    // 2. QUERY TẢI DANH SÁCH SHELTERS
+    const { data: shelters = [], isLoading: isSheltersLoading } = useQuery({
+        queryKey: ['shelters-nearby', location?.lat, location?.lng],
+        queryFn: async () => {
+            if (location?.lat && location?.lng) {
+                const res = await shelterService.getSheltersNearBy(location.lat, location.lng, 10);
+                const data = res?.data?.data || res?.data || res || [];
+                if (Array.isArray(data) && data.length > 0) return data;
+            }
+            // Fallback: Tự động gọi hàm lấy shelters mặc định nếu không có tọa độ hoặc tìm không thấy
+            const fallbackRes = await shelterService.getShelters({ limit: 10 });
+            const fallbackData = fallbackRes?.data?.data || fallbackRes?.data || fallbackRes || [];
+            return Array.isArray(fallbackData) ? fallbackData : [];
+        },
+        enabled: isLocationLoaded,
+        staleTime: 5 * 60 * 1000,
+    });
     const handleScanPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         router.push('/scan');
@@ -354,50 +399,58 @@ export default function HomeScreen() {
                 }
             };
             checkUnreadNotifications();
-
-            // Xóa loadHomeData ở đây nếu nó gây gọi API đúp khi vừa mở app
-            // Giữ lại nếu bạn muốn refresh data ngầm mỗi khi chuyển tab
-            if (isLocationLoaded && !isInitialLoading) {
-                loadHomeData(location?.lat, location?.lng, true);
-            }
-        }, [isLocationLoaded, location, user?.id, isInitialLoading])
+        }, [isLocationLoaded, location, user?.id, isPetsLoading, isSheltersLoading])
     );
 
-    const loadHomeData = async (currentLat?: number, currentLng?: number, isSilentRefresh = false) => {
-        try {
-            if (!isSilentRefresh && pets.length === 0) setIsInitialLoading(true);
-
-            const [petsRes, sheltersRes] = await Promise.all([
-                petService.getFeed(10, currentLat, currentLng),
-                (currentLat && currentLng)
-                    ? shelterService.getSheltersNearBy(currentLat, currentLng, 5)
-                    : shelterService.getShelters({ limit: 5 })
-            ]);
-
-            // Lấy data pet từ API
-            let fetchedPets = petsRes?.data || petsRes || [];
-
-            // Cập nhật thẳng vào state, KHÔNG nhân bản 50 lần nữa
-            setPets(fetchedPets);
-
-            const fetchedShelters = sheltersRes?.data?.data || sheltersRes?.data || sheltersRes || [];
-            setShelters(Array.isArray(fetchedShelters) ? fetchedShelters : []);
-        } catch (error: any) {
-            if (error?.response?.status === 401) {
-                // setPets([]); setEvents([]); setShelters([]);
-            }
-        } finally {
-            setIsInitialLoading(false);
-        }
-    };
 
     useEffect(() => {
-        if (!isLocationLoaded) return;
-        const initLoad = async () => {
-            await loadHomeData(location?.lat, location?.lng);
+        // 1. Xử lý xóa Pet bị chặn ngay lập tức khỏi UI
+        const petBlockedSub = DeviceEventEmitter.addListener('pet_blocked', (blockedPetId) => {
+            queryClient.setQueryData(['pets-feed', location?.lat, location?.lng], (oldPets: any) => {
+                if (!oldPets) return [];
+                return oldPets.filter((pet: any) => pet.id !== blockedPetId);
+            });
+        });
+
+        const petHiddenSub = DeviceEventEmitter.addListener('PET_HIDDEN', ({ petId }) => {
+            queryClient.setQueriesData({ queryKey: ['pets-feed'] }, (oldPets: any) => {
+                if (!Array.isArray(oldPets)) return oldPets;
+                return oldPets.filter((pet: any) => pet.id !== petId);
+            });
+        });
+
+        // 🌟 THÊM MỚI: 2. Xử lý xóa Shelter và Pet của Shelter đó ngay lập tức khỏi UI khi Block Shelter
+        const shelterBlockedSub = DeviceEventEmitter.addListener('SHELTER_BLOCKED', ({ shelterId }) => {
+            // Lọc shelter khỏi danh sách shelters-nearby
+            queryClient.setQueryData(['shelters-nearby', location?.lat, location?.lng], (oldShelters: any) => {
+                if (!oldShelters) return [];
+                return oldShelters.filter((s: any) => s.id !== shelterId);
+            });
+            // Lọc các pet thuộc shelter này khỏi pets-feed
+            queryClient.setQueryData(['pets-feed', location?.lat, location?.lng], (oldPets: any) => {
+                if (!oldPets) return [];
+                return oldPets.filter((p: any) => p.shelterId !== shelterId);
+            });
+        });
+
+        // 3. Xử lý khi bỏ chặn: Yêu cầu React Query gọi lại API ngầm (Silent Refresh)
+        const unblockSub = DeviceEventEmitter.addListener('REFETCH_DATA_AFTER_UNBLOCK', () => {
+            // ✅ type: 'all' để refetch kể cả khi Home đang không active/mounted quan sát
+            queryClient.refetchQueries({ queryKey: ['pets-feed'], type: 'all' });
+            queryClient.refetchQueries({ queryKey: ['shelters-nearby'], type: 'all' });
+            queryClient.refetchQueries({ queryKey: ['pets-list'], type: 'all' });
+            queryClient.refetchQueries({ queryKey: ['search-shelters'], type: 'all' });
+        });
+
+
+        return () => {
+            petBlockedSub.remove();
+            petHiddenSub.remove();
+            shelterBlockedSub.remove();
+            unblockSub.remove();
         };
-        initLoad();
-    }, [isLocationLoaded, location, errorMsg, user?.id]);
+    }, [location?.lat, location?.lng, queryClient]);
+
 
     useEffect(() => {
         rotation.value = withRepeat(
@@ -428,11 +481,7 @@ export default function HomeScreen() {
     const renderPetItem = useCallback(({ item: pet }: { item: any }) => {
         const petImageUrl = (pet.images && pet.images.length > 0) ? pet.images[0]?.url : 'https://via.placeholder.com/200x300.png?text=No+Image';
         const fullAddress = pet.location || pet.shelter?.address;
-        let displayCity = 'not updated';
-        if (fullAddress) {
-            const addressParts = fullAddress.split(',');
-            displayCity = addressParts[addressParts.length - 1].trim();
-        }
+        const displayCity = getDisplayCity(fullAddress);
 
         const isFemale = pet.gender?.toUpperCase() === 'FEMALE' || pet.gender?.toUpperCase() === 'CÁI';
         const displayAge = (() => {
@@ -531,6 +580,7 @@ export default function HomeScreen() {
                                 <Text className="text-[16px] font-semibold text-gray-900 mb-4">{t('Pawcare')}</Text>
                                 <View className="flex-row justify-between">
                                     {CATEGORIES.map((cat) => {
+                                        // 1. Đổi biến thành isNutrition
                                         const isNutrition = cat.label === 'Nutrition';
 
                                         return (
@@ -538,70 +588,24 @@ export default function HomeScreen() {
                                                 key={cat.id}
                                                 className="items-center w-[22%] -ml-1"
                                                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-
-                                                onPress={() => router.push({ pathname: '/pawcare/[category]', params: { category: cat.label } })}
-
-                                                onPressIn={() => {
+                                                onPress={() => {
+                                                    // 2. Kiểm tra nếu là Nutrition thì mới vào ingredient-check
                                                     if (isNutrition) {
-                                                        setPressedCatId(cat.id);
-                                                        // Đợi 300ms rồi mới bắt đầu chạy animation lấp đầy trong 800ms
-                                                        nutritionProgress.value = withDelay(
-                                                            300,
-                                                            withTiming(1, { duration: 800, easing: Easing.linear })
-                                                        );
-                                                    }
-                                                }}
-
-                                                onPressOut={() => {
-                                                    if (isNutrition) {
-                                                        setPressedCatId(null);
-                                                        // Người dùng nhả tay: 
-                                                        // Nếu nhả trước 300ms -> withDelay bị hủy, vòng tròn chưa kịp hiện.
-                                                        // Nếu nhả sau 300ms -> vòng tròn tụt nhanh về 0 trong 150ms.
-                                                        nutritionProgress.value = withTiming(0, { duration: 150 });
-                                                    }
-                                                }}
-
-                                                onLongPress={() => {
-                                                    if (isNutrition) {
-                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                        setPressedCatId(null);
-                                                        nutritionProgress.value = 0; // Reset lại vòng
                                                         router.push('/ingredient-check');
+                                                    } else {
+                                                        // Các mục còn lại (bao gồm cả Training) sẽ vào pawcare/[category]
+                                                        router.push({ pathname: '/pawcare/[category]', params: { category: cat.label } });
                                                     }
                                                 }}
-
-                                                // TỔNG THỜI GIAN NHẤN GIỮ = 300ms (chờ) + 800ms (loading) = 1100ms
-                                                delayLongPress={isNutrition ? 1100 : undefined}
                                             >
                                                 <View className="relative items-center justify-center mb-3 w-20 h-20">
-
-                                                    {/* HIỆU ỨNG ĐỔ ĐẦY VÒNG TRÒN TỪ 12 GIỜ */}
-                                                    {isNutrition && (
-                                                        <View style={{ position: 'absolute', width: 90, height: 90, alignItems: 'center', justifyContent: 'center', zIndex: 0 }}>
-                                                            {/* Xoay SVG -90 độ để điểm bắt đầu nằm ở hướng 12h thay vì 3h */}
-                                                            <Svg width="90" height="90" style={{ transform: [{ rotate: '-90deg' }] }}>
-                                                                <AnimatedCircle
-                                                                    cx="45"
-                                                                    cy="45"
-                                                                    r={CIRCLE_RADIUS}
-                                                                    stroke="#E89B5A"
-                                                                    strokeWidth="4"
-                                                                    fill="transparent"
-                                                                    strokeDasharray={CIRCUMFERENCE}
-                                                                    animatedProps={animatedCircleProps}
-                                                                    strokeLinecap="round" // Làm tròn đầu vòng loading (tùy chọn)
-                                                                />
-                                                            </Svg>
-                                                        </View>
-                                                    )}
-
-                                                    {/* UI HIỆN TẠI (GIỮ NGUYÊN HOÀN TOÀN) */}
-                                                    <View className="w-full h-full bg-white rounded-full items-center justify-center z-10" style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 }}>
+                                                    <View
+                                                        className="w-full h-full bg-white rounded-full items-center justify-center z-10"
+                                                        style={{ shadowColor: '#E89B5A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 }}
+                                                    >
                                                         <Image source={cat.icon} className="w-11 h-11" />
                                                     </View>
                                                 </View>
-
                                                 <Text className="text-gray-500 text-xs font-medium">{t(cat.label)}</Text>
                                             </Pressable>
                                         );
@@ -613,7 +617,7 @@ export default function HomeScreen() {
                         {/* --- PETS NEAR YOU TỪ API --- */}
                         <View className="mt-[38px]">
                             <SectionHeader title="Pets Near You" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Pet' } })} t={t} />
-                            {isInitialLoading && pets.length === 0 ? (
+                            {isPetsLoading && pets.length === 0 ? (
                                 <SectionLoader />
                             ) : pets.length === 0 ? (
                                 <Text className="text-center text-gray-400 mt-2 mb-4">No pets recently</Text>
@@ -644,7 +648,7 @@ export default function HomeScreen() {
                         {/* --- ADOPTION SHELTERS TỪ API --- */}
                         <View className="mt-[38px]">
                             <SectionHeader title="Adoption Shelters" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Shelter' } })} t={t} />
-                            {isInitialLoading && shelters.length === 0 ? (
+                            {isSheltersLoading && shelters.length === 0 ? (
                                 <SectionLoader />
                             ) : shelters.length === 0 ? (
                                 <Text className="text-center text-gray-400 mt-2 mb-4">No shelters available</Text>
@@ -662,7 +666,9 @@ export default function HomeScreen() {
                                                 <Text className="font-medium text-black text-[14px]" numberOfLines={1}>{shelter.name}</Text>
                                                 <View className="flex-row items-center mt-2">
                                                     <Image source={require('../../assets/icon/location-solid-gray.png')} style={{ width: 10, height: 10 }} resizeMode="cover" />
-                                                    <Text className="text-[#8E8E93] font-regular text-[12px] ml-1 flex-1" numberOfLines={1}>{shelter.address || (isVi ? 'Đang cập nhật' : 'Updating')}</Text>
+                                                    <Text className="text-[#8E8E93] font-regular text-[12px] ml-1 flex-1" numberOfLines={1}>
+                                                        {shelter.address ? formatShortAddress(shelter.address) : (isVi ? 'Đang cập nhật' : 'Updating')}
+                                                    </Text>
                                                 </View>
                                             </View>
                                         </TouchableOpacity>
@@ -778,8 +784,11 @@ export default function HomeScreen() {
                         </Text>
 
                         <Animated.Text
-                            style={[subtitleAnimatedStyle]}
-                            className="text-white text-[14px] font-medium tracking-tight overflow-hidden"
+                            style={[
+                                subtitleAnimatedStyle,
+                                { fontFamily: isVi ? 'BeVietnamPro-Medium' : 'Urbanist-Medium' }
+                            ]}
+                            className="text-white text-[14px] tracking-tight overflow-hidden"
                             numberOfLines={1}
                             ellipsizeMode="tail"
                         >

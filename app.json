@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PawLife",
-    "slug": "pet-id-app",
+    "name": "PawLife Beta",
+    "slug": "pawlife-beta",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.annguyen.pawlife",
+      "usesAppleSignIn": true,
       "config": {
         "googleMapsApiKey": "AIzaSyDSiggtEz29dOMLPbALCl4YBAvxJTWKgAU"
       },
@@ -25,22 +26,18 @@
           "comgooglemaps"
         ],
         "SKAdNetworkItems": [
-          { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
-          { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" }
+          {
+            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
+          }
         ],
-
         "ITSAppUsesNonExemptEncryption": false,
-
         "NSCameraUsageDescription": "PawLife cần quyền Camera để quét mã QR trên thẻ định danh thú cưng và hỗ trợ tìm kiếm thú cưng thất lạc.",
-
         "NSPhotoLibraryUsageDescription": "PawLife cần truy cập thư viện ảnh để cập nhật ảnh hồ sơ cá nhân và thú cưng.",
-
         "NSPhotoLibraryAddUsageDescription": "PawLife cần quyền lưu ảnh để bạn có thể tải mã QR, thẻ thú cưng và ảnh hồ sơ y tế về thư viện ảnh trên thiết bị.",
-
-        "NSLocationWhenInUseUsageDescription": "PawLife cần quyền vị trí để gửi tọa độ hỗ trợ tìm kiếm thú cưng thất lạc, hiển thị nội dung phù hợp gần bạn và tính toán khoảng cách, chỉ đường chính xác từ bạn đến nơi thú cưng vừa được quét mã.",
-
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "PawLife cần quyền vị trí để hỗ trợ các tính năng tìm kiếm thú cưng thất lạc ngay cả khi ứng dụng đang chạy nền.",
-
+        "NSLocationWhenInUseUsageDescription": "PawLife cần quyền vị trí để gửi tọa độ hỗ trợ tìm kiếm thú cưng thất lạc, hiển thị nội dung phù hợp gần bạn và tính toán khoảng cách, chỉ đường chính xác từ bạn đến nơi thú cưng vừa được quét mã."
       }
     },
     "android": {
@@ -52,11 +49,16 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.annguyen.pawlife",
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
         "android.permission.INTERNET",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -65,31 +67,24 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withModularHeaders.js",
       "expo-router",
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "PawLife cần truy cập thư viện ảnh để cập nhật ảnh hồ sơ cá nhân và thú cưng.",
+          "cameraPermission": "PawLife cần quyền Camera để quét mã QR trên thẻ định danh thú cưng và hỗ trợ tìm kiếm thú cưng thất lạc."
+        }
+      ],
       [
         "expo-local-authentication",
         {
           "faceIDPermission": "Ứng dụng cần sử dụng Face ID để bảo mật tài khoản của bạn."
         }
       ],
-      // [
-      //   "react-native-fbsdk-next",
-      //   {
-      //     "appID": "1465556478529591",
-      //     "clientToken": "e53c55d304602fbdda9e9b910721eda0",
-      //     "displayName": "PawLife",
-      //     "scheme": "fb1465556478529591"
-      //   }
-      // ],
-      // [
-      //   "@react-native-google-signin/google-signin",
-      //   {
-      //     "iosUrlScheme": "com.googleusercontent.apps.725064672703-l61bog4iims28n57sspk6hokcf1l86c7"
-      //   }
-      // ],
       "expo-apple-authentication",
       [
         "expo-location",
@@ -103,7 +98,13 @@
           "RNMapboxMapsDownloadToken": "",
           "RNMapboxMapsImpl": "mapbox"
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-build-properties",
+      "@react-native-google-signin/google-signin",
+      {
+        "iosUrlScheme": "com.googleusercontent.apps.725064672703-l61bog4iims28n57sspk6hokcf1l86c7"
+      }
     ],
     "experiments": {
       "typedRoutes": true
@@ -111,14 +112,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f063f55b-e230-45c5-922b-de13a3a21132"
+        "projectId": "c621725d-be20-456a-9645-7073310e8c7e"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/f063f55b-e230-45c5-922b-de13a3a21132"
-    }
+      "url": "https://u.expo.dev/c621725d-be20-456a-9645-7073310e8c7e"
+    },
+    "owner": "petid.2026"
   }
 }

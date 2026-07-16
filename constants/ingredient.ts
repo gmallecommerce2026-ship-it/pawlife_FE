@@ -2811,48 +2811,6 @@ export const INGREDIENTS: IngredientItem[] = [
     },
   },
   {
-    id: 'liquid_potpourri',
-    pets: ['cat'],
-    icon: '🍯',
-    badge: 'emergency',
-    title: { en: 'Liquid Potpourri', vi: 'Tinh dầu thơm dạng lỏng (Potpourri)' },
-    riskLabel: { en: 'Emergency', vi: 'Nguy hiểm' },
-    shortContent: { en: 'Cationic detergents burn tissue on contact', vi: 'Chất tẩy cation gây bỏng mô khi tiếp xúc' },
-    details: {
-      whyTitle: { en: "Why it's harmful", vi: 'Tại sao có hại' },
-      why: {
-        en: ['Contains cationic detergents and essential oils', 'Causes chemical burns to the mouth and skin'],
-        vi: ['Chứa chất tẩy cation và tinh dầu', 'Gây bỏng hóa chất ở miệng và da'],
-      },
-      symptomsTitle: { en: 'Symptoms to watch', vi: 'Triệu chứng cần chú ý' },
-      symptoms: {
-        en: ['Drooling', 'Mouth ulcers', 'Difficulty breathing'],
-        vi: ['Chảy nước dãi', 'Loét miệng', 'Khó thở'],
-      },
-    },
-  },
-  {
-    id: 'marijuana_thc',
-    pets: ['cat'],
-    icon: '🌿',
-    badge: 'toxic',
-    title: { en: 'Marijuana / THC (edibles)', vi: 'Cần sa / THC (đồ ăn chứa)' },
-    riskLabel: { en: 'Toxic', vi: 'Có hại' },
-    shortContent: { en: 'Accidental exposure from edibles or smoke', vi: 'Tiếp xúc do đồ ăn hoặc khói' },
-    details: {
-      whyTitle: { en: "Why it's harmful", vi: 'Tại sao có hại' },
-      why: {
-        en: ['Affects the nervous system', 'Edibles often also contain chocolate or xylitol'],
-        vi: ['Ảnh hưởng đến hệ thần kinh', 'Đồ ăn chứa THC thường kèm socola hoặc xylitol'],
-      },
-      symptomsTitle: { en: 'Symptoms to watch', vi: 'Triệu chứng cần chú ý' },
-      symptoms: {
-        en: ['Wobbliness', 'Dribbling urine', 'Extreme sleepiness'],
-        vi: ['Đi loạng choạng', 'Rỉ nước tiểu', 'Ngủ li bì bất thường'],
-      },
-    },
-  },
-  {
     id: 'human_toothpaste',
     pets: ['cat'],
     icon: '🪥',
@@ -3765,21 +3723,6 @@ export const INGREDIENTS: IngredientItem[] = [
       why: { en: ['Causes acute kidney failure in cats', 'Even licking pollen can be fatal'], vi: ['Gây suy thận cấp ở mèo', 'Chỉ cần liếm phấn hoa cũng có thể gây tử vong'] },
       symptomsTitle: { en: 'Symptoms to watch', vi: 'Triệu chứng cần chú ý' },
       symptoms: { en: ['Vomiting', 'Loss of appetite', 'No urine production'], vi: ['Nôn mửa', 'Chán ăn', 'Không đi tiểu được'] },
-    },
-  },
-  {
-    id: 'tea_tree_oil',
-    pets: ['cat'],
-    icon: '💧',
-    badge: 'emergency',
-    title: { en: 'Tea Tree Oil', vi: 'Tinh dầu Tràm Trà (Tea Tree Oil)' },
-    riskLabel: { en: 'Emergency', vi: 'Nguy hiểm' },
-    shortContent: { en: 'Highly concentrated oil, severe toxicity', vi: 'Tinh dầu đậm đặc, độc tính nghiêm trọng' },
-    details: {
-      whyTitle: { en: "Why it's harmful", vi: 'Tại sao có hại' },
-      why: { en: ['Rapidly absorbed through skin and mouth', 'Affects nervous system severely'], vi: ['Hấp thụ nhanh qua da và miệng', 'Ảnh hưởng nghiêm trọng đến hệ thần kinh'] },
-      symptomsTitle: { en: 'Symptoms to watch', vi: 'Triệu chứng cần chú ý' },
-      symptoms: { en: ['Wobbliness', 'Tremors', 'Collapse'], vi: ['Đi loạng choạng', 'Run rẩy', 'Ngất xỉu'] },
     },
   },
   {

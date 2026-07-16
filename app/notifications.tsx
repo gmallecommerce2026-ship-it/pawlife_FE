@@ -23,9 +23,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 // =====================================================================
 // 🚀 HELPER DÙNG CHUNG: resolveNotificationText
-// Mọi nơi cần hiển thị title/body của 1 notification PHẢI đi qua hàm này,
-// để đảm bảo dữ liệu động (petName, radius...) luôn được dịch đúng theo
-// ngôn ngữ hiện tại, không bị hard-code tiếng Anh rải rác nhiều nơi.
 // =====================================================================
 const resolveNotificationText = (item: any, t: any) => {
   const i18n = item?.metadata?.i18n;
@@ -35,9 +32,6 @@ const resolveNotificationText = (item: any, t: any) => {
       body: t(i18n.bodyKey, i18n.params || {}),
     };
   }
-  // Fallback cho noti cũ / không có dữ liệu động: vẫn cố dịch title/body
-  // thô qua t() (nếu nó trùng key tĩnh có sẵn trong dictionary), nếu không
-  // tìm thấy thì t() tự trả lại nguyên văn.
   return {
     title: item?.title ? t(item.title) : item?.title,
     body: item?.body ? t(item.body) : item?.body,
@@ -61,7 +55,7 @@ const getIconByType = (type: string) => {
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-// --- Component Item với hiệu ứng Swipe Premium, Parallax & Border Masking ---
+// --- Component Item với hiệu ứng Swipe Premium ---
 const NotificationItem = ({ item, onPress, onDelete, onView, t }: { item: any, onPress: any, onDelete: any, onView: any, t: any }) => {
   const swipeableRef = useRef<Swipeable>(null);
   const slideOutAnim = useRef(new Animated.Value(0)).current;
@@ -74,13 +68,10 @@ const NotificationItem = ({ item, onPress, onDelete, onView, t }: { item: any, o
   const [dragXNode, setDragXNode] = useState<any>(null);
 
   const attachGestureListener = (dragX: any) => {
-    if (!dragXNode) {
-      setTimeout(() => setDragXNode(dragX), 0);
-    }
+    if (!dragXNode) setTimeout(() => setDragXNode(dragX), 0);
 
     if (!dragXListenerAttached.current && dragX) {
       dragXListenerAttached.current = true;
-
       dragX.addListener(({ value }: { value: number }) => {
         if (value >= 80 && !hapticTriggeredRight.current) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -110,50 +101,29 @@ const NotificationItem = ({ item, onPress, onDelete, onView, t }: { item: any, o
             toValue: -500,
             duration: 150,
             useNativeDriver: true,
-          }).start(() => {
-            onDelete(item);
-          });
+          }).start(() => onDelete(item));
         }
 
-        if (Math.abs(value) < 10) {
-          isActionFired.current = false;
-        }
+        if (Math.abs(value) < 10) isActionFired.current = false;
       });
     }
   };
 
   const renderLeftActions = (progress: any, dragX: any) => {
     attachGestureListener(dragX);
-
-    const transX = dragX.interpolate({
-      inputRange: [0, 80],
-      outputRange: [-20, 0],
-      extrapolate: 'clamp',
-    });
-
+    const transX = dragX.interpolate({ inputRange: [0, 80], outputRange: [-20, 0], extrapolate: 'clamp' });
     return (
       <View style={{ width: 80, overflow: 'visible' }}>
         <AnimatedTouchableOpacity
           activeOpacity={0.8}
-          onPress={() => {
-            onView(item);
-            swipeableRef.current?.close();
-          }}
+          onPress={() => { onView(item); swipeableRef.current?.close(); }}
           style={{
-            position: 'absolute', top: 0, bottom: 0, left: 0,
-            width: 1000,
-            backgroundColor: '#00761D',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            paddingLeft: 27,
+            position: 'absolute', top: 0, bottom: 0, left: 0, width: 1000,
+            backgroundColor: '#00761D', justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 27,
           }}
         >
           <Animated.View style={{ transform: [{ translateX: transX }] }}>
-            <Image
-              source={require('../assets/icon/eye.png')}
-              style={{ width: 11, height: 8 }}
-              resizeMode="cover"
-            />
+            <Image source={require('../assets/icon/eye.png')} style={{ width: 11, height: 8 }} resizeMode="cover" />
           </Animated.View>
         </AnimatedTouchableOpacity>
       </View>
@@ -162,42 +132,22 @@ const NotificationItem = ({ item, onPress, onDelete, onView, t }: { item: any, o
 
   const renderRightActions = (progress: any, dragX: any) => {
     attachGestureListener(dragX);
-
-    const transX = dragX.interpolate({
-      inputRange: [-80, 0],
-      outputRange: [0, 20],
-      extrapolate: 'clamp',
-    });
-
+    const transX = dragX.interpolate({ inputRange: [-80, 0], outputRange: [0, 20], extrapolate: 'clamp' });
     return (
       <View style={{ width: 80, overflow: 'visible' }}>
         <AnimatedTouchableOpacity
           activeOpacity={0.8}
           onPress={() => {
             isActionFired.current = true;
-            Animated.timing(slideOutAnim, {
-              toValue: -500,
-              duration: 200,
-              useNativeDriver: true,
-            }).start(() => {
-              onDelete(item);
-            });
+            Animated.timing(slideOutAnim, { toValue: -500, duration: 200, useNativeDriver: true }).start(() => onDelete(item));
           }}
           style={{
-            position: 'absolute', top: 0, bottom: 0, right: 0,
-            width: 1000,
-            backgroundColor: '#760000',
-            justifyContent: 'center',
-            alignItems: 'flex-end',
-            paddingRight: 27,
+            position: 'absolute', top: 0, bottom: 0, right: 0, width: 1000,
+            backgroundColor: '#760000', justifyContent: 'center', alignItems: 'flex-end', paddingRight: 27,
           }}
         >
           <Animated.View style={{ transform: [{ translateX: transX }] }}>
-            <Image
-              source={require('../assets/icon/trash-red.png')}
-              style={{ width: 10, height: 11 }}
-              resizeMode="cover"
-            />
+            <Image source={require('../assets/icon/trash-red.png')} style={{ width: 10, height: 11 }} resizeMode="cover" />
           </Animated.View>
         </AnimatedTouchableOpacity>
       </View>
@@ -205,20 +155,9 @@ const NotificationItem = ({ item, onPress, onDelete, onView, t }: { item: any, o
   };
 
   const bgColorHex = !item.isRead ? '#FFF4ED' : '#FFFFFF';
+  const leftOpacity = dragXNode ? dragXNode.interpolate({ inputRange: [0, 40], outputRange: [1, 0], extrapolate: 'clamp' }) : 1;
+  const rightOpacity = dragXNode ? dragXNode.interpolate({ inputRange: [-40, 0], outputRange: [0, 1], extrapolate: 'clamp' }) : 1;
 
-  const leftOpacity = dragXNode ? dragXNode.interpolate({
-    inputRange: [0, 40],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  }) : 1;
-
-  const rightOpacity = dragXNode ? dragXNode.interpolate({
-    inputRange: [-40, 0],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  }) : 1;
-
-  // 🚀 Dùng helper chung thay cho getLocalizedText riêng lẻ
   const { body: localizedBody } = resolveNotificationText(item, t);
 
   return (
@@ -226,63 +165,30 @@ const NotificationItem = ({ item, onPress, onDelete, onView, t }: { item: any, o
       ref={swipeableRef}
       renderLeftActions={renderLeftActions}
       renderRightActions={renderRightActions}
-      overshootLeft={true}
-      overshootRight={true}
-      friction={1}
-      overshootFriction={1}
+      overshootLeft={true} overshootRight={true} friction={1} overshootFriction={1}
     >
-      <Animated.View style={{
-        position: 'relative',
-        transform: [{ translateX: slideOutAnim }]
-      }}>
-        <Animated.View
-          key={dragXNode ? 'left-active' : 'left-static'}
-          style={{
-            position: 'absolute', top: 0, bottom: 0, left: 0, width: 20,
-            backgroundColor: bgColorHex,
-            opacity: leftOpacity
-          }}
-        />
-        <Animated.View
-          key={dragXNode ? 'right-active' : 'right-static'}
-          style={{
-            position: 'absolute', top: 0, bottom: 0, right: 0, width: 20,
-            backgroundColor: bgColorHex,
-            opacity: rightOpacity
-          }}
-        />
+      <Animated.View style={{ position: 'relative', transform: [{ translateX: slideOutAnim }] }}>
+        <Animated.View key={dragXNode ? 'left-active' : 'left-static'} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 20, backgroundColor: bgColorHex, opacity: leftOpacity }} />
+        <Animated.View key={dragXNode ? 'right-active' : 'right-static'} style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 20, backgroundColor: bgColorHex, opacity: rightOpacity }} />
 
-        <View style={{
-          borderRadius: 16,
-          backgroundColor: bgColorHex,
-          overflow: 'hidden',
-        }}>
-          <TouchableOpacity
-            activeOpacity={1}
-            className="flex-row justify-center items-center px-5 py-4 border-b border-gray-50"
-            onPress={() => onPress(item)}
-          >
+        <View style={{ borderRadius: 16, backgroundColor: bgColorHex, overflow: 'hidden' }}>
+          <TouchableOpacity activeOpacity={1} className="flex-row justify-center items-center px-5 py-4 border-b border-gray-50" onPress={() => onPress(item)}>
             <View className="relative mr-4">
               <View className="w-12 h-12 rounded-full border border-gray-50 items-center justify-center bg-white shadow-sm">
                 {getIconByType(item.type)}
               </View>
-              {!item.isRead && (
-                <View className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ffa053] rounded-full border-2 border-[#FFF4ED]" />
-              )}
+              {!item.isRead && <View className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ffa053] rounded-full border-2 border-[#FFF4ED]" />}
             </View>
-
             <View className="flex-1 justify-center">
               <Text className={`text-[12px] text-black ${!item.isRead ? 'font-semibold' : 'font-regular'}`} numberOfLines={3}>
                 {localizedBody} {item.emoji || ''}
               </Text>
-
               <Text className="text-[10px] text-gray-400 font-medium">
                 {dayjs(item.createdAt).format('hh:mm A')}
               </Text>
             </View>
           </TouchableOpacity>
         </View>
-
       </Animated.View>
     </Swipeable>
   );
@@ -290,7 +196,9 @@ const NotificationItem = ({ item, onPress, onDelete, onView, t }: { item: any, o
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -298,6 +206,7 @@ export default function NotificationsScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+
   const [popupConfig, setPopupConfig] = useState({
     visible: false, title: '', message: '', type: 'info', buttonText: 'Close'
   });
@@ -350,7 +259,6 @@ export default function NotificationsScreen() {
   const handleDeleteNotification = async (item: any) => {
     try {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
       setSections(prevSections => prevSections.map(section => ({
         ...section,
         data: section.data.filter((note: any) => note.id !== item.id)
@@ -363,9 +271,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handleViewNotification = (item: any) => {
-    handlePressItem(item);
-  };
+  const handleViewNotification = (item: any) => { handlePressItem(item); };
 
   const handlePressItem = async (item: any) => {
     if (!item.isRead) {
@@ -376,25 +282,36 @@ export default function NotificationsScreen() {
       })));
     }
 
-    // 🚀 Dùng helper chung để có title/body đã dịch + đã chèn dữ liệu động
     const { title, body } = resolveNotificationText(item, t);
 
     const showCustomAlert = (alertTitle: string, message: string, type: 'error' | 'feature' | 'system', buttonText: string) => {
       setPopupConfig({ visible: true, title: alertTitle, message, type, buttonText });
     };
 
-    const isTransferNotification =
-      item.title?.toLowerCase().includes('yêu cầu chuyển nhượng') ||
-      item.title?.toLowerCase().includes('transfer ownership') ||
-      item.title?.toLowerCase().includes('chuyển nhượng');
+    const rawTitleStr = item.title?.toLowerCase() || '';
+    const resolvedTitleStr = title?.toLowerCase() || '';
+    const i18nTitleKey = item.metadata?.i18n?.titleKey?.toLowerCase() || '';
 
-    if (isTransferNotification && item.referenceId) {
-      router.push({
-        pathname: '/transfer-ownership',
-        params: { petId: item.referenceId }
-      });
+    const uiAction = item.metadata?.uiAction;
+
+    if (uiAction === 'show_success_popup') {
+      showCustomAlert(
+        t('Chuyển nhượng hoàn tất'),
+        t('Thú cưng đã được chuyển nhượng thành công.'),
+        'system',
+        t('Đóng')
+      );
       return;
     }
+
+    if (uiAction === 'navigate_transfer') {
+      const targetPetId = item.referenceId;
+      if (targetPetId) {
+        router.push(`/transfer-ownership?petId=${targetPetId}`);
+      }
+      return;
+    }
+
 
     switch (item.type) {
       case 'TAG_SCANNED':
@@ -404,7 +321,6 @@ export default function NotificationsScreen() {
           params: {
             reportId: item.referenceId,
             openFrom: 'notification',
-            // Truyền kèm i18n để màn chi tiết cũng hiển thị song ngữ đúng dữ liệu động
             i18nTitleKey: item.metadata?.i18n?.titleKey ?? '',
             i18nBodyKey: item.metadata?.i18n?.bodyKey ?? '',
             i18nParams: JSON.stringify(item.metadata?.i18n?.params || {}),
@@ -424,6 +340,7 @@ export default function NotificationsScreen() {
       case 'SYSTEM':
         showCustomAlert(title || t("System Notification"), body, "system", "Got it"); break;
       default:
+        showCustomAlert(title || "Notification", body || "", "info" as any, "Đóng");
     }
   };
 
@@ -435,27 +352,14 @@ export default function NotificationsScreen() {
           <TouchableOpacity
             onPress={() => router.back()}
             activeOpacity={0.7}
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 5,
-              elevation: 3,
-            }}
+            style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 }}
             className="w-10 h-10 rounded-full items-center justify-center"
           >
             <View className="overflow-hidden rounded-full w-[36px] h-[36px] items-center justify-center"
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 28,
-                borderWidth: 0.5,
-                borderTopColor: 'white',
-                borderLeftColor: 'white',
-                borderBottomColor: 'transparent',
-                borderRightColor: 'transparent',
-                justifyContent: 'center',
-                alignItems: 'center',
+                width: 36, height: 36, borderRadius: 28, borderWidth: 0.5,
+                borderTopColor: 'white', borderLeftColor: 'white',
+                borderBottomColor: 'transparent', borderRightColor: 'transparent',
                 backgroundColor: 'rgba(255, 255, 255, 0.1)',
               }}>
               <LinearGradient
@@ -511,7 +415,7 @@ export default function NotificationsScreen() {
         )}
       </SafeAreaView>
 
-      {/* Popup / Modals */}
+      {/* Popup Báo Cáo Cơ Bản (Dùng chung) */}
       <Modal transparent={true} visible={popupConfig.visible} animationType="fade" onRequestClose={closePopup}>
         <TouchableOpacity className="flex-1 bg-black/50 justify-center items-center px-6" activeOpacity={1} onPress={closePopup}>
           <TouchableWithoutFeedback>
@@ -530,6 +434,7 @@ export default function NotificationsScreen() {
           </TouchableWithoutFeedback>
         </TouchableOpacity>
       </Modal>
+
     </GestureHandlerRootView>
   );
 }

@@ -346,7 +346,7 @@ interface MapPinProps {
 // ─────────────────────────────────────────────
 const PinIcon = React.memo(({
   id, coordinate, iconName, pinColor, hasRadius = false,
-  gradientColors, // ← THÊM
+  gradientColors, customIconImage,// ← THÊM
   onPress, onZoomRequest, isZoomedIn,
 }: {
   id: string;
@@ -354,6 +354,7 @@ const PinIcon = React.memo(({
   iconName: string;
   pinColor: string;
   gradientColors?: readonly [string, string]; // ← THÊM
+  customIconImage?: any;
   hasRadius?: boolean;
   isZoomedIn: boolean;
   onPress?: () => void;
@@ -404,7 +405,15 @@ const PinIcon = React.memo(({
             style={{ borderColor: pinColor, borderWidth: 2.5 }}
             className="w-11 h-11 bg-white rounded-full items-center justify-center shadow-sm"
           >
-            <Ionicons name={iconName as any} size={20} color={pinColor} />
+            {customIconImage ? (
+              <Image
+                source={customIconImage}
+                style={{ width: 22, height: 22 }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Ionicons name={iconName as any} size={20} color={pinColor} />
+            )}
           </View>
         )}
       </View>
@@ -614,6 +623,10 @@ export default function TagReportDetailScreen() {
     try {
       if (!reportId) return;
       const res = await axiosClient.get(`/tags/reports/${reportId}`);
+
+      // 2. Đặt log để xem cấu trúc data nhận về
+      console.log("🚀 [TAG REPORT DETAIL] Dữ liệu fetch được:", JSON.stringify(res.data, null, 2));
+
       setReportData(res.data);
     } catch (error) {
       console.error('Error loading report details:', error);
@@ -786,15 +799,32 @@ export default function TagReportDetailScreen() {
     if (!dobString) return !isVi ? '? years old' : '? tuổi';
     const dob = new Date(dobString);
     if (isNaN(dob.getTime())) return !isVi ? '? years old' : '? tuổi';
+
     const diff_ms = Date.now() - dob.getTime();
     const age_dt = new Date(diff_ms);
+
     const years = Math.abs(age_dt.getUTCFullYear() - 1970);
     const months = age_dt.getUTCMonth();
-    if (years > 0)
+    const days = age_dt.getUTCDate() - 1; // Lấy ra số ngày lẻ dư ra
+
+    // Nếu đã trên 1 năm tuổi -> Hiển thị năm tuổi
+    if (years > 0) {
       return `${years} ${isVi ? 'tuổi' : 'year'}${years > 1 && !isVi ? 's' : ''} ${isVi ? '' : 'old'}`;
-    if (months > 0)
-      return `${months} ${isVi ? 'tháng' : 'month'}${months > 1 && !isVi ? 's' : ''} ${isVi ? '' : 'old'}`;
-    return 'Newborn';
+    }
+
+    // Nếu dưới 1 năm nhưng trên 1 tháng -> Hiển thị tháng (kèm ngày lẻ nếu có)
+    if (months > 0) {
+      const dayStr = days > 0 ? ` ${days} ${isVi ? 'ngày' : 'day'}${days > 1 && !isVi ? 's' : ''}` : '';
+      return `${months} ${isVi ? 'tháng' : 'month'}${months > 1 && !isVi ? 's' : ''}${dayStr}`;
+    }
+
+    // Nếu dưới 1 tháng tuổi -> Hiển thị số ngày tuổi
+    if (days > 0) {
+      return `${days} ${isVi ? 'ngày tuổi' : 'day'}${days > 1 && !isVi ? 's' : ''} ${isVi ? '' : 'old'}`;
+    }
+
+    // Vẫn dự phòng trường hợp thú cưng mới sinh đúng ngày hôm nay (0 ngày)
+    return isVi ? 'Mới sinh (0 ngày tuổi)' : 'Newborn';
   };
 
   useFocusEffect(
@@ -1311,7 +1341,13 @@ export default function TagReportDetailScreen() {
   const lostTimeAgo = getTimeAgo(pet.lostDate, isVi);
   const displayContactName = pet.contactName || ownerInfo.name || 'N/A';
   const displayContactPhone = pet.contactPhone || ownerInfo.phone || 'N/A';
-  const displayContactAddress = pet.contactAddress || ownerInfo.address || 'Address not provided';
+  const displayContactAddress = pet.contactAddress || ownerInfo.address || (isVi ? 'Địa chỉ không cung cấp' : 'Address not provided');
+  const displayNote =
+    reportData?.details ||
+    reportData?.message ||
+    pet?.lostDetails ||
+    pet?.note ||
+    (isVi ? "Xin hãy liên hệ với tôi sớm nhất có thể" : "Please contact me ASAP");
   const petImage =
     pet.images?.[0]?.url ||
     'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=150&q=80';
@@ -1333,8 +1369,8 @@ export default function TagReportDetailScreen() {
       id: scan.id,
       type: parsedImages.length > 0 ? 'LOCATION' : 'SCAN',
       title: scan.scannedBy !== 'Anonymous'
-        ? (isVi ? `Được quét bởi ${scan.scannedBy}` : `Tag Scanned by ${scan.scannedBy}`)
-        : (isVi ? 'Quét thẻ ẩn danh' : 'Tag Scanned Anonymously'),
+        ? (isVi ? `Vị trí được chia sẻ bởi ${scan.scannedBy}` : `Tag Scanned by ${scan.scannedBy}`)
+        : (isVi ? 'Vị trí được chia sẻ ẩn danh' : 'Tag Scanned Anonymously'),
       time: getTimeAgo(scan.scannedAt, isVi),
       location: addressMap[scan.id] || (isVi ? 'Đang định vị...' : 'Locating address...'),
       note: scan.message || undefined,
@@ -1352,13 +1388,14 @@ export default function TagReportDetailScreen() {
     });
   });
 
-  if (reportData.tag?.status === 'LOST') {
+  if (reportData.tag?.status === 'LOST' || reportData.isLost) {
     activities.push({
       id: 'report-lost-origin',
       type: 'REPORT',
       title: `${pet.name || 'Pet'} ${!isVi ? 'reported as lost' : 'đã được báo cáo mất'}`,
       time: lostTimeAgo,
       location: displayContactAddress,
+      note: displayNote, // 2. Đảm bảo 'note' đã được truyền vào đây
     });
   }
   const visibleActivities = activities.filter(a => !hiddenIds.includes(a.id));
@@ -1583,6 +1620,7 @@ export default function TagReportDetailScreen() {
                   coordinate={pinCoordinate}
                   hasRadius={hasRadius}
                   isZoomedIn={isZoomedIn}
+                  customIconImage={require('../assets/images/purple-pin-icon.png')}
                   iconName="scan-outline"
                   pinColor="#8D5AEE"
                   onZoomRequest={(coord) => {
@@ -1728,30 +1766,45 @@ export default function TagReportDetailScreen() {
             <View className="flex-row items-center justify-between flex-1 mx-[20px] pb-[12px]">
               <Image source={{ uri: petImage }} className="rounded-full mr-4" style={{ width: 60, height: 60 }} />
               <View className="flex-1">
-                <View className="flex-row justify-between items-center">
-                  <View className="flex-row items-center mb-2">
-                    <Text className="text-[16px] font-semibold text-black mr-2">{pet.name || 'Unknown Pet'}</Text>
+
+                {/* Hàng 1: Tên Pet + Status + Nút "Nhận dạng" */}
+                <View className="flex-row justify-between items-center mb-2">
+                  {/* Cụm tên và trạng thái */}
+                  <View className="flex-row items-center flex-1 mr-2">
+                    <Text className="text-[16px] font-semibold text-black mr-2" numberOfLines={1}>
+                      {pet.name || 'Unknown Pet'}
+                    </Text>
                     <View className="bg-[#FFE8E8] border border-[#DA5A5A]/25 py-1 px-[10px] rounded-full">
                       <Text className="text-[#DA5A5A] text-[10px] font-regular">
                         {reportData.status === 'PENDING' ? 'Lost' : 'Resolved'}
                       </Text>
                     </View>
                   </View>
+
+                  {/* Nút Edit (Nhận dạng) đã được di chuyển lên đây */}
+                  <TouchableOpacity onPress={() => {
+                    if (pet?.id) router.push(`/edit-pet?id=${pet.id}`);
+                    else Alert.alert('Notice', 'Pet identity information not found.');
+                  }}>
+                    <View className="flex-row items-center">
+                      <Image
+                        className="mr-1"
+                        source={require('../assets/icon/pen.png')}
+                        style={{ width: 7, height: 8 }}
+                        resizeMode="cover"
+                      />
+                      <Text className="text-[10px] text-[#8E8E93] underline tracking-[0.06px]">
+                        {isVi ? 'Nhận dạng' : 'Identification'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
                 </View>
-                <Text className="text-[12px] text-[#757575] font-regular mb-2">
+
+                {/* Hàng 2: Tuổi và Giống */}
+                <Text className="text-[12px] text-[#757575] font-regular">
                   {getAge(pet.dob)} • {breedText || (isVi ? 'Chưa rõ giống' : 'Unknown breed')}
                 </Text>
-                <TouchableOpacity onPress={() => {
-                  if (pet?.id) router.push(`/edit-pet?id=${pet.id}`);
-                  else Alert.alert('Notice', 'Pet identity information not found.');
-                }}>
-                  <View className="flex-row items-center">
-                    <Image className="bottom-1 mr-1" source={require('../assets/icon/pen.png')} style={{ width: 7, height: 8 }} resizeMode="cover" />
-                    <Text className="text-[10px] text-[#8E8E93] mb-2 underline tracking-[0.06px]">
-                      Edit pet information
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+
               </View>
             </View>
           </Animated.View>
@@ -1793,11 +1846,16 @@ export default function TagReportDetailScreen() {
                   </View>
                 </View>
               </View>
-              <View className="flex items-center w-4/5 bg-[#FAFAFA] px-2.5 rounded-full border border-[#D9D9D9] bottom-5">
-                <Text className="text-[#757575] text-[12px] font-regular leading-[20px] py-[6px]">
-                  "Please contact me ASAP"
-                </Text>
-              </View>
+              {displayNote ? (
+                <View className="flex items-center w-4/5 bg-[#FAFAFA] px-3 rounded-full border border-[#D9D9D9] bottom-5 shadow-sm">
+                  <Text
+                    className="text-[#757575] text-[12px] font-regular leading-[20px] py-[6px] text-center"
+                    numberOfLines={2}
+                  >
+                    "{displayNote}"
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -1930,20 +1988,20 @@ export default function TagReportDetailScreen() {
                 setCurrentImageIndex(newIndex);
               }}
               // 🚀 1. Thêm flex: 1 để ScrollView phủ kín modal
-              style={{ flex: 1, width: '100%' }} 
+              style={{ flex: 1, width: '100%' }}
             >
               {currentImageList.map((uri, idx) => (
                 <View
                   key={idx}
-                  style={{ 
-                    width: Dimensions.get('window').width, 
+                  style={{
+                    width: Dimensions.get('window').width,
                     // 🚀 2. Đặt flex: 1 để View bao trọn chiều cao ScrollView
-                    flex: 1, 
-                    justifyContent: 'center', 
+                    flex: 1,
+                    justifyContent: 'center',
                     alignItems: 'center',
                     // 🚀 3. Thêm padding để đẩy khung ảnh lọt thỏm vào giữa, 
                     // cách xa thanh Header bên trên và cụm dấu chấm bên dưới
-                    paddingTop: Math.max(insets.top, 20) + 60, 
+                    paddingTop: Math.max(insets.top, 20) + 60,
                     paddingBottom: 80,
                     paddingHorizontal: 10
                   }}
@@ -1951,7 +2009,7 @@ export default function TagReportDetailScreen() {
                   <Image
                     source={{ uri }}
                     // 🚀 4. Ảnh sẽ scale vừa vặn (contain) 100% TRONG vùng đã được padding an toàn
-                    style={{ width: '100%', height: '100%' }} 
+                    style={{ width: '100%', height: '100%' }}
                     resizeMode="contain"
                   />
                 </View>

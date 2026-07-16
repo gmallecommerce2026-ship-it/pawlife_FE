@@ -39,7 +39,7 @@ export interface ReportSubmitData {
 }
 
 // --- CONTEXT TYPE: phân biệt report Pet (đi lạc/found) hay report Shelter ---
-export type ReportContext = 'pet' | 'shelter' | 'event' | 'matching' | 'medicalRecord';
+export type ReportContext = 'pet' | 'shelter' | 'event' | 'matching' | 'medicalRecord' | 'transfer';
 interface Props {
     isVisible: boolean;
     onClose: () => void;
@@ -49,7 +49,14 @@ interface Props {
     onSuccessModalClose?: () => void;   // ⬅️ THÊM MỚI
 }
 
-
+const TRANSFER_REPORT_OPTIONS = [
+    { key: "Suspected scam or fraud", en: "Suspected scam or fraud", vi: "Nghi ngờ lừa đảo" },
+    { key: "Fake identity or impersonation", en: "Fake identity or impersonation", vi: "Giả mạo danh tính" },
+    { key: "Harassment or abusive behavior", en: "Harassment or abusive behavior", vi: "Quấy rối hoặc hành vi xúc phạm" },
+    { key: "Unwanted or unsolicited transfer request", en: "Unwanted or unsolicited transfer request", vi: "Yêu cầu chuyển nhượng không mong muốn" },
+    { key: "Pressuring or forcing the transfer", en: "Pressuring or forcing the transfer", vi: "Ép buộc chuyển nhượng" },
+    { key: "Other", en: "Other", vi: "Khác" },
+];
 // Cấu trúc lại REPORT_OPTIONS để hỗ trợ song ngữ — dùng cho context 'pet' (giữ behavior cũ)
 const PET_REPORT_OPTIONS = [
     { key: "Inappropriate content or photos", en: "Inappropriate content or photos", vi: "Hình ảnh hoặc nội dung phản cảm" },
@@ -184,9 +191,8 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit, context
     const isEventContext = context === 'event';
     const isMatchingContext = context === 'matching';
     const isMedicalRecordContext = context === 'medicalRecord';
-
-    // true cho shelter, event, matching, medicalRecord — đều ẩn block địa điểm/ngày giờ kiểu "pet"
-    const hideLocationDateBlock = isShelterContext || isEventContext || isMatchingContext || isMedicalRecordContext;
+    const isTransferContext = context === 'transfer';
+    const hideLocationDateBlock = isShelterContext || isEventContext || isMatchingContext || isMedicalRecordContext || isTransferContext;
 
     const REPORT_OPTIONS = isShelterContext
         ? SHELTER_REPORT_OPTIONS
@@ -196,7 +202,10 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit, context
                 ? MATCHING_REPORT_OPTIONS
                 : isMedicalRecordContext
                     ? MEDICAL_RECORD_REPORT_OPTIONS
-                    : PET_REPORT_OPTIONS;
+                    : isTransferContext
+                        ? TRANSFER_REPORT_OPTIONS
+                        : PET_REPORT_OPTIONS;
+
 
 
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -230,7 +239,6 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit, context
                 setSubmittedAt(new Date());
                 setIsSuccessVisible(true);
             }, 350);
-            handleResetState();
 
         } catch (e) {
             Alert.alert(isVi ? 'Lỗi' : 'Error', isVi ? 'Không thể gửi báo cáo.' : 'Failed to submit.');
@@ -385,7 +393,9 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit, context
                 ? (isVi ? 'Báo cáo hồ sơ' : 'Report Profile')
                 : isMedicalRecordContext
                     ? (isVi ? 'Báo cáo hồ sơ y tế' : 'Report Medical Record')
-                    : (isVi ? 'Báo cáo vấn đề' : 'Report Concern');
+                    : isTransferContext
+                        ? (isVi ? 'Báo cáo người dùng' : 'Report User')
+                        : (isVi ? 'Báo cáo vấn đề' : 'Report Concern');
 
     const questionLabel = isShelterContext
         ? (isVi ? 'Bạn đang gặp vấn đề gì?' : 'What is the issue?')
@@ -395,26 +405,29 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit, context
                 ? (isVi ? 'Tại sao bạn báo cáo hồ sơ này?' : 'Why are you reporting this profile?')
                 : isMedicalRecordContext
                     ? (isVi ? 'Bạn muốn báo cáo điều gì về hồ sơ này?' : 'What would you like to report about this record?')
-                    : (isVi ? 'Tại sao bạn lo lắng?' : 'Why are you concerned?');
+                    : isTransferContext
+                        ? (isVi ? 'Tại sao bạn báo cáo yêu cầu chuyển nhượng này?' : 'Why are you reporting this transfer request?')
+                        : (isVi ? 'Tại sao bạn lo lắng?' : 'Why are you concerned?');
 
-
-
-    // 👇 ĐIỀU CHỈNH TEXT CHO NÚT SWITCH CHẶN
     const blockTitle = isShelterContext
         ? (isVi ? `Ẩn nội dung từ ${targetName || (isVi ? 'trạm này' : 'this shelter')}` : `Block content from ${targetName || 'this shelter'}`)
         : isMatchingContext
             ? (isVi ? `Chặn hồ sơ của ${targetName || 'bé này'}` : `Block profile of ${targetName || 'this pet'}`)
-            : isEventContext // 👈 THÊM DÒNG NÀY CHO EVENT
+            : isEventContext
                 ? (isVi ? `Ẩn sự kiện này` : `Hide this event`)
-                : (isVi ? "Ẩn nội dung từ người này" : "Block content from this user");
+                : isTransferContext
+                    ? (isVi ? `Chặn ${targetName || 'người dùng này'} khỏi các yêu cầu trong tương lai` : `Block ${targetName || 'this user'} from future requests`)
+                    : (isVi ? "Ẩn nội dung từ người này" : "Block content from this user");
 
     const blockDesc = isShelterContext
         ? (isVi ? "Bạn sẽ không còn thấy thú cưng từ trạm cứu hộ này nữa." : "You will no longer see pets from this shelter.")
         : isMatchingContext
             ? (isVi ? "Bạn sẽ không còn thấy thú cưng này trong danh sách nữa." : "You will no longer see this pet in your list.")
-            : isEventContext // 👈 THÊM DÒNG NÀY CHO EVENT
+            : isEventContext
                 ? (isVi ? "Sự kiện này sẽ bị ẩn khỏi danh sách của bạn." : "This event will be hidden from your list.")
-                : (isVi ? "Bạn sẽ không còn thấy thú cưng của người dùng này nữa." : "You will no longer see pets from this owner.");
+                : isTransferContext
+                    ? (isVi ? "Người này sẽ không thể gửi yêu cầu chuyển nhượng cho bạn nữa." : "This user will no longer be able to send you transfer requests.")
+                    : (isVi ? "Bạn sẽ không còn thấy thú cưng của người dùng này nữa." : "You will no longer see pets from this owner.");
 
     const disclaimerText = isShelterContext
         ? (isVi ? 'Báo cáo sẽ được xem xét bởi đội ngũ PawLife và không tự động ảnh hưởng đến trạm cứu hộ.' : 'The report will be reviewed by the PawLife team and does not automatically affect the shelter.')
@@ -424,8 +437,9 @@ export default function ReportIssueModal({ isVisible, onClose, onSubmit, context
                 ? (isVi ? 'Báo cáo sẽ được xem xét bởi PawLife. Chúng tôi sẽ bảo mật danh tính của bạn.' : 'The report will be reviewed by PawLife. Your identity will remain anonymous.')
                 : isMedicalRecordContext
                     ? (isVi ? 'Báo cáo của bạn giúp hệ thống kiểm tra nếu có sai lệch.' : 'Your report helps our system review the record for any discrepancies.')
-                    : (isVi ? 'Báo cáo sẽ được xem xét và không tự động đánh dấu thú cưng là đi lạc.' : 'The report will be reviewed and does not automatically mark pet as lost.');
-
+                    : isTransferContext
+                        ? (isVi ? 'Báo cáo sẽ được xem xét bởi đội ngũ PawLife. Danh tính của bạn sẽ được bảo mật.' : 'The report will be reviewed by the PawLife team. Your identity will remain confidential.')
+                        : (isVi ? 'Báo cáo sẽ được xem xét và không tự động đánh dấu thú cưng là đi lạc.' : 'The report will be reviewed and does not automatically mark pet as lost.');
     return (
         <>
             <Modal visible={isVisible} transparent animationType="fade">

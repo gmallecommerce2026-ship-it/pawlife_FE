@@ -2,6 +2,7 @@ import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { TextInput } from '@/components/AppTextInput';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { socket } from '@/utils/socket';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,20 +16,23 @@ export default function TransferOwnershipScreen() {
   const { petId } = useLocalSearchParams<{ petId: string }>();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const { l } = useLocalizedData();
   const [contactValue, setContactValue] = useState('');
 
   const [petInfo, setPetInfo] = useState<any>(null);
   const [ownerInfo, setOwnerInfo] = useState<any>(null);
   const [isFetchingData, setIsFetchingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [successPayload, setSuccessPayload] = useState<any>(null); // Thêm state này
   const [transferRole, setTransferRole] = useState<'none' | 'sender' | 'receiver'>('none');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isTransferUnsuccessful, setIsTransferUnsuccessful] = useState(false);
   const [isPending, setIsPending] = useState(true)
   const [inputType, setInputType] = useState<'email' | 'phone'>('email');
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
-
+  const [isReportModalVisible, setIsReportModalVisible] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [targetReportUserId, setTargetReportUserId] = useState<string | null>(null);
   // 1. TÁCH HÀM FETCH DATA RA NGOÀI ĐỂ TÁI SỬ DỤNG
   const fetchPetDetails = useCallback(async () => {
     try {
@@ -43,7 +47,7 @@ export default function TransferOwnershipScreen() {
       setOwnerInfo(data.owner);
 
       if (data.transferStatus === 'PENDING') {
-        if (data.receiverId === myUserId) {
+        if (data.receiver === myUserId) {
           setTransferRole('receiver');
         } else if (data.senderId === myUserId || data.ownerId === myUserId) {
           setTransferRole('sender');
@@ -52,7 +56,7 @@ export default function TransferOwnershipScreen() {
         setIsTransferUnsuccessful(false);
       } else if (data.transferStatus === 'REJECTED' || data.transferStatus === 'CANCELED') {
         if (data.senderId === myUserId || data.ownerId === myUserId) setTransferRole('sender');
-        if (data.receiverId === myUserId) setTransferRole('receiver');
+        if (data.receiver === myUserId) setTransferRole('receiver');
         setIsTransferUnsuccessful(true);
         setIsPending(false)
       } else {
@@ -80,18 +84,21 @@ export default function TransferOwnershipScreen() {
 
   // THÊM MỚI: Lắng nghe thêm sự kiện transfer_cancelled từ socket
   useEffect(() => {
-    const handleTransferComplete = (data: { petId: string }) => {
+    // Nhận thêm `data` đầy đủ từ backend
+    const handleTransferComplete = async (data: any) => {
       if (data.petId === petId) {
-        router.push({
-          pathname: '/(tabs)/my-pets',
-          params: { showTransferComplete: 'true', transferredPetId: petId }
-        });
+        setSuccessPayload(data); // Lưu role và targetName vào state
+        await fetchPetDetails();
+        setIsSuccessModalVisible(true);
       }
     };
 
-    const handleTransferCancelled = (data: { petId: string }) => {
-      if (data.petId === petId) setIsTransferUnsuccessful(true);
-      setIsPending(false)
+    const handleTransferCancelled = async (data: { petId: string }) => {
+      if (data.petId === petId) {
+        await fetchPetDetails(); // Cập nhật lại UI từ Pending -> Canceled lập tức
+        setIsTransferUnsuccessful(true);
+        setIsPending(false);
+      }
     };
 
     socket.on('transfer_completed', handleTransferComplete);
@@ -101,12 +108,26 @@ export default function TransferOwnershipScreen() {
       socket.off('transfer_completed', handleTransferComplete);
       socket.off('transfer_cancelled', handleTransferCancelled);
     };
-  }, [petId]);
-
+  }, [petId, fetchPetDetails]);
+  const handleReportUser = async () => {
+    if (!reportReason.trim()) return Alert.alert('Lỗi', 'Vui lòng nhập lý do!');
+    try {
+      // Thay endpoint bằng endpoint report user của bạn
+      await axiosClient.post('/reports', {
+        targetId: targetReportUserId,
+        type: 'user',
+        reason: reportReason
+      });
+      Alert.alert('Thành công', 'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét ngay lập tức.');
+      setIsReportModalVisible(false);
+    } catch (e) {
+      Alert.alert('Lỗi', 'Không thể gửi báo cáo lúc này.');
+    }
+  }
   const handleSendConfirmation = async () => {
     const inputValue = contactValue.trim();
     if (!inputValue) {
-      Alert.alert(isVi ? `Vui lòng nhập ${inputType === 'email' ? 'Email' : 'Số điện thoại'} người nhận!`: `Please enter the recipient's ${inputType === 'email' ? 'email' : 'phone number'}!`);
+      Alert.alert(isVi ? `Vui lòng nhập ${inputType === 'email' ? 'Email' : 'Số điện thoại'} người nhận!` : `Please enter the recipient's ${inputType === 'email' ? 'email' : 'phone number'}!`);
       return;
     }
 
@@ -147,7 +168,7 @@ export default function TransferOwnershipScreen() {
             // Chuyển UI sang trạng thái Unsuccessful
             setIsTransferUnsuccessful(true);
           } catch (error: any) {
-            Alert.alert(isVi ? 'Lỗi': 'Error', error.response?.data?.message || (isVi ? 'Không thể hủy yêu cầu lúc này.': 'You cannot cancel the request at this time.'));
+            Alert.alert(isVi ? 'Lỗi' : 'Error', error.response?.data?.message || (isVi ? 'Không thể hủy yêu cầu lúc này.' : 'You cannot cancel the request at this time.'));
           } finally {
             setIsSubmitting(false);
             setIsPending(false)
@@ -169,9 +190,9 @@ export default function TransferOwnershipScreen() {
         params: { showTransferComplete: 'true', transferredPetId: petId }
       });
     } catch (error: any) {
-      Alert.alert(isVi ? 'Lỗi': 'Error', error.response?.data?.message || (isVi ? 'Không thể xác nhận chuyển nhượng lúc này.' : 'The transfer cannot be confirmed at this time.'));
+      Alert.alert(isVi ? 'Lỗi' : 'Error', error.response?.data?.message || (isVi ? 'Không thể xác nhận chuyển nhượng lúc này.' : 'The transfer cannot be confirmed at this time.'));
       setIsSubmitting(false);
-        setIsPending(false)
+      setIsPending(false)
     }
   };
 
@@ -237,10 +258,10 @@ export default function TransferOwnershipScreen() {
             <Text className="text-[24px] font-semibold text-black">Transfer Ownership</Text>
           </View>
         </View>
-        <KeyboardAvoidingView 
-          style={{ flex: 1 }} 
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          // keyboardVerticalOffset={20} // Mở comment này nếu bàn phím vẫn hơi che mất 1 tí do SafeArea
+        // keyboardVerticalOffset={20} // Mở comment này nếu bàn phím vẫn hơi che mất 1 tí do SafeArea
         >
           <ScrollView
             contentContainerStyle={{ alignItems: 'center', paddingTop: 10, backgroundColor: '#FFFFFF', paddingBottom: 40, paddingHorizontal: 20 }}
@@ -269,7 +290,7 @@ export default function TransferOwnershipScreen() {
                     <Image source={{ uri: petInfo?.avatarUrl || defaultPetImage }} className="w-[64px] h-[64px] rounded-[12px]" />
                     <View className="flex-1 flex-col justify-center ml-[12px] h-[64px]">
                       <Text className="text-[16px] font-semibold text-black" numberOfLines={1}>{petInfo?.name || 'Unknown Name'}</Text>
-                      <Text className="text-[12px] font-regular text-[#8E8E93] mt-[6px] tracking-[0.5px]">{getAge(petInfo?.dob, isVi)} • {petInfo?.breed || 'Unknown Breed'}</Text>
+                      <Text className="text-[12px] font-regular text-[#8E8E93] mt-[6px] tracking-[0.5px]">{getAge(petInfo?.dob, isVi)} • {l(petInfo?.breed) || 'Unknown Breed'}</Text>
                       <Text className="text-[12px] font-regular text-[#8E8E93] mt-[2px] tracking-[0.5px]">ID: {petInfo?.id?.substring(0, 8).toUpperCase()}</Text>
                     </View>
                   </View>
@@ -284,11 +305,19 @@ export default function TransferOwnershipScreen() {
               >
                 {/* Top Row - Hiển thị Avatar */}
                 <View className="flex-row justify-between items-start w-full pb-[21px] px-[22px] pt-[30px] border-t border-l border-r rounded-t-[16px] border-[#FFE4CC]">
-                  <View className="items-center w-[80px]">
+                  <View className="items-center w-[80px] relative">
                     <Image
                       source={{ uri: ownerInfo?.avatarUrl || defaultAvatar }}
                       className="w-[68px] h-[68px] rounded-full border-[2px] border-[#FF9F5A] mb-2"
                     />
+                    {ownerInfo?.id && ownerInfo.id !== currentUserId && (
+                      <TouchableOpacity
+                        className="absolute top-0 right-0 bg-white p-1 rounded-full shadow-sm"
+                        onPress={() => { setTargetReportUserId(ownerInfo.id); setIsReportModalVisible(true); }}
+                      >
+                        <Feather name="flag" size={12} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
                     <Text className="text-[14px] font-medium text-black text-center" numberOfLines={1}>{ownerInfo?.name || 'Current Owner'}</Text>
                     <Text className="text-[12px] text-[#8E8E93] text-center mt-0.5 tracking-[0.06px] ">Current Owner</Text>
                   </View>
@@ -326,7 +355,7 @@ export default function TransferOwnershipScreen() {
                     </Text>
                   </View>
 
-                  <View className="items-center w-[80px]">
+                  <View className="items-center w-[80px] relative">
                     {petInfo?.receiver ? (
                       <Image
                         source={{ uri: petInfo.receiver.avatarUrl || defaultAvatar }}
@@ -363,9 +392,10 @@ export default function TransferOwnershipScreen() {
                     </View>
                     <View className="w-full px-[30px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[16px] pb-[30px] items-center">
                       <Text className="text-[12px] text-[#8E8E93] leading-[16px] tracking-[0.06px] ml-3">
-                        {isVi 
-                          ? `Tôi xác nhận việc chuyển nhượng này là vĩnh viễn và toàn bộ hồ sơ của ${petInfo?.name || 'thú cưng'} sẽ được giao cho ${receiverName}.`
-                          : `I acknowledge this transfer is permanent and all ${petInfo?.name || 'pet'}'s profile will be transferred to ${receiverName}.`
+                        {
+                          isVi
+                            ? `Tôi hiểu rằng sau khi hoàn tất, việc chuyển nhượng này sẽ không thể hoàn tác và toàn bộ hồ sơ của ${petInfo?.name || 'thú cưng'} sẽ được chuyển cho ${receiverName}.`
+                            : `I understand that once completed, this transfer cannot be undone and all records for ${petInfo?.name || 'the pet'} will be transferred to ${receiverName}.`
                         }
                       </Text>
                     </View>
@@ -467,7 +497,7 @@ export default function TransferOwnershipScreen() {
                           <Text className="text-[16px] font-semibold text-[#FEA766]">Waiting for confirmation</Text>
                         </View>
                         <View className="w-full px-[30px] border-b border-l border-r rounded-b-[16px] border-[#FFE4CC] pt-[27px] pb-[30px] items-center">
-                         <Text className="text-[12px] text-[#8E8E93] font-regular text-center leading-[22px]">
+                          <Text className="text-[12px] text-[#8E8E93] font-regular text-center leading-[22px]">
                             {isVi ? 'Một yêu cầu xác nhận đã được gửi đến' : 'A confirmation request has been sent to'}{'\n'}
                             <Text className="font-medium text-black">{contactValue}</Text>.{'\n'}
                             {isVi ? 'Đang chờ họ chấp nhận yêu cầu chuyển nhượng.' : 'Waiting for them to accept the transfer.'}
@@ -491,9 +521,10 @@ export default function TransferOwnershipScreen() {
                             className="w-[13px] h-[13px] mr-2"
                           />
                           <Text className="text-[12px] text-[#8E8E93] leading-[16px] italic ">
-                            {isVi 
-                              ? `Tôi xác nhận việc chuyển nhượng này là vĩnh viễn và toàn bộ hồ sơ của ${petInfo?.name || 'thú cưng'} sẽ được giao cho ${receiverName}.`
-                              : `I acknowledge this transfer is permanent and all ${petInfo?.name || 'pet'}'s profile will be transferred to ${receiverName}.`
+                            {
+                              isVi
+                                ? `Tôi hiểu rằng sau khi hoàn tất, việc chuyển nhượng này sẽ không thể hoàn tác và toàn bộ hồ sơ của ${petInfo?.name || 'thú cưng'} sẽ được chuyển cho ${receiverName}.`
+                                : `I understand that once completed, this transfer cannot be undone and all records for ${petInfo?.name || 'the pet'} will be transferred to ${receiverName}.`
                             }
                           </Text>
                         </View>
@@ -609,53 +640,70 @@ export default function TransferOwnershipScreen() {
               </View>
               <View className="w-full bg-white rounded-[24px] items-center px-[51px]">
 
+                {/* 1. TEXT THÔNG BÁO ĐỘNG THEO ROLE */}
                 <Text className="text-[14px] font-regular text-[#8E8E93] text-center tracking-[-0.08px] mb-[23px]">
-                  {isVi 
-                    ? `${ownerInfo?.name || 'Chủ cũ'} đã chuyển nhượng ${petInfo?.name || 'thú cưng'} cho bạn.`
-                    : `${ownerInfo?.name || 'Old Owner'} has transferred ${petInfo?.name || 'Unknown Name'} to you.`
+                  {successPayload?.role === 'sender'
+                    ? (isVi
+                      ? `Bạn đã chuyển nhượng thành công thú cưng ${petInfo?.name || ''} cho ${successPayload?.targetName}.`
+                      : `You have successfully transferred ${petInfo?.name || 'the pet'} to ${successPayload?.targetName}.`)
+                    : (isVi
+                      ? `${successPayload?.targetName || ownerInfo?.name || 'Chủ cũ'} đã chuyển nhượng ${petInfo?.name || 'thú cưng'} cho bạn.`
+                      : `${successPayload?.targetName || ownerInfo?.name || 'Old Owner'} has transferred ${petInfo?.name || 'Unknown Name'} to you.`)
                   }
                 </Text>
-                {/* 1. ICON CHECK THÀNH CÔNG (Màu cam/vàng theo tone app của bạn) */}
+
                 <View className="w-[104px] h-[104px] rounded-full justify-center items-center mb-2">
                   <Image source={{ uri: petInfo?.avatarUrl || defaultPetImage }} className="w-[104px] h-[104px] rounded-full" />
                 </View>
 
-                {/* 2. TIÊU ĐỀ "SUCCESS" */}
                 <Text
                   className="text-[20px] font-semibold text-gray-900 mb-2 text-center"
                   style={{ fontFamily: 'Urbanist' }}
                 >
                   {petInfo?.name || 'Unknown Name'}
                 </Text>
-                <Text className="text-[14px] font-regular text-[#8E8E93] tracking-[0.5px] mb-3">{getAge(petInfo?.dob)} • {petInfo?.breed || 'Unknown Breed'}</Text>
+                <Text className="text-[14px] font-regular text-[#8E8E93] tracking-[0.5px] mb-3">{getAge(petInfo?.dob, isVi)} • {l(petInfo?.breed) || 'Unknown Breed'}</Text>
 
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    // 1. Tắt modal trước
-                    setIsSuccessModalVisible(false);
-                    // 2. Chuyển người dùng về trang chủ hoặc danh sách pet
-                    router.back();
-                  }}
-                  className="bg-[#E89B5A] flex-row w-full h-[48px] mx-[15px] rounded-[16px] justify-center items-center mb-2"
-                >
-                  <Text
-                    className="text-[16px] font-semibold text-white"
-                    style={{ fontFamily: 'Urbanist' }}
+                {/* 2. NÚT BẤM ĐỘNG THEO ROLE */}
+                {successPayload?.role === 'sender' ? (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setIsSuccessModalVisible(false);
+                      router.push('/(tabs)'); // Sender không còn sở hữu -> Đẩy về màn chính
+                    }}
+                    className="bg-[#E89B5A] flex-row w-full h-[48px] mx-[15px] rounded-[16px] justify-center items-center mb-2"
                   >
-                    {isVi 
-                      ? `Xem hồ sơ của ${petInfo?.name || 'thú cưng'}`
-                      : `View ${petInfo?.name || 'New pet'} Profile`
-                    }
-                  </Text>
-                  <Feather name="chevron-right" size={18} color="white" />
-                </TouchableOpacity>
-                {/* 3. ĐOẠN TEXT THÔNG BÁO NHỎ GIỮA MODAL */}
+                    <Text className="text-[16px] font-semibold text-white" style={{ fontFamily: 'Urbanist' }}>
+                      {isVi ? 'Trở về trang chủ' : 'Back to Home'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setIsSuccessModalVisible(false);
+                      router.back();
+                    }}
+                    className="bg-[#E89B5A] flex-row w-full h-[48px] mx-[15px] rounded-[16px] justify-center items-center mb-2"
+                  >
+                    <Text className="text-[16px] font-semibold text-white" style={{ fontFamily: 'Urbanist' }}>
+                      {isVi
+                        ? `Xem hồ sơ của ${petInfo?.name || 'thú cưng'}`
+                        : `View ${petInfo?.name || 'New pet'} Profile`
+                      }
+                    </Text>
+                    <Feather name="chevron-right" size={18} color="white" />
+                  </TouchableOpacity>
+                )}
+
                 <Text
                   className="text-[12px] text-[#8E8E93] font-regular text-center mb-6 leading-[16px] px-2 italic tracking-[0.5px]"
                   style={{ fontFamily: 'Urbanist' }}
                 >
-                  This transfer will be recorded in PawHistory in 3 days.
+                  {isVi
+                    ? 'Giao dịch chuyển nhượng này sẽ được lưu vào PawHistory sau 3 ngày.'
+                    : 'This transfer will be recorded in PawHistory in 3 days.'}
                 </Text>
               </View>
 

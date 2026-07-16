@@ -391,7 +391,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                           <View style={{ position: 'absolute', right: 0, width: `${100 - percent}%`, height: 2, backgroundColor: '#E5E7EB', borderRadius: 1 }} />
                           <Slider
                             value={radius}
-                            minimumValue={100} maximumValue={5000} step={100}
+                            minimumValue={100} maximumValue={2000} step={100}
                             onValueChange={handleSliderChange}
                             minimumTrackTintColor="transparent" maximumTrackTintColor="transparent"
                             trackStyle={{ height: 2, backgroundColor: 'transparent' }}

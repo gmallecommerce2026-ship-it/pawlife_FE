@@ -28,7 +28,11 @@ export default function InterestedEventsScreen() {
     const isVi = language === 'vi';
     // --- LOGIC SEARCH & ANIMATION ---
     const [searchQuery, setSearchQuery] = useState('');
-
+    const getSafeText = (val: any) => {
+        if (!val) return '';
+        if (typeof val === 'object') return isVi ? (val.vi || val.en) : (val.en || val.vi);
+        return String(val);
+    };
     // --- 1. DÙNG REACT QUERY ĐỂ FETCH DANH SÁCH ---
     const { data: events = [], isLoading: loading, refetch } = useQuery({
         queryKey: ['interested-events', user?.id],
@@ -52,10 +56,11 @@ export default function InterestedEventsScreen() {
     // --- LỌC DỮ LIỆU KHI TÌM KIẾM ---
     const filteredEvents = useMemo(() => {
         if (!searchQuery.trim()) return events;
-        return events.filter((event: any) =>
-            (event.title || '').toLowerCase().includes(searchQuery.toLowerCase().trim())
-        );
-    }, [events, searchQuery]);
+        return events.filter((event: any) => {
+            const safeTitle = getSafeText(event.title); // Lấy string an toàn
+            return safeTitle.toLowerCase().includes(searchQuery.toLowerCase().trim());
+        });
+    }, [events, searchQuery, isVi]); // Thêm isVi vào dependency
 
     // --- 2. DÙNG MUTATION ĐỂ HUỶ QUAN TÂM ---
     const removeInterestMutation = useMutation({
@@ -67,7 +72,7 @@ export default function InterestedEventsScreen() {
             // Lấy dữ liệu cũ để chuẩn bị rollback nếu lỗi
             const previousEvents = queryClient.getQueryData(['interested-events', user?.id]);
             const targetEvent = (previousEvents as any[])?.find(e => e.id === eventId);
-            const eventTitle = targetEvent?.title || 'This event';
+            const eventTitle = getSafeText(targetEvent?.title) || 'This event';
 
             // Optimistic Update: Xóa item ngay lập tức trên UI
             queryClient.setQueryData(['interested-events', user?.id], (old: any[]) =>
@@ -128,8 +133,9 @@ export default function InterestedEventsScreen() {
                     pathname: '/event-detail',
                     params: {
                         id: item.id,
-                        title: item.title,
-                        location: item.locationName || item.address,
+                        // SỬA Ở ĐÂY: Dùng getSafeText cho params
+                        title: getSafeText(item.title),
+                        location: getSafeText(item.locationName) || getSafeText(item.address),
                         date: item.startDate,
                         image: item.bannerUrl
                     }
@@ -143,11 +149,14 @@ export default function InterestedEventsScreen() {
 
                 <View className="flex-1 p-[14px] justify-between">
                     <View className="pr-6 relative">
+                        {/* SỬA Ở ĐÂY: Dùng getSafeText khi render Text */}
                         <Text className="text-gray-900 font-bold text-[16px]  -top-1 leading-[22px] mb-1" numberOfLines={2}>
-                            {item.title || 'Weekend Animal Event'}
+                            {getSafeText(item.title) || 'Weekend Animal Event'}
                         </Text>
+
+                        {/* SỬA Ở ĐÂY */}
                         <Text className="text-[#8E8E93] text-[12px] font-regular" numberOfLines={1}>
-                            {item.locationName || item.address || 'District, City'}
+                            {getSafeText(item.locationName) || getSafeText(item.address) || 'District, City'}
                         </Text>
 
                         <TouchableOpacity

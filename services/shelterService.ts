@@ -9,7 +9,15 @@ export const shelterService = {
       throw error.response?.data || { message: error.message };
     }
   },
+  getBlockedShelters: async () => {
+    const response = await axiosClient.get('/interactions/blocked-shelters');
+    return response.data.data;
+  },
 
+  unblockShelter: async (shelterId: string) => {
+    const response = await axiosClient.post('/interactions/unblock-shelter', { shelterId });
+    return response.data;
+  },
   getOrganizerProfile: async (shelterId: string, userId?: string) => {
     try {
       const response = await axiosClient.get(`shelters/${shelterId}/organizer-profile`, {

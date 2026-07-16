@@ -43,6 +43,14 @@ export const authService = {
       throw error.response?.data || { message: error.message };
     }
   },
+  blockUser: (userId: string) => axiosClient.post(`/auth/block/${userId}`),
+  unblockUser: (userId: string) => axiosClient.delete(`/auth/block/${userId}`),
+  getBlockedUsers: async () => {
+    const res = await axiosClient.get('/auth/blocked-users');
+    return res.data;
+  },
+  reportUser: (userId: string, data: { reason: string; detail?: string; isBlockRequested?: boolean }) =>
+    axiosClient.post(`/auth/report-user/${userId}`, data),
 
   updateProfileAPI: async (data: UpdateProfilePayload) => {
     // Lưu ý: Đổi URL '/auth/me/profile' thành đường dẫn chính xác 

@@ -6,7 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // THÊM MỚI: Hằng số thời gian đếm ngược (2 phút = 120 giây)
 const RESEND_OTP_TIME = 120;
 
@@ -72,9 +73,9 @@ export default function VerifyOtpScreen() {
       setTimer(RESEND_OTP_TIME);
       Alert.alert(isVi ? "Thành công" : "Success", isVi ? "Mã OTP mới đã được gửi đến email của bạn." : "Mã OTP mới đã được gửi đến email của bạn.");
     } catch (error: any) {
-      let errorMessage = error?.message || (isVi ? "Không thể gửi lại OTP lúc này.": "Cannot resend OTP at this time.");
-      if (error?.statusCode === 429) errorMessage = isVi ? "Vui lòng đợi 1 phút trước khi yêu cầu lại.": "Please wait 1 minute before requesting again.";
-      Alert.alert(isVi ? "Lỗi": "Error", errorMessage);
+      let errorMessage = error?.message || (isVi ? "Không thể gửi lại OTP lúc này." : "Cannot resend OTP at this time.");
+      if (error?.statusCode === 429) errorMessage = isVi ? "Vui lòng đợi 1 phút trước khi yêu cầu lại." : "Please wait 1 minute before requesting again.";
+      Alert.alert(isVi ? "Lỗi" : "Error", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -116,14 +117,16 @@ export default function VerifyOtpScreen() {
       // 3. Sử dụng Global Modal khi thành công
       showModal({
         title: isVi ? 'Thành công' : 'Success',
-        message: isVi ? 'Tài khoản của bạn đã được đăng ký thành công! Hãy bắt đầu hành trình tại PawLife ngay.': 'Your account has been successfully registered! Start your journey on PawLife now.',
+        message: isVi ? 'Tài khoản của bạn đã được đăng ký thành công! Hãy bắt đầu hành trình tại PawLife ngay.' : 'Your account has been successfully registered! Start your journey on PawLife now.',
         buttonText: isVi ? 'Đăng nhập' : "Sign-in",
         onConfirm: () => {
           // Khi người dùng bấm OK, chuyển hướng về trang sign-in
-          router.replace({
-            pathname: '/sign-in',
-            params: { prefillEmail: params.email as string }
-          });
+          setTimeout(() => {
+            router.replace({
+              pathname: '/sign-in',
+              params: { prefillEmail: params.email as string }
+            });
+          }, 300);
         }
       });
 

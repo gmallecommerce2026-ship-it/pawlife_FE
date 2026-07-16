@@ -244,7 +244,7 @@ const PlaylistsView = ({ playlists, loading, searchQuery, onPlayVideo, t }: { pl
                 <View className="flex-row justify-between items-start">
                     <View className="flex-1 pr-2">
                         <Text className="text-gray-900 font-bold text-[15px] mb-1 leading-5" numberOfLines={2}>{item.title}</Text>
-                        <Text className="text-gray-500 text-xs font-medium">{item.count || 0} videos • Updated today</Text>
+                        <Text className="text-gray-500 text-xs font-medium">{item.count || 0} videos</Text>
                     </View>
                 </View>
             </View>

@@ -47,21 +47,17 @@ export default function SelectLocationMapScreen() {
   const [isReadyToMount, setIsReadyToMount] = useState(false);
 
   useEffect(() => {
-    let interactionHandle: { cancel: () => void } | null = null;
-
     if (isFocused) {
-      interactionHandle = InteractionManager.runAfterInteractions(() => {
-        setIsReadyToMount(true);
+      const handle = InteractionManager.runAfterInteractions(() => {
+        // buffer thêm 1 frame để chắc chắn native transition đã settle
+        requestAnimationFrame(() => setIsReadyToMount(true));
       });
+      return () => handle.cancel();
     } else {
-      // Khi screen mất focus (bị che hoặc back), unmount map ngay để giải phóng OpenGL context trên iOS.
       setIsReadyToMount(false);
     }
-
-    return () => {
-      interactionHandle?.cancel();
-    };
   }, [isFocused]);
+
 
   // Đề phòng trường hợp dùng push/pop nhiều lần liên tiếp, reset khi unmount hẳn component.
   useFocusEffect(
@@ -84,24 +80,32 @@ export default function SelectLocationMapScreen() {
 
   // --- ANIMATION STATES ---
   const translateY = useRef(new Animated.Value(0)).current;
-  const radiusScale = useRef(new Animated.Value(1)).current;
+  // const radiusScale = useRef(new Animated.Value(1)).current;
   const shadowScale = useRef(new Animated.Value(1)).current;
   const isDragging = useRef(false);
-
+  const [isPinLifted, setIsPinLifted] = useState(false);
   const [displayRadius, setDisplayRadius] = useState(radius);
+  const [isMapReady, setIsMapReady] = useState(false);
 
+  // reset khi unmount / rời screen
   useEffect(() => {
-    const listenerId = radiusScale.addListener(({ value }) => {
-      setDisplayRadius(radius * value);
-    });
-    return () => radiusScale.removeListener(listenerId);
-  }, [radius]);
+    if (!isReadyToMount) setIsMapReady(false);
+  }, [isReadyToMount]);
 
+  // useEffect(() => {
+  //   const listenerId = radiusScale.addListener(({ value }) => {
+  //     setDisplayRadius(radius * value);
+  //   });
+  //   return () => radiusScale.removeListener(listenerId);
+  // }, [radius]);
+
+  // useEffect(() => {
+  //   radiusScale.setValue(1);
+  //   setDisplayRadius(radius);
+  // }, [radius]);
   useEffect(() => {
-    radiusScale.setValue(1);
     setDisplayRadius(radius);
   }, [radius]);
-
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -160,11 +164,11 @@ export default function SelectLocationMapScreen() {
   const onMapDragStart = () => {
     if (!isDragging.current) {
       isDragging.current = true;
-
+      setIsPinLifted(true);
       Animated.parallel([
         Animated.timing(translateY, { toValue: -35, duration: 200, useNativeDriver: true }),
         Animated.timing(shadowScale, { toValue: 0.3, duration: 200, useNativeDriver: true }),
-        Animated.timing(radiusScale, { toValue: 0, duration: 200, useNativeDriver: false })
+        // Animated.timing(radiusScale, { toValue: 0, duration: 200, useNativeDriver: false })
       ]).start();
     }
   };
@@ -176,7 +180,7 @@ export default function SelectLocationMapScreen() {
 
     if (isDragging.current) {
       isDragging.current = false;
-
+      setIsPinLifted(false);
       Animated.parallel([
         Animated.spring(translateY, {
           toValue: 0,
@@ -190,12 +194,12 @@ export default function SelectLocationMapScreen() {
           tension: 20,   // Bóng dưới đất cũng to ra chậm chậm khớp với nhịp rơi
           useNativeDriver: true
         }),
-        Animated.spring(radiusScale, {
-          toValue: 1,
-          friction: 5,
-          tension: 20,
-          useNativeDriver: false
-        })
+        // Animated.spring(radiusScale, {
+        //   toValue: 1,
+        //   friction: 5,
+        //   tension: 20,
+        //   useNativeDriver: false
+        // })
       ]).start();
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -221,7 +225,8 @@ export default function SelectLocationMapScreen() {
         <MapView
           ref={mapRef}
           provider={MAP_PROVIDER}
-          mapType="standard" 
+          mapType="standard"
+          onMapReady={() => setIsMapReady(true)}
           userInterfaceStyle="light"
           showsPointsOfInterest={false}
           style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}
@@ -241,12 +246,13 @@ export default function SelectLocationMapScreen() {
 
           showsUserLocation={true}
         >
-          {displayRadius > 0 && (
+          {displayRadius > 0 && !isPinLifted && (
             <Circle
+              key={`circle-${centerCoord.latitude.toFixed(5)}-${centerCoord.longitude.toFixed(5)}`}
               center={{ latitude: centerCoord.latitude, longitude: centerCoord.longitude }}
               radius={displayRadius}
-              fillColor="rgba(232, 90, 90, 0.2)"   // Nền đỏ nhạt (Opacity 20%)
-              strokeColor="rgba(232, 90, 90, 0.8)" // Viền đỏ đậm (Opacity 80%)
+              fillColor="rgba(232, 90, 90, 0.2)"
+              strokeColor="rgba(232, 90, 90, 0.8)"
               strokeWidth={1}
             />
           )}
@@ -448,7 +454,7 @@ export default function SelectLocationMapScreen() {
                   <Slider
                     value={radius}
                     minimumValue={100}
-                    maximumValue={5000}
+                    maximumValue={2000}
                     step={100}
                     onValueChange={(val) => setRadius(Array.isArray(val) ? val[0] : val)}
                     minimumTrackTintColor="transparent"

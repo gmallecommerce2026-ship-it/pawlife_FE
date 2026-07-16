@@ -19,10 +19,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosClient from '../api/axiosClient';
 // Import thư viện sinh trắc học và bộ nhớ
+import { TextInput } from '@/components/AppTextInput';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { TextInput } from '@/components/AppTextInput';
 
 // Tái sử dụng component cho dạng bật/tắt (Toggle)
 const SettingToggle = ({ label, value, onValueChange, t }: { label: string, value: boolean, onValueChange: (val: boolean) => void, t: any }) => (
@@ -211,7 +211,7 @@ export default function AccountSecurityScreen() {
       t("Are you sure you want to deactivate your account? You can reactivate it anytime by logging back in."),
       [
         { text: t("common.cancel"), style: "cancel" },
-        { text: t("Deactivate"), style: "destructive", onPress: () => {} }
+        { text: t("Deactivate"), style: "destructive", onPress: () => { } }
       ]
     );
   };
@@ -296,6 +296,13 @@ export default function AccountSecurityScreen() {
               description="Manage your account on the various devices you own."
               t={t} // Truyền t vào
               onPress={() => router.push('/device-management')}
+              isLast={true}
+            />
+            <SettingLink
+              label="Blocked List"
+              description="View and manage shelters you've blocked. You can unblock them at any time."
+              t={t}
+              onPress={() => router.push('/blocked-list')}
               isLast={true}
             />
           </View>

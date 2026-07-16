@@ -1,7 +1,7 @@
 export const enDict: Record<string, string> = {
   "Language": "Language",
   "English": "English",
-  "Vietnamese": "Vietnamese",
+  "Vietnamese": "Vietnamese", 
   "Search": "Search",
   "Home": "Home",
   "Profile": "Profile",
@@ -91,6 +91,7 @@ export const enDict: Record<string, string> = {
   'Failed to delete account. Please try again later.': 'Failed to delete account. Please try again later.',
   'Deleting Account...': 'Deleting Account...',
   'notification.tag_scanned_title': '📍 New location of the pet!',
+  'notification.transfer_completed_body': 'Transfer owner completed',
   'notification.tag_scanned_precise': 'Someone just found {petName} at their exact location.',
   'notification.tag_scanned_radius': 'Someone just shared a suspected area for {petName} within a {radius}m radius.',
   'New Feature ✨': 'New Feature ✨',

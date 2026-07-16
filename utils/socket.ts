@@ -4,19 +4,20 @@ import { io } from 'socket.io-client';
 
 // 1. CHÚ Ý: Bắt buộc phải thêm '/notifications' vào sau BASE_URL
 // 2. Tắt autoConnect để kiểm soát thời điểm kết nối (chỉ kết nối khi đã có token)
-export const socket = io(`${BASE_URL}/notifications`, {
+console.log('[socket] Connecting to:', `${BASE_URL}/notifications`);
+const SOCKET_ORIGIN = 'https://api.p3tid.com';
+export const socket = io(`${SOCKET_ORIGIN}/notifications`, {
   autoConnect: false,
 });
+socket.on('connect', () => console.log(`🟢 [${new Date().toISOString()}] connected, id=`, socket.id));
+socket.on('connect_error', (err) => console.log(`🔴 [${new Date().toISOString()}] connect_error:`, err.message));
+socket.on('disconnect', (reason) => console.log(`⚠️ [${new Date().toISOString()}] disconnected:`, reason));
 
-// Hàm này dùng để gọi sau khi đăng nhập thành công HOẶC khi app khởi động và check thấy đã login
 export const connectSocket = async (token?: string) => {
   try {
-    // Nếu gọi lúc login, bạn có thể truyền thẳng token vào. 
-    // Nếu gọi lúc app khởi động, tự động lấy từ storage.
-    const accessToken = token || await SecureStore.getItemAsync('access_token'); // Đổi lại đúng key lưu token của bạn
-
+    const accessToken = token || await SecureStore.getItemAsync('access_token');
     if (accessToken) {
-      socket.auth = { token: accessToken }; // Backend lấy token từ đây
+      socket.auth = { token: accessToken };
       socket.connect();
     } else {
       console.warn("Không tìm thấy token để kết nối socket");
@@ -26,13 +27,9 @@ export const connectSocket = async (token?: string) => {
   }
 };
 
-// Hàm này dùng để gọi khi User Logout
 export const disconnectSocket = () => {
   if (socket) {
-    // 1. Tắt tất cả các sự kiện hiện có trước khi ngắt kết nối
     socket.removeAllListeners();
-
-    // 2. Ngắt kết nối
     if (socket.connected) {
       socket.disconnect();
     }

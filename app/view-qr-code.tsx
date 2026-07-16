@@ -190,54 +190,54 @@ export default function ViewQrCode() {
   const [otherDetail, setOtherDetail] = useState('');
   const cardRef = useRef<ViewShot>(null);
   const RadioOption = ({ label, subLabel, selected, onPress }: RadioOptionProps) => (
-  <TouchableOpacity
-    activeOpacity={0.7}
-    onPress={onPress}
-    className="flex-row mb-4 mx-2"
-    style={{
-      alignItems: subLabel ? 'flex-start' : 'center',
-    }}
-  >
-    <View
-      className={`w-[16px] h-[16px] rounded-full border-[1px] items-center justify-center ${selected ? 'border-[#E89B5A]' : 'border-[#757575]'}`}
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      className="flex-row mb-4 mx-2"
       style={{
-        marginTop: subLabel ? 0 : 0,
+        alignItems: subLabel ? 'flex-start' : 'center',
       }}
     >
-      {selected && <View className="w-[10px] h-[10px] rounded-full bg-[#E89B5A]" />}
-    </View>
-
-    <View
-      className="ml-2"
-      style={{
-        flexShrink: 1,
-      }}
-    >
-      <Text
-        className="text-[14px] font-medium text-black"
+      <View
+        className={`w-[16px] h-[16px] rounded-full border-[1px] items-center justify-center ${selected ? 'border-[#E89B5A]' : 'border-[#757575]'}`}
         style={{
-          lineHeight: 16,
-          includeFontPadding: false,
-          textAlignVertical: 'center',
+          marginTop: subLabel ? 0 : 0,
         }}
       >
-        {label}
-      </Text>
+        {selected && <View className="w-[10px] h-[10px] rounded-full bg-[#E89B5A]" />}
+      </View>
 
-      {subLabel && (
+      <View
+        className="ml-2"
+        style={{
+          flexShrink: 1,
+        }}
+      >
         <Text
-          className="text-[12px] text-gray-400 mt-0.5"
+          className="text-[14px] font-medium text-black"
           style={{
-            lineHeight: 14,
+            lineHeight: 16,
             includeFontPadding: false,
+            textAlignVertical: 'center',
           }}
         >
-          {subLabel}
+          {label}
         </Text>
-      )}
-    </View>
-  </TouchableOpacity>
-);
+
+        {subLabel && (
+          <Text
+            className="text-[12px] text-gray-400 mt-0.5"
+            style={{
+              lineHeight: 14,
+              includeFontPadding: false,
+            }}
+          >
+            {subLabel}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
   const handleShareCard = async () => {
     try {
       if (!cardRef.current || !cardRef.current.capture) {
@@ -306,12 +306,21 @@ export default function ViewQrCode() {
     );
   }
 
-  const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId?.substring(0, 8).toUpperCase();
   const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=600&auto=format&fit=crop';
   const avatarUrl = petData?.avatarUrl || petData?.images?.[0]?.url || FALLBACK_AVATAR;
 
+  // 1. Lấy tagId ra trước
   const activeTag = petData?.tags?.find((tag: any) => tag.status === 'ACTIVE') || petData?.tags?.[0];
   const tagId = activeTag?.id;
+  console.log('DEBUG tagId:', tagId); // 👈 thêm dòng này tạm thời
+  console.log('DEBUG full tag object:', JSON.stringify(activeTag)); // 👈 log toàn bộ object, không chỉ .id
+
+
+  // 2. Cập nhật lại displayId: Ưu tiên lấy tagId (cắt 8 ký tự đầu để UI gọn gàng), nếu không có thẻ thì mới fallback về mã của pet
+  const displayId = tagId?.substring(0, 8).toUpperCase()
+    || petData.code
+    || petData.id?.substring(0, 8).toUpperCase()
+    || petId?.substring(0, 8).toUpperCase();
   const publicDomain = "https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev";
   const qrUri = tagId ? `${publicDomain}/qr-codes/${tagId}.svg` : null;
 
@@ -367,12 +376,14 @@ export default function ViewQrCode() {
     try {
       const accessToken = await SecureStore.getItemAsync('accessToken');
 
-      // Bước 1: Xin token (giữ nguyên)
+      // Bước 1: Xin token (đã bổ sung Accept-Language)
       const tokenRes = await fetch(`${BASE_URL}wallet/pets/${petId}/pass-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
+          // Truyền ngôn ngữ hiện tại của app xuống Backend
+          'Accept-Language': language === 'vi' ? 'vi' : 'en',
         },
       });
 

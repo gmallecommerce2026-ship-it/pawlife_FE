@@ -121,6 +121,13 @@ const CustomDropdown = ({ placeholder, value, options = [], onSelect }: { placeh
   );
 };
 
+interface PhotoItem {
+  id: string;
+  localUri: string;   // để hiển thị preview ngay lập tức
+  url: string | null; // URL thật sau khi upload xong, null nếu chưa/đang upload
+  uploading: boolean;
+  error: boolean;
+}
 
 export default function ReportLostPetScreen() {
   const router = useRouter();
@@ -132,7 +139,7 @@ export default function ReportLostPetScreen() {
 
   // --- API State ---
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { pickAndUploadImage, isUploading } = useImageUpload();
+  const { pickAndUploadImage, isUploading, uploadOnly } = useImageUpload();
 
   // --- Form States ---
   const [location, setLocation] = useState('');
@@ -143,7 +150,8 @@ export default function ReportLostPetScreen() {
   const [ownerPhone, setOwnerPhone] = useState('');
   const [ownerAddress, setOwnerAddress] = useState('');
   const [note, setNote] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+
 
   // --- NÂNG CẤP: DATE PICKER STATES & REFS (IOS & ANDROID) ---
   const [lostDate, setLostDate] = useState<Date>(new Date());
@@ -361,30 +369,54 @@ export default function ReportLostPetScreen() {
     updateDateTimeString(lostDate);
   }, [lostDate]);
 
-  const isFormValid = location && dateTime && details && ownerName && ownerPhone && ownerAddress;
+  const isPhotosUploading = photos.some((p: any) => p.uploading);
+
+  const isFormValid =
+    location && dateTime && details && ownerName && ownerPhone && ownerAddress && !isPhotosUploading;
 
   const handleAddPhoto = async () => {
     const remainingSlots = 5 - photos.length;
 
     if (remainingSlots <= 0) {
-      Alert.alert(isVi ? "Giới hạn ảnh" : "Photo limit", isVi ? "Bạn chỉ được tải lên tối đa 5 ảnh." : "You can upload a maximum of 5 photos.");
+      Alert.alert(
+        isVi ? "Giới hạn ảnh" : "Photo limit",
+        isVi ? "Bạn chỉ được tải lên tối đa 5 ảnh." : "You can upload a maximum of 5 photos."
+      );
       return;
     }
 
     try {
-      let result = await ImagePicker.launchImageLibraryAsync({
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
         selectionLimit: remainingSlots,
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets) {
-        const newLocalUrls = result.assets.map(asset => asset.uri);
-        setPhotos((prev) => {
-          const combined = [...prev, ...newLocalUrls];
-          return combined.slice(0, 5);
-        });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      // 1. Hiện preview ngay lập tức với trạng thái "đang upload"
+      const newItems: PhotoItem[] = result.assets.map((asset) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        localUri: asset.uri,
+        url: null,
+        uploading: true,
+        error: false,
+      }));
+
+      setPhotos((prev) => [...prev, ...newItems].slice(0, 5));
+
+      // 2. Upload tuần tự từng ảnh lên server (tránh đua trạng thái isUploading của hook)
+      for (const item of newItems) {
+        const uploadedUrl = await uploadOnly(item.localUri, 'lost-pet-reports');
+
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id === item.id
+              ? { ...p, url: uploadedUrl, uploading: false, error: !uploadedUrl }
+              : p
+          )
+        );
       }
     } catch (error) {
       console.error(isVi ? "Lỗi khi chọn ảnh:" : "Error selecting image: ", error);
@@ -392,9 +424,10 @@ export default function ReportLostPetScreen() {
     }
   };
 
-  const handleRemovePhoto = (index: number) => {
-    setPhotos(photos.filter((_, i) => i !== index));
+  const handleRemovePhoto = (id: string) => {
+    setPhotos((prev) => prev.filter((p: any) => p.id !== id));
   };
+
 
   const handleClose = () => {
     if (petId) {
@@ -409,7 +442,8 @@ export default function ReportLostPetScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsSubmitting(true);
     try {
-      const res = await petService.toggleLostMode(petId, {
+      // 1. Gắn payload ra biến riêng và log
+      const payload = {
         isLost: true,
         location: location || "",
         dateTime: dateTime || "",
@@ -417,18 +451,25 @@ export default function ReportLostPetScreen() {
         ownerName: ownerName || "",
         ownerPhone: ownerPhone || "",
         ownerAddress: ownerAddress || "",
-        note: note || "",
-        photos: photos || [],
+        note: note || "", // Ghi chú user nhập
+        photos: photos.filter((p: any) => p.url).map((p: any) => p.url as string),
         latitude: mapLat,
         longitude: mapLng,
         radius: mapRadius > 0 ? mapRadius : 500,
         lostDate: lostDate.toISOString(),
-      });
+      };
+
+      console.log("🚀 [REPORT LOST] Payload gửi đi:", JSON.stringify(payload, null, 2));
+
+      const res = await petService.toggleLostMode(petId, payload);
+
+      console.log("🚀 [REPORT LOST] Response từ server:", JSON.stringify(res?.data, null, 2));
 
       DeviceEventEmitter.emit('LOST_MODE_ACTIVATED', { petId });
 
-      // Lấy reportId trả về từ BE nếu có (ví dụ res?.data?.reportId hoặc res?.reportId)
-      const newReportId = res?.data?.reportId;
+      // 2. SỬA LẠI ĐOẠN LẤY ID TÙY THEO LOG BÊN TRÊN
+      // Ví dụ thường gặp: res.data.id hoặc res.data.data.id
+      const newReportId = res?.data?.reportId || res?.data?.id || res?.id;
 
       Alert.alert(
         isVi ? 'Báo lạc thành công' : 'Reported lost successfully',
@@ -446,12 +487,7 @@ export default function ReportLostPetScreen() {
                     params: { reportId: newReportId, openFrom: 'profile' }
                   });
                 } else {
-                  // Fallback: chưa có report cụ thể, dùng petId + openFrom=profile
-                  // (TagReportDetailScreen sẽ cần hỗ trợ fetch theo petId trong trường hợp này)
-                  router.replace({
-                    pathname: '/tag-report-detail',
-                    params: { reportId: petId, openFrom: 'profile' }
-                  });
+                  router.back();
                 }
               }, 100);
             }
@@ -782,30 +818,54 @@ export default function ReportLostPetScreen() {
                     <TouchableOpacity
                       onPress={handleAddPhoto}
                       activeOpacity={0.7}
-                      disabled={isUploading}
                       className="w-full flex-row h-[60px] border-[1.5px] border-dashed border-[#D1D5DB] rounded-[16px] items-center justify-center"
                     >
-                      {isUploading ? (
-                        <ActivityIndicator size="small" color="#9CA3AF" className="mr-1" />
-                      ) : (
-                        <Image source={require('../assets/icon/upload-gray.png')} className="w-[18px] h-[18px]" />
-                      )}
+                      <Image source={require('../assets/icon/upload-gray.png')} className="w-[18px] h-[18px]" />
                       <Text className="ml-[11px] text-[14px] font-regular text-black">
-                        {isUploading ? (isVi ? 'Đang tải lên...' : 'Uploading...') : (isVi ? 'Tải ảnh lên' : 'Upload photos')}
+                        {isVi ? 'Tải ảnh lên' : 'Upload photos'}
                       </Text>
                     </TouchableOpacity>
                   ) : (
                     <>
-                      {photos.map((uri, index) => (
-                        <View key={index} style={{ width: PHOTO_SIZE, height: PHOTO_SIZE }} className="relative">
-                          <Image source={{ uri }} className="w-full h-full rounded-[14px] bg-[#F3F4F6]" />
+                      {photos.map((photo) => (
+                        <View key={photo.id} style={{ width: PHOTO_SIZE, height: PHOTO_SIZE }} className="relative">
+                          <Image source={{ uri: photo.localUri }} className="w-full h-full rounded-[14px] bg-[#F3F4F6]" />
+
+                          {photo.uploading && (
+                            <View
+                              className="absolute inset-0 rounded-[14px] items-center justify-center"
+                              style={{ backgroundColor: 'rgba(0,0,0,0.35)' }}
+                            >
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            </View>
+                          )}
+
+                          {photo.error && !photo.uploading && (
+                            <TouchableOpacity
+                              onPress={async () => {
+                                setPhotos((prev) =>
+                                  prev.map((p) => (p.id === photo.id ? { ...p, uploading: true, error: false } : p))
+                                );
+                                const uploadedUrl = await uploadOnly(photo.localUri, 'lost-pet-reports');
+                                setPhotos((prev) =>
+                                  prev.map((p) =>
+                                    p.id === photo.id ? { ...p, url: uploadedUrl, uploading: false, error: !uploadedUrl } : p
+                                  )
+                                );
+                              }}
+                              className="absolute inset-0 rounded-[14px] items-center justify-center"
+                              style={{ backgroundColor: 'rgba(220,38,38,0.35)' }}
+                            >
+                              <Feather name="refresh-cw" size={18} color="#FFFFFF" />
+                            </TouchableOpacity>
+                          )}
+
                           <TouchableOpacity
-                            onPress={() => handleRemovePhoto(index)}
+                            onPress={() => handleRemovePhoto(photo.id)}
                             activeOpacity={0.7}
                             className="absolute -top-2 -right-2 w-6 h-6 rounded-full items-center justify-center"
-                            style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 }}
+                            style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, backgroundColor: '#FFFFFF' }}
                           >
-                            <LinearGradient colors={['rgba(221, 221, 221, 0.3)', 'rgba(247, 247, 247, 0.7)', '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} locations={[0, 0.3, 1]} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9999 }} />
                             <X size={10} color="#000000" strokeWidth={3} />
                           </TouchableOpacity>
                         </View>
@@ -814,17 +874,17 @@ export default function ReportLostPetScreen() {
                         <TouchableOpacity
                           onPress={handleAddPhoto}
                           activeOpacity={0.7}
-                          disabled={isUploading}
                           style={{ width: PHOTO_SIZE, height: PHOTO_SIZE }}
                           className="bg-[#F9FAFB] border-[1.5px] border-dashed border-[#E5E5E5] rounded-[14px] items-center justify-center"
                         >
-                          {isUploading ? <ActivityIndicator size="small" color="#9CA3AF" /> : <Image source={require('../assets/icon/upload-gray.png')} className="w-[18px] h-[18px] mr-1" />}
+                          <Image source={require('../assets/icon/upload-gray.png')} className="w-[18px] h-[18px]" />
                         </TouchableOpacity>
                       )}
                     </>
                   )}
                 </View>
               </View>
+
 
               {/* OWNER INFORMATION */}
               <View className="mb-[20px]">
@@ -894,7 +954,7 @@ export default function ReportLostPetScreen() {
               <View className="gap-y-3">
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  disabled={!isFormValid || isSubmitting || isUploading}
+                  disabled={!isFormValid || isSubmitting}
                   onPress={handleActivateLostMode}
                   className={`w-full h-[48px] rounded-[16px] items-center justify-center flex-row ${isFormValid && !isSubmitting && !isUploading ? 'bg-[#E85A5A]' : 'bg-[#FFB4B4]'}`}
                   style={isFormValid && !isSubmitting && !isUploading ? { shadowColor: '#FF0000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 } : {}}

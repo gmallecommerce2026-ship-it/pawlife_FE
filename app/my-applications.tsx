@@ -30,14 +30,14 @@ interface ApplicationRecord {
 const getStatusWeight = (status: string) => {
   const normalizedStatus = status.toUpperCase().replace(/\s+/g, '_');
   switch (normalizedStatus) {
-    case 'INTERVIEW_SCHEDULED': return 1; 
-    case 'NEED_MORE_INFO': return 2;      
-    case 'PENDING': return 3;             
-    case 'SUBMITTED': return 4;           
-    case 'APPROVED': return 5;            
-    case 'ADOPTION_COMPLETED': return 6;  
-    case 'CLOSED': return 7;              
-    default: return 99; 
+    case 'INTERVIEW_SCHEDULED': return 1;
+    case 'NEED_MORE_INFO': return 2;
+    case 'PENDING': return 3;
+    case 'SUBMITTED': return 4;
+    case 'APPROVED': return 5;
+    case 'ADOPTION_COMPLETED': return 6;
+    case 'CLOSED': return 7;
+    default: return 99;
   }
 };
 
@@ -45,9 +45,9 @@ const sortApplications = (apps: ApplicationRecord[]) => {
   return [...apps].sort((a, b) => {
     const weightA = getStatusWeight(a.status);
     const weightB = getStatusWeight(b.status);
-    
+
     if (weightA !== weightB) {
-      return weightA - weightB; 
+      return weightA - weightB;
     }
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
@@ -153,25 +153,33 @@ const StatusBadge = ({ status, t }: { status: string, t: any }) => {
 
 export default function MyApplicationsScreen() {
   const router = useRouter();
-  const { t } = useLanguage(); // GỌI HOOK DỊCH THUẬT
+  const { t, language } = useLanguage(); // GỌI HOOK DỊCH THUẬT
 
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
-  
+
   const [isWithdrawVisible, setIsWithdrawVisible] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
-  
+
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 24 });
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
-  
+
   const maxApplications = 5;
   const currentApplications = applications.filter(app =>
     !['CLOSED', 'ADOPTION_COMPLETED'].includes(app.status)
   ).length;
 
   const progressPercentage = (currentApplications / maxApplications) * 100;
-
+  const getDisplayBreed = (breed: any, currentLang: string, fallback: string) => {
+    if (!breed) return fallback;
+    if (typeof breed === 'string') return breed; // Nếu API trả về string bình thường
+    if (typeof breed === 'object') {
+      // Ưu tiên ngôn ngữ hiện tại -> fallback qua tiếng Việt -> fallback qua tiếng Anh
+      return breed[currentLang] || breed.vi || breed.en || fallback;
+    }
+    return fallback;
+  };
   // BỔ SUNG: HÀM TÍNH TUỔI VÀ DỊCH CỤC BỘ
   const getDisplayAge = (dob: string | undefined) => {
     if (!dob) return t('Unknown');
@@ -200,7 +208,7 @@ export default function MyApplicationsScreen() {
     try {
       setIsLoading(true);
       const response = await axiosClient.get('/applications/my-applications');
-      
+
       const sortedData = sortApplications(response.data.data);
       setApplications(sortedData);
     } catch (error) {
@@ -212,18 +220,18 @@ export default function MyApplicationsScreen() {
 
   const handleWithdrawApplication = async () => {
     if (!selectedAppId) return;
-    
+
     try {
       setIsWithdrawing(true);
       await axiosClient.patch(`/applications/${selectedAppId}/withdraw`);
-      
+
       setApplications(prevApps => {
-        const updatedApps = prevApps.map(app => 
+        const updatedApps = prevApps.map(app =>
           app.id === selectedAppId ? { ...app, status: 'CLOSED' } : app
         );
         return sortApplications(updatedApps);
       });
-      
+
       setIsWithdrawVisible(false);
     } catch (error: any) {
       console.error('Error withdrawing application:', error);
@@ -238,7 +246,7 @@ export default function MyApplicationsScreen() {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
     // Lấy tên viết tắt của tháng (ví dụ: "Jan", "Feb"...)
-    const monthKey = date.toLocaleDateString('en-US', { month: 'short' }); 
+    const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
     const year = date.getFullYear();
 
     // Trả về dạng: "04 Tháng 6, 2026" (hoặc format bạn muốn)
@@ -342,15 +350,16 @@ export default function MyApplicationsScreen() {
               </View>
             }
             renderItem={({ item }) => {
-              // 1. CHỐNG CRASH: Tránh trường hợp cả mảng có phần tử null
               if (!item) return null;
 
               const isNeedMoreInfo = item.status?.toLowerCase().replace(/\s+/g, '_') === 'need_more_info';
-              
-              // 2. CHỐNG CRASH: Thêm dấu ?. sau item.pet để an toàn khi thú cưng bị xóa
+
               const petImage = item.pet?.images?.[0]?.url || 'https://via.placeholder.com/150';
+
               const computedAge = getDisplayAge(item.pet?.dob);
-              const ageAndBreed = [computedAge, item.pet?.breed || t('Unknown')].filter(Boolean).join(' • ');
+              // SỬA TẠI ĐÂY: Xử lý breed đa ngôn ngữ để tránh lỗi [object Object]
+              const computedBreed = getDisplayBreed(item.pet?.breed, language, t('Unknown'));
+              const ageAndBreed = [computedAge, computedBreed].filter(Boolean).join(' • ');
 
               return (
                 <TouchableOpacity
@@ -405,7 +414,7 @@ export default function MyApplicationsScreen() {
                   </View>
 
                   <View className={`flex-row justify-between items-center py-3 border-t ${isNeedMoreInfo ? 'border-[#E89B5A] bg-[#FFF5EE]' : 'border-[#E5E5E5] bg-[#F6F6F6]'}  -mx-[14px] px-[14px] rounded-b-[13px]`}>
-                    <StatusBadge status={item.status} t={t} /> 
+                    <StatusBadge status={item.status} t={t} />
 
                     <View className="flex-row items-center">
                       <Text className={`${isNeedMoreInfo ? 'text-[#E89B5A]' : 'text-[#8E8E93]'} text-[12px] font-regular tracking-[0.5px] ml-1.5`}>
@@ -419,7 +428,7 @@ export default function MyApplicationsScreen() {
             }}
           />
         )}
-        
+
         {/* MODAL 1: DROPDOWN MENU */}
         <Modal
           visible={isOptionsVisible}
@@ -435,8 +444,8 @@ export default function MyApplicationsScreen() {
             <View
               className="absolute bg-white rounded-xl border border-gray-100 w-48 shadow-sm"
               style={{
-                top: menuPosition.top,     
-                right: menuPosition.right, 
+                top: menuPosition.top,
+                right: menuPosition.right,
                 elevation: 8,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
@@ -452,13 +461,13 @@ export default function MyApplicationsScreen() {
                   const selectedApp = applications.find(app => app.id === selectedAppId);
                   if (selectedApp?.pet?.id) {
                     router.push({
-                    pathname: '/pet-detail-modal',
-                    params: { id: selectedApp.pet.id }
-                  });
+                      pathname: '/pet-detail-modal',
+                      params: { id: selectedApp.pet.id }
+                    });
                   }
                 }}
               >
-               
+
                 <Feather name="twitter" size={16} color="#4B5563" />
                 <Text className="text-[13px] font-medium text-gray-700 ml-2 leading-5">{t('Pet Profile')}</Text>
               </TouchableOpacity>
@@ -484,7 +493,7 @@ export default function MyApplicationsScreen() {
                   setIsOptionsVisible(false);
                   const selectedApp = applications.find(app => app.id === selectedAppId);
                   const shelterId = selectedApp?.pet?.shelter?.id || (selectedApp?.pet as any)?.shelterId;
-                  
+
                   if (shelterId) {
                     router.push(`/shelter-profile?id=${shelterId}`);
                   } else {
@@ -502,10 +511,10 @@ export default function MyApplicationsScreen() {
                 onPress={() => {
                   setIsOptionsVisible(false);
                   const selectedApp = applications.find(app => app.id === selectedAppId);
-                  
+
                   if (selectedApp && ['CLOSED', 'ADOPTION_COMPLETED'].includes(selectedApp.status)) {
-                     Alert.alert(t("Invalid"), t("This application is closed or completed, cannot be withdrawn."));
-                     return;
+                    Alert.alert(t("Invalid"), t("This application is closed or completed, cannot be withdrawn."));
+                    return;
                   }
 
                   setTimeout(() => setIsWithdrawVisible(true), 150);
@@ -530,7 +539,7 @@ export default function MyApplicationsScreen() {
               <View className="w-14 h-14 bg-red-50 rounded-full items-center justify-center mb-4">
                 <Feather name="alert-triangle" size={24} color="#EF4444" />
               </View>
-              
+
               <Text className="text-[18px] font-bold text-center text-gray-900 mb-2">
                 {t('Withdraw Application?')}
               </Text>

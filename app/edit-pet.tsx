@@ -5,6 +5,7 @@ import { TextInput } from '@/components/AppTextInput';
 import ReportIssueModal, { ReportSubmitData } from '@/components/ReportIssueModal';
 import { buildBreedBilingual, getBreedOptions, resolveBreedValue, resolveSpeciesValue, SPECIES_BILINGUAL } from '@/constants/breedData';
 import { getMedicalRecordIcon } from '@/constants/medicalRecordIcons';
+import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useModalStore } from '@/store/useModalStore';
 import { buildBilingualOnSubmit } from '@/utils/autoTranslate';
@@ -15,7 +16,7 @@ import { BlurView } from 'expo-blur';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -366,7 +367,11 @@ const MedicalRecordItem = memo(({ record, index, isVi, onOpenMenu }: MedicalReco
 export default function EditPetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-
+  const [initialFormData, setInitialFormData] = useState<EditPetFormData | null>(null);
+  const [initialMedicalRecords, setInitialMedicalRecords] = useState<any[]>([]);
+  const { user } = useContext(AuthContext);
+  const [isDefaultName, setIsDefaultName] = useState(false);
+  const [isDefaultPhone, setIsDefaultPhone] = useState(false);
   const id = params.id as string;
 
   const openMedicalModalParam = Array.isArray(params.openMedicalModal)
@@ -745,13 +750,36 @@ export default function EditPetScreen() {
     const fetchPet = async () => {
       try {
         const data = await petService.getPetById(id as string);
+        const resolvedContactName = data.contactName || user?.name || '';
+        const resolvedContactPhone = data.contactPhone || user?.phone || '';
         const colorBi = parseBilingual(data.color);
         const descBi = parseBilingual(data.description);
         setOriginalBilingual({ color: colorBi, description: descBi });
 
         const resolvedSpecies = resolveSpeciesValue(data.species);
         const resolvedBreed = resolveBreedValue(data.breed, resolvedSpecies);
-
+        const finalFormData = {
+          name: data.name || '',
+          species: resolvedSpecies,
+          breed: resolvedBreed.value,
+          color: displayBilingual(colorBi, isVi),
+          size: data.size || 'MEDIUM',
+          weight: data.weight ? data.weight.toString() : '',
+          dob: data.dob ? new Date(data.dob).toISOString() : '',
+          microchip: data.microchipNumber || '',
+          description: displayBilingual(descBi, isVi),
+          gender: (data.gender as GenderType) || 'UNKNOWN',
+          imageUrl: data.avatarUrl || data.images?.[0]?.url || '',
+          contactName: resolvedContactName,
+          contactPhone: resolvedContactPhone,
+          contactAddress: data.contactAddress || '',
+          qrCodeUrl: data.qrCodeUrl || '',
+          sterilized: data.isSpayedNeutered !== undefined ? data.isSpayedNeutered : null,
+          createdAt: data.createdAt,
+          adoptedAt: data.adoptedAt,
+          nameLastUpdatedAt: data.nameLastUpdatedAt,
+          status: data.status,
+        };
 
         setFormData({
           name: data.name || '',
@@ -765,8 +793,8 @@ export default function EditPetScreen() {
           description: displayBilingual(descBi, isVi),
           gender: (data.gender as GenderType) || 'UNKNOWN',
           imageUrl: data.avatarUrl || data.images?.[0]?.url || '',
-          contactName: data.contactName || '',
-          contactPhone: data.contactPhone || '',
+          contactName: resolvedContactName,
+          contactPhone: resolvedContactPhone,
           contactAddress: data.contactAddress || '',
           qrCodeUrl: data.qrCodeUrl || '',
           sterilized: data.isSpayedNeutered !== undefined ? data.isSpayedNeutered : null,
@@ -776,9 +804,12 @@ export default function EditPetScreen() {
           status: data.status,
         });
         setIsCustomBreed(resolvedBreed.isCustom);
-
+        setInitialFormData(finalFormData);
+        if (resolvedContactName === user?.name && user?.name) setIsDefaultName(true);
+        if (resolvedContactPhone === user?.phone && user?.phone) setIsDefaultPhone(true);
         if (data.medicalRecords && Array.isArray(data.medicalRecords)) {
           setMedicalRecords(data.medicalRecords);
+          setInitialMedicalRecords(data.medicalRecords);
         }
 
         // 🚀 NÂNG CẤP 3: Xử lý tính toán ngày và trạng thái khóa
@@ -858,8 +889,8 @@ export default function EditPetScreen() {
       ]);
 
       const finalMedicalRecords = await Promise.all(
+        // ... (Giữ nguyên logic xử lý finalMedicalRecords)
         medicalRecords.map(async (record) => {
-          // 🚀 FIX: Chủ động stringify các object đa ngôn ngữ
           const formattedRecordName = typeof record.recordName === 'object' ? JSON.stringify(record.recordName) : record.recordName;
           const formattedNextDueName = record.nextDueName && typeof record.nextDueName === 'object' ? JSON.stringify(record.nextDueName) : record.nextDueName;
 
@@ -930,25 +961,78 @@ export default function EditPetScreen() {
         payload.dob = formData.dob;
       }
 
+      // Gọi API cập nhật
       await petService.updatePet(id as string, payload);
 
-      showModal({
-        title: isVi ? 'Thành công' : 'Success',
-        message: isVi ? 'Cập nhật hồ sơ thú cưng thành công!' : 'Pet profile updated successfully!',
-        buttonText: isVi ? 'Trở lại' : 'Back',
-        onConfirm: () => router.back(),
-      });
+      // SỬA Ở ĐÂY: Xóa đoạn gọi showModal và gọi trực tiếp router.back()
+      router.back();
 
     } catch (error: any) {
       // Bắt lỗi từ Backend và hiển thị Alert lên UI
       const displayMsg = resolveErrorMessage(error, t) || error.message || (isVi ? 'Cập nhật thất bại. Vui lòng thử lại.' : 'Failed to update pet. Please try again.');
       Alert.alert(isVi ? 'Lỗi' : 'Error', displayMsg);
     } finally {
+      // (Optional) Tắt loading state nếu có lỗi để UI không bị treo
       setIsSubmitting(false);
       setIsUploadingRecords(false);
     }
   };
 
+  // --- 1. HÀM XỬ LÝ NHẬP LIỆU THÔNG MINH ---
+  const handleContactNameChange = (text: string) => {
+    if (isDefaultName) {
+      setIsDefaultName(false);
+      if (text.length < formData.contactName.length) {
+        handleChange('contactName', '');
+      } else {
+        let newChar = text.replace(formData.contactName, '');
+        if (!newChar) newChar = text.slice(-1);
+        handleChange('contactName', newChar);
+      }
+    } else {
+      handleChange('contactName', text);
+    }
+  };
+
+  const handleContactPhoneChange = (text: string) => {
+    const cleanText = text.replace(/[^0-9]/g, '');
+    if (isDefaultPhone) {
+      setIsDefaultPhone(false);
+      if (cleanText.length < formData.contactPhone.length) {
+        handleChange('contactPhone', '');
+      } else {
+        let newChar = cleanText.replace(formData.contactPhone, '');
+        if (!newChar) newChar = cleanText.slice(-1);
+        handleChange('contactPhone', newChar);
+      }
+    } else {
+      handleChange('contactPhone', cleanText);
+    }
+  };
+
+  // --- 2. BIẾN KIỂM TRA VALIDATE FORM ---
+  const isFormValid =
+    formData.name.trim() !== '' &&
+    formData.species !== '' && formData.species !== 'UNKNOWN' &&
+    formData.gender !== 'UNKNOWN' &&
+    formData.sterilized !== null &&
+    formData.breed.trim() !== '' &&
+    formData.color.trim() !== '' &&
+    formData.dob !== '' &&
+    formData.contactName.trim() !== '' &&
+    formData.contactPhone.trim() !== '' &&
+    formData.contactAddress.trim() !== '';
+
+  // --- 3. BIẾN KIỂM TRA CÓ CHỈNH SỬA GÌ KHÔNG ---
+  const hasChanges = useMemo(() => {
+    if (!initialFormData) return false;
+
+    // So sánh dữ liệu dạng chuỗi JSON để xem có gì khác biệt không
+    const formDataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormData);
+    const medicalRecordsChanged = JSON.stringify(medicalRecords) !== JSON.stringify(initialMedicalRecords);
+
+    return formDataChanged || medicalRecordsChanged;
+  }, [formData, initialFormData, medicalRecords, initialMedicalRecords]);
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -1055,7 +1139,8 @@ export default function EditPetScreen() {
                         style={{ height: 34, borderColor: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? 'transparent' : '#E5E7EB', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, backgroundColor: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? '#F9FAFB' : '#FFFFFF' }}
                         containerStyle={{ borderRadius: 12, overflow: 'hidden', marginTop: 2, borderColor: '#E5E7EB', borderWidth: 1 }}
                         placeholderStyle={{ fontSize: 14, color: '#9CA3AF', fontFamily: defaultFont }}
-                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.species && formData.species !== 'UNKNOWN') ? '#9CA3AF' : '#000000', fontFamily: defaultFont }}
+                        selectedTextStyle={{ fontSize: 14, color: (lockStatus.isCoreLocked && !!formData.breed) ? '#9CA3AF' : '#000000', fontFamily: defaultFont, marginRight: 8 }}
+                        selectedTextProps={{ numberOfLines: 1 }}
                         itemTextStyle={{ fontSize: 14, color: '#000000', fontFamily: defaultFont }}
                         data={speciesData}
                         maxHeight={200}
@@ -1207,24 +1292,26 @@ export default function EditPetScreen() {
 
                 <View className="bg-white rounded-[20px] border border-gray-200 px-4 py-2">
                   <View className="flex-row items-center py-3 border-b border-gray-100">
-                    <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'Tên' : 'Name'}</Text>
+                    <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'Họ và tên' : 'Name'}</Text>
                     <TextInput
                       style={inputFontStyle}
                       className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
                       value={formData.contactName}
-                      onChangeText={(text) => handleChange('contactName', text)}
+                      onChangeText={handleContactNameChange} // Thay thế ở đây
+                      selectTextOnFocus={isDefaultName} // Thêm focus UX
                       placeholder={isVi ? "Họ Và Tên" : "Full Name"}
                       placeholderTextColor="#A1A1AA"
                     />
                   </View>
 
                   <View className="flex-row items-center py-3 border-b border-gray-100">
-                    <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'SĐT' : 'Phone'}</Text>
+                    <Text className="text-[14px] font-medium text-black">{isVi ? 'Số điện thoại' : 'Phone'}</Text>
                     <TextInput
                       style={inputFontStyle}
                       className="flex-1 text-right text-[14px] text-[#8E8E93] p-0"
                       value={formData.contactPhone}
-                      onChangeText={(text) => handleChange('contactPhone', text.replace(/[^0-9]/g, ''))}
+                      onChangeText={handleContactPhoneChange} // Thay thế ở đây
+                      selectTextOnFocus={isDefaultPhone} // Thêm focus UX
                       keyboardType="phone-pad"
                       placeholder={isVi ? "Số Điện Thoại" : "Phone Number"}
                       placeholderTextColor="#A1A1AA"
@@ -1233,7 +1320,7 @@ export default function EditPetScreen() {
                   </View>
 
                   <View className="flex-row items-center py-4">
-                    <Text className="text-[16px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
+                    <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
                     <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
                       <Text
                         style={inputFontStyle}
@@ -1311,8 +1398,12 @@ export default function EditPetScreen() {
               <View className="space-y-3 mb-10">
                 <TouchableOpacity
                   onPress={handleSubmit}
-                  disabled={isSubmitting || isUploadingAvatar || isUploadingRecords}
-                  className={`bg-[#EFA062] h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm ${(isSubmitting || isUploadingRecords) ? 'opacity-70' : ''}`}
+                  // CẬP NHẬT disabled
+                  disabled={!isFormValid || !hasChanges || isSubmitting || isUploadingAvatar || isUploadingRecords}
+                  className={`h-[52px] rounded-2xl items-center justify-center flex-row shadow-sm ${(!isFormValid || !hasChanges || isSubmitting || isUploadingRecords)
+                      ? 'bg-[#EFA062]/50' // Nút mờ đi khi chưa sửa gì hoặc đang thiếu thông tin
+                      : 'bg-[#EFA062]'
+                    }`}
                 >
                   {(isSubmitting || isUploadingRecords) ? (
                     <ActivityIndicator size="small" color="white" />

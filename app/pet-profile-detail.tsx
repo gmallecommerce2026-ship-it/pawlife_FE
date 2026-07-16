@@ -113,7 +113,7 @@ const DEFAULT_HISTORY_UI: PawHistoryUIConfig = {
 
 const I18N_MAP: Record<string, { vi: string; en: string }> = {
   'pawHistory.current_owner_title': { vi: 'Chủ sở hữu hiện tại', en: 'Current Owner' },
-  'pawHistory.current_owner_body': { vi: 'Quyền sở hữu đã chuyển cho {name}', en: 'Ownership transferred to {name}' },
+  'pawHistory.current_owner_body': { vi: 'Quyền sở hữu thuộc về {name}', en: 'Ownership transferred to {name}' },
   'pawHistory.previous_owner_title': { vi: 'Chủ trước', en: 'Previous Owner' },
   'pawHistory.previous_owner_body': { vi: 'Từng được chăm sóc bởi {name}', en: 'Previously cared for by {name}' },
   'pawHistory.under_shelter_title': { vi: 'Đang ở trạm cứu hộ', en: "Under Shelter's Care" },
@@ -191,13 +191,13 @@ const resolvePawHistoryText = (
       // Format lại Description thành "Đã hoàn thành mũi 1/2/3 (Tên vaccine)"
       if (doseNumber) {
         description = isVi
-          ? `Đã hoàn thành mũi ${doseNumber} (${pureVaccineNameVi})`
-          : `Completed dose ${doseNumber} (${pureVaccineNameEn})`;
+          ? `Đã hoàn thành mũi ${doseNumber} ${pureVaccineNameVi}`
+          : `Completed dose ${doseNumber} ${pureVaccineNameEn}`;
       } else {
         // Fallback nếu người dùng chọn loại Vaccine không phân mũi (VD: Vaccine Dại 1 mũi duy nhất)
         description = isVi
-          ? `Đã hoàn thành mũi tiêm (${pureVaccineNameVi})`
-          : `Completed vaccination (${pureVaccineNameEn})`;
+          ? `Đã hoàn thành mũi tiêm ${pureVaccineNameVi}`
+          : `Completed vaccination ${pureVaccineNameEn}`;
       }
     }
     // --- KẾT THÚC ---
@@ -294,6 +294,21 @@ export default function PetProfileDetailScreen() {
   const displayAvatar = petData?.avatarUrl || petData?.images?.[0]?.url || FALLBACK_AVATAR;
   console.log(petData);
 
+  const handleBack = useCallback(() => {
+    const fromFlow = params.fromFlow as string;
+
+    if (fromFlow === 'add-pet') {
+      // router.navigate tới tab gốc sẽ làm Expo Router tự động 
+      // Pop Stack hiện tại (tạo hiệu ứng slide from left) và đưa về tab My Pets
+      router.navigate('/(tabs)/my-pets');
+    } else if (router.canGoBack()) {
+      // Trở về bình thường nếu có lịch sử đúng
+      router.back();
+    } else {
+      // Fallback an toàn nếu app bị mất lịch sử (do reload/deep link)
+      router.navigate('/(tabs)/my-pets');
+    }
+  }, [router, params]);
 
   const getHistoryUIConfig = (type: string) => {
     switch (type) {
@@ -606,12 +621,62 @@ export default function PetProfileDetailScreen() {
       }).start();
     }
   };
-
   const toggleHistory = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowHistory(!showHistory);
   };
+  const ownerInfo = petData?.shelter || petData?.owner || {};
+  const isShelter = !!petData?.shelter;
+  const displayContactName = petData?.contactName || ownerInfo.name || (isVi ? 'chủ mới' : 'new owner');
+  const handleDeleteMedicalRecord = (recordId: string) => {
+    Alert.alert(
+      isVi ? 'Xác nhận xóa' : 'Confirm Delete',
+      isVi
+        ? 'Bạn có chắc chắn muốn xóa hồ sơ y tế này? Hành động này không thể hoàn tác.'
+        : 'Are you sure you want to delete this medical record? This action cannot be undone.',
+      [
+        { text: isVi ? 'Hủy' : 'Cancel', style: 'cancel' },
+        {
+          text: isVi ? 'Xóa' : 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Bật loading nếu cần (dùng chung state isSavingMedicalRecord cho tiện)
+              setIsSavingMedicalRecord(true);
 
+              // 1. Gọi API để xóa phía Backend
+              await petService.deleteMedicalRecord(petId, recordId);
+
+              // 2. Cập nhật UI ngay lập tức (Optimistic update)
+              setPetData((prev: any) => {
+                if (!prev) return prev;
+                const updatedRecords = (prev.medicalRecords || []).filter(
+                  (r: any) => r.id !== recordId
+                );
+                return { ...prev, medicalRecords: updatedRecords };
+              });
+
+              // 3. Clear cache của react-query
+              queryClient.invalidateQueries({ queryKey: ['pet', petId] });
+
+              Alert.alert(
+                isVi ? 'Thành công' : 'Success',
+                isVi ? 'Đã xóa hồ sơ y tế!' : 'Medical record deleted successfully!'
+              );
+            } catch (error: any) {
+              Alert.alert(
+                isVi ? 'Lỗi' : 'Error',
+                error?.response?.data?.message || error?.message ||
+                (isVi ? 'Không thể xóa hồ sơ lúc này.' : 'Unable to delete the record.')
+              );
+            } finally {
+              setIsSavingMedicalRecord(false);
+            }
+          }
+        }
+      ]
+    );
+  };
   const combinedHistory = React.useMemo(() => {
     if (!petData?.pawHistory?.length) return [];
 
@@ -620,7 +685,14 @@ export default function PetProfileDetailScreen() {
       .filter((item: any) => item?.i18n?.titleKey !== 'pawHistory.joined_title' && item?.type !== 'CREATED')
       // -----------------------------------------------------
       .map((item: any) => {
-        const { title, description } = resolvePawHistoryText(item, isVi);
+        let { title, description } = resolvePawHistoryText(item, isVi); // Đổi const thành let
+
+        // --- BẮT ĐẦU: GHI ĐÈ TÊN CHỦ HIỆN TẠI ---
+        if (item.type === 'CURRENT_OWNER' || item?.i18n?.titleKey === 'pawHistory.current_owner_title') {
+          description = isVi
+            ? `Quyền sở hữu thuộc về ${displayContactName}`
+            : `Ownership transferred to ${displayContactName}`;
+        }
 
         // Pending check: chỉ áp dụng cho VACCINE — khớp với medical record
         let isPending = false;
@@ -697,13 +769,14 @@ export default function PetProfileDetailScreen() {
     );
   }
 
-  const ownerInfo = petData.shelter || petData.owner || {};
-  const isShelter = !!petData.shelter;
-  const displayContactName = petData.contactName || ownerInfo.name || 'not updated';
   const displayContactPhone = petData.contactPhone || ownerInfo.phone || 'not updated';
   const displayContactAddress = petData.contactAddress || ownerInfo.address || 'not updated';
-
-  const displayId = petData.code || petData.id?.substring(0, 8).toUpperCase() || petId.substring(0, 8).toUpperCase();
+  const activeTag = petData?.tags?.find((tag: any) => tag.status === 'ACTIVE') || petData?.tags?.[0];
+  const tagId = activeTag?.id;
+  const displayId = tagId?.substring(0, 8).toUpperCase()
+    || petData.code
+    || petData.id?.substring(0, 8).toUpperCase()
+    || petId.substring(0, 8).toUpperCase();
   const hasValidQRCode = !!petData.qrCodeUrl && petData.qrVerificationStatus === 'VERIFIED';
   const qrCodeId = petData.qrCode || petData.tags?.[0]?.code || petData.code;
   const selectedMedicalRecord = selectedVaccineIndex !== null
@@ -926,7 +999,7 @@ export default function PetProfileDetailScreen() {
         {/* --- HEADER --- */}
         <View className="flex-row items-center justify-between px-4 py-2 bg-[#FFFFFF]">
           <TouchableOpacity
-            onPress={() => router.replace('/(tabs)/my-pets')}
+            onPress={handleBack}
             activeOpacity={0.7}
             style={{
               shadowColor: '#000',
@@ -1007,11 +1080,15 @@ export default function PetProfileDetailScreen() {
 
             {/* Pet ID Tag */}
             {hasValidQRCode && (
-              <View className="bg-[#F3F4F6] px-3 py-[3px] rounded-full mb-[6px] border border-[#E5E7EB]">
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push(`/view-qr-code?id=${petId}`)}
+                className="bg-[#F3F4F6] px-3 py-[3px] rounded-full mb-[6px] border border-[#E5E7EB]"
+              >
                 <Text className="text-[#6B7280] font-medium text-[12px] tracking-wider">
                   ID: {displayId}
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -1197,22 +1274,22 @@ export default function PetProfileDetailScreen() {
               />
               <InfoRow
                 label1="Breed"
-                value1={petData.breed || 'Not updated'}
-                label2="Color" value2={petData.color || 'Not updated'}
+                value1={petData.breed || (isVi ? 'Chưa cập nhật' : 'Not updated')}
+                label2="Color" value2={petData.color || (isVi ? 'Chưa cập nhật' : 'Not updated')}
               />
               <InfoRow2
                 label1="Birthday"
                 value1={
                   petData.dob
                     ? new Date(petData.dob).toLocaleDateString('en-GB')
-                    : (petData.age ? `${petData.age} tuổi` : 'Not updated')
+                    : (petData.age ? `${petData.age} tuổi` : (isVi ? 'Chưa cập nhật' : 'Not updated'))
                 }
-                label2="Weight" value2={petData.weight != null ? `${petData.weight} kg` : 'Not updated'}
+                label2="Weight" value2={petData.weight != null ? `${petData.weight} kg` : (isVi ? 'Chưa cập nhật' : 'Not updated')}
               />
               <View className="h-[1px] bg-gray-200 w-full mb-5" />
               <Text className="text-black text-[14px] font-medium mb-2">Notes</Text>
               <Text className="text-[#8E8E93] text-[14px] leading-5">
-                {petData.description || 'Loves Belly rubs and playing fetch. Very friendly with children'}
+                {petData.description || (isVi ? 'Chưa cập nhật' : 'Not updated')}
               </Text>
 
             </View>
@@ -1394,8 +1471,8 @@ export default function PetProfileDetailScreen() {
                   />
                   <Text className="font-regular text-[12px] text-[#8E8E93]">
                     {isVi
-                      ? 'Dòng thời gian này được tạo tự động và không thể chỉnh sửa.'
-                      : 'This timeline is auto-generated and append-only.'}
+                      ? 'Hành trình không thể bị xoá hay chỉnh sửa.'
+                      : 'The journey cannot be deleted or edited.'}
                   </Text>
                 </View>
 
@@ -1703,12 +1780,19 @@ export default function PetProfileDetailScreen() {
                     {isVi ? 'Sửa hồ sơ' : 'Edit Record'}
                   </Text>
                 </TouchableOpacity>
+
+                {/* --- NÚT XÓA ĐÃ ĐƯỢC CẬP NHẬT --- */}
                 <TouchableOpacity
                   className="flex-row items-center px-4 py-3 border-t border-gray-50"
                   activeOpacity={0.6}
                   onPress={() => {
                     setShowVaccineMenu(false);
-                    // TODO: handle delete medical record
+                    const record = selectedVaccineIndex !== null ? petData?.medicalRecords?.[selectedVaccineIndex] : null;
+
+                    if (record && record.id) {
+                      // Gọi hàm xử lý xóa đã tạo ở trên
+                      handleDeleteMedicalRecord(record.id);
+                    }
                     setSelectedVaccineIndex(null);
                   }}
                 >

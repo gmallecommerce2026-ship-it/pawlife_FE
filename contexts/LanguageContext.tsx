@@ -18,14 +18,14 @@ type LanguageContextType = {
 };
 
 const LanguageContext = createContext<LanguageContextType>({
-  language: 'en',
+  language: 'vi',
   setLanguage: async () => { },
   t: (key: string) => key,
   isInitialized: false,
 });
 
 export const LanguageProvider = ({ children }: { children: React.ReactNode }) => {
-  const [language, setLangState] = useState<Language>('en');
+  const [language, setLangState] = useState<Language>('vi');
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {

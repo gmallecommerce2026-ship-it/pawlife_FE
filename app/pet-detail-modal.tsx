@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, ImageSourcePropType, LayoutAnimation, Modal, Platform, TouchableOpacity, UIManager, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Dimensions, FlatList, Image, ImageSourcePropType, LayoutAnimation, Modal, Platform, TouchableOpacity, UIManager, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -349,7 +349,14 @@ export default function PetDetailModal() {
       return petService.hidePet(pet.id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      // ✅ 1. Xóa ngay lập tức khỏi TẤT CẢ các bộ nhớ đệm (Cache) của React Query
+      queryClient.setQueriesData({ queryKey: ['matching-pets'] }, (old: any) => Array.isArray(old) ? old.filter(p => p.id !== pet.id) : old);
+      queryClient.setQueriesData({ queryKey: ['pets-feed'] }, (old: any) => Array.isArray(old) ? old.filter(p => p.id !== pet.id) : old);
+      queryClient.setQueriesData({ queryKey: ['pets-list'] }, (old: any) => Array.isArray(old) ? old.filter(p => p.id !== pet.id) : old);
+
+      // ✅ 2. Phát tín hiệu toàn cục để các màn hình khác biết
+      DeviceEventEmitter.emit('PET_HIDDEN', { petId: pet.id });
+
       setShowHideModal(false);
       Toast.show({
         type: 'success',
@@ -374,6 +381,10 @@ export default function PetDetailModal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       setShowBlockShelterModal(false);
+
+      // ✅ PHÁT TÍN HIỆU CHO CÁC MÀN HÌNH KHÁC (Search, Matching...)
+      DeviceEventEmitter.emit('SHELTER_BLOCKED', { shelterId: pet.shelter.id });
+
       Toast.show({
         type: 'success',
         text1: isVi ? 'Đã chặn trạm cứu hộ' : 'Shelter Blocked',
@@ -381,6 +392,7 @@ export default function PetDetailModal() {
       });
       router.back();
     },
+
     onError: () => {
       setShowBlockShelterModal(false);
       Toast.show({
@@ -442,9 +454,18 @@ export default function PetDetailModal() {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-            setActiveIndex(index);
+          onScroll={(event) => {
+            // Lấy chiều rộng của màn hình/slide
+            const slideSize = event.nativeEvent.layoutMeasurement.width;
+            // Tính toán vị trí offset hiện tại
+            const offset = event.nativeEvent.contentOffset.x;
+            // Làm tròn index khi vuốt qua 50% ảnh
+            const newIndex = Math.round(offset / slideSize);
+
+            // Kiểm tra để tránh re-render liên tục không cần thiết
+            if (activeIndex !== newIndex) {
+              setActiveIndex(newIndex);
+            }
           }}
           renderItem={({ item }) => (
             <Image source={{ uri: item }} style={{ width: SCREEN_WIDTH, height: '100%' }} resizeMode="cover" />
@@ -506,7 +527,7 @@ export default function PetDetailModal() {
 
                 <Image source={require('../assets/icon/idcardicon.png')} style={{ width: 16, height: 16, marginLeft: 10 }} resizeMode="contain" />
                 <Text className="text-[12px] text-[#8E8E93] ml-1.5 font-regular" numberOfLines={1}>
-                  {pet?.idSetByShelter || '—'}
+                  {pet?.idSetByShelter ? pet.id.slice(0, 8) : '—'}
                 </Text>
               </View>
             </View>
@@ -785,70 +806,141 @@ export default function PetDetailModal() {
                 </TouchableOpacity>
               </View>
 
-              {showHistory && Array.isArray(pet?.pawHistory) && pet.pawHistory.length > 0 && (
-                <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
-                  {pet.pawHistory.map((item: any, index: number) => {
-                    const isLast = index === pet.pawHistory.length - 1;
-                    const uiConfig =
-                      PAW_HISTORY_UI_CONFIG[item.type as PawHistoryType] ?? DEFAULT_HISTORY_UI;
-                    const { title, description } = resolvePawHistoryText(item, isVi);
-                    const formattedDate = new Date(item.date).toLocaleDateString(
-                      isVi ? 'vi-VN' : 'en-GB',
-                      { day: '2-digit', month: '2-digit', year: 'numeric' },
-                    );
+              {showHistory && (
+                <View className="py-[20px] px-[12px] border border-[#E5E5EA] rounded-[20px] bg-white">
+                  {(() => {
+                    // 🔽 Lọc bỏ item "Gia nhập PawLife" (CREATED) và item "Triệt sản"
+                    const filteredHistory = Array.isArray(pet?.pawHistory)
+                      ? pet.pawHistory.filter((item: any) => {
+                        if (item.type === 'CREATED') return false; // Gia nhập PawLife
 
-                    return (
-                      <View key={item.id} className="flex-row min-h-[54px]">
-                        {/* Timeline line + icon */}
-                        <View className="w-[40px] relative mr-2.5">
-                          {!isLast && (
+                        const key = (item?.i18n?.titleKey || '').toLowerCase();
+                        if (key.includes('joined')) return false; // Gia nhập PawLife (theo i18n key)
+
+                        const text = `${item?.title || ''} ${item?.description || ''}`.toLowerCase();
+                        if (text.includes('triệt sản') || text.includes('neuter') || text.includes('spay')) {
+                          return false; // Triệt sản
+                        }
+
+                        return true;
+                      })
+                      : [];
+
+                    if (filteredHistory.length === 0) {
+                      return (
+                        <Text className="text-center text-[#8E8E93] py-4 font-regular text-[13px] italic">
+                          {isVi ? 'Chưa có lịch sử hoạt động.' : 'No history available yet.'}
+                        </Text>
+                      );
+                    }
+
+                    return filteredHistory.map((item: any, index: number) => {
+                      const isLastItem = index === filteredHistory.length - 1;
+                      const uiConfig = PAW_HISTORY_UI_CONFIG[item.type as PawHistoryType] ?? DEFAULT_HISTORY_UI;
+                      const { title, description } = resolvePawHistoryText(item, isVi);
+                      const formattedDate = new Date(item.date).toLocaleDateString(
+                        isVi ? 'vi-VN' : 'en-GB',
+                        { day: '2-digit', month: '2-digit', year: 'numeric' },
+                      );
+
+                      // Khớp logic UI pending bên profile (đề phòng API Modal cũng trả về isPending)
+                      const isPending = item.isPending || false;
+
+                      return (
+                        <View key={item.id ?? index} className="flex-row min-h-[54px]">
+                          {/* Cột trái: icon + line */}
+                          <View className="w-[36px] relative mr-[5px]">
+                            {/* Vertical line — nét đứt nếu pending, nét liền bình thường */}
+                            {!isLastItem && (
+                              isPending ? (
+                                <View
+                                  className="absolute overflow-hidden items-center"
+                                  style={{ top: 24, bottom: -2, left: 14.25, width: 1.5 }}
+                                >
+                                  {Array.from({ length: 20 }).map((_, i) => (
+                                    <View
+                                      key={i}
+                                      style={{
+                                        width: 1.5,
+                                        height: 4,
+                                        backgroundColor: uiConfig.lineColor,
+                                        marginBottom: 4,
+                                      }}
+                                    />
+                                  ))}
+                                </View>
+                              ) : (
+                                <View
+                                  className="absolute w-[1.5px]"
+                                  style={{
+                                    top: 24,
+                                    bottom: -2,
+                                    left: 14.25,
+                                    backgroundColor: uiConfig.lineColor,
+                                  }}
+                                />
+                              )
+                            )}
+
+                            {/* Icon tròn */}
                             <View
-                              className="absolute w-[1.5px]"
-                              style={{
-                                top: 24,
-                                bottom: -2,
-                                left: 14.25,
-                                backgroundColor: uiConfig.lineColor,
-                              }}
-                            />
-                          )}
-                          <View
-                            className="w-[30px] h-[30px] rounded-full items-center justify-center z-10"
-                            style={{ backgroundColor: uiConfig.iconBgColor }}
-                          >
-                            <Image
-                              source={uiConfig.icon}
-                              style={{ width: 16, height: 16 }}
-                              resizeMode="contain"
-                            />
+                              className="w-[30px] h-[30px] rounded-full items-center justify-center z-10"
+                              style={{ backgroundColor: uiConfig.iconBgColor }}
+                            >
+                              <Image
+                                source={uiConfig.icon}
+                                style={{ width: 16, height: 16 }}
+                                resizeMode="contain"
+                              />
+                            </View>
+                          </View>
+
+                          {/* Cột phải: nội dung */}
+                          <View className={`flex-1 ${!isLastItem ? 'pb-4' : ''}`}>
+                            {/* Title + pending badge + date */}
+                            <View className="flex-row justify-between items-start">
+                              <View className="flex-1 flex-row flex-wrap items-center pr-2">
+                                <Text
+                                  className="text-[14px] font-medium text-black leading-[18px]"
+                                  numberOfLines={1}
+                                >
+                                  {title}
+                                </Text>
+
+                                {/* Icon chấm than (pending) */}
+                                {isPending && (
+                                  <Text style={{ marginLeft: 4 }}>
+                                    <Feather
+                                      name="alert-circle"
+                                      size={13}
+                                      color="#BBB4B5"
+                                    />
+                                  </Text>
+                                )}
+                              </View>
+
+                              <Text
+                                className="text-[11px] font-regular text-[#8E8E93] pt-[2px]"
+                                style={{ flexShrink: 0 }}
+                              >
+                                {formattedDate}
+                              </Text>
+                            </View>
+
+                            {/* Description */}
+                            <Text
+                              className="text-[12px] font-regular text-[#9B9B9B] mt-[2px] leading-[15px]"
+                            >
+                              {item.displayDescription || description}
+                            </Text>
                           </View>
                         </View>
-
-                        {/* Content */}
-                        <View className="flex-1 pb-4 pr-3">
-                          <Text
-                            className="text-[15px] font-medium text-black leading-[18px]"
-                            numberOfLines={1}
-                          >
-                            {title}
-                          </Text>
-                          <Text
-                            className="text-[12px] font-regular text-[#9B9B9B] mt-[2px] leading-[15px]"
-                          >
-                            {item.displayDescription}
-                          </Text>
-                        </View>
-
-                        {/* Date */}
-                        <Text className="text-[11px] font-regular text-[#8E8E93] pt-[2px]">
-                          {formattedDate}
-                        </Text>
-                      </View>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
 
                   {/* Footer badge */}
-                  <View className="flex-row py-[8px] items-center justify-center gap-2 bg-[#F5F5F5] rounded-[8px]">
+                  <View className="flex-row py-[8px] items-center justify-center gap-2 mt-4 bg-[#F5F5F5] rounded-[8px] mx-[8px]">
                     <Image
                       source={require('../assets/icon/lock.png')}
                       style={{ width: 12, height: 12 }}
@@ -856,19 +948,19 @@ export default function PetDetailModal() {
                     />
                     <Text className="font-regular text-[12px] text-[#8E8E93]">
                       {isVi
-                        ? 'Dòng thời gian này được tạo tự động và không thể chỉnh sửa.'
-                        : 'This timeline is auto-generated and append-only.'}
+                        ? 'Hành trình không thể bị xoá hay chỉnh sửa.'
+                        : 'The journey cannot be deleted or edited.'}
                     </Text>
                   </View>
                 </View>
               )}
 
               {/* Empty state khi pawHistory rỗng */}
-              {showHistory && (!pet?.pawHistory || pet.pawHistory.length === 0) && (
+              {/* {showHistory && (!pet?.pawHistory || pet.pawHistory.length === 0) && (
                 <Text className="text-[13px] text-[#8E8E93] italic text-center py-4">
                   {isVi ? 'Chưa có lịch sử hoạt động.' : 'No history available yet.'}
                 </Text>
-              )}
+              )} */}
               {/* <View className="p-[20px] border border-[#E5E5EA] rounded-[20px] bg-white">
                 {pet.pawHistory.map((item: any, index: number) => {
                   const isLastItem = index === pet.pawHistory.length - 1;

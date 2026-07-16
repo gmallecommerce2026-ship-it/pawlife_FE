@@ -39,7 +39,7 @@ export const useImageUpload = () => {
       }
 
       const fileUri = result.assets[0].uri;
-      
+
       const fileName = fileUri.split('/').pop() || `image-${Date.now()}.jpg`;
       const match = /\.(\w+)$/.exec(fileName);
       const ext = match ? match[1].toLowerCase() : 'jpg';
@@ -51,7 +51,7 @@ export const useImageUpload = () => {
         fileType,
         folder: options.folder,
       });
-      
+
       const { uploadUrl, fileUrl } = presignedRes.data;
 
       // 3. Đọc file thành Blob
@@ -72,15 +72,15 @@ export const useImageUpload = () => {
       }
 
       // 5. Trả về link ảnh công khai
-      return fileUrl; 
-      
+      return fileUrl;
+
     } catch (error: any) {
       if (error.response) {
         console.error(isVi ? 'Lỗi Axios chi tiết:' : 'Detailed Axios error:', error.response.status, error.response.data);
       } else {
         console.error(isVi ? 'Lỗi upload ảnh:' : 'Image upload error:', error.message || error);
       }
-      
+
       // Xử lý song ngữ cho UI Error Message
       setUploadError(isVi ? 'Không thể tải ảnh lên. Vui lòng kiểm tra lại máy chủ!' : 'Cannot upload image. Please check the server!');
       return null;
@@ -89,6 +89,31 @@ export const useImageUpload = () => {
       setIsUploading(false);
     }
   };
+  const uploadOnly = async (uri: string, folder: string = 'pets'): Promise<string | null> => {
+    setIsUploading(true);
+    try {
+      const fileName = uri.split('/').pop() || `image-${Date.now()}.jpg`;
+      const fileType = 'image/jpeg';
 
-  return { pickAndUploadImage, isUploading, uploadError };
+      const presignedRes = await axiosClient.post('/storage/presigned-url', {
+        fileName, fileType, folder
+      });
+      const { uploadUrl, fileUrl } = presignedRes.data;
+
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': fileType } });
+
+      if (!uploadRes.ok) throw new Error(`Upload to Cloudflare R2 failed: ${uploadRes.status}`);
+      return fileUrl;
+    } catch (e: any) {
+      console.error('[uploadOnly] error:', e?.response?.data || e?.message || e);
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+
+  return { pickAndUploadImage, uploadOnly, isUploading, uploadError };
 };

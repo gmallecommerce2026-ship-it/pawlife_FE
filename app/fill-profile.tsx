@@ -121,10 +121,12 @@ export default function FillProfileScreen() {
   const [phone, setPhone] = useState('');
   const [isAgree, setIsAgree] = useState(false);
 
-  // Gender
+  // Gender — value stays in English (sent to backend), label is translated for display
   const [gender, setGender] = useState('');
   const [showGenderModal, setShowGenderModal] = useState(false);
   const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+  const GENDER_LABELS_VI: Record<string, string> = { Male: 'Nam', Female: 'Nữ', Other: 'Khác' };
+  const getGenderLabel = (value: string) => (isVi ? GENDER_LABELS_VI[value] ?? value : value);
 
   // Country Code
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[0]);
@@ -221,25 +223,28 @@ export default function FillProfileScreen() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!email.trim()) {
-      newErrors.email = 'Please enter your email.';
+      newErrors.email = isVi ? 'Vui lòng nhập email của bạn.' : 'Please enter your email.';
     } else if (!emailRegex.test(email)) {
-      newErrors.email = 'Invalid email format.';
+      newErrors.email = isVi ? 'Định dạng email không hợp lệ.' : 'Invalid email format.';
     }
 
     if (!password) {
-      newErrors.password = 'Please enter a password.';
+      newErrors.password = isVi ? 'Vui lòng nhập mật khẩu.' : 'Please enter a password.';
     } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters.';
+      newErrors.password = isVi ? 'Mật khẩu phải có ít nhất 6 ký tự.' : 'Password must be at least 6 characters.';
     }
 
     if (!confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password.';
+      newErrors.confirmPassword = isVi ? 'Vui lòng xác nhận mật khẩu.' : 'Please confirm your password.';
     } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match.';
+      newErrors.confirmPassword = isVi ? 'Mật khẩu không khớp.' : 'Passwords do not match.';
     }
 
     if (!isAgree) {
-      Alert.alert("Required", "Please agree to the Policy Terms & Privacy Conditions.");
+      Alert.alert(
+        isVi ? 'Yêu cầu' : 'Required',
+        isVi ? 'Vui lòng đồng ý với Điều khoản & Điều kiện Bảo mật.' : 'Please agree to the Policy Terms & Privacy Conditions.'
+      );
       return false;
     }
 
@@ -251,14 +256,14 @@ export default function FillProfileScreen() {
     let newErrors: Record<string, string> = {};
     const phoneRegex = /^(0?)(3|5|7|8|9)[0-9]{8}$/;
 
-    if (!name.trim()) newErrors.name = 'Please enter your full name/nickname.';
-    if (!gender) newErrors.gender = 'Please select your gender.';
-    if (!hasSelectedDate) newErrors.dob = 'Please select your date of birth.';
+    if (!name.trim()) newErrors.name = isVi ? 'Vui lòng nhập họ tên/biệt danh của bạn.' : 'Please enter your full name/nickname.';
+    if (!gender) newErrors.gender = isVi ? 'Vui lòng chọn giới tính.' : 'Please select your gender.';
+    if (!hasSelectedDate) newErrors.dob = isVi ? 'Vui lòng chọn ngày sinh.' : 'Please select your date of birth.';
 
     if (!phone.trim()) {
-      newErrors.phone = 'Please enter your phone number.';
+      newErrors.phone = isVi ? 'Vui lòng nhập số điện thoại.' : 'Please enter your phone number.';
     } else if (!phoneRegex.test(phone)) {
-      newErrors.phone = 'Invalid phone number format.';
+      newErrors.phone = isVi ? 'Định dạng số điện thoại không hợp lệ.' : 'Invalid phone number format.';
     }
 
     setErrors(newErrors);
@@ -358,7 +363,7 @@ export default function FillProfileScreen() {
       </View>
 
       <InputField
-        label="Your Name"
+        label={isVi ? "Tên của bạn" : "Your Name"}
         placeholder={isVi ? "Nhập tên của bạn" : "Your Name"}
         value={name}
         onChangeText={(text: string) => { setName(text); setErrors({ ...errors, name: '' }) }}
@@ -370,9 +375,9 @@ export default function FillProfileScreen() {
       <View className="flex-row justify-between">
         <View className="flex-1 mr-2">
           <InputField
-            label="Gender"
+            label={isVi ? "Giới tính" : "Gender"}
             placeholder={isVi ? "Chọn giới tính" : "Select Gender"}
-            value={gender}
+            value={gender ? getGenderLabel(gender) : ''}
             onPress={() => setShowGenderModal(true)}
             error={errors.gender}
             containerStyle=""
@@ -382,7 +387,7 @@ export default function FillProfileScreen() {
 
         <View className="flex-1 ml-2" ref={dobRef} collapsable={false}>
           <InputField
-            label="Date of Birth"
+            label={isVi ? "Ngày sinh" : "Date of Birth"}
             placeholder={isVi ? "Chọn ngày" : "Select DOB"}
             value={hasSelectedDate ? dob.toLocaleDateString('en-GB') : ''}
             onPress={() => Platform.OS === 'ios' ? openDropdownPicker('dob') : setShowPicker(true)}
@@ -394,7 +399,7 @@ export default function FillProfileScreen() {
       </View>
 
       <View className="mb-8">
-        <Text className="text-[16px] font-medium text-gray-900 mb-2">Phone Number</Text>
+        <Text className="text-[16px] font-medium text-gray-900 mb-2">{isVi ? "Số điện thoại" : "Phone Number"}</Text>
         <View className="flex-row gap-3">
           <TouchableOpacity
             onPress={() => setShowCountryModal(true)}
@@ -425,8 +430,12 @@ export default function FillProfileScreen() {
   const renderSignUp = () => (
     <>
       <View className="mb-[35px] mt-3">
-        <Text className="text-[30px] font-semibold text-black mb-[26px] tracking-[0.06px]">Join PawLife Today 🐾</Text>
-        <Text className="text-[#8E8E93] font-medium text-[16px] tracking-[0.06px]">A world of furry possibilities awaits you.</Text>
+        <Text className="text-[30px] font-semibold text-black mb-[26px] tracking-[0.06px]">
+          {isVi ? "Tham gia PawLife ngay hôm nay 🐾" : "Join PawLife Today 🐾"}
+        </Text>
+        <Text className="text-[#8E8E93] font-medium text-[16px] tracking-[0.06px]">
+          {isVi ? "Một thế giới đầy những điều thú vị đang chờ bạn." : "A world of furry possibilities awaits you."}
+        </Text>
       </View>
 
       <InputField
@@ -434,12 +443,12 @@ export default function FillProfileScreen() {
         icon={<Mail size={22} />} keyboardType="email-address" error={errors.email} title={"Email"} large={true}
       />
       <InputField
-        placeholder="Password" value={password} onChangeText={(t: string) => { setPassword(t); setErrors({ ...errors, password: '' }) }}
-        isPassword={true} icon={<Lock size={22} />} error={errors.password} title={"Password"} large={true}
+        placeholder={isVi ? "Mật khẩu" : "Password"} value={password} onChangeText={(t: string) => { setPassword(t); setErrors({ ...errors, password: '' }) }}
+        isPassword={true} icon={<Lock size={22} />} error={errors.password} title={isVi ? "Mật khẩu" : "Password"} large={true}
       />
 
       <InputField
-        placeholder="Confirm your password"
+        placeholder={isVi ? "Xác nhận mật khẩu của bạn" : "Confirm your password"}
         value={confirmPassword}
         onChangeText={(t: string) => {
           setConfirmPassword(t);
@@ -448,7 +457,7 @@ export default function FillProfileScreen() {
         isPassword={true}
         icon={<Lock size={22} />}
         error={errors.confirmPassword}
-        title={"Confirm Password"}
+        title={isVi ? "Xác nhận mật khẩu" : "Confirm Password"}
         large={true}
       />
 
@@ -458,7 +467,16 @@ export default function FillProfileScreen() {
           size={22}
           color={isAgree ? "#E89B5A" : "#9CA3AF"}
         />
-        <Text className="text-black font-medium ml-2 text-[14px] tracking-[0.06px]">I agree to <Text className='text-[#E89B5A]'>Policy Terms & Privacy Conditions.</Text></Text>
+        <Text className="text-black font-medium ml-2 text-[14px] tracking-[0.06px]">
+          {isVi ? "Tôi đồng ý với " : "I agree to "}
+          <Text
+            onPress={() => router.push('/terms-of-service')}
+            className='text-[#E89B5A]'
+          >
+            {isVi ? "Điều khoản & Điều kiện Bảo mật" : "Policy Terms & Privacy Conditions"}
+          </Text>
+          .
+        </Text>
       </TouchableOpacity>
     </>
   );
@@ -513,7 +531,9 @@ export default function FillProfileScreen() {
               className="absolute left-0 right-0 items-center justify-center"
               pointerEvents="none"
             >
-              <Text className="text-[18px] font-semibold text-gray-900">Your Profile</Text>
+              <Text className="text-[18px] font-semibold text-gray-900">
+                {isVi ? "Hồ sơ của bạn" : "Your Profile"}
+              </Text>
             </View>}
           </View>
         }
@@ -535,7 +555,12 @@ export default function FillProfileScreen() {
 
       <View className="mt-auto mx-[22px] py-4">
         {currentStep === 'ACCOUNT' &&
-          <Text className='text-center text-[14px] font-regular mb-4'>Already have an account? <Text onPress={() => router.push('/sign-in')} className='text-[#E89B5A]'>Log in</Text></Text>
+          <Text className='text-center text-[14px] font-regular mb-4'>
+            {isVi ? "Bạn đã có tài khoản? " : "Already have an account? "}
+            <Text onPress={() => router.push('/sign-in')} className='text-[#E89B5A]'>
+              {isVi ? "Đăng nhập" : "Log in"}
+            </Text>
+          </Text>
         }
 
         {currentStep === "ACCOUNT" &&
@@ -544,7 +569,7 @@ export default function FillProfileScreen() {
             onPress={handleNextToProfile} disabled={isLoading} activeOpacity={0.8}
             style={{ opacity: isLoading ? 0.7 : 1 }}
           >
-            {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">Sign up</Text>}
+            {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">{isVi ? "Đăng ký" : "Sign up"}</Text>}
           </TouchableOpacity>
         }
         {currentStep === 'PROFILE' &&
@@ -553,7 +578,7 @@ export default function FillProfileScreen() {
             onPress={handleRegister} disabled={isLoading || isImageUploading} activeOpacity={0.8}
             style={{ opacity: isLoading || isImageUploading ? 0.7 : 1 }}
           >
-            {isLoading || isImageUploading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">Save</Text>}
+            {isLoading || isImageUploading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-[16px]">{isVi ? "Lưu" : "Save"}</Text>}
           </TouchableOpacity>
         }
         {currentStep === 'SUCCESS' &&
@@ -562,7 +587,7 @@ export default function FillProfileScreen() {
             onPress={() => router.push('/')} disabled={isLoading} activeOpacity={0.8}
             style={{ opacity: isLoading ? 0.7 : 1 }}
           >
-            <Text className="text-white font-bold text-[16px]">Let’s PawLife!</Text>
+            <Text className="text-white font-bold text-[16px]">{isVi ? "Cùng PawLife nào!" : "Let's PawLife!"}</Text>
           </TouchableOpacity>
         }
       </View>
@@ -607,10 +632,10 @@ export default function FillProfileScreen() {
 
             <View className="flex-row justify-between items-center px-[16px] py-[12px] border-b border-white/10 relative z-10">
               <TouchableOpacity onPress={closeDropdownPicker}>
-                <Text className="text-[16px] text-[#A1A1AA] font-medium">Cancel</Text>
+                <Text className="text-[16px] text-[#A1A1AA] font-medium">{isVi ? "Hủy" : "Cancel"}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={closeDropdownPicker}>
-                <Text className="text-[16px] font-semibold text-[#E89B5A]">Done</Text>
+                <Text className="text-[16px] font-semibold text-[#E89B5A]">{isVi ? "Xong" : "Done"}</Text>
               </TouchableOpacity>
             </View>
 
@@ -621,6 +646,7 @@ export default function FillProfileScreen() {
                 display="inline"
                 themeVariant="dark"
                 maximumDate={new Date()}
+                locale={isVi ? 'vi-VN' : 'en-US'}
                 style={{ width: 320, height: 315, alignSelf: 'center' }}
                 accentColor="#E89B5A"
                 onChange={(event, selectedDate) => {
@@ -643,7 +669,7 @@ export default function FillProfileScreen() {
             <TouchableWithoutFeedback>
               <View className="bg-white rounded-3xl overflow-hidden shadow-2xl">
                 <View className="bg-gray-50 py-5 items-center border-b border-gray-100">
-                  <Text className="font-bold text-gray-900 text-[18px]">Select Gender</Text>
+                  <Text className="font-bold text-gray-900 text-[18px]">{isVi ? "Chọn giới tính" : "Select Gender"}</Text>
                 </View>
                 <FlatList
                   data={GENDER_OPTIONS}
@@ -658,7 +684,7 @@ export default function FillProfileScreen() {
                       }}
                     >
                       <Text className={`text-center text-[16px] ${gender === item ? 'text-[#F97316] font-bold' : 'text-gray-700'}`}>
-                        {item}
+                        {getGenderLabel(item)}
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -676,7 +702,7 @@ export default function FillProfileScreen() {
             <TouchableWithoutFeedback>
               <View className="bg-white rounded-3xl overflow-hidden shadow-2xl max-h-[50%]">
                 <View className="bg-gray-50 py-5 items-center border-b border-gray-100">
-                  <Text className="font-bold text-gray-900 text-[18px]">Select Country</Text>
+                  <Text className="font-bold text-gray-900 text-[18px]">{isVi ? "Chọn quốc gia" : "Select Country"}</Text>
                 </View>
                 <FlatList
                   data={COUNTRY_CODES}

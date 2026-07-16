@@ -62,7 +62,7 @@ const RECORD_OPTIONS = [
     titleEn: 'Vaccination',
     descEn: 'Shots, booster, and immunizations',
     titleVi: 'Tiêm phòng',
-    descVi: 'Vaccine cơ bản & mở rộng',
+    descVi: 'Lưu mũi tiêm và đặt lịch tiếp theo',
     iconUnselected: require('../assets/icon/vacc-icon.png'),
     iconSelected: require('../assets/icon/vacc-icon-selected.png'),
   },
@@ -71,7 +71,7 @@ const RECORD_OPTIONS = [
     titleEn: 'Examination',
     descEn: 'Regular check-ups and exam',
     titleVi: 'Khám bệnh',
-    descVi: 'Khám và kiểm tra sức khỏe định kỳ',
+    descVi: 'Kiểm tra sức khỏe định kì hằng năm',
     iconUnselected: require('../assets/icon/exam-vacc-icon.png'),
     iconSelected: require('../assets/icon/exam-icon-selected.png'),
   },
@@ -80,7 +80,7 @@ const RECORD_OPTIONS = [
     titleEn: 'Dental',
     descEn: 'Teeth cleaning and dental care',
     titleVi: 'Răng miệng',
-    descVi: 'Vệ sinh và chăm sóc răng miệng',
+    descVi: 'Vệ sinh cao răng và kiểm tra nướu',
     iconUnselected: require('../assets/icon/dental-vacc-icon.png'),
     iconSelected: require('../assets/icon/dental-icon-selected.png'),
   },
@@ -89,7 +89,7 @@ const RECORD_OPTIONS = [
     titleEn: 'Other',
     descEn: 'Other medical records',
     titleVi: 'Khác',
-    descVi: 'Các hồ sơ y tế khác',
+    descVi: 'Hồ sơ y tế khác',
     iconUnselected: require('../assets/icon/other-vacc-icon.png'),
     iconSelected: require('../assets/icon/other-icon-selected.png'),
   },
@@ -215,7 +215,9 @@ export default function AddMedicalRecordModal({
   const [nextDueName, setNextDueName] = useState('');
   const [nextDueDate, setNextDueDate] = useState(new Date());
   const [showNextDatePicker, setShowNextDatePicker] = useState(false);
-
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
+  const imageScrollRef = useRef<ScrollView>(null);
   // Trong view mode: true khi người dùng thực sự đổi nextDueName hoặc nextDueDate
   // so với giá trị gốc lúc mở modal. Dùng để quyết định hiện/ẩn nút "Cập nhật Next Due".
   const hasNextDueChanged = isViewMode && (() => {
@@ -328,7 +330,7 @@ export default function AddMedicalRecordModal({
       setNextDueDate(nextDate);
 
       const vName = VACCINE_OPTIONS[safeSpecies].find(v => v.id === vaccineType)?.label || '';
-      setNextDueName(isVi ? `Nhắc lại ${vName}` : `${vName} Booster`);
+      setNextDueName(isVi ? `${vName}` : `${vName} Booster`);
     }
   }, [selectedType, vaccineType, recordDate, doseNumber, safeSpecies, isVi]);
 
@@ -361,7 +363,7 @@ export default function AddMedicalRecordModal({
         ? (isVi ? 'Khám bệnh' : 'Examination')
         : (isVi ? 'Khám răng' : 'Dental Checkup'));
 
-    setNextDueName(isVi ? `Nhắc lại ${baseName}` : `${baseName} Reminder`);
+    setNextDueName(isVi ? `${baseName}` : `${baseName} Reminder`);
   }, [selectedType, recordName, recordDate, isVi]);
 
   const animateTo = (anim: Animated.Value, toValue: number, duration = 260) =>
@@ -551,13 +553,25 @@ export default function AddMedicalRecordModal({
 
   const handleSubmit = () => {
     if (!selectedType) return;
+
     if (selectedType === 'vaccination' && !vaccineType) {
       Alert.alert('Lỗi', isVi ? 'Vui lòng chọn loại Vaccine' : 'Please select a Vaccine');
       return;
     }
+
+    // 🚀 Bắt buộc phải có ít nhất 1 ảnh mới được submit/update
+    if (images.length === 0) {
+      Alert.alert(
+        isVi ? 'Thiếu ảnh' : 'Missing Photo',
+        isVi ? 'Vui lòng tải lên ít nhất 1 ảnh trước khi lưu hồ sơ' : 'Please upload at least 1 photo before saving the record'
+      );
+      return;
+    }
+
     const recordNameBilingual = selectedType === 'vaccination'
       ? buildBilingual(VACCINE_OPTIONS[safeSpecies].find(v => v.id === vaccineType)?.label || '')
       : buildBilingual(recordName);
+
 
     const nextDueNameBilingual = hasNextDueDate
       ? buildBilingual(nextDueName)
@@ -623,7 +637,7 @@ export default function AddMedicalRecordModal({
           </TouchableOpacity>
 
           <View className="flex-row items-center justify-center pt-[26px]">
-            <Text className="text-[18px] font-semibold text-[#000000]">
+            <Text className="text-[16px] font-semibold text-[#000000]">
               {isViewMode
                 ? (isVi ? 'Xem hồ sơ y tế' : 'View Medical Record')
                 : isEditMode
@@ -646,9 +660,18 @@ export default function AddMedicalRecordModal({
                     disabled={isReadOnly}
                     onPress={() => {
                       if (isReadOnly) return;
-                      // Trong edit mode, vẫn cho phép đổi loại nếu muốn — nhưng sẽ reset chi tiết
-                      setSelectedType(isActive ? null : item.id);
-                      setRecordName('');
+                      const newType = isActive ? null : item.id;
+                      setSelectedType(newType);
+
+                      // 🚀 Tự động điền text mặc định cho Examination / Dental
+                      let defaultName = '';
+                      if (newType === 'examination') {
+                        defaultName = isVi ? 'Khám bệnh' : 'Examination';
+                      } else if (newType === 'dental') {
+                        defaultName = isVi ? 'Khám răng' : 'Dental Checkup';
+                      }
+                      setRecordName(defaultName);
+
                       setVaccineType('');
                       setShowVaccineDropdown(false);
                       setDoseNumber(1);
@@ -677,7 +700,7 @@ export default function AddMedicalRecordModal({
                       >
                         {isVi ? item.titleVi : item.titleEn}
                       </Text>
-                      <Text className="text-[12px] font-regular text-[#8E8E93]" numberOfLines={1}>
+                      <Text className="text-[12px] font-lighter text-[#8E8E93]" numberOfLines={1}>
                         {isVi ? item.descVi : item.descEn}
                       </Text>
                     </View>
@@ -838,17 +861,29 @@ export default function AddMedicalRecordModal({
                     >
                       <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
                       <Text className="text-[12px] text-[#000000] font-regular ml-2">
-                        {isVi ? 'Tải ảnh lên (Tối đa 3)' : 'Upload Photos (Max 3)'}
+                        {selectedType === 'vaccination'
+                          ? (isVi ? 'Tải sổ tiêm phòng (Tối đa 3)' : 'Upload Vaccination Book (Max 3)')
+                          : (isVi ? 'Tải ảnh lên (Tối đa 3)' : 'Upload Photos (Max 3)')}
                       </Text>
                     </TouchableOpacity>
                   )}
+
 
                   <Animated.View style={{ opacity: imagesFade }}>
                     {images.length > 0 && (
                       <View className="flex-row flex-wrap gap-2 mb-3 ">
                         {images.map((url, index) => (
                           <View key={index} style={{ width: '31%', aspectRatio: 1 }} className="relative">
-                            <Image source={{ uri: url }} className="w-full h-full rounded-[12px]" />
+                            <TouchableOpacity
+                              activeOpacity={0.85}
+                              onPress={() => {
+                                setImageViewerIndex(index);
+                                setImageViewerVisible(true);
+                              }}
+                              className="w-full h-full"
+                            >
+                              <Image source={{ uri: url }} className="w-full h-full rounded-[12px]" />
+                            </TouchableOpacity>
                             {!isReadOnly && (
                               <TouchableOpacity
                                 onPress={() => setImages(prev => prev.filter((_, i) => i !== index))}
@@ -958,7 +993,7 @@ export default function AddMedicalRecordModal({
       {/* --- KÍNH MỜ DROPDOWN FIX CHIỀU CAO VÀ MÀU CAM (IOS) --- */}
       {Platform.OS === 'ios' && activePicker && (
         <View className="absolute inset-0 z-[100]">
-          <TouchableOpacity activeOpacity={1} className="absolute inset-0" onPress={closeDropdownPicker} />
+          <TouchableOpacity activeOpacity={1} className="absolute inset-0" onPress={() => closeDropdownPicker()} />
 
           <Animated.View
             style={{
@@ -981,10 +1016,10 @@ export default function AddMedicalRecordModal({
             <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(15, 15, 15, 0.45)' }} />
 
             <View className="flex-row justify-between items-center px-[16px] py-[12px] border-b border-white/10 relative z-10">
-              <TouchableOpacity onPress={closeDropdownPicker}>
+              <TouchableOpacity onPress={() => closeDropdownPicker()}>
                 <Text className="text-[16px] text-[#A1A1AA] font-medium">{isVi ? 'Huỷ' : 'Cancel'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={closeDropdownPicker}>
+              <TouchableOpacity onPress={() => closeDropdownPicker()}>
                 <Text className="text-[16px] font-semibold text-[#E89B5A]">{isVi ? 'Xong' : 'Done'}</Text>
               </TouchableOpacity>
             </View>
@@ -1036,6 +1071,97 @@ export default function AddMedicalRecordModal({
           }}
         />
       )}
+      <Modal
+        visible={imageViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageViewerVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' }}>
+          {/* Nút đóng góc trên bên phải */}
+          <TouchableOpacity
+            onPress={() => setImageViewerVisible(false)}
+            style={{
+              position: 'absolute',
+              top: 50,
+              right: 20,
+              zIndex: 100,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+
+          {/* Slide ảnh vuốt ngang */}
+          <ScrollView
+            ref={imageScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: imageViewerIndex * SCREEN_WIDTH, y: 0 }}
+            onMomentumScrollEnd={(e) => {
+              const newIndex = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+              setImageViewerIndex(newIndex);
+            }}
+            style={{ flex: 1 }}
+          >
+            {images.map((url, index) => (
+              <View
+                key={index}
+                style={{
+                  width: SCREEN_WIDTH,
+                  height: '100%',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingTop: 110,   // chừa chỗ cho nút Close phía trên
+                  paddingBottom: 90, // chừa chỗ cho dot phía dưới
+                  paddingHorizontal: 24,
+                }}
+              >
+                <Image
+                  source={{ uri: url }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="contain"
+                />
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* Dot timeline phía dưới */}
+          {images.length > 1 && (
+            <View
+              style={{
+                position: 'absolute',
+                bottom: 50,
+                left: 0,
+                right: 0,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              {images.map((_, index) => (
+                <View
+                  key={index}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    marginHorizontal: 4,
+                    backgroundColor: index === imageViewerIndex ? '#FFFFFF' : 'rgba(255,255,255,0.35)',
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </Modal>
     </Modal>
+
   );
 }
