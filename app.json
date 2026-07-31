@@ -17,6 +17,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.annguyen.pawlife",
       "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.developer.pass-type-identifiers": [
+          "$(TeamIdentifierPrefix)pass.com.pawlife.petid"
+        ]
+      },
       "config": {
         "googleMapsApiKey": "AIzaSyDSiggtEz29dOMLPbALCl4YBAvxJTWKgAU"
       },

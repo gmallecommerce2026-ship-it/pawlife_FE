@@ -1,0 +1,188 @@
+diff --git a/node_modules/react-native-wallet-manager/android/src/main/java/com/reactnativewalletmanager/WalletManagerModule.kt b/node_modules/react-native-wallet-manager/android/src/main/java/com/reactnativewalletmanager/WalletManagerModule.kt
+index 009d83c..4884714 100644
+--- a/node_modules/react-native-wallet-manager/android/src/main/java/com/reactnativewalletmanager/WalletManagerModule.kt
++++ b/node_modules/react-native-wallet-manager/android/src/main/java/com/reactnativewalletmanager/WalletManagerModule.kt
+@@ -97,6 +97,12 @@ class WalletManagerModule(reactContext: ReactApplicationContext) : NativeWalletM
+     promise.reject("UNSUPPORTED_PLATFORM", "This function is not supported on Android.")
+   }
+ 
++  // Chỉ có nghĩa trên iOS (PKPassLibrary.replacePass). Google Wallet cập nhật
++  // pass từ phía server nên Android không cần — báo lỗi rõ ràng thay vì im lặng.
++  override fun replacePassFromUrl(url: String, headers: ReadableMap?, promise: Promise) {
++    promise.reject("API_ERROR", "replacePassFromUrl is only available on iOS")
++  }
++
+   override fun addPassFromUrl(url: String, headers: ReadableMap?, promise: Promise) {
+     val activity = currentActivity
+     if (activity == null) {
+diff --git a/node_modules/react-native-wallet-manager/ios/WalletManager.mm b/node_modules/react-native-wallet-manager/ios/WalletManager.mm
+index 2950919..930d72d 100644
+--- a/node_modules/react-native-wallet-manager/ios/WalletManager.mm
++++ b/node_modules/react-native-wallet-manager/ios/WalletManager.mm
+@@ -32,6 +32,16 @@ - (void)addPassFromUrl:(nonnull NSString *)url headers:(nullable NSDictionary *)
+   }];
+ }
+ 
++- (void)replacePassFromUrl:(nonnull NSString *)url headers:(nullable NSDictionary *)headers resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
++  [walletManager replacePassFromUrl:url headers:headers completion:^(BOOL success, NSString *errorCode, NSString *errorMessage) {
++    if (success) {
++      resolve(@(YES));
++    } else {
++      reject(errorCode, errorMessage, nil);
++    }
++  }];
++}
++
+ - (void)addPassToGoogleWallet:(nonnull NSString *)jwt resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
+ 
+ }
+diff --git a/node_modules/react-native-wallet-manager/ios/WalletManagerImpl.swift b/node_modules/react-native-wallet-manager/ios/WalletManagerImpl.swift
+index fbf494d..953f3a1 100644
+--- a/node_modules/react-native-wallet-manager/ios/WalletManagerImpl.swift
++++ b/node_modules/react-native-wallet-manager/ios/WalletManagerImpl.swift
+@@ -87,6 +87,70 @@ public class WalletManagerImpl: NSObject, @preconcurrency PKAddPassesViewControl
+     }.resume()
+   }
+ 
++  // MARK: - replacePassFromUrl
++
++  // Thay thế IM LẶNG một thẻ đã có trong Wallet bằng bản mới cùng
++  // (passTypeIdentifier, serialNumber) — không hiện PKAddPassesViewController.
++  // Dùng khi dữ liệu thú cưng đổi (tên/ảnh) và cần làm mới thẻ trong ví.
++  // Trả về PASS_NOT_FOUND nếu thẻ chưa có sẵn — khi đó phải dùng addPassFromUrl.
++  @MainActor @objc(replacePassFromUrl:headers:completion:)
++  public func replacePassFromUrl(_ passUrlString: String,
++                                 headers: [String: String]?,
++                                 completion: @escaping (Bool, String?, String?) -> Void
++  ) {
++    guard let url = URL(string: passUrlString) else {
++      completion(false, "INVALID_URL", "The pass URL is invalid")
++      return
++    }
++
++    var request = URLRequest(url: url)
++    request.httpMethod = "GET"
++
++    if let headers = headers {
++      for (key, value) in headers {
++        request.setValue(value, forHTTPHeaderField: key)
++      }
++    }
++
++    URLSession.shared.dataTask(with: request) { data, response, error in
++      if let error = error {
++        DispatchQueue.main.async {
++          completion(false, "NETWORK_ERROR", error.localizedDescription)
++        }
++        return
++      }
++
++      if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
++        DispatchQueue.main.async {
++          completion(false, "HTTP_ERROR", "HTTP \(httpResponse.statusCode)")
++        }
++        return
++      }
++
++      guard let data = data else {
++        DispatchQueue.main.async {
++          completion(false, "INVALID_DATA", "No data received")
++        }
++        return
++      }
++
++      DispatchQueue.main.async {
++        guard let pass = try? PKPass(data: data) else {
++          completion(false, "INVALID_PASS", "Failed to parse pass data")
++          return
++        }
++        // replacePass trả false khi thẻ chưa có trong ví hoặc app thiếu entitlement
++        // com.apple.developer.pass-type-identifiers cho pass type này.
++        let replaced = PKPassLibrary().replacePass(with: pass)
++        if replaced {
++          completion(true, nil, nil)
++        } else {
++          completion(false, "PASS_NOT_FOUND", "Pass is not in the library or app lacks entitlement")
++        }
++      }
++    }.resume()
++  }
++
+   // MARK: - hasPass
+ 
+   @objc
+diff --git a/node_modules/react-native-wallet-manager/lib/commonjs/index.js b/node_modules/react-native-wallet-manager/lib/commonjs/index.js
+index 8d585f5..c260bfe 100644
+--- a/node_modules/react-native-wallet-manager/lib/commonjs/index.js
++++ b/node_modules/react-native-wallet-manager/lib/commonjs/index.js
+@@ -30,6 +30,12 @@ var _default = exports.default = {
+     return await _NativeWalletManager.default.addPassToGoogleWallet(jwt);
+   },
+   addPassFromUrl: (url, headers) => _NativeWalletManager.default.addPassFromUrl(url, headers ?? null),
++  replacePassFromUrl: async (url, headers) => {
++    if (_reactNative.Platform.OS === 'android') {
++      throw new Error('replacePassFromUrl method not available on Android');
++    }
++    return await _NativeWalletManager.default.replacePassFromUrl(url, headers ?? null);
++  },
+   hasPass: async (cardIdentifier, serialNumber) => {
+     if (_reactNative.Platform.OS === 'android') {
+       throw new Error('hasPass method not available on Android');
+diff --git a/node_modules/react-native-wallet-manager/lib/module/index.js b/node_modules/react-native-wallet-manager/lib/module/index.js
+index 3675974..bc6da1b 100644
+--- a/node_modules/react-native-wallet-manager/lib/module/index.js
++++ b/node_modules/react-native-wallet-manager/lib/module/index.js
+@@ -28,6 +28,12 @@ export default {
+     return await WalletManager.addPassToGoogleWallet(jwt);
+   },
+   addPassFromUrl: (url, headers) => WalletManager.addPassFromUrl(url, headers ?? null),
++  replacePassFromUrl: async (url, headers) => {
++    if (Platform.OS === 'android') {
++      throw new Error('replacePassFromUrl method not available on Android');
++    }
++    return await WalletManager.replacePassFromUrl(url, headers ?? null);
++  },
+   hasPass: async (cardIdentifier, serialNumber) => {
+     if (Platform.OS === 'android') {
+       throw new Error('hasPass method not available on Android');
+diff --git a/node_modules/react-native-wallet-manager/lib/typescript/index.d.ts b/node_modules/react-native-wallet-manager/lib/typescript/index.d.ts
+index 66444cf..c9d1ec8 100644
+--- a/node_modules/react-native-wallet-manager/lib/typescript/index.d.ts
++++ b/node_modules/react-native-wallet-manager/lib/typescript/index.d.ts
+@@ -13,6 +13,7 @@ declare const _default: {
+     showAddPassControllerFromFile: (filePath: string) => Promise<boolean>;
+     addPassToGoogleWallet: (jwt: string) => Promise<void>;
+     addPassFromUrl: (url: string, headers?: Record<string, string>) => Promise<boolean>;
++    replacePassFromUrl: (url: string, headers?: Record<string, string>) => Promise<boolean>;
+     hasPass: (cardIdentifier: string, serialNumber?: string) => Promise<boolean>;
+     removePass: (cardIdentifier: string, serialNumber?: string) => Promise<boolean>;
+     viewInWallet: (cardIdentifier: string, serialNumber?: string) => Promise<boolean>;
+diff --git a/node_modules/react-native-wallet-manager/src/index.tsx b/node_modules/react-native-wallet-manager/src/index.tsx
+index 1409b1c..a9868dd 100644
+--- a/node_modules/react-native-wallet-manager/src/index.tsx
++++ b/node_modules/react-native-wallet-manager/src/index.tsx
+@@ -48,6 +48,12 @@ export default {
+   },
+   addPassFromUrl: (url: string, headers?: Record<string, string>) =>
+     WalletManager.addPassFromUrl(url, headers ?? null),
++  replacePassFromUrl: async (url: string, headers?: Record<string, string>) => {
++    if (Platform.OS === 'android') {
++      throw new Error('replacePassFromUrl method not available on Android');
++    }
++    return await WalletManager.replacePassFromUrl(url, headers ?? null);
++  },
+   hasPass: async (cardIdentifier: string, serialNumber?: string) => {
+     if (Platform.OS === 'android') {
+       throw new Error('hasPass method not available on Android');
+diff --git a/node_modules/react-native-wallet-manager/src/specs/NativeWalletManager.ts b/node_modules/react-native-wallet-manager/src/specs/NativeWalletManager.ts
+index 502cb57..cbfa815 100644
+--- a/node_modules/react-native-wallet-manager/src/specs/NativeWalletManager.ts
++++ b/node_modules/react-native-wallet-manager/src/specs/NativeWalletManager.ts
+@@ -4,6 +4,7 @@ export interface Spec extends TurboModule {
+   canAddPasses(): Promise<boolean>;
+   showAddPassControllerFromFile(url: string): Promise<boolean>;
+   addPassFromUrl(url: string, headers: Object | null): Promise<boolean>;
++  replacePassFromUrl(url: string, headers: Object | null): Promise<boolean>;
+   hasPass(
+     cardIdentifier: string,
+     serialNumber: string | null

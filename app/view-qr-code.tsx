@@ -18,7 +18,6 @@ import {
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -38,10 +37,15 @@ import Svg, {
 } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
 import { petService } from '../services/petService';
-import { openWebLink } from '@/utils/browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import WalletManager from 'react-native-wallet-manager';
 
 const { width } = Dimensions.get('window');
 const QR_SIZE = Math.min(width * 0.45, 170);
+
+// Phải khớp WALLET_PASS_TYPE_IDENTIFIER bên BE và entitlement
+// com.apple.developer.pass-type-identifiers trong app.json.
+const PASS_TYPE_ID = 'pass.com.pawlife.petid';
 
 const SHADOW_OPACITY = 0.05;
 const SHADOW_RADIUS = 8;
@@ -189,6 +193,9 @@ export default function ViewQrCode() {
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [replaceTag, setReplaceTag] = useState<string | null>(null);
   const [otherDetail, setOtherDetail] = useState('');
+  // Thẻ của bé này đã nằm trong Apple Wallet chưa → quyết định nút "View" hay "Add".
+  // 'unknown' = chưa hỏi xong Wallet, nút tạm hiện "Add" cho an toàn.
+  const [walletStatus, setWalletStatus] = useState<'unknown' | 'added' | 'notAdded'>('unknown');
   const cardRef = useRef<ViewShot>(null);
   const RadioOption = ({ label, subLabel, selected, onPress }: RadioOptionProps) => (
     <TouchableOpacity
@@ -291,6 +298,75 @@ export default function ViewQrCode() {
     }, [petId])
   );
 
+  // Xin token dùng-một-lần rồi ghép URL tải thẻ .pkpass. Endpoint download là
+  // public (token nằm trong URL) nên bên native không cần truyền header nữa.
+  const getPassDownloadUrl = useCallback(async () => {
+    const accessToken = await SecureStore.getItemAsync('accessToken');
+    const tokenRes = await fetch(`${BASE_URL}wallet/pets/${petId}/pass-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+        // BE sinh thẻ theo ngôn ngữ này nên đổi ngôn ngữ app = thẻ phải làm mới
+        'Accept-Language': isVi ? 'vi' : 'en',
+      },
+    });
+    if (!tokenRes.ok) throw new Error(`Token failed: ${tokenRes.status}`);
+    const { token: passToken } = await tokenRes.json();
+    return `${BASE_URL}wallet/download-pass/${passToken}`;
+  }, [petId, isVi]);
+
+  // Dấu vân tay của những dữ liệu THỰC SỰ in lên thẻ (khớp danh sách field mà
+  // wallet.service bên BE dùng). Khác dấu vân tay đã lưu = thẻ trong ví đã cũ.
+  const buildPassFingerprint = useCallback((pet: any) => {
+    const activeTag = pet?.tags?.find((tag: any) => tag.status === 'ACTIVE') || pet?.tags?.[0];
+    return JSON.stringify([
+      pet?.name ?? null,
+      pet?.species ?? null,
+      pet?.breed ?? null,
+      pet?.dob ?? null,
+      pet?.gender ?? null,
+      pet?.microchipNumber ?? null,
+      pet?.images?.[0]?.url ?? null,
+      activeTag?.id ?? null,
+      isVi ? 'vi' : 'en',
+    ]);
+  }, [isVi]);
+
+  // Mỗi lần vào màn: hỏi Wallet xem thẻ đã có chưa (→ nút View hay Add), và nếu
+  // đã có mà dữ liệu bé đã đổi thì thay thẻ IM LẶNG bằng bản mới — người dùng
+  // không phải tự xoá thẻ cũ rồi thêm lại.
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'ios' || !petId || !petData) return;
+
+      let cancelled = false;
+      (async () => {
+        try {
+          const hasPass = await WalletManager.hasPass(PASS_TYPE_ID, petId);
+          if (cancelled) return;
+          setWalletStatus(hasPass ? 'added' : 'notAdded');
+          if (!hasPass) return;
+
+          const fingerprintKey = `walletPassFingerprint:${petId}`;
+          const fingerprint = buildPassFingerprint(petData);
+          const savedFingerprint = await AsyncStorage.getItem(fingerprintKey);
+          if (cancelled || savedFingerprint === fingerprint) return;
+
+          const downloadUrl = await getPassDownloadUrl();
+          if (cancelled) return;
+          await WalletManager.replacePassFromUrl(downloadUrl);
+          await AsyncStorage.setItem(fingerprintKey, fingerprint);
+        } catch (error) {
+          // Không chặn màn hình vì việc này chạy ngầm — thẻ cũ vẫn dùng được
+          console.warn('[wallet] Không đồng bộ được thẻ:', error);
+        }
+      })();
+
+      return () => { cancelled = true; };
+    }, [petId, petData, buildPassFingerprint, getPassDownloadUrl])
+  );
+
   if (!petData) {
     return (
       <View className="flex-1 justify-center items-center bg-[#FAFAFA] px-4">
@@ -370,39 +446,27 @@ export default function ViewQrCode() {
     }
   };
 
-  // Tải thẻ .pkpass từ BE (kèm Bearer token) rồi present qua PassKit để thêm vào Apple Wallet
+  // Tải thẻ .pkpass từ BE rồi mở màn Add của PassKit ngay trong app —
+  // bấm Add xong tự quay lại PawLife, không nhảy qua trình duyệt như trước.
   const handleAddToWallet = async () => {
     if (Platform.OS !== 'ios') return;
 
     try {
-      const accessToken = await SecureStore.getItemAsync('accessToken');
+      const downloadUrl = await getPassDownloadUrl();
+      await WalletManager.addPassFromUrl(downloadUrl);
 
-      // Bước 1: Xin token (đã bổ sung Accept-Language)
-      const tokenRes = await fetch(`${BASE_URL}wallet/pets/${petId}/pass-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          // Truyền ngôn ngữ hiện tại của app xuống Backend
-          'Accept-Language': language === 'vi' ? 'vi' : 'en',
-        },
-      });
+      setWalletStatus('added');
+      await AsyncStorage.setItem(`walletPassFingerprint:${petId}`, buildPassFingerprint(petData));
+    } catch (error: any) {
+      // Người dùng tự đóng màn Add → không phải lỗi, đừng làm phiền bằng Alert
+      if (error?.code === 'USER_CANCELLED') return;
 
-      if (!tokenRes.ok) throw new Error(`Token failed: ${tokenRes.status}`);
-      const { token: passToken } = await tokenRes.json();
-
-      // Bước 2: Mở URL trực tiếp — iOS sẽ intercept MIME type và gọi PassKit
-      // KHÔNG download về cache, KHÔNG dùng Sharing.shareAsync
-      const downloadUrl = `${BASE_URL}wallet/download-pass/${passToken}`;
-
-      const supported = await Linking.canOpenURL(downloadUrl);
-      if (!supported) {
-        throw new Error('Cannot open URL');
+      // Thẻ đã có sẵn trong ví (vd thêm từ máy khác qua iCloud) → chỉ cần đổi nút
+      if (error?.code === 'PASS_ALREADY_EXISTS') {
+        setWalletStatus('added');
+        return;
       }
 
-      await openWebLink(downloadUrl);
-
-    } catch (error) {
       console.error('[handleAddToWallet] Error:', error);
       Alert.alert(
         isVi ? 'Lỗi' : 'Error',
@@ -410,6 +474,20 @@ export default function ViewQrCode() {
           ? 'Không thể thêm thẻ vào Apple Wallet. Vui lòng thử lại.'
           : 'Unable to add pass to Apple Wallet. Please try again.'
       );
+    }
+  };
+
+  // Thẻ đã có trong ví → mở thẳng app Wallet tại đúng thẻ của bé này
+  const handleViewInWallet = async () => {
+    if (Platform.OS !== 'ios') return;
+
+    try {
+      const opened = await WalletManager.viewInWallet(PASS_TYPE_ID, petId);
+      // Không mở được nghĩa là thẻ vừa bị xoá khỏi ví → trả nút về "Add"
+      if (!opened) setWalletStatus('notAdded');
+    } catch (error) {
+      console.error('[handleViewInWallet] Error:', error);
+      setWalletStatus('notAdded');
     }
   };
 
@@ -692,14 +770,19 @@ export default function ViewQrCode() {
                   </View>
 
                   {/* Nút Apple Wallet - Cách 2 nút trên đúng 30px theo thiết lập marginBottom bên trên */}
+                  {/* Thẻ đã có trong ví → "Xem trong Wallet"; chưa có → "Thêm vào ví Apple" */}
                   {Platform.OS === 'ios' && (
                     <TouchableOpacity
-                      onPress={handleAddToWallet}
+                      onPress={walletStatus === 'added' ? handleViewInWallet : handleAddToWallet}
                       activeOpacity={0.85}
                       className="flex-row items-center justify-center self-stretch h-[40px] mx-[5px] rounded-[12px] bg-black border border-[#757575]"
                     >
                       <Image source={require('../assets/icon/apple-wallet.png')} style={{ width: 21, height: 15 }} resizeMode="contain" />
-                      <Text className="text-white text-[14px] font-medium ml-2">{isVi ? "Thêm vào ví Apple" : "Add to Apple Wallet"}</Text>
+                      <Text className="text-white text-[14px] font-medium ml-2">
+                        {walletStatus === 'added'
+                          ? (isVi ? 'Xem trong ví Apple' : 'View in Apple Wallet')
+                          : (isVi ? 'Thêm vào ví Apple' : 'Add to Apple Wallet')}
+                      </Text>
                     </TouchableOpacity>
                   )}
                 </View>
