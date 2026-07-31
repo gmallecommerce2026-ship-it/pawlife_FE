@@ -566,20 +566,22 @@ const SurveyScreen = ({ onComplete, onBack, initialFilters }: { onComplete: (fil
 // 2. POLICY SCREEN (PURE UI - KHÔNG GỌI NAVIGATION)
 // ==================================================================
 const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => void }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+    const isVi = language === 'vi';
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const [isAgreed, setIsAgreed] = useState(false);
 
     const PolicyItem = ({ number, title, content }: any) => (
         <View className="flex-row items-start mb-[21px]">
-            <View className="w-4 shrink-0 mr-2 items-start">
+            {/* Đổi w-4 thành w-6 để cấp đủ không gian hiển thị "Số + dấu chấm" */}
+            <View className="w-6 shrink-0 mr-2 items-start">
                 <Text className="text-black text-[16px] font-medium">
                     {number}.
                 </Text>
             </View>
             <View className="flex-1">
-                <Text className="text-gray-800 font-medium text-[16px] mb-[4px]" numberOfLines={1}>{title}</Text>
+                <Text className="text-gray-800 font-medium text-[16px] mb-[4px]">{title}</Text>
                 <Text className="text-gray-500 font-regular text-[14px] leading-[20px] tracking-[0.06px]">{content}</Text>
             </View>
         </View>
@@ -629,15 +631,17 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                 <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => setIsAgreed(!isAgreed)}
-                    className="flex-row items-center mb-5"
+                    className="flex-row items-center mb-5 w-full"
                 >
-                    <View className='flex-row items-center w-full justify-center'>
+                    {/* Bỏ justify-center để canh trái đồng đều, tránh lỗi xô lệch khi rớt dòng */}
+                    <View className='flex-row items-center w-full justify-start'>
                         <Ionicons
                             name={isAgreed ? "checkbox" : "square-outline"}
                             size={24}
                             color={isAgreed ? "#E89B5A" : "#9CA3AF"}
                         />
-                        <Text className={`ml-3 text-[14px] ${isAgreed ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
+                        {/* Bổ sung flex-1 để text tự động rớt dòng nằm gọn trong khung hình */}
+                        <Text className={`ml-3 flex-1 text-[14px] ${isAgreed ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
                             {t("I agree to ")}
                             <Text
                                 onPress={() => router.push('/terms-of-service')}
@@ -657,7 +661,7 @@ const PolicyScreen = ({ onAgree, onBack }: { onAgree: () => void, onBack: () => 
                     className={`w-full py-[18px] rounded-full items-center justify-center ${isAgreed ? 'bg-[#E89B5A]' : 'bg-gray-100'}`}
                 >
                     <Text className={`font-bold text-[17px] ${isAgreed ? 'text-white' : 'text-gray-400'}`}>
-                        {t("Submit")}
+                        {isVi ? "Gửi" : "Submit"}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -670,7 +674,7 @@ const TUTORIAL_DATA = [
         id: 'step1',
         image: require('../../assets/images/t-left.png'),
         forcedDir: 'left',
-        instruction: "Not this one",
+        instruction: "Swipe left to skip",
         subInstruction: "",
         iconName: "arrow-left"
     },
@@ -678,7 +682,7 @@ const TUTORIAL_DATA = [
         id: 'step2',
         image: require('../../assets/images/t-right.png'),
         forcedDir: 'right',
-        instruction: "Hmm... this one!",
+        instruction: "Swipe right to apply",
         subInstruction: "",
         iconName: "arrow-right"
     },
@@ -686,7 +690,7 @@ const TUTORIAL_DATA = [
         id: 'step3',
         image: require('../../assets/images/t-top.png'),
         forcedDir: 'up',
-        instruction: "What’s their story?",
+        instruction: "Swipe up for info",
         subInstruction: "",
         iconName: "arrow-up"
     },
@@ -694,7 +698,7 @@ const TUTORIAL_DATA = [
         id: 'step4',
         image: require('../../assets/images/t-center.jpg'),
         forcedDir: 'heart',
-        instruction: "Maybe later,\nmight be forever",
+        instruction: "Double tap to save",
         subInstruction: "",
         iconName: "gesture-double-tap"
     }

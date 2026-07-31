@@ -1,5 +1,4 @@
 import { useLanguage } from '@/contexts/LanguageContext';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
 import React from 'react';
 import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -112,7 +111,11 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
               }}
           />
           <View style={styles.scanButtonInner}>
-            <MaterialCommunityIcons name="line-scan" size={28} color="#F59E0B" />
+            <Image
+              source={require('../../assets/icon/scan-index.png')}
+              style={{ width: 21, height: 21 }}
+              resizeMode="cover"
+            />
           </View>
         </TouchableOpacity>
       </View>

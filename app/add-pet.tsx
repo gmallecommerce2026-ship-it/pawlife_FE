@@ -2,12 +2,12 @@ import axiosClient from '@/api/axiosClient';
 import AddMedicalRecordModal from '@/components/AddMedicalRecordModal';
 import { Text } from '@/components/AppText';
 import { TextInput } from '@/components/AppTextInput';
+import { useGlobalDatePicker } from '@/contexts/GlobalDatePickerContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { petService } from '@/services/petService';
 import { useModalStore } from '@/store/useModalStore';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,11 +21,8 @@ import React, { memo, useCallback, useContext, useEffect, useRef, useState } fro
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Dimensions,
-  Easing,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -41,7 +38,7 @@ type GenderType = 'MALE' | 'FEMALE' | 'UNKNOWN';
 type SpeciesType = 'Dog' | 'Cat';
 type SizeType = 'SMALL' | 'MEDIUM' | 'LARGE';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 
 
@@ -319,52 +316,22 @@ export default function AddPetScreen() {
   const [isVaccineModalVisible, setVaccineModalVisible] = useState(false);
 
   // --- STATE CHO IOS GLASSMORPHISM DATE PICKER ---
-  const dobRef = useRef<View>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const contentRef = useRef<View>(null);
-  const [activePicker, setActivePicker] = useState<'dob' | null>(null);
-  const [pickerLayout, setPickerLayout] = useState({ x: 0, y: 0, width: 340 });
-  const pickerOpacity = useRef(new Animated.Value(0)).current;
-  const pickerTranslateY = useRef(new Animated.Value(-8)).current;
 
-  const openDropdownPicker = (type: 'dob') => {
-    Keyboard.dismiss(); // Đóng bàn phím nếu đang mở
-
-    // Đo tọa độ của dobRef dựa trên contentRef (Native Component chuẩn)
-    if (contentRef.current && dobRef.current) {
-      dobRef.current.measureLayout(
-        contentRef.current,
-        (left, top, width, height) => {
-          // Cuộn ScrollView đến vị trí vừa đo (trừ đi 120px để chừa chỗ phía trên)
-          scrollViewRef.current?.scrollTo({ y: Math.max(0, top - 120), animated: true });
-
-          // Chờ animation cuộn xong (350ms) rồi mới tính toạ độ trên màn hình để mở Picker
-          setTimeout(() => {
-            dobRef.current?.measureInWindow((x, windowY, w, h) => {
-              const dropdownWidth = 340;
-              const finalX = (SCREEN_WIDTH - dropdownWidth) / 2; // Luôn căn giữa tuyệt đối
-
-              setPickerLayout({ x: finalX, y: windowY + h + 8, width: dropdownWidth });
-              setActivePicker(type);
-
-              Animated.parallel([
-                Animated.timing(pickerOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-                Animated.timing(pickerTranslateY, { toValue: 0, duration: 250, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true })
-              ]).start();
-            });
-          }, 350);
-        },
-        () => console.log('Lỗi không thể đo kích thước layout')
-      );
-    }
+  const handleOpenDobPicker = () => {
+    dobRef.current?.measureInWindow((x, y, width, height) => {
+      openGlobalPicker({
+        value: formData.dob ? new Date(formData.dob) : new Date(),
+        maximumDate: new Date(),
+        locale: isVi ? 'vi-VN' : 'en-US',
+        anchorLayout: { x, y, width, height },
+        labels: { cancel: isVi ? 'Huỷ' : 'Cancel', done: isVi ? 'Xong' : 'Done' },
+        onChange: (date) => handleChange('dob', date.toISOString()),
+      });
+    });
   };
 
-  const closeDropdownPicker = () => {
-    Animated.parallel([
-      Animated.timing(pickerOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(pickerTranslateY, { toValue: -8, duration: 150, useNativeDriver: true })
-    ]).start(() => setActivePicker(null));
-  };
   // ------------------------------------------------
 
   // --- ADDRESS POPUP STATE & LOGIC ---
@@ -374,6 +341,8 @@ export default function AddPetScreen() {
   const [tempCity, setTempCity] = useState('');
   const [tempWard, setTempWard] = useState('');
   const [tempDetail, setTempDetail] = useState('');
+  const { open: openGlobalPicker, close: closeGlobalPicker } = useGlobalDatePicker();
+  const dobRef = useRef<View>(null);
 
   const cleanAdminPrefix = (name: string) => {
     if (!name) return '';
@@ -749,8 +718,8 @@ export default function AddPetScreen() {
     formData.gender !== 'UNKNOWN' &&
     formData.sterilized !== null &&
     formData.breed.trim() !== '' &&
-    formData.contactName.trim() !== '' &&
-    formData.contactPhone.trim() !== '';
+    formData.contactName.trim() !== '';
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView
@@ -991,7 +960,7 @@ export default function AddPetScreen() {
                     <View className="flex-1" ref={dobRef} collapsable={false}>
                       <Text className="text-[14px] text-black font-medium mb-1.5">{isVi ? 'Ngày sinh' : 'Birthday'}</Text>
                       <TouchableOpacity
-                        onPress={() => Platform.OS === 'ios' ? openDropdownPicker('dob') : setShowDatePicker(true)}
+                        onPress={() => Platform.OS === 'ios' ? handleOpenDobPicker() : setShowDatePicker(true)} // 🚀 sửa: gọi hàm mới
                         className="h-[34px] border border-[#E5E5E5] rounded-[12px] px-3.5 justify-center bg-white"
                       >
                         <Text className={`text-[14px] ${formData.dob ? 'text-black' : 'text-[#A1A1AA]'}`}>
@@ -1071,7 +1040,7 @@ export default function AddPetScreen() {
                   {/* Address (Không cần thay thế khi gõ) */}
                   <View className="flex-row items-center py-4">
                     <Text className="text-[14px] font-medium text-black w-[80px]">{isVi ? 'Địa chỉ' : 'Address'}</Text>
-                    <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
+                    <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 flex-row items-center justify-end">
                       <Text
                         style={inputFontStyle}
                         className={`text-right text-[14px] p-0 ${formData.contactAddress ? 'text-black' : 'text-[#A1A1AA]'}`}
@@ -1080,6 +1049,15 @@ export default function AddPetScreen() {
                         {formData.contactAddress || (isVi ? "Địa chỉ" : "Street Address, District, City")}
                       </Text>
                     </TouchableOpacity>
+                    {!!formData.contactAddress && (
+                      <TouchableOpacity
+                        onPress={() => handleChange('contactAddress', '')}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        className="ml-2"
+                      >
+                        <Feather name="x-circle" size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -1091,7 +1069,11 @@ export default function AddPetScreen() {
                     {isVi ? 'Hồ sơ y tế' : 'Medical Records'} ({medicalRecords.length})
                   </Text>
                   <TouchableOpacity
-                    onPress={() => setShowMedicalModal(true)}
+                    onPress={() => {
+                      closeGlobalPicker();
+                      setShowMedicalModal(true);
+                    }}
+
                     className="bg-[#FFF8F0] px-4 py-2 rounded-full border border-[#E89B5A]/30"
                   >
                     <Text className="text-[#E89B5A] font-medium text-[13px]">{isVi ? '+ Thêm hồ sơ' : '+ Add Record'}</Text>
@@ -1153,6 +1135,7 @@ export default function AddPetScreen() {
       {/* ANDROID GỐC DATE PICKER CHO NGÀY SINH */}
       {Platform.OS === 'android' && showDatePicker && (
         <DateTimePicker
+          key="dob-picker-android"
           value={formData.dob ? new Date(formData.dob) : new Date()}
           mode="date"
           display="default"
@@ -1161,60 +1144,6 @@ export default function AddPetScreen() {
         />
       )}
 
-      {/* --- KÍNH MỜ DROPDOWN FIX CHIỀU CAO VÀ MÀU CAM (IOS) - CHO NGÀY SINH --- */}
-      {Platform.OS === 'ios' && activePicker === 'dob' && (
-        <View className="absolute inset-0 z-[100]">
-          <TouchableOpacity activeOpacity={1} className="absolute inset-0" onPress={closeDropdownPicker} />
-
-          <Animated.View
-            style={{
-              position: 'absolute',
-              top: pickerLayout.y,
-              left: pickerLayout.x,
-              width: pickerLayout.width,
-              opacity: pickerOpacity,
-              transform: [{ translateY: pickerTranslateY }],
-              borderRadius: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.25,
-              shadowRadius: 16,
-              elevation: 10,
-              overflow: 'hidden'
-            }}
-          >
-            <BlurView tint="dark" intensity={65} style={{ position: 'absolute', inset: 0 }} />
-            <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(15, 15, 15, 0.45)' }} />
-
-            <View className="flex-row justify-between items-center px-[16px] py-[12px] border-b border-white/10 relative z-10">
-              <TouchableOpacity onPress={closeDropdownPicker}>
-                <Text className="text-[16px] text-[#A1A1AA] font-medium">{isVi ? 'Huỷ' : 'Cancel'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={closeDropdownPicker}>
-                <Text className="text-[16px] font-semibold text-[#E89B5A]">{isVi ? 'Xong' : 'Done'}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ paddingTop: 4, paddingBottom: 4, paddingHorizontal: 10, alignItems: 'center' }} className="relative z-10">
-              <DateTimePicker
-                value={formData.dob ? new Date(formData.dob) : new Date()}
-                mode="date"
-                display="inline"
-                themeVariant="dark"
-                locale={isVi ? "vi-VN" : "en-US"}
-                maximumDate={new Date()}
-                style={{ width: 320, height: 315, alignSelf: 'center' }}
-                accentColor="#E89B5A"
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) {
-                    handleChange('dob', selectedDate.toISOString());
-                  }
-                }}
-              />
-            </View>
-          </Animated.View>
-        </View>
-      )}
 
       {/* Modal Chọn Phương thức Upload Ảnh (Camera / Gallery) - Cho Vaccine (cũ) */}
       <Modal visible={isVaccineModalVisible} transparent animationType="fade">
@@ -1265,6 +1194,7 @@ export default function AddPetScreen() {
                   setTempCity(val);
                   setTempWard('');
                 }}
+                isVi={isVi}
               />
 
               <Label text={isVi ? "Quận/Huyện & Phường/Xã" : "District & Ward"} required />
@@ -1273,6 +1203,7 @@ export default function AddPetScreen() {
                 value={tempWard}
                 options={wardOptions}
                 onSelect={setTempWard}
+                isVi={isVi}
               />
 
               <Label text={isVi ? "Địa chỉ chi tiết (Tùy chọn)" : "Detailed Address (Optional)"} />

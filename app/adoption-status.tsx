@@ -3,12 +3,12 @@ import axiosClient from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext'; // IMPORT HOOK
 import { useImageUpload } from '@/hooks/useImageUpload';
+import { getLocalizedField } from '@/utils/localization';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
-import { getLocalizedField } from '@/utils/localization';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +17,24 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // --- KHAI BÁO TYPE ---
 type StepState = 'completed' | 'active' | 'alert' | 'error' | 'success';
+// --- MẢNG TỪ ĐIỂN DỊCH NGƯỢC ---
+const HOUSING_TYPES_EN = ["House", "House with a garden", "Apartment (allows pet ownership)", "Apartment (pets not allowed, but willing to keep a pet discreetly)", "Rented house", "Other"];
+const HOUSING_TYPES_VI = ["Nhà riêng", "Nhà có sân vườn", "Căn hộ (cho phép nuôi thú cưng)", "Căn hộ (không cho phép nhưng vẫn muốn nuôi)", "Nhà thuê", "Khác"];
 
+const PET_EXPERIENCES_EN = ["Yes, I used to have one", "My pet is still living with me now", "No, I haven't"];
+const PET_EXPERIENCES_VI = ["Có, tôi đã từng nuôi", "Thú cưng vẫn đang sống cùng tôi", "Chưa bao giờ"];
+
+const EMPLOYMENT_STATUSES_EN = ["Currently employed", "Currently employed (occasionally travels for work)", "Currently employed (frequently travels for work)", "Self-employed", "Student (without a stable income)", "Pupil"];
+const EMPLOYMENT_STATUSES_VI = ["Đang đi làm", "Đang đi làm (thỉnh thoảng công tác)", "Đang đi làm (thường xuyên công tác)", "Tự kinh doanh", "Sinh viên (chưa có thu nhập ổn định)", "Học sinh"];
+
+const ADOPTION_REASONS_EN = ["Garden guarding", "Parking lot guarding", "Breeding", "Gift for children", "Because I want to give them a forever home", "Other"];
+const ADOPTION_REASONS_VI = ["Trông coi nhà/sân vườn", "Giữ xe/bãi đỗ", "Nhân giống", "Quà tặng cho trẻ em", "Vì tôi muốn cho chúng một mái ấm mãi mãi", "Khác"];
+
+const YES_NO_SOMETIMES_EN = ["Yes", "No", "Sometimes"];
+const YES_NO_SOMETIMES_VI = ["Có", "Không", "Đôi khi"];
+
+const ADOPT_FOR_EN = ["Myself", "Someone else"];
+const ADOPT_FOR_VI = ["Cho bản thân", "Cho người khác"];
 interface TimelineStep {
   id: string;
   title: string;
@@ -41,11 +58,20 @@ export default function AdoptionStatusScreen() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
-
+  const DEFAULT_HISTORY_EN = "My previous dog passed away due to old age after 12 wonderful years together.";
+  const DEFAULT_HISTORY_VI = "Chó qua đời do tuổi già sau 12 năm tuyệt vời bên nhau."; // Đổi lại đúng text gốc tiếng Việt của bạn
   const { width } = useWindowDimensions();
   const imageSize = (width - 116 - 32) / 5;
   const { pickAndUploadImage, isUploading } = useImageUpload();
+  const getTranslatedValue = (value: string | undefined, enList: string[], viList: string[]) => {
+    if (!value) return 'N/A';
+    if (!isVi) return value; // Nếu app đang ở Tiếng Anh thì giữ nguyên
 
+    const index = enList.indexOf(value);
+    // Nếu tìm thấy trong mảng EN, trả về vị trí tương ứng trong mảng VI.
+    // Nếu không tìm thấy (ví dụ: người dùng nhập lý do "Khác" bằng tay), giữ nguyên text gốc.
+    return index >= 0 ? viList[index] : value;
+  };
   const getDisplayAge = (dob: string | undefined) => {
     if (!dob) return t('Unknown');
     const birthDate = new Date(dob);
@@ -245,7 +271,12 @@ export default function AdoptionStatusScreen() {
   const submittedDate = new Date(applicationData.createdAt).toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric'
   });
+  const rawPrevHistory = applicationData.prevPetHistory;
+  let displayPrevHistory = rawPrevHistory;
 
+  if (rawPrevHistory === DEFAULT_HISTORY_EN || rawPrevHistory === DEFAULT_HISTORY_VI) {
+    displayPrevHistory = isVi ? DEFAULT_HISTORY_VI : DEFAULT_HISTORY_EN;
+  }
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -608,34 +639,47 @@ export default function AdoptionStatusScreen() {
                 <DetailRow label={t('Full Name')} value={applicationData.fullName || 'N/A'} />
                 <DetailRow label={t('Phone')} value={applicationData.phone || 'N/A'} />
                 <DetailRow label={t('Zalo/WhatsApp')} value={applicationData.zalo || 'N/A'} />
-                <DetailRow label={t('Adopting For')} value={applicationData.adoptFor || 'N/A'} isLast />
+                {/* Đã thêm hàm dịch cho AdoptFor */}
+                <DetailRow label={t('Adopting For')} value={getTranslatedValue(applicationData.adoptFor, ADOPT_FOR_EN, ADOPT_FOR_VI)} isLast />
               </SectionCard>
 
               <SectionCard title={t('B - Living Conditions')}>
                 <DetailRow label={t('Location')} value={applicationData.location || 'N/A'} />
-                <DetailRow label={t('Housing Type')} value={applicationData.housing || 'N/A'} />
-                <DetailRow label={t('Children')} value={applicationData.children || 'N/A'} />
-                <DetailRow label={t('Cage Plans')} value={applicationData.cage || 'N/A'} isLast />
+                {/* Đã thêm hàm dịch cho Housing, Children, Cage */}
+                <DetailRow label={t('Housing Type')} value={getTranslatedValue(applicationData.housing, HOUSING_TYPES_EN, HOUSING_TYPES_VI)} />
+                <DetailRow label={t('Children')} value={getTranslatedValue(applicationData.children, YES_NO_SOMETIMES_EN, YES_NO_SOMETIMES_VI)} />
+                <DetailRow label={t('Cage Plans')} value={getTranslatedValue(applicationData.cage, YES_NO_SOMETIMES_EN, YES_NO_SOMETIMES_VI)} isLast />
               </SectionCard>
 
               <SectionCard title={t('C - Pet Experience')}>
-                <DetailRow label={t('Previous Pet')} value={applicationData.petExperience || 'N/A'} />
-                {applicationData.prevPetHistory ? (
-                  <DetailRow label={t('What Happened')} value={`${applicationData.prevPetHistory}`} />
+                <DetailRow
+                  label={t('Previous Pet')}
+                  value={getTranslatedValue(applicationData.petExperience, PET_EXPERIENCES_EN, PET_EXPERIENCES_VI)}
+                />
+                {/* Đã sửa thành displayPrevHistory thay vì applicationData.prevPetHistory */}
+                {displayPrevHistory ? (
+                  <DetailRow
+                    label={t('What Happened')}
+                    value={`${displayPrevHistory}`}
+                    isQuote
+                  />
                 ) : null}
               </SectionCard>
 
               <SectionCard title={t('D - Employment & Personal')}>
-                <DetailRow label={t('Employment')} value={applicationData.employmentStatus || 'N/A'} isLast />
+                {/* Đã thêm hàm dịch cho Employment */}
+                <DetailRow label={t('Employment')} value={getTranslatedValue(applicationData.employmentStatus, EMPLOYMENT_STATUSES_EN, EMPLOYMENT_STATUSES_VI)} isLast />
               </SectionCard>
 
               <SectionCard title={t('E - Adoption Commitment')}>
                 <View className="py-2 border-b border-[#E5E5E5]">
                   <Text className="text-[14px] text-[#8E8E93] mt-0.5">{t('Reason for Adoption')}</Text>
                   <Text className="text-[15px] pt-[7px] pb-[15px]">
-                    {`${applicationData.adoptionReason || 'N/A'}`}
+                    {/* Đã thêm hàm dịch cho Reason */}
+                    {getTranslatedValue(applicationData.adoptionReason, ADOPTION_REASONS_EN, ADOPTION_REASONS_VI)}
                   </Text>
                 </View>
+                {/* Phần commitments bên dưới bạn đã dùng <CommitmentItem text={t('...')}> nên đã xử lý song ngữ đúng rồi */}
                 {Object.keys(commitments).length > 0 ? (
                   <View className="pt-2 pb-1">
                     {commitments.vaccine === 'Yes' ? <CommitmentItem text={t('Yearly vaccinations')} /> : null}

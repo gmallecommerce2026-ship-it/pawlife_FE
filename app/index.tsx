@@ -3,11 +3,12 @@ import axiosClient, { setCachedAccessToken } from '@/api/axiosClient';
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { openWebLink } from '@/utils/browser';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Href, useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Linking, Platform, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, Platform, TouchableOpacity, View } from 'react-native';
 // import { AccessToken, LoginManager, Settings } from 'react-native-fbsdk-next';
 import Animated, {
   FadeInDown,
@@ -312,7 +313,7 @@ export default function WelcomeScreen() {
         <Animated.View entering={FadeInDown.delay(800).springify()} className="mb-4">
           <View className="flex-row justify-center items-center">
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://elfin-pajama-4bb.notion.site/CH-NH-S-CH-B-O-M-T-PAWLIFE-36c6c8475df680fa8064e7ebf82d0933')}
+              onPress={() => openWebLink('https://elfin-pajama-4bb.notion.site/CH-NH-S-CH-B-O-M-T-PAWLIFE-36c6c8475df680fa8064e7ebf82d0933')}
               activeOpacity={0.7}
             >
               <Text className="text-center text-[#8E8E93] tracking-[0.06px] text-[16px] font-medium">
@@ -325,7 +326,7 @@ export default function WelcomeScreen() {
             </Text>
 
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://elfin-pajama-4bb.notion.site/I-U-KHO-N-D-CH-V-PAWLIFE-36c6c8475df6802d9157e559e3eb422c')}
+              onPress={() => openWebLink('https://elfin-pajama-4bb.notion.site/I-U-KHO-N-D-CH-V-PAWLIFE-36c6c8475df6802d9157e559e3eb422c')}
               activeOpacity={0.7}
             >
               <Text className="text-center text-[#8E8E93] tracking-[0.06px] text-[16px] font-medium">

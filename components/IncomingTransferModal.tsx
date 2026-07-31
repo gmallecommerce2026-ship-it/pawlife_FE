@@ -90,9 +90,10 @@ export default function IncomingTransferModal() {
     const handleConfirmNow = async () => {
         setIsSubmitting(true);
         try {
-            await axiosClient.post(`/pets/transfer-confirm/${transferId}`);
-            // ✅ Giữ data lại để render success card, KHÔNG dismiss/reset/navigate ngay
-            setLocalRequest(activeRequest);
+            const res = await axiosClient.post(`/pets/transfer-confirm/${transferId}`);
+            const updatedPet = res.data.pet; // 🔧 pet đã có owner mới
+
+            setLocalRequest(prev => prev ? { ...prev, pet: { ...prev.pet, ...updatedPet } } : prev);
             setShowTransferSuccessPrompt(true);
         } catch (error: any) {
             await refetchPending();
@@ -100,11 +101,11 @@ export default function IncomingTransferModal() {
             setIsSubmitting(false);
         }
     };
+
     const handleViewProfileAfterTransfer = () => {
         const targetPetId = petId;
-        const targetPetName = pet?.name;
-        const targetImage = pet?.avatarUrl || pet?.images?.[0]?.url;
-        const targetBreed = pet?.breed;
+        const finalPet = localRequest?.pet ?? pet; // 🔧 dùng bản đã cập nhật owner
+        const newOwner = finalPet?.owner;
 
         resetFlowState();
         dismiss();
@@ -113,9 +114,14 @@ export default function IncomingTransferModal() {
             pathname: '/pet-profile-detail',
             params: {
                 id: targetPetId,
-                name: targetPetName,
-                image: targetImage,
-                breed: targetBreed,
+                name: finalPet?.name,
+                image: finalPet?.avatarUrl || finalPet?.images?.[0]?.url,
+                breed: finalPet?.breed,
+                // 🔧 THÊM: owner mới để màn detail hiển thị ngay, không cần chờ fetch lại
+                ownerId: newOwner?.id,
+                ownerName: newOwner?.name,
+                ownerAvatar: newOwner?.avatarUrl,
+                ownerPhone: newOwner?.phone,
             },
         });
     };

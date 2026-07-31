@@ -16,6 +16,7 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import axiosClient from '../../api/axiosClient';
+import { openWebLink } from '@/utils/browser';
 
 const { width } = Dimensions.get('window');
 const AnimatedFeather = Animated.createAnimatedComponent(Feather);
@@ -476,7 +477,7 @@ export default function PawcareCategoryScreen() {
       if (ytId) {
           setPlayingVideoId(ytId); // Mở Modal phát video in-app
       } else {
-          Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+          openWebLink(url).catch(err => console.error("Couldn't load page", err));
       }
   }, [isVi]);
 

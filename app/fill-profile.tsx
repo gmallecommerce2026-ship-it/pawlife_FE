@@ -42,9 +42,16 @@ const COUNTRY_CODES = [
   { code: 'JP', dial_code: '+81', name: 'Japan', flag: '🇯🇵' },
 ];
 
+// 🌟 Label hỗ trợ hiển thị "(Không bắt buộc)" cạnh tiêu đề field — dùng cho Gender / DOB / Phone
+const OptionalTitle = ({ text, isVi }: { text: string; isVi: boolean }) => (
+  <Text className="text-[16px] mb-[12px] font-medium">
+    {text} <Text className="text-gray-400 text-[13px] font-regular">{isVi ? '(Không bắt buộc)' : '(Optional)'}</Text>
+  </Text>
+);
+
 const InputField = ({
   label, placeholder, icon, value, onChangeText,
-  secureTextEntry, isPassword, autoCapitalize = 'none', keyboardType = 'default', error, maxLength, title, onPress, large,
+  secureTextEntry, isPassword, autoCapitalize = 'none', keyboardType = 'default', error, maxLength, title, onPress, large, renderLabel,
 }: any) => {
   const [isSecure, setIsSecure] = useState(isPassword ? true : secureTextEntry);
   const [isFocused, setIsFocused] = useState(false);
@@ -53,12 +60,16 @@ const InputField = ({
     <TouchableOpacity className="mb-[18px]"
       disabled={!onPress}
       onPress={onPress}>
-      {title &&
-        <Text className='text-[16px] mb-[12px] font-semibold'>{title}</Text>
-      }
-      {label &&
-        <Text className='text-[16px] mb-[12px] font-medium'>{label}</Text>
-      }
+      {renderLabel ? renderLabel : (
+        <>
+          {title &&
+            <Text className='text-[16px] mb-[12px] font-semibold'>{title}</Text>
+          }
+          {label &&
+            <Text className='text-[16px] mb-[12px] font-medium'>{label}</Text>
+          }
+        </>
+      )}
       <View
         className={`flex-row items-center ${large ? 'px-5 py-4 border-[1.5px] bg-[#FAFAFA]' : 'px-5 py-2 border bg-white'} rounded-[16px]  ${error ? 'border-red-500 bg-red-50' : isFocused ? 'border-[#E5E5E5]' : 'border-[#E5E5E5]'
           }`}
@@ -252,17 +263,21 @@ export default function FillProfileScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // ==========================================
+  // 🌟 FIX 5.1.1(v): Gender / DOB / Phone không còn bắt buộc để hoàn tất đăng ký.
+  // Chỉ giữ Tên (Name) là bắt buộc — Apple không liệt kê Tên trong danh sách reject.
+  // Số điện thoại chỉ validate định dạng NẾU người dùng có nhập, không bắt buộc nhập.
+  // ==========================================
   const validateProfileStep = () => {
     let newErrors: Record<string, string> = {};
     const phoneRegex = /^(0?)(3|5|7|8|9)[0-9]{8}$/;
 
     if (!name.trim()) newErrors.name = isVi ? 'Vui lòng nhập họ tên/biệt danh của bạn.' : 'Please enter your full name/nickname.';
-    if (!gender) newErrors.gender = isVi ? 'Vui lòng chọn giới tính.' : 'Please select your gender.';
-    if (!hasSelectedDate) newErrors.dob = isVi ? 'Vui lòng chọn ngày sinh.' : 'Please select your date of birth.';
 
-    if (!phone.trim()) {
-      newErrors.phone = isVi ? 'Vui lòng nhập số điện thoại.' : 'Please enter your phone number.';
-    } else if (!phoneRegex.test(phone)) {
+    // Gender & DOB: không còn bắt buộc — bỏ qua validate required
+
+    // Phone: không bắt buộc, nhưng nếu có nhập thì phải đúng định dạng
+    if (phone.trim() && !phoneRegex.test(phone)) {
       newErrors.phone = isVi ? 'Định dạng số điện thoại không hợp lệ.' : 'Invalid phone number format.';
     }
 
@@ -287,8 +302,13 @@ export default function FillProfileScreen() {
         type: 'SIGNUP'
       });
 
-      const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
-      const fullPhone = `${selectedCountry.dial_code}${formattedPhone}`;
+      // Chỉ format & gửi số điện thoại nếu người dùng có nhập
+      let fullPhone: string | undefined = undefined;
+      if (phone.trim()) {
+        const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
+        fullPhone = `${selectedCountry.dial_code}${formattedPhone}`;
+      }
+
       const DEFAULT_AVATAR_URL = 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg';
 
       router.push({
@@ -297,9 +317,10 @@ export default function FillProfileScreen() {
           email: email.trim(),
           password,
           name: name.trim(),
-          phone: fullPhone,
-          gender,
-          dob: dob.toISOString(),
+          // Chỉ đính kèm nếu có giá trị, không ép buộc gửi chuỗi rỗng
+          ...(fullPhone ? { phone: fullPhone } : {}),
+          ...(gender ? { gender } : {}),
+          ...(hasSelectedDate ? { dob: dob.toISOString() } : {}),
           avatarUrl: avatar || DEFAULT_AVATAR_URL
         }
       });
@@ -372,10 +393,11 @@ export default function FillProfileScreen() {
         large={false}
       />
 
+      {/* 🌟 Gender & DOB — đã gắn nhãn "(Không bắt buộc)" */}
       <View className="flex-row justify-between">
         <View className="flex-1 mr-2">
           <InputField
-            label={isVi ? "Giới tính" : "Gender"}
+            renderLabel={<OptionalTitle text={isVi ? "Giới tính" : "Gender"} isVi={isVi} />}
             placeholder={isVi ? "Chọn giới tính" : "Select Gender"}
             value={gender ? getGenderLabel(gender) : ''}
             onPress={() => setShowGenderModal(true)}
@@ -387,7 +409,7 @@ export default function FillProfileScreen() {
 
         <View className="flex-1 ml-2" ref={dobRef} collapsable={false}>
           <InputField
-            label={isVi ? "Ngày sinh" : "Date of Birth"}
+            renderLabel={<OptionalTitle text={isVi ? "Ngày sinh" : "Date of Birth"} isVi={isVi} />}
             placeholder={isVi ? "Chọn ngày" : "Select DOB"}
             value={hasSelectedDate ? dob.toLocaleDateString('en-GB') : ''}
             onPress={() => Platform.OS === 'ios' ? openDropdownPicker('dob') : setShowPicker(true)}
@@ -398,8 +420,9 @@ export default function FillProfileScreen() {
         </View>
       </View>
 
+      {/* 🌟 Phone Number — đã gắn nhãn "(Không bắt buộc)" */}
       <View className="mb-8">
-        <Text className="text-[16px] font-medium text-gray-900 mb-2">{isVi ? "Số điện thoại" : "Phone Number"}</Text>
+        <OptionalTitle text={isVi ? "Số điện thoại" : "Phone Number"} isVi={isVi} />
         <View className="flex-row gap-3">
           <TouchableOpacity
             onPress={() => setShowCountryModal(true)}

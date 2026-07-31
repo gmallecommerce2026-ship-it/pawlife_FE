@@ -470,7 +470,7 @@ export default function EditProfileScreen() {
                     resizeMode="cover"
                   />}
                   label="Gender"
-                  value={gender}
+                  value={gender != "UNKNOWN" ? gender : "Unknown"}
                   isEditing={editingField === 'gender'}
                   isLoading={savingField === 'gender'}
                   onPressRow={() => {

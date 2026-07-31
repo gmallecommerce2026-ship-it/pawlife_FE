@@ -36,6 +36,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const MODAL_MAP_WIDTH = Math.round(SCREEN_WIDTH * 0.9 - 48);
 const MODAL_MAP_HEIGHT = 178; // Tương ứng h-[178px]
+const MIN_RADIUS = 100;
+const MAX_RADIUS = 2000;
+const RADIUS_STEP = 100;
 
 // Yêu cầu 1: Không ép Google Maps trên iOS. Modal map nhẹ + bản đồ ở report-lost-pet đang active
 // cùng lúc là tổ hợp dễ gây OOM OpenGL nhất trên iOS, nên modal map BẮT BUỘC phải dùng Apple Maps.
@@ -97,7 +100,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
 
     if (remainingSlots <= 0) {
       Alert.alert(
-        isVi ? "Giới hạn ảnh" : "Photo Limit", 
+        isVi ? "Giới hạn ảnh" : "Photo Limit",
         isVi ? "Bạn chỉ có thể chọn tối đa 5 ảnh." : "You can only select up to 5 photos."
       );
       return;
@@ -118,7 +121,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
     } catch (error) {
       console.error(isVi ? "Lỗi khi chọn ảnh: " : "Error selecting photo: ", error);
       Alert.alert(
-        isVi ? "Lỗi" : "Error", 
+        isVi ? "Lỗi" : "Error",
         isVi ? "Không thể mở thư viện ảnh." : "Cannot open photo library."
       );
     }
@@ -163,7 +166,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
     } catch (error) {
       console.error(isVi ? "Lỗi khi lấy vị trí:" : "Error getting location:", error);
       Alert.alert(
-        isVi ? "Lỗi" : "Error", 
+        isVi ? "Lỗi" : "Error",
         isVi ? "Không thể lấy vị trí hiện tại. Vui lòng thử lại." : "Cannot get current location. Please try again."
       );
     } finally {
@@ -192,17 +195,9 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
   const handleConfirm = async () => {
     Keyboard.dismiss();
 
-    if (!formData.phoneNumber.trim()) {
-      Alert.alert(
-        isVi ? "Thiếu thông tin" : "Missing Info", 
-        isVi ? "Vui lòng nhập Số điện thoại để chủ thú cưng có thể liên hệ." : "Please enter your Phone number so the pet owner can contact you."
-      );
-      return;
-    }
-
     if (!location) {
       Alert.alert(
-        isVi ? "Thiếu vị trí" : "Missing Location", 
+        isVi ? "Thiếu vị trí" : "Missing Location",
         isVi ? "Đang tải vị trí hoặc không thể lấy vị trí của bạn." : "Fetching location or cannot get your location."
       );
       return;
@@ -262,7 +257,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
     } catch (error) {
       console.error(isVi ? "Lỗi upload ảnh R2:" : "Error uploading to R2:", error);
       Alert.alert(
-        isVi ? "Lỗi" : "Error", 
+        isVi ? "Lỗi" : "Error",
         isVi ? "Không thể tải ảnh lên hệ thống lưu trữ. Vui lòng thử lại." : "Failed to upload photos to storage. Please try again."
       );
     } finally {
@@ -380,7 +375,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                   {/* SLIDER RADIUS */}
                   <View className="px-12">
                     {(() => {
-                      const percent = ((radius - 100) / 4900) * 100;
+                      const percent = ((radius - MIN_RADIUS) / (MAX_RADIUS - MIN_RADIUS)) * 100;
                       return (
                         <View style={{ height: 40, justifyContent: 'center', position: 'relative' }}>
                           <LinearGradient
@@ -391,7 +386,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                           <View style={{ position: 'absolute', right: 0, width: `${100 - percent}%`, height: 2, backgroundColor: '#E5E7EB', borderRadius: 1 }} />
                           <Slider
                             value={radius}
-                            minimumValue={100} maximumValue={2000} step={100}
+                            minimumValue={MIN_RADIUS} maximumValue={MAX_RADIUS} step={RADIUS_STEP}
                             onValueChange={handleSliderChange}
                             minimumTrackTintColor="transparent" maximumTrackTintColor="transparent"
                             trackStyle={{ height: 2, backgroundColor: 'transparent' }}
@@ -411,7 +406,7 @@ export default function LostModeShareModal({ isVisible, onClose, onConfirm }: Lo
                       <Image className='mr-3 top-1' source={require('../assets/icon/phone-gray.png')} style={{ width: 15, height: 15 }} resizeMode="cover" />
                       <View className='flex-row border-b border-gray-300 w-full pt-2 pb-1'>
                         <Text className="text-[14px] font-medium text-black">
-                          {isVi ? 'Số điện thoại' : 'Phone Number'}<Text className="text-[#EF4444]"> *</Text>
+                          {isVi ? 'Số điện thoại' : 'Phone Number'}<Text className="text-[#EF4444]"></Text>
                         </Text>
                         <TextInput
                           placeholder="0123456789"

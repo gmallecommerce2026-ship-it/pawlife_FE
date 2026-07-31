@@ -790,7 +790,7 @@ export default function ShelterProfileScreen() {
               style={{
                 paddingHorizontal: 20,
                 columnGap: 13,
-                rowGap: 16
+                rowGap: 16,
               }}
             >
               {filteredPets.length > 0 ? (

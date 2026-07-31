@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { openWebLink } from '@/utils/browser';
 
 // Component hỗ trợ render các mục có gạch đầu dòng với UI căn lề thẳng tắp
 const BulletPoint = ({ title, text }: { title?: string; text: string }) => (
@@ -25,7 +26,7 @@ export default function TermsOfServiceScreen() {
 
   const handleOpenWebTerms = () => {
     // Bạn có thể thay đổi link Notion này thành link Terms of Service thực tế của bạn
-    Linking.openURL('https://elfin-pajama-4bb.notion.site/I-U-KHO-N-D-CH-V-PAWLIFE-36c6c8475df6802d9157e559e3eb422c?pvs=73');
+    openWebLink('https://elfin-pajama-4bb.notion.site/I-U-KHO-N-D-CH-V-PAWLIFE-36c6c8475df6802d9157e559e3eb422c?pvs=73');
   };
   
   return (

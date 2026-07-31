@@ -17,6 +17,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, Dimensions, Image, ImageSourcePropType, InteractionManager, LayoutAnimation, Modal, Platform, ScrollView, Switch, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { petService } from '../services/petService';
+import axiosClient from '@/api/axiosClient';
 
 // Kích hoạt LayoutAnimation cho Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -769,8 +770,8 @@ export default function PetProfileDetailScreen() {
     );
   }
 
-  const displayContactPhone = petData.contactPhone || ownerInfo.phone || 'not updated';
-  const displayContactAddress = petData.contactAddress || ownerInfo.address || 'not updated';
+  const displayContactPhone = petData.contactPhone || 'not updated';
+  const displayContactAddress = petData.contactAddress || 'not updated';
   const activeTag = petData?.tags?.find((tag: any) => tag.status === 'ACTIVE') || petData?.tags?.[0];
   const tagId = activeTag?.id;
   const displayId = tagId?.substring(0, 8).toUpperCase()

@@ -2,6 +2,7 @@
 import { Text } from '@/components/AppText';
 import { AuthContext } from '@/contexts/AuthContext';
 // import { useInfiniteSlider } from '@/hooks/useInfiniteSlider'; 
+import AdoptionNoticePopup from '@/components/AdoptionNoticePopup';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalizedData } from '@/hooks/useLocalizedData';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -280,6 +281,19 @@ export default function HomeScreen() {
             return Array.isArray(responseData) ? responseData : [];
         }
     });
+    const { data: latestStory, isLoading: isStoryLoading } = useQuery({
+        queryKey: ['stories-latest'],
+        queryFn: async () => {
+            const res = await axiosClient.get('/stories');
+            const list = res?.data?.data || res?.data || res || [];
+            const stories = Array.isArray(list) ? list : [];
+            if (stories.length === 0) return null;
+            // Backend trả về sắp xếp theo `date` tăng dần (asc) — lấy câu chuyện
+            // cuối cùng (mới nhất theo ngày) để hiển thị preview trên Home.
+            return stories[stories.length - 1];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
     // Đổi logic loading: Tách riêng initialLoading để phục vụ hiển thị UI mượt
     const [hasUnread, setHasUnread] = useState(false);
     const bounceY = useSharedValue(0);
@@ -399,9 +413,9 @@ export default function HomeScreen() {
                 }
             };
             checkUnreadNotifications();
-        }, [isLocationLoaded, location, user?.id, isPetsLoading, isSheltersLoading])
+            queryClient.invalidateQueries({ queryKey: ['stories-latest'] });
+        }, [isLocationLoaded, location, user?.id, isPetsLoading, isSheltersLoading, queryClient])
     );
-
 
     useEffect(() => {
         // 1. Xử lý xóa Pet bị chặn ngay lập tức khỏi UI
@@ -442,12 +456,17 @@ export default function HomeScreen() {
             queryClient.refetchQueries({ queryKey: ['search-shelters'], type: 'all' });
         });
 
+        const storiesUpdatedSub = DeviceEventEmitter.addListener('STORIES_UPDATED', () => {
+            queryClient.invalidateQueries({ queryKey: ['stories-latest'] });
+        });
+
 
         return () => {
             petBlockedSub.remove();
             petHiddenSub.remove();
             shelterBlockedSub.remove();
             unblockSub.remove();
+            storiesUpdatedSub.remove();
         };
     }, [location?.lat, location?.lng, queryClient]);
 
@@ -678,7 +697,7 @@ export default function HomeScreen() {
                         </View>
 
                         {/* --- UPCOMING EVENTS TỪ API --- */}
-                        <View className="mt-[38px] mb-6">
+                        <View className="mt-[38px]">
                             <SectionHeader title="Upcoming Events" onLinkPress={() => router.push({ pathname: '/search', params: { type: 'Event' } })} t={t} />
 
                             {/* Sửa biến check loading thành isEventsLoading và upcomingEvents */}
@@ -725,6 +744,60 @@ export default function HomeScreen() {
                                     })}
                                 </ScrollView>
                             )}
+                        </View>
+
+                        <View className="mt-[38px] mb-8">
+                            <SectionHeader
+                                title="Forever Stories"
+                                onLinkPress={() => router.push('/forever-stories')}
+                                t={t}
+                            />
+
+                            <View className="px-[21px]">
+                                {isStoryLoading ? (
+                                    <SectionLoader />
+                                ) : !latestStory ? (
+                                    <Text className="text-center text-gray-400 mt-2 mb-4">
+                                        {isVi ? 'Chưa có câu chuyện nào' : 'No stories yet'}
+                                    </Text>
+                                ) : (
+                                    <TouchableOpacity
+                                        activeOpacity={0.85}
+                                        onPress={() => router.push('/forever-stories')}
+                                        className="bg-white rounded-[24px] p-[21px]"
+                                        style={{
+                                            shadowColor: '#E89B5A',
+                                            shadowOffset: { width: 3, height: 3 },
+                                            shadowOpacity: 0.25,
+                                            shadowRadius: 4,
+                                            elevation: 6
+                                        }}
+                                    >
+                                        {/* Header Card */}
+                                        <View className="flex-row items-center mb-[12px]">
+                                            <Image
+                                                source={{ uri: latestStory.avatar || 'https://i.pravatar.cc/150?img=47' }}
+                                                className="w-12 h-12 rounded-full bg-gray-100"
+                                            />
+                                            <View className="ml-3 flex-1">
+                                                <Text className="text-[14px] font-medium text-black" numberOfLines={1}>
+                                                    {l(latestStory.title) || (isVi ? 'Chưa có tên' : 'Unnamed')}
+                                                </Text>
+                                                <Text className="text-[12px] text-[#8E8E93] italic mt-0.5" numberOfLines={1}>
+                                                    {l(latestStory.subtitle)}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Image Content */}
+                                        <Image
+                                            source={{ uri: latestStory.images?.[0] || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=600&auto=format&fit=crop' }}
+                                            className="w-full h-[200px] rounded-[16px] bg-gray-100"
+                                            resizeMode="cover"
+                                        />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         </View>
                     </LinearGradient>
                 </View>
@@ -799,6 +872,7 @@ export default function HomeScreen() {
 
                 <View className="absolute bottom-0 w-full bg-[#FFFFFF] rounded-t-[60px]" style={{ height: CURVE_HEIGHT - 5, zIndex: 0 }} pointerEvents="none" />
             </Animated.View>
+            <AdoptionNoticePopup />
         </View>
     );
 }

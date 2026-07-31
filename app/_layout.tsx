@@ -39,11 +39,36 @@ import Toast from 'react-native-toast-message';
 import { SuccessModal } from '../components/SuccessModal';
 // BỔ SUNG: Import React Query
 import IncomingTransferModal from '@/components/IncomingTransferModal';
+import { DatePickerProvider } from '@/contexts/GlobalDatePickerContext'; // 🚀 THÊM MỚI
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ResizeMode, Video } from 'expo-av';
 export { ErrorBoundary } from 'expo-router';
+import { LocaleConfig } from 'react-native-calendars';
 
+LocaleConfig.locales['vi'] = {
+  monthNames: [
+    'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+    'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+  ],
+  monthNamesShort: ['Th.1', 'Th.2', 'Th.3', 'Th.4', 'Th.5', 'Th.6', 'Th.7', 'Th.8', 'Th.9', 'Th.10', 'Th.11', 'Th.12'],
+  dayNames: ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'],
+  dayNamesShort: ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'],
+  today: 'Hôm nay',
+};
+
+LocaleConfig.locales['en'] = {
+  monthNames: [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ],
+  monthNamesShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  dayNames: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  dayNamesShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  today: 'Today',
+};
+
+LocaleConfig.defaultLocale = 'vi';
 SplashScreen.preventAutoHideAsync();
 
 const overrideDefaultFont = () => {
@@ -170,7 +195,13 @@ function RootLayoutNavGuard() {
         router.replace('/'); // Đổi sang replace
       }
     } else {
-      const isProfileIncomplete = !user?.phone || !user?.dob || !user?.gender;
+      // 🌟 FIX Apple 5.1.1(v): Gender/DOB/Phone không còn là điều kiện bắt buộc để coi
+      // hồ sơ là "hoàn tất". Chỉ coi hồ sơ chưa hoàn tất nếu thiếu Tên (Name) — vì đây
+      // là thông tin tối thiểu cần có để hiển thị trong app (ví dụ social login đôi khi
+      // trả về tên rỗng). Việc này cũng tránh vòng lặp redirect: trước đây nếu user để
+      // trống Gender/DOB/Phone (giờ đã optional) thì guard này sẽ liên tục ép quay lại
+      // màn complete-social-profile dù updateUser() đã thành công.
+      const isProfileIncomplete = !user?.name || !user.name.trim();
 
       if (isProfileIncomplete) {
         if (!inCompleteProfileScreen) {
@@ -332,52 +363,58 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
-      <QueryClientProvider client={queryClient}>
+      {/* 🚀 THÊM MỚI: Bọc DatePickerProvider NGOÀI CÙNG, ngay dưới GestureHandlerRootView,
+          để overlay <DateTimePicker inline> chung của toàn app luôn phủ đúng full-screen
+          và hiển thị trên mọi Stack.Screen bất kể đang ở màn nào */}
+      <DatePickerProvider>
+        <QueryClientProvider client={queryClient}>
 
-        {/* QUAN TRỌNG: Đưa LoadingProvider lên TRƯỚC AppProvider và AuthProvider */}
-        <LoadingProvider>
-          <AppProvider>
-            <AuthProvider>
-              <LanguageProvider>
+          {/* QUAN TRỌNG: Đưa LoadingProvider lên TRƯỚC AppProvider và AuthProvider */}
+          <LoadingProvider>
+            <AppProvider>
+              <AuthProvider>
+                <LanguageProvider>
 
-                <RootLayoutNavGuard />
-                <GlobalOverlay />
+                  <RootLayoutNavGuard />
+                  <GlobalOverlay />
 
-                {/* OVERLAY VIDEO SPLASH */}
-                {/* <>
-                  {!isVideoFinished && (
-                    <Animated.View
-                      style={[
-                        StyleSheet.absoluteFill,
-                        { opacity: fadeAnim, zIndex: 9999, elevation: 9999, backgroundColor: '#000' }
-                      ]}
-                    >
-                      <Video
-                        source={require('../assets/video/splash.mp4')}
-                        style={StyleSheet.absoluteFill}
-                        resizeMode={ResizeMode.COVER}
-                        shouldPlay={true}
-                        isLooping={false}
-                        isMuted={true}
-                        onPlaybackStatusUpdate={(status) => {
-                          if (status.isLoaded && status.didJustFinish) {
-                            handleVideoFinish();
-                          }
-                        }}
-                      />
-                    </Animated.View>
-                  )}
-                </> */}
-                <IncomingTransferModal />
-              </LanguageProvider>
-            </AuthProvider>
-          </AppProvider>
-        </LoadingProvider>
+                  {/* OVERLAY VIDEO SPLASH */}
+                  {/* <>
+                    {!isVideoFinished && (
+                      <Animated.View
+                        style={[
+                          StyleSheet.absoluteFill,
+                          { opacity: fadeAnim, zIndex: 9999, elevation: 9999, backgroundColor: '#000' }
+                        ]}
+                      >
+                        <Video
+                          source={require('../assets/video/splash.mp4')}
+                          style={StyleSheet.absoluteFill}
+                          resizeMode={ResizeMode.COVER}
+                          shouldPlay={true}
+                          isLooping={false}
+                          isMuted={true}
+                          onPlaybackStatusUpdate={(status) => {
+                            if (status.isLoaded && status.didJustFinish) {
+                              handleVideoFinish();
+                            }
+                          }}
+                        />
+                      </Animated.View>
+                    )}
+                  </> */}
+                  <IncomingTransferModal />
+                </LanguageProvider>
+              </AuthProvider>
+            </AppProvider>
+          </LoadingProvider>
 
-      </QueryClientProvider>
+        </QueryClientProvider>
+      </DatePickerProvider>
     </GestureHandlerRootView>
   );
 }
+
 
 // ------------------------------------------------------------------
 // Component Stack cấu hình các màn hình
@@ -413,6 +450,7 @@ function RootLayoutNav() {
       <Stack.Screen name="faq" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="privacy-policy" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="terms-of-service" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <Stack.Screen name="forever-stories" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="verify-otp" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="followed-shelters" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="interested-events" options={{ headerShown: false, animation: 'slide_from_right' }} />

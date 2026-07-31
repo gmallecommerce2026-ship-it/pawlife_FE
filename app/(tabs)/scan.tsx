@@ -6,11 +6,12 @@ import { useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { CheckCircle, ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   StyleSheet,
@@ -38,7 +39,6 @@ export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
 
   const [scanned, setScanned] = useState(false);
-  const [scanSuccess, setScanSuccess] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -56,8 +56,6 @@ export default function ScanScreen() {
 
   // Animations
   const laserAnim = useRef(new Animated.Value(0)).current;
-  const successScaleAnim = useRef(new Animated.Value(0)).current;
-  const successOpacityAnim = useRef(new Animated.Value(0)).current;
 
   // FIX TỐI ƯU HIỆU NĂNG: Delay việc mount Camera 200ms để animation chuyển màn hình được mượt mà 100%
   useEffect(() => {
@@ -71,7 +69,7 @@ export default function ScanScreen() {
   }, [isFocused, permission?.granted]);
 
   useEffect(() => {
-    if (!scanSuccess && isFocused && isCameraReady) {
+    if (isFocused && isCameraReady) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(laserAnim, {
@@ -91,10 +89,10 @@ export default function ScanScreen() {
     } else {
       laserAnim.stopAnimation();
     }
-  }, [scanSuccess, laserAnim, isFocused, isCameraReady]);
+  }, [laserAnim, isFocused, isCameraReady]);
 
   const handleBarCodeScanned = ({ type, data, bounds }: any) => {
-    if (scanned || scanSuccess) return;
+    if (scanned) return;
 
     if (bounds) {
       const { origin, size } = bounds;
@@ -120,47 +118,36 @@ export default function ScanScreen() {
   };
 
   const processValidScan = (data: string) => {
-      setScanned(true);
-      setScanSuccess(true);
+    setScanned(true);
 
-      // --- BẮT ĐẦU: LÀM SẠCH VÀ BÓC TÁCH ID TỐI ƯU ---
-      // 1. Trị lỗi bàn phím iOS: Đổi tất cả các loại gạch ngang dài (en-dash, em-dash...) thành dấu gạch ngang chuẩn ASCII (-)
-      let safeData = data.replace(/[\u2012\u2013\u2014\u2015\u2212]/g, '-');
-      let finalTagId = safeData;
+    // --- BẮT ĐẦU: LÀM SẠCH VÀ BÓC TÁCH ID TỐI ƯU ---
+    let safeData = data.replace(/[\u2012\u2013\u2014\u2015\u2212]/g, '-');
+    let finalTagId = safeData;
 
-      const pltMatch = safeData.match(/(PLT-\d+)/i);
-      const tagMatch = safeData.match(/\/tag\/([a-zA-Z0-9-_]+)/) || safeData.match(/pawlife:\/\/tag\/([a-zA-Z0-9-_]+)/);
-      const r2Match = safeData.match(/\/qr-codes\/([a-zA-Z0-9-_]+)\.svg/i);
+    const pltMatch = safeData.match(/(PLT-\d+)/i);
+    const tagMatch = safeData.match(/\/tag\/([a-zA-Z0-9-_]+)/) || safeData.match(/pawlife:\/\/tag\/([a-zA-Z0-9-_]+)/);
+    const r2Match = safeData.match(/\/qr-codes\/([a-zA-Z0-9-_]+)\.svg/i);
 
-      if (pltMatch && pltMatch[1]) {
-        finalTagId = pltMatch[1];
-      } else if (tagMatch && tagMatch[1]) {
-        finalTagId = tagMatch[1];
-      } else if (r2Match && r2Match[1]) {
-        finalTagId = r2Match[1];
-      }
+    if (pltMatch && pltMatch[1]) {
+      finalTagId = pltMatch[1];
+    } else if (tagMatch && tagMatch[1]) {
+      finalTagId = tagMatch[1];
+    } else if (r2Match && r2Match[1]) {
+      finalTagId = r2Match[1];
+    }
 
-      // 2. Làm sạch tuyệt đối: Xóa BỎ TOÀN BỘ các ký tự ẩn (zero-width), dấu cách thừa, 
-      // Chỉ giữ lại đúng chữ cái (a-z), số (0-9) và dấu gạch ngang (-). Cuối cùng ép viết HOA.
-      finalTagId = finalTagId.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase();
+    finalTagId = finalTagId.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase();
 
-      console.log("🚀 Mã ID (Đã làm sạch tuyệt đối):", `"${finalTagId}"`);
-      // --- KẾT THÚC ĐOẠN LÀM SẠCH ---
+    console.log("🚀 Mã ID (Đã làm sạch tuyệt đối):", `"${finalTagId}"`);
+    // --- KẾT THÚC ĐOẠN LÀM SẠCH ---
 
-      Animated.parallel([
-        Animated.spring(successScaleAnim, { toValue: 1, friction: 4, tension: 50, useNativeDriver: true }),
-        Animated.timing(successOpacityAnim, { toValue: 1, duration: 200, useNativeDriver: true })
-      ]).start(async () => {
-
+    (async () => {
       // LUỒNG 1: THÊM PET MỚI
       if (isAddingPet) {
-        setTimeout(() => {
-          router.replace({
-            pathname: '/add-pet',
-            params: { tagId: finalTagId, rawQrData: data }
-          });
-          resetCamera();
-        }, 800);
+        router.replace({
+          pathname: '/add-pet',
+          params: { tagId: finalTagId, rawQrData: data }
+        });
       }
 
       // LUỒNG 2: GÁN QR CHO PET CHƯA CÓ
@@ -172,7 +159,6 @@ export default function ScanScreen() {
             message: t('QR code successfully assigned to the pet!'),
             buttonText: t('View QR'),
             onConfirm: () => {
-              resetCamera();
               router.replace(`/view-qr-code?id=${linkPetId}`);
             }
           });
@@ -192,7 +178,6 @@ export default function ScanScreen() {
             message: t("Great! The pet's collar has been replaced with the new QR code."),
             buttonText: t('View New QR'),
             onConfirm: () => {
-              resetCamera();
               router.replace(`/view-qr-code?id=${replacePetId}`);
             }
           });
@@ -203,24 +188,12 @@ export default function ScanScreen() {
 
       // LUỒNG 4: QUÉT PET LẠC BÌNH THƯỜNG
       else {
-        setTimeout(() => {
-          router.replace({
-            pathname: '/scanned-pet',
-            params: { tagId: finalTagId }
-          });
-          resetCamera();
-        }, 800);
+        router.replace({
+          pathname: '/scanned-pet',
+          params: { tagId: finalTagId }
+        });
       }
-    });
-  };
-
-  const resetCamera = () => {
-    setTimeout(() => {
-      setScanned(false);
-      setScanSuccess(false);
-      successScaleAnim.setValue(0);
-      successOpacityAnim.setValue(0);
-    }, 500);
+    })();
   };
 
   const handleScanError = (error: any) => {
@@ -228,7 +201,7 @@ export default function ScanScreen() {
       title: t('Error'),
       message: error.response?.data?.message || error.message || t("Invalid QR code or already in use!"),
       buttonText: t('Try Again'),
-      onConfirm: () => resetCamera()
+      onConfirm: () => { }
     });
   };
 
@@ -237,8 +210,15 @@ export default function ScanScreen() {
     return <View style={StyleSheet.absoluteFillObject} className="bg-black" />;
   }
 
-  // YÊU CẦU QUYỀN CAMERA (Đã đồng bộ màu sắc với app và có dịch)
+  // ==========================================
+  // 🌟 FIX 5.1.1(iv): Yêu cầu quyền Camera
+  // - Nút không còn dùng chữ "Grant Camera Access" (ngụ ý đang tự cấp quyền) mà đổi thành "Continue"/"Tiếp tục".
+  // - Nếu người dùng đã từ chối trước đó (canAskAgain === false), gọi lại requestPermission() sẽ không có tác dụng
+  //   (hệ điều hành không hiện popup lần 2) nên phải dẫn thẳng qua Settings.
+  // ==========================================
   if (!permission.granted) {
+    const canAskAgain = permission.canAskAgain;
+
     return (
       <View className="flex-1 bg-black items-center justify-center px-6">
         <StatusBar style="light" />
@@ -247,10 +227,17 @@ export default function ScanScreen() {
         </View>
         <Text className="text-white text-[18px] font-semibold mb-2 text-center">{t('Camera Access Required')}</Text>
         <Text className="text-gray-400 mb-8 text-center text-[15px] leading-6 px-4">
-          {t('Need to grant camera access to scan QR code.')}
+          {canAskAgain
+            ? t('Need to grant camera access to scan QR code.')
+            : t('Camera access was denied. Please enable it in Settings to scan QR codes.')}
         </Text>
-        <TouchableOpacity className="bg-[#E89B5A] py-[16px] px-10 rounded-full w-full items-center active:opacity-80" onPress={requestPermission}>
-          <Text className="text-white font-bold text-[16px]">{t('Grant Camera Access')}</Text>
+        <TouchableOpacity
+          className="bg-[#E89B5A] py-[16px] px-10 rounded-full w-full items-center active:opacity-80"
+          onPress={canAskAgain ? requestPermission : () => Linking.openSettings()}
+        >
+          <Text className="text-white font-bold text-[16px]">
+            {canAskAgain ? t('Continue') : t('Open Settings')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity className="mt-6 py-2 px-6" onPress={() => router.back()}>
           <Text className="text-gray-500 font-medium text-[15px]">{t('Cancel')}</Text>
@@ -335,26 +322,10 @@ export default function ScanScreen() {
           <View className="absolute bottom-0 right-0 w-16 h-16 border-b-[4px] border-r-[4px] border-[#E89B5A] rounded-br-[24px]" />
 
           {/* Animation Laser / Success */}
-          {!scanSuccess ? (
-            <Animated.View
-              style={{ transform: [{ translateY: laserAnim }] }}
-              className="absolute top-0 w-full h-[2px] bg-[#E89B5A] shadow-lg shadow-orange-400 opacity-90"
-            />
-          ) : (
-            <Animated.View
-              style={{
-                transform: [{ scale: successScaleAnim }],
-                opacity: successOpacityAnim,
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <View className="bg-[#22c55e]/20 p-4 rounded-full">
-                <CheckCircle size={80} color="#22c55e" />
-              </View>
-            </Animated.View>
-          )}
+          <Animated.View
+            style={{ transform: [{ translateY: laserAnim }] }}
+            className="absolute top-0 w-full h-[2px] bg-[#E89B5A] shadow-lg shadow-orange-400 opacity-90"
+          />
         </View>
 
         {/* Text hướng dẫn */}
@@ -365,7 +336,7 @@ export default function ScanScreen() {
         </View>
       </View>
       {/* THÊM MỚI: Nút nhập mã thủ công */}
-      <View style={{ position: 'absolute', top: boxY + BOX_SIZE + 100, left: 0, right: 0, alignItems: 'center' }}>
+      {/* <View style={{ position: 'absolute', top: boxY + BOX_SIZE + 100, left: 0, right: 0, alignItems: 'center' }}>
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={() => setShowInputModal(true)}
@@ -374,7 +345,7 @@ export default function ScanScreen() {
           <Feather name="edit-2" size={16} color={"#ffffff"} />
           <Text className="text-white font-medium text-[15px]">{t('Enter Code Manually')}</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
       {/* --- LỚP 4: HEADER VỚI CÁC NÚT ĐIỀU HƯỚNG --- */}
       <SafeAreaView pointerEvents="box-none" className="absolute top-0 w-full z-30">
         <View pointerEvents="box-none" className="flex-row items-center justify-between px-6 pt-2 relative">

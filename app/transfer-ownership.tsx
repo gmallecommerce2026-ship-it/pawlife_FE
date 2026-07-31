@@ -180,10 +180,14 @@ export default function TransferOwnershipScreen() {
   };
 
   const handleConfirmTransfer = async () => {
-
     setIsSubmitting(true);
     try {
-      await axiosClient.post(`/pets/transfer-confirm/${petInfo.transferRequestId}`);
+      const res = await axiosClient.post(`/pets/transfer-confirm/${petInfo.transferRequestId}`);
+      const updatedPet = res.data.pet; // 🔧
+
+      setPetInfo((prev: any) => ({ ...prev, ...updatedPet }));
+      setOwnerInfo(updatedPet?.owner); // 🔧 điền Owner Information ngay
+
       setIsSubmitting(false);
       router.push({
         pathname: '/(tabs)/my-pets',
@@ -192,7 +196,7 @@ export default function TransferOwnershipScreen() {
     } catch (error: any) {
       Alert.alert(isVi ? 'Lỗi' : 'Error', error.response?.data?.message || (isVi ? 'Không thể xác nhận chuyển nhượng lúc này.' : 'The transfer cannot be confirmed at this time.'));
       setIsSubmitting(false);
-      setIsPending(false)
+      setIsPending(false);
     }
   };
 

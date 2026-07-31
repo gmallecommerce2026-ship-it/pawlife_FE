@@ -1,9 +1,8 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useRef, useState } from 'react';
+
 import {
   Alert,
   Animated,
@@ -13,14 +12,16 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StyleSheet,
   Switch,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Text } from './AppText';
 import { TextInput } from './AppTextInput';
+import CalendarPopupField from './CalendarPopupField';
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 function buildBilingual(sourceText: string): { vi: string; en: string } {
   const trimmed = sourceText?.trim() || '';
   return { vi: trimmed, en: trimmed };
@@ -194,7 +195,6 @@ export default function AddMedicalRecordModal({
   // resolveSpeciesKey luôn trả về đúng 'Dog' | 'Cat', không bao giờ undefined.
   const safeSpecies = resolveSpeciesKey(species);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   // Lưu giá trị GỐC của nextDueName/nextDueDate lúc mở modal (chỉ dùng ở view mode)
   // để so sánh và biết người dùng có thực sự thay đổi gì không → quyết định hiện/ẩn nút Update.
   const originalNextDueRef = useRef<{ name: string; date: Date | null }>({ name: '', date: null });
@@ -203,7 +203,6 @@ export default function AddMedicalRecordModal({
 
   const [recordName, setRecordName] = useState('');
   const [recordDate, setRecordDate] = useState(new Date());
-  const [showRecordDatePicker, setShowRecordDatePicker] = useState(false);
   // images: có thể là local file:// uri (ảnh mới chọn) hoặc http(s) url (ảnh cũ đã upload)
   const [images, setImages] = useState<string[]>([]);
 
@@ -211,15 +210,39 @@ export default function AddMedicalRecordModal({
   const [showVaccineDropdown, setShowVaccineDropdown] = useState(false);
   const [doseNumber, setDoseNumber] = useState<1 | 2 | 3>(1);
 
+
   const [hasNextDueDate, setHasNextDueDate] = useState(false);
   const [nextDueName, setNextDueName] = useState('');
   const [nextDueDate, setNextDueDate] = useState(new Date());
-  const [showNextDatePicker, setShowNextDatePicker] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
   const imageScrollRef = useRef<ScrollView>(null);
-  // Trong view mode: true khi người dùng thực sự đổi nextDueName hoặc nextDueDate
-  // so với giá trị gốc lúc mở modal. Dùng để quyết định hiện/ẩn nút "Cập nhật Next Due".
+  const [activeDatePicker, setActiveDatePicker] = useState<'record' | 'next' | null>(null);
+
+  // 🚀 THAY ĐỔI: không còn dùng <Modal> để bọc component này nữa, nên không
+  // cần "claim" quyền host qua registerModalHost — GlobalDatePickerContext ở
+  // root luôn là nơi DUY NHẤT render DateTimePicker native, không có 2 native
+  // window nào tranh chấp nhau nữa.
+
+
+  // 🚀 THAY ĐỔI: giữ component mount thêm một khoảng ngắn sau khi visible=false
+  // để animation đóng (backdropOpacity) có thời gian chạy mượt trước khi thực
+  // sự gỡ nội dung ra khỏi cây view.
+  const [shouldRender, setShouldRender] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+    } else {
+      const timer = setTimeout(() => setShouldRender(false), 250);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+
+
+
+
   const hasNextDueChanged = isViewMode && (() => {
     const original = originalNextDueRef.current;
     const originalHasNextDue = !!original.date;
@@ -248,51 +271,7 @@ export default function AddMedicalRecordModal({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   // --- STATE VÀ REF CHO DROPDOWN KÍNH MỜ ---
-  const recordDateRef = useRef<View>(null);
-  const nextDateRef = useRef<View>(null);
 
-  const [activePicker, setActivePicker] = useState<'record' | 'next' | null>(null);
-  const [pickerLayout, setPickerLayout] = useState({ x: 0, y: 0, width: 340 });
-  const pickerOpacity = useRef(new Animated.Value(0)).current;
-  const pickerTranslateY = useRef(new Animated.Value(-8)).current;
-
-  const openDropdownPicker = (type: 'record' | 'next') => {
-    // Nếu đang có picker khác mở, đóng nó trước rồi mới mở picker mới,
-    // tránh đổi value/onChange giữa lúc native view đang animate.
-    if (activePicker && activePicker !== type) {
-      closeDropdownPicker(() => openDropdownPicker(type));
-      return;
-    }
-
-    const ref = type === 'record' ? recordDateRef : nextDateRef;
-    ref.current?.measureInWindow((x, y, width, height) => {
-      const dropdownWidth = 340;
-      const finalX = (SCREEN_WIDTH - dropdownWidth) / 2;
-
-      setPickerLayout({ x: finalX, y: y + height + 8, width: dropdownWidth });
-      setActivePicker(type);
-
-      pickerOpacity.setValue(0);
-      pickerTranslateY.setValue(-8);
-
-      Animated.parallel([
-        Animated.timing(pickerOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(pickerTranslateY, { toValue: 0, duration: 250, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true })
-      ]).start();
-    });
-  };
-
-  const closeDropdownPicker = (onDone?: () => void) => {
-    Animated.parallel([
-      Animated.timing(pickerOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(pickerTranslateY, { toValue: -8, duration: 150, useNativeDriver: true })
-    ]).start(() => {
-      setActivePicker(null);
-      onDone?.();
-    });
-  };
-
-  // ------------------------------------------
 
   const optionHeights = useRef(
     RECORD_OPTIONS.reduce<Record<string, Animated.Value>>((acc, opt) => {
@@ -301,8 +280,6 @@ export default function AddMedicalRecordModal({
     }, {})
   ).current;
 
-  // Auto-tính nextDueDate/nextDueName cho vaccine — CHỈ áp dụng khi đang tạo mới
-  // hoặc khi user tự đổi vaccine/dose trong lúc edit (không chạy ngay sau khi prefill)
   // Auto-tính nextDueDate/nextDueName cho vaccine — CHỈ áp dụng khi đang tạo mới
   // hoặc khi user tự đổi vaccine/dose trong lúc edit (không chạy ngay sau khi prefill)
   useEffect(() => {
@@ -526,13 +503,13 @@ export default function AddMedicalRecordModal({
       animateTo(backdropOpacity, 1, 220).start();
     } else {
       backdropOpacity.setValue(0);
-      setActivePicker(null);
     }
   }, [visible, isEditMode, isViewMode, initialRecord]);
 
   const handleClose = () => {
     onClose();
   };
+
 
   const handleUploadPhotos = async () => {
     const remainingSlots = 3 - images.length;
@@ -619,9 +596,26 @@ export default function AddMedicalRecordModal({
     handleClose();
   };
 
+
+  // 🚀 THAY ĐỔI CỐT LÕI: không còn <Modal transparent animationType="none">
+  // bọc ngoài nữa. Thay bằng 1 View overlay tuyệt đối phủ toàn màn hình,
+  // KHÔNG tạo native window/UIViewController mới — nhờ đó DateTimePicker của
+  // GlobalDatePickerContext (cũng render tuyệt đối ở root) không bao giờ phải
+  // di chuyển qua lại giữa các window khác nhau, loại bỏ hoàn toàn nguồn gốc
+  // gây crash native khi mở/đóng modal này lồng nhau với DOB picker.
+  if (!shouldRender) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+    <View
+      pointerEvents={visible ? 'auto' : 'none'}
+      style={[
+        StyleSheet.absoluteFillObject,
+        { zIndex: 9999, elevation: 9999 }, // 🚀 FIX: đảm bảo luôn nằm trên mọi header/z-10 khác trong screen
+      ]}
+
+    >
       <Animated.View style={{ opacity: backdropOpacity }} className="absolute inset-0 bg-black/50" />
+
 
       <View className="flex-1 justify-center items-center px-4">
         <Animated.View
@@ -743,20 +737,19 @@ export default function AddMedicalRecordModal({
                       )}
                     </View>
 
-                    <View style={{ flex: 1 }} ref={recordDateRef} collapsable={false}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (isReadOnly) return;
-                          Platform.OS === 'ios' ? openDropdownPicker('record') : setShowRecordDatePicker(true);
-                        }}
-                        activeOpacity={isReadOnly ? 1 : 0.7}
-                        disabled={isReadOnly}
-                        className={`h-[36px] border border-[#E5E5E5] rounded-[12px] px-1 justify-center items-center ${isReadOnly ? 'bg-[#F9FAFB]' : 'bg-white'}`}
-                      >
-                        <Text className={`text-[14px] font-regular text-center ${isReadOnly ? 'text-[#6B7280]' : 'text-black'}`} numberOfLines={1} adjustsFontSizeToFit>
-                          {formatShortDate(recordDate, isVi)}
-                        </Text>
-                      </TouchableOpacity>
+                    <View style={{ flex: 1 }} >
+                      <View style={{ flex: 1 }}>
+                        <TouchableOpacity
+                          onPress={() => !isReadOnly && setActiveDatePicker('record')}
+                          activeOpacity={isReadOnly ? 1 : 0.7}
+                          disabled={isReadOnly}
+                          className={`h-[36px] border border-[#E5E5E5] rounded-[12px] px-1 justify-center items-center ${isReadOnly ? 'bg-[#F9FAFB]' : 'bg-white'}`}
+                        >
+                          <Text className={`text-[14px] font-regular text-center ${isReadOnly ? 'text-[#6B7280]' : 'text-black'}`} numberOfLines={1} adjustsFontSizeToFit>
+                            {formatShortDate(recordDate, isVi)}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
 
@@ -927,9 +920,9 @@ export default function AddMedicalRecordModal({
                               />
                             </View>
 
-                            <View style={{ flex: 1 }} ref={nextDateRef} collapsable={false}>
+                            <View style={{ flex: 1 }}>
                               <TouchableOpacity
-                                onPress={() => Platform.OS === 'ios' ? openDropdownPicker('next') : setShowNextDatePicker(true)}
+                                onPress={() => setActiveDatePicker('next')}
                                 className="h-[36px] border border-[#E5E5E5] rounded-[12px] px-1 justify-center items-center bg-white"
                               >
                                 <Text className="text-[14px] font-regular text-black text-center" numberOfLines={1} adjustsFontSizeToFit>
@@ -937,9 +930,11 @@ export default function AddMedicalRecordModal({
                                 </Text>
                               </TouchableOpacity>
                             </View>
+
                           </View>
                         )}
                       </Animated.View>
+
                     </>
                   )}
                 </>
@@ -990,87 +985,24 @@ export default function AddMedicalRecordModal({
         </Animated.View>
       </View>
 
-      {/* --- KÍNH MỜ DROPDOWN FIX CHIỀU CAO VÀ MÀU CAM (IOS) --- */}
-      {Platform.OS === 'ios' && activePicker && (
-        <View className="absolute inset-0 z-[100]">
-          <TouchableOpacity activeOpacity={1} className="absolute inset-0" onPress={() => closeDropdownPicker()} />
+      <CalendarPopupField
+        visible={activeDatePicker !== null}
+        title={
+          activeDatePicker === 'record'
+            ? (isVi ? 'Chọn ngày ghi nhận' : 'Select Record Date')
+            : (isVi ? 'Chọn ngày hẹn tiếp theo' : 'Select Next Due Date')
+        }
+        value={activeDatePicker === 'record' ? recordDate : nextDueDate}
+        minDate={activeDatePicker === 'next' ? (nextDueDate < new Date() ? nextDueDate : new Date()) : undefined}
+        isVi={isVi}
+        onChange={(d) => {
+          if (activeDatePicker === 'record') setRecordDate(d);
+          else setNextDueDate(d);
+          setActiveDatePicker(null);
+        }}
+        onRequestClose={() => setActiveDatePicker(null)}
+      />
 
-          <Animated.View
-            style={{
-              position: 'absolute',
-              top: pickerLayout.y,
-              left: pickerLayout.x,
-              width: pickerLayout.width,
-              opacity: pickerOpacity,
-              transform: [{ translateY: pickerTranslateY }],
-              borderRadius: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.25,
-              shadowRadius: 16,
-              elevation: 10,
-              overflow: 'hidden'
-            }}
-          >
-            <BlurView tint="dark" intensity={65} style={{ position: 'absolute', inset: 0 }} />
-            <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(15, 15, 15, 0.45)' }} />
-
-            <View className="flex-row justify-between items-center px-[16px] py-[12px] border-b border-white/10 relative z-10">
-              <TouchableOpacity onPress={() => closeDropdownPicker()}>
-                <Text className="text-[16px] text-[#A1A1AA] font-medium">{isVi ? 'Huỷ' : 'Cancel'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => closeDropdownPicker()}>
-                <Text className="text-[16px] font-semibold text-[#E89B5A]">{isVi ? 'Xong' : 'Done'}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ paddingTop: 4, paddingBottom: 4, paddingHorizontal: 10, alignItems: 'center' }} className="relative z-10">
-              <DateTimePicker
-                key={activePicker}
-                value={activePicker === 'record' ? recordDate : nextDueDate}
-                mode="date"
-                display="inline"
-                themeVariant="dark"
-                locale={isVi ? "vi-VN" : "en-US"}
-                minimumDate={activePicker === 'next' ? new Date() : undefined}
-                style={{ width: 320, height: 315, alignSelf: 'center' }}
-                accentColor="#E89B5A"
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) {
-                    if (activePicker === 'record') setRecordDate(selectedDate);
-                    if (activePicker === 'next') setNextDueDate(selectedDate);
-                  }
-                }}
-              />
-            </View>
-          </Animated.View>
-        </View>
-      )}
-
-      {/* --- ANDROID CHUẨN GỐC --- */}
-      {Platform.OS === 'android' && showRecordDatePicker && (
-        <DateTimePicker
-          value={recordDate}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowRecordDatePicker(false);
-            if (event.type === 'set' && selectedDate) setRecordDate(selectedDate);
-          }}
-        />
-      )}
-      {Platform.OS === 'android' && showNextDatePicker && (
-        <DateTimePicker
-          value={nextDueDate}
-          mode="date"
-          minimumDate={new Date()}
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowNextDatePicker(false);
-            if (event.type === 'set' && selectedDate) setNextDueDate(selectedDate);
-          }}
-        />
-      )}
       <Modal
         visible={imageViewerVisible}
         transparent
@@ -1161,7 +1093,6 @@ export default function AddMedicalRecordModal({
           )}
         </View>
       </Modal>
-    </Modal>
-
+    </View>
   );
 }

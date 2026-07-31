@@ -25,6 +25,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MIN_RADIUS = 100;
+const MAX_RADIUS = 2000;
+const RADIUS_STEP = 100;
 
 // Yêu cầu 1: Trên iOS, không ép Google Maps SDK (rất tốn RAM/OpenGL context).
 // Để provider = undefined -> RN Maps tự dùng MKMapView (Apple Maps) native, nhẹ và ổn định hơn nhiều.
@@ -431,7 +434,7 @@ export default function SelectLocationMapScreen() {
 
           <View className="">
             {(() => {
-              const percent = ((radius - 100) / 4900) * 100;
+              const percent = ((radius - MIN_RADIUS) / (MAX_RADIUS - MIN_RADIUS)) * 100;
               return (
                 <View style={{ height: 40, justifyContent: 'center', position: 'relative' }}>
                   <LinearGradient
@@ -453,9 +456,9 @@ export default function SelectLocationMapScreen() {
 
                   <Slider
                     value={radius}
-                    minimumValue={100}
-                    maximumValue={2000}
-                    step={100}
+                    minimumValue={MIN_RADIUS}
+                    maximumValue={MAX_RADIUS}
+                    step={RADIUS_STEP}
                     onValueChange={(val) => setRadius(Array.isArray(val) ? val[0] : val)}
                     minimumTrackTintColor="transparent"
                     maximumTrackTintColor="transparent"

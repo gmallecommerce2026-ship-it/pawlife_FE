@@ -372,7 +372,7 @@ export default function ReportLostPetScreen() {
   const isPhotosUploading = photos.some((p: any) => p.uploading);
 
   const isFormValid =
-    location && dateTime && details && ownerName && ownerPhone && ownerAddress && !isPhotosUploading;
+    location && dateTime && details && ownerName && !isPhotosUploading;
 
   const handleAddPhoto = async () => {
     const remainingSlots = 5 - photos.length;
@@ -926,11 +926,20 @@ export default function ReportLostPetScreen() {
                     <View className='flex-row py-[13px] mx-4 items-center'>
                       <Image source={require('../assets/icon/location-form.png')} style={{ width: 14, height: 14 }} resizeMode="cover" />
                       <Text className="text-[14px] font-medium text-[#8E8E93] px-2">{isVi ? 'Địa chỉ' : 'Address'}</Text>
-                      <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 items-end justify-center">
+                      <TouchableOpacity onPress={() => setShowAddressPopup(true)} className="flex-1 flex-row items-center justify-end">
                         <Text className={`font-regular text-[12px] text-right tracking-[0.06px] ${ownerAddress ? 'text-black' : 'text-[#9CA3AF]'}`} numberOfLines={1}>
                           {ownerAddress || (isVi ? "Nhấn để chọn địa chỉ..." : "Tap to select address...")}
                         </Text>
                       </TouchableOpacity>
+                      {!!ownerAddress && (
+                        <TouchableOpacity
+                          onPress={() => setOwnerAddress('')}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          className="ml-2"
+                        >
+                          <Feather name="x-circle" size={14} color="#9CA3AF" />
+                        </TouchableOpacity>
+                      )}
                     </View>
 
                   </View>

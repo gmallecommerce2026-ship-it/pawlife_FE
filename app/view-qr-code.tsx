@@ -38,6 +38,7 @@ import Svg, {
 } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
 import { petService } from '../services/petService';
+import { openWebLink } from '@/utils/browser';
 
 const { width } = Dimensions.get('window');
 const QR_SIZE = Math.min(width * 0.45, 170);
@@ -399,7 +400,7 @@ export default function ViewQrCode() {
         throw new Error('Cannot open URL');
       }
 
-      await Linking.openURL(downloadUrl);
+      await openWebLink(downloadUrl);
 
     } catch (error) {
       console.error('[handleAddToWallet] Error:', error);

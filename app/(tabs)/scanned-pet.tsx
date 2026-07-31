@@ -166,7 +166,6 @@ export default function ScannedPetScreen() {
   const [hasReported, setHasReported] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReportVisible, setIsReportVisible] = useState(false);
-  const [shelterData, setShelterData] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isContactModalVisible, setIsContactModalVisible] = useState(false);
   const [isViewerVisible, setIsViewerVisible] = useState(false);
@@ -282,7 +281,6 @@ export default function ScannedPetScreen() {
 
           const petData = response.data;
 
-          setShelterData(petData.owner);
           setPet(petData);
 
         } catch (error: any) {
@@ -414,9 +412,9 @@ export default function ScannedPetScreen() {
   const displayAge = calculateAgeDisplay(rawDob);
 
   const displayOwnerName = pet?.lostInfo?.ownerName || pet?.ownerName || pet?.owner?.name || (isVi ? 'Không rõ chủ nhân' : 'Unknown Owner');
-  const displayOwnerPhone = pet?.lostInfo?.ownerPhone || pet?.ownerPhone || pet?.owner?.phone || null;
-  const displayOwnerAddress = pet?.lostInfo?.ownerAddress || pet?.ownerAddress || pet?.owner?.address || (isVi ? 'Chưa cung cấp địa chỉ' : 'No address provided');
-
+  const displayOwnerPhone = pet?.owner?.phone || null;
+  const displayOwnerAddress = pet?.owner?.address || (isVi ? 'Chưa cung cấp địa chỉ' : 'No address provided');
+  
   // SỬA Ở ĐÂY: Xử lý an toàn cho note (phòng trường hợp BE trả về object đa ngôn ngữ {vi, en})
   const rawNote = pet?.lostInfo?.note || pet?.note;
   const displayNote = rawNote
@@ -663,23 +661,21 @@ export default function ScannedPetScreen() {
                       </View>
                     </View>
 
-                    {displayOwnerPhone && (
-                      <View className="flex-row gap-4 pb-[12.15px]">
-                        <View className="justify-center mb-5 bottom-1">
-                          <Image
-                            source={require('../../assets/icon/phone.png')}
-                            style={{ width: 16, height: 16 }}
-                            resizeMode="cover"
-                          />
-                        </View>
-                        <View className="flex-1 justify-center">
-                          <Text className="text-[#AB5C1A] text-[16px] font-semibold  leading-[16px] mb-[7px]">
-                            {isVi ? 'Số điện thoại' : 'Phone Number'}
-                          </Text>
-                          <Text className="text-[#8E8E93] text-[14px] font-regular mt leading-[16px]">{displayOwnerPhone}</Text>
-                        </View>
+                    <View className="flex-row gap-4 pb-[12.15px]">
+                      <View className="justify-center mb-5 bottom-1">
+                        <Image
+                          source={require('../../assets/icon/phone.png')}
+                          style={{ width: 16, height: 16 }}
+                          resizeMode="cover"
+                        />
                       </View>
-                    )}
+                      <View className="flex-1 justify-center">
+                        <Text className="text-[#AB5C1A] text-[16px] font-semibold  leading-[16px] mb-[7px]">
+                          {isVi ? 'Số điện thoại' : 'Phone Number'}
+                        </Text>
+                        <Text className="text-[#8E8E93] text-[14px] font-regular mt leading-[16px]">{displayOwnerPhone ? displayOwnerPhone : "No phone provided"}</Text>
+                      </View>
+                    </View>
 
                     <View className="flex-row gap-4 pb-[12.15px]">
                       <View className="justify-center mb-5 bottom-1">
@@ -778,19 +774,21 @@ export default function ScannedPetScreen() {
             ) : isLost ? (
               // UX CHO NGƯỜI LẠ KHI PET BỊ MẤT
               <View className="gap-3">
-                <TouchableOpacity
-                  onPress={() => setIsContactModalVisible(true)}
-                  className="w-full bg-[#E89B5A] py-4 rounded-2xl flex-row justify-center items-center"
-                >
-                  <Image
-                    source={require('../../assets/icon/phone-white.png')}
-                    style={{ width: 16, height: 16 }}
-                    resizeMode="cover"
-                  />
-                  <Text className="text-white font-semibold text-[16px] ml-2">
-                    {isVi ? 'Liên hệ chủ nhân' : 'Contact Owner'}
-                  </Text>
-                </TouchableOpacity>
+                {!!displayOwnerPhone && (
+                  <TouchableOpacity
+                    onPress={() => setIsContactModalVisible(true)}
+                    className="w-full bg-[#E89B5A] py-4 rounded-2xl flex-row justify-center items-center"
+                  >
+                    <Image
+                      source={require('../../assets/icon/phone-white.png')}
+                      style={{ width: 16, height: 16 }}
+                      resizeMode="cover"
+                    />
+                    <Text className="text-white font-semibold text-[16px] ml-2">
+                      {isVi ? 'Liên hệ chủ nhân' : 'Contact Owner'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
                 {!hasReported && (
                   <TouchableOpacity
@@ -840,11 +838,16 @@ export default function ScannedPetScreen() {
         initialIndex={viewerIndex}
         onClose={() => setIsViewerVisible(false)}
       />
-      {shelterData && (
+      {!!displayOwnerPhone && (
         <ShelterContactModal
           isVisible={isContactModalVisible}
           onClose={() => setIsContactModalVisible(false)}
-          shelterData={shelterData}
+          shelterData={{
+            name: displayOwnerName,
+            phone: displayOwnerPhone,
+            avatarUrl: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(displayOwnerName) + '&background=E89B5A&color=fff',
+            note: displayNote,
+          }}
         />
       )}
 

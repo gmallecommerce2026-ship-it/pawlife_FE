@@ -47,13 +47,20 @@ const GENDER_OPTIONS = [
   { label: 'Other', value: 'OTHER' },
 ];
 
+// 🌟 Label hỗ trợ hiển thị "(Không bắt buộc)" cạnh nhãn field
+const OptionalLabel = ({ text, isVi }: { text: string; isVi: boolean }) => (
+  <Text className="text-[16px] font-medium text-black mb-[6px]">
+    {text} <Text className="text-gray-400 text-[13px] font-regular">{isVi ? '(Không bắt buộc)' : '(Optional)'}</Text>
+  </Text>
+);
+
 const InputField = ({
   label, placeholder, value, onChangeText,
   secureTextEntry, autoCapitalize = 'none', keyboardType = 'default',
-  error, onPress, containerStyle = 'mb-[12px]'
+  error, onPress, containerStyle = 'mb-[12px]', renderLabel
 }: any) => (
   <View className={containerStyle}>
-    {label && <Text className="text-[16px] font-medium text-black mb-[6px]">{label}</Text>}
+    {renderLabel ? renderLabel : (label && <Text className="text-[16px] font-medium text-black mb-[6px]">{label}</Text>)}
     <TouchableOpacity
       activeOpacity={onPress ? 0.7 : 1}
       onPress={onPress}
@@ -189,27 +196,47 @@ export default function CompleteSocialProfileScreen() {
     }
   };
 
+  // ==========================================
+  // 🌟 FIX 5.1.1(v): Gender / DOB / Phone không còn bắt buộc.
+  // Chỉ giữ Tên (Name) là bắt buộc — Apple không liệt kê Tên trong danh sách reject.
+  // ==========================================
   const handleSave = async () => {
-    if (!name || !phone || !gender) {
-      Alert.alert(isVi ? 'Lỗi': 'Error', isVi ? 'Vui lòng điền đầy đủ các thông tin bắt buộc.' : 'Please fill in all the required fields.');
+    if (!name.trim()) {
+      Alert.alert(isVi ? 'Lỗi' : 'Error', isVi ? 'Vui lòng nhập tên của bạn.' : 'Please enter your name.');
       return;
     }
 
     try {
       setIsLoading(true);
-      const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
-      const fullPhone = phone.includes('+') ? phone : `${selectedCountry.dial_code}${formattedPhone}`;
+
+      // Chỉ format & gửi số điện thoại nếu người dùng có nhập
+      let fullPhone: string | undefined = undefined;
+      if (phone.trim()) {
+        const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
+        fullPhone = phone.includes('+') ? phone : `${selectedCountry.dial_code}${formattedPhone}`;
+      }
+
       const DEFAULT_AVATAR_URL = 'https://pub-35c6d59c9e96467b9783df2a4e890a09.r2.dev/default-avatar.jpg';
 
       await updateUser({
         name,
-        phone: fullPhone,
-        gender,
-        dob: dob.toISOString(),
+        // Không gửi field nếu người dùng bỏ trống — để backend giữ giá trị cũ / null
+        ...(fullPhone ? { phone: fullPhone } : {}),
+        ...(gender ? { gender } : {}),
+        ...(hasSelectedDate ? { dob: dob.toISOString() } : {}),
         avatarUrl: avatar || DEFAULT_AVATAR_URL || '/assets/images/default-avatar.jpg',
       });
 
-      Alert.alert(isVi ? 'Thành công' : 'Success', isVi ? 'Hồ sơ đã được cập nhật!' : 'The profile has been updated!');
+      Alert.alert(
+        isVi ? 'Thành công' : 'Success',
+        isVi ? 'Hồ sơ đã được cập nhật!' : 'The profile has been updated!',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(tabs)'),
+          },
+        ]
+      );
     } catch (error: any) {
       Alert.alert(isVi ? 'Lỗi' : 'Error', error.response?.data?.message || (isVi ? 'Có lỗi xảy ra khi lưu thông tin.' : 'An error occurred while saving the information.'));
     } finally {
@@ -270,19 +297,19 @@ export default function CompleteSocialProfileScreen() {
 
               {/* Inputs */}
               <InputField
-                label={isVi ? "Tên" :"Your Name"}
+                label={isVi ? "Tên" : "Your Name"}
                 placeholder={isVi ? "Nhập tên của bạn" : "Enter your name"}
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
               />
 
-              {/* Gender & DOB Row Layout */}
+              {/* Gender & DOB Row Layout — 🌟 Đã gắn nhãn "(Không bắt buộc)" */}
               <View className="flex-row justify-between mb-5">
                 <View className="flex-1 mr-2">
                   <InputField
-                    label="Gender"
-                    placeholder={isVi ? "Chọn giới tính" :"Select Gender"}
+                    renderLabel={<OptionalLabel text={isVi ? "Giới tính" : "Gender"} isVi={isVi} />}
+                    placeholder={isVi ? "Chọn giới tính" : "Select Gender"}
                     value={getGenderLabel()}
                     onPress={() => setShowGenderModal(true)}
                     containerStyle=""
@@ -291,7 +318,7 @@ export default function CompleteSocialProfileScreen() {
 
                 <View className="flex-1 ml-2" ref={dobRef} collapsable={false}>
                   <InputField
-                    label={isVi ? "Ngày sinh" : "Date of Birth"}
+                    renderLabel={<OptionalLabel text={isVi ? "Ngày sinh" : "Date of Birth"} isVi={isVi} />}
                     placeholder={isVi ? "Chọn ngày" : "Select DOB"}
                     value={hasSelectedDate ? dob.toLocaleDateString('en-GB') : ''}
                     onPress={() => Platform.OS === 'ios' ? openDropdownPicker('dob') : setShowPicker(true)}
@@ -300,9 +327,9 @@ export default function CompleteSocialProfileScreen() {
                 </View>
               </View>
 
-              {/* Phone Number Layout */}
+              {/* Phone Number Layout — 🌟 Đã gắn nhãn "(Không bắt buộc)" */}
               <View className="mb-8">
-                <Text className="text-[16px] font-medium text-gray-900 mb-2">Phone Number</Text>
+                <OptionalLabel text={isVi ? "Số điện thoại" : "Phone Number"} isVi={isVi} />
                 <View className="flex-row gap-3">
                   <TouchableOpacity
                     onPress={() => setShowCountryModal(true)}

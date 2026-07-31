@@ -228,15 +228,39 @@ export default function AccountSecurityScreen() {
           onPress: async () => {
             try {
               setIsDeleting(true);
+
+              // 1. Gọi API xóa tài khoản
               await axiosClient.delete('/auth/account');
-              if (logout) await logout();
-              Alert.alert(t("Success"), t("Your account has been permanently deleted."));
-              router.push('/');
-            } catch (error) {
-              console.error("Delete Error:", error);
-              Alert.alert(t("Error"), t("Failed to delete account. Please try again later."));
-            } finally {
+
+              // 2. Tắt trạng thái loading ngay khi API thành công
               setIsDeleting(false);
+
+              // 3. Hiển thị thông báo thành công TRƯỚC
+              Alert.alert(
+                t("Success"),
+                t("Your account has been permanently deleted."),
+                [
+                  {
+                    text: "OK",
+                    onPress: async () => {
+                      // 4. Chỉ logout và chuyển trang SAU KHI user đã đọc và bấm OK
+                      if (logout) {
+                        await logout();
+                      }
+                      // Dùng replace để ngăn user bấm nút Back quay lại trang settings
+                      router.replace('/');
+                    }
+                  }
+                ]
+              );
+
+            } catch (error: any) {
+              console.error("Delete Error:", error);
+              setIsDeleting(false); // Đảm bảo tắt loading khi có lỗi
+
+              // Lấy message lỗi chi tiết từ backend (nếu có)
+              const errorMessage = error.response?.data?.message || t("Failed to delete account. Please try again later.");
+              Alert.alert(t("Error"), errorMessage);
             }
           }
         }

@@ -1343,10 +1343,7 @@ export default function TagReportDetailScreen() {
   const displayContactPhone = pet.contactPhone || ownerInfo.phone || 'N/A';
   const displayContactAddress = pet.contactAddress || ownerInfo.address || (isVi ? 'Địa chỉ không cung cấp' : 'Address not provided');
   const displayNote =
-    reportData?.details ||
     reportData?.message ||
-    pet?.lostDetails ||
-    pet?.note ||
     (isVi ? "Xin hãy liên hệ với tôi sớm nhất có thể" : "Please contact me ASAP");
   const petImage =
     pet.images?.[0]?.url ||
@@ -1794,19 +1791,26 @@ export default function TagReportDetailScreen() {
                         resizeMode="cover"
                       />
                       <Text className="text-[10px] text-[#8E8E93] underline tracking-[0.06px]">
-                        {isVi ? 'Nhận dạng' : 'Identification'}
+                        {isVi ? 'Chỉnh sửa' : 'Edit pet'}
                       </Text>
                     </View>
                   </TouchableOpacity>
                 </View>
 
                 {/* Hàng 2: Tuổi và Giống */}
-                <Text className="text-[12px] text-[#757575] font-regular">
+                <Text className="text-[12px] text-[#757575] font-regular mb-2">
                   {getAge(pet.dob)} • {breedText || (isVi ? 'Chưa rõ giống' : 'Unknown breed')}
                 </Text>
-
+                {
+                  lostDetailsText ? <Text className="mb-[10px] text-[12px] text-[#8E8E93] font-regular w-full">
+                    {isVi ? "Nhận dạng: " : "Identification: "} {lostDetailsText}
+                  </Text> : ""
+                }
               </View>
+
             </View>
+
+
           </Animated.View>
         </BottomSheetView>
 

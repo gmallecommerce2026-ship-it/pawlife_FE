@@ -16,6 +16,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -24,6 +25,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useModalStore } from '../store/useModalStore';
+import { openWebLink } from '@/utils/browser';
 
 // --- DATA CONSTANTS ---
 const HOUSING_TYPES_EN = [
@@ -477,13 +479,14 @@ export default function AdoptionFormScreen() {
       Alert.alert(isVi ? 'Lỗi' : 'Error', isVi ? 'Không tìm thấy thông tin thú cưng.' : 'Pet information not found.');
       return;
     }
-    if (!fullName || !phone || !zalo || !location) {
+    if (!fullName) {
       Alert.alert(
         isVi ? 'Thiếu thông tin' : 'Missing information',
-        isVi ? 'Vui lòng điền đầy đủ thông tin liên lạc và địa chỉ cư trú.' : 'Please fill in all contact and address fields.'
+        isVi ? 'Vui lòng nhập họ và tên.' : 'Please enter your full name.'
       );
       return;
     }
+
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
@@ -516,8 +519,12 @@ export default function AdoptionFormScreen() {
           : 'Thanks for your application. We will review it and contact you soon. Please keep your phone available!',
         buttonText: isVi ? 'Quay lại' : 'Back',
         onConfirm: () => {
-          router.dismissAll();
-          router.push({ pathname: '/(tabs)/matching', params: { returnFromSuccess: '1' } });
+          setTimeout(() => {
+            router.navigate({
+              pathname: '/my-applications',
+              params: { returnFromSuccess: '1' }
+            });
+          }, 300);
         }
       });
     } catch (error: any) {
@@ -702,10 +709,16 @@ export default function AdoptionFormScreen() {
             <Label text={isVi ? 'Họ và tên' : 'Full Name'} required />
             <CustomInput value={fullName} onChangeText={handleNameChange} />
 
-            <Label text={isVi ? 'Số điện thoại' : 'Phone Number'} required />
+            <Label text={isVi ? 'Số điện thoại' : 'Phone Number'} />
+            <AdviceText text={isVi
+              ? 'Dùng để trung tâm liên hệ xác nhận và trao đổi về đơn nhận nuôi của bạn.'
+              : 'Used by the shelter to contact you regarding your adoption application.'} />
             <CustomInput value={phone} onChangeText={handlePhoneChange} keyboardType="phone-pad" isPristine={isPhonePristine} />
 
-            <Label text={isVi ? 'Số Zalo/WhatsApp' : 'Zalo/WhatsApp number'} required />
+            <Label text={isVi ? 'Số Zalo/WhatsApp' : 'Zalo/WhatsApp number'} />
+            <AdviceText text={isVi
+              ? 'Chỉ dùng để liên lạc nhanh, không dùng cho mục đích quảng cáo.'
+              : 'Used only for direct contact, never for advertising purposes.'} />
             <CustomInput value={zalo} onChangeText={handleZaloChange} keyboardType="phone-pad" isPristine={isZaloPristine} />
 
             <Label
@@ -719,7 +732,7 @@ export default function AdoptionFormScreen() {
             {/* SECTION B */}
             <SectionTitle title={isVi ? 'Mục B – Điều kiện sinh sống' : 'Section B – Living Conditions'} />
 
-            <Label text={isVi ? 'Thú cưng sẽ ở đâu?' : 'Where will your pet stay?'} required />
+            <Label text={isVi ? 'Thú cưng sẽ ở đâu?' : 'Where will your pet stay?'} />
             <TouchableOpacity
               onPress={() => setShowAddressPopup(true)}
               className="w-full bg-white border border-gray-200 rounded-2xl h-14 px-4 flex-row items-center justify-between"
@@ -835,8 +848,23 @@ export default function AdoptionFormScreen() {
             <Label text={isVi
               ? 'Bạn có sẵn sàng cung cấp thông tin CCCD và địa chỉ chính xác nơi thú cưng sẽ được nuôi giữ không?'
               : 'Are you willing to provide your ID details and exact address where the pet will be kept?'} required />
-            <OptionGroup options={yesNo} selected={provideID} onSelect={setProvideID} />
+            <AdviceText text={isVi
+              ? 'CCCD chỉ dùng để xác minh danh tính người nhận nuôi trước khi bàn giao thú cưng, không lưu trữ công khai.'
+              : "ID details are used solely to verify the adopter's identity before handover and are never made public."} />
 
+            <OptionGroup options={yesNo} selected={provideID} onSelect={setProvideID} />
+            <Text className="text-gray-400 text-[12px] leading-4 mt-3 mb-1">
+              {isVi
+                ? 'Thông tin bạn cung cấp được PawLife sử dụng để xét duyệt đơn nhận nuôi và liên hệ với bạn. Xem '
+                : 'Information you provide is used by PawLife to review your application and contact you. See '}
+              <Text
+                className="text-[#E89B5A] font-semibold"
+                onPress={() => openWebLink('https://elfin-pajama-4bb.notion.site/CH-NH-S-CH-B-O-M-T-PAWLIFE-36c6c8475df680fa8064e7ebf82d0933')}
+              >
+                {isVi ? 'Chính sách quyền riêng tư' : 'Privacy Policy'}
+              </Text>
+              {isVi ? '.' : '.'}
+            </Text>
             {/* SUBMIT */}
             <View className="flex-row items-center mt-[50px] mb-[21px]">
               <TouchableOpacity onPress={() => setIsAgreed(!isAgreed)} className="mr-3" activeOpacity={0.7}>

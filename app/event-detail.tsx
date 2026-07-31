@@ -17,6 +17,7 @@ import { useEngagementStore } from '../store/useEngagementStore';
 // BỔ SUNG: Import React Query
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalizedData } from '@/hooks/useLocalizedData';
+import { openWebLink } from '@/utils/browser';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ReportIssueModal from '../components/ReportIssueModal';
 
@@ -341,7 +342,7 @@ export default function EventDetailScreen() {
                 await Linking.openURL(url);
             } else {
                 // Mở trình duyệt Web (Safari/Chrome) an toàn qua chuẩn HTTPS
-                await Linking.openURL(fallbackUrl);
+                await openWebLink(fallbackUrl);
             }
         } catch (error) {
             console.warn(isVi ? "Lỗi khi mở bản đồ: " : "Error opening map: ", error);
@@ -687,7 +688,10 @@ export default function EventDetailScreen() {
                         {eventData.images && eventData.images.length > 0 && (
                             <View className="mb-8">
                                 <Text className="text-[16px] font-medium text-black mb-[20px]">Photo Gallery</Text>
-                                <View className="flex-row justify-between">
+                                <View
+                                    className="flex-row flex-wrap"
+                                    style={{ justifyContent: 'flex-start', gap: '4%' }} // 👈 thay justify-between
+                                >
                                     {eventData.images.slice(0, 4).map((img: any, index: number) => {
                                         const isLastImage = index === 3;
                                         const remainingCount = eventData.images.length - 4;

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PawLife Beta",
-    "slug": "pawlife-beta",
+    "name": "PawLife",
+    "slug": "anpawlife",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -23,9 +23,17 @@
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "maps",
+          "comgooglemaps",
+          "maps",
           "comgooglemaps"
         ],
         "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
+          },
           {
             "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
           },
@@ -49,6 +57,16 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.annguyen.pawlife",
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -101,10 +119,12 @@
       ],
       "expo-asset",
       "expo-build-properties",
-      "@react-native-google-signin/google-signin",
-      {
-        "iosUrlScheme": "com.googleusercontent.apps.725064672703-l61bog4iims28n57sspk6hokcf1l86c7"
-      }
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.725064672703-l61bog4iims28n57sspk6hokcf1l86c7"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -112,15 +132,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "c621725d-be20-456a-9645-7073310e8c7e"
+        "projectId": "716ecc9a-6f9d-4f66-8e06-61537ad7faa3"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/c621725d-be20-456a-9645-7073310e8c7e"
+      "url": "https://u.expo.dev/716ecc9a-6f9d-4f66-8e06-61537ad7faa3"
     },
-    "owner": "petid.2026"
+    "owner": "annguyenthiens-team"
   }
 }
